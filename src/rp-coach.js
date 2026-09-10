@@ -143,6 +143,8 @@
       });
     }
 
+    if (RP.scorecardHTML) h += RP.scorecardHTML(RP.user.id, 'you');
+
     var inbox = RP.messages.filter(function (m) { return m.from_id === coach.id || m.to_id === coach.id; });
     h += '<div class="rp-lab" style="margin-top:16px">MESSAGES</div>';
     if (!inbox.length) h += '<div class="rp-empty" style="padding:6px 2px">Nothing yet.</div>';
@@ -277,7 +279,8 @@
       h += '<div class="rp-card" data-stu="' + esc(s.id) + '" style="cursor:pointer">' +
         '<div class="row" style="justify-content:space-between;align-items:center">' +
         '<div><div class="rp-ttl">' + esc(s.display_name) + '</div>' +
-        '<div class="rp-sub">' + open + ' open · ' + (mine.length - open) + ' done</div></div>' +
+        '<div class="rp-sub">' + open + ' open · ' + (mine.length - open) + ' done' +
+        (RP.scorecard ? ' · ' + RP.scorecard(s.id).daysThisWeek + '/7 days' : '') + '</div></div>' +
         '<div style="color:var(--ink-faint);font-size:20px">›</div></div></div>';
     });
     return h;
@@ -348,6 +351,8 @@
         '<button class="btn" data-drop="' + esc(a.id) + '" style="padding:6px 10px;font-size:11.5px">Drop</button>' +
         '</div></div>';
     });
+
+    if (RP.scorecardHTML) h += RP.scorecardHTML(s.id, 'them');
 
     h += '<div class="rp-lab" style="margin-top:18px">TAKES</div>';
     if (!takes.length) h += '<div class="rp-empty" style="padding:6px 2px">None sent yet.</div>';

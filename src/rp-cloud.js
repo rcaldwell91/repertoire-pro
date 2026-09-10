@@ -22,7 +22,7 @@
     students: [],           // a coach's students
     assignments: [],        // student: mine · coach: everything I set
     exercises: [],          // a coach's own set
-    takes: [], messages: [],
+    takes: [], messages: [], results: [],
     face: 'auto',           // 'auto' | 'student' — a coach can look at the student app
     err: ''
   };
@@ -300,11 +300,13 @@
       sb.from('coach_students').select('coach_id').eq('student_id', uid),
       sb.from('assignments').select('*').eq('student_id', uid).order('created_at', { ascending: false }),
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
-      sb.from('takes').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(50)
+      sb.from('takes').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(50),
+      sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300)
     ]).then(function (r) {
       RP.assignments = r[1].data || [];
       RP.messages = r[2].data || [];
       RP.takes = r[3].data || [];
+      RP.results = r[4].data || [];
       var link = (r[0].data || [])[0];
       if (!link) { RP.coach = null; return; }
       return sb.from('profiles').select('*').eq('id', link.coach_id).maybeSingle()
@@ -326,9 +328,11 @@
       RP.takes = r[3].data || [];
       RP.messages = r[4].data || [];
       var ids = (r[0].data || []).map(function (x) { return x.student_id; });
-      if (!ids.length) { RP.students = []; return; }
-      return sb.from('profiles').select('*').in('id', ids)
-        .then(function (p) { RP.students = p.data || []; });
+      if (!ids.length) { RP.students = []; RP.results = []; return; }
+      return Promise.all([
+        sb.from('profiles').select('*').in('id', ids),
+        sb.from('results').select('*').in('student_id', ids).order('created_at', { ascending: false }).limit(600)
+      ]).then(function (p) { RP.students = p[0].data || []; RP.results = p[1].data || []; });
     }).then(function () {
       if (!RP.exercises.length) return seedExercises(uid);
     });
@@ -378,6 +382,8 @@
         function () { refresh(); });
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
+      ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'results' },
+        function () { refresh(); });
     } else {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'student_id=eq.' + uid },
         function (p) { bump('assignment', p); });
@@ -406,6 +412,20 @@
       }
     });
   }
+
+  /* Everything the app measures comes through here. Signed out, nothing
+     leaves the phone — the app keeps its own local record as it always did. */
+  RP.logResult = function (row) {
+    try {
+      if (!RP.user || !RP.sb || !RP.profile) return;
+      var r = { student_id: RP.user.id, coach_id: RP.coach ? RP.coach.id : null };
+      Object.keys(row || {}).forEach(function (k) { if (row[k] != null) r[k] = row[k]; });
+      RP.sb.from('results').insert(r).then(function (x) {
+        if (x.error) return;
+        RP.results.unshift(r);
+      });
+    } catch (e) {}
+  };
 
   var refreshing = null;
   function refresh() {
@@ -444,7 +464,7 @@
         RP.user = session ? session.user : null;
         if (!RP.user) {
           RP.profile = null; RP.coach = null; RP.students = [];
-          RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = [];
+          RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];
           unsubscribe(); syncHeaderButton(); rerender();
           return;
         }
