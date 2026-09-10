@@ -11298,7 +11298,16 @@ renderJourney();
       '.rp-done{opacity:.55;}' +
       '.rp-tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.5px;' +
       'padding:2px 7px;border-radius:999px;background:var(--panel2);color:var(--ink-faint);margin-left:6px;}' +
-      '.rp-empty{font-size:12.5px;color:var(--ink-faint);line-height:1.5;padding:14px 2px;}';
+      '.rp-empty{font-size:12.5px;color:var(--ink-faint);line-height:1.5;padding:14px 2px;}' +
+      /* A coach brings his own colours. Ja Ronn: brown, gold and burnt orange,
+         off the That \'70s FLOW poster. Scoped to the coach\'s side of the tab
+         so the rest of the app keeps the Repertoire palette. */
+      '.rp-brand{--gold:#e0a94a;--gold-deep:#a9691f;--accent:#c1521d;}' +
+      '.rp-brand .rp-seg button.on{background:#c1521d;border-color:#c1521d;color:#fff;}' +
+      '.rp-brand .rp-card.hot{border-left-color:#e0a94a;}' +
+      '.rp-brand button.btn.primary{background:linear-gradient(135deg,#a9691f 0%,#c1521d 55%,#e0a94a 100%);color:#fff;}' +
+      '.rp-brandbar{height:4px;border-radius:3px;margin:2px 0 10px;' +
+        'background:linear-gradient(90deg,#6b3f1d 0%,#c1521d 48%,#e0a94a 100%);}';
     document.head.appendChild(s);
   })();
 
@@ -11346,7 +11355,8 @@ renderJourney();
     var open = mine.filter(function (a) { return !a.done_at; });
     var done = mine.filter(function (a) { return a.done_at; });
 
-    var h = '<div class="panel" style="margin-bottom:14px;border-left:3px solid var(--gold)">';
+    var h = '<div class="panel rp-brand" style="margin-bottom:14px;border-left:3px solid #e0a94a">' +
+      '<div class="rp-brandbar"></div>';
     if (!coach) {
       h += '<b style="font-size:15px">Your coach</b>' +
         '<div class="rp-empty">You are signed in as <b>' + esc(RP.profile.display_name) + '</b>. ' +
@@ -11466,7 +11476,8 @@ renderJourney();
     if (!host) return;
     var me = RP.profile;
 
-    var h = '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
+    var h = '<div class="rp-brandbar"></div>' +
+      '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
       '<div><h1 style="margin:0 0 2px">Coach</h1>' +
       '<div class="rp-sub" style="margin:0">' + esc(me.display_name) + ' · teaching</div></div>' +
       '<button class="btn" id="rpToStudent" style="padding:7px 11px;font-size:12px">My practice</button></div>';
@@ -11482,6 +11493,7 @@ renderJourney();
     else h += inbox();
 
     host.innerHTML = h;
+    host.classList.add('rp-brand');
 
     each(host, '[data-tab]', function (b) {
       on(b, 'click', function () { tab = b.dataset.tab; openStudent = null; renderTeacher(); });
@@ -11759,6 +11771,7 @@ renderJourney();
     orig.apply(this, arguments);
     var host = $('modeCoach');
     if (!host) return;
+    host.classList.remove('rp-brand');
     if (RP.user && RP.profile) {
       var d = document.createElement('div');
       d.id = 'rpChannel';
