@@ -212,31 +212,33 @@
   function ask() {
     if (step === 0) {
       sheet('<b style="font-size:18px">Before we start — two questions.</b>' +
-        '<div class="measured" style="margin-top:8px">So the app talks to you the right way. ' +
+        '<div class="measured" style="margin-top:8px">So the app pitches itself at the right level. ' +
         'There is no wrong answer and you can change both later.</div>' +
-        '<div class="rp-lab" style="margin-top:20px">HAVE YOU SUNG MUCH BEFORE?</div>' +
-        opt('exp', 1, 'Not really', 'Singing along in the car counts, but that is about it.') +
-        opt('exp', 2, 'A bit', 'A choir, a band, some lessons — somewhere in there.') +
-        opt('exp', 3, 'Quite a lot', 'You have been doing this a while.'));
+        '<div class="rp-lab" style="margin-top:20px">WHERE WOULD YOU PUT YOURSELF?</div>' +
+        opt('exp', 1, 'New', 'Never been taught any of this.') +
+        opt('exp', 1, 'Beginner', 'You sing, but you have never trained.') +
+        opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
+        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.'));
       wire('exp', function (v) { ME.experience = v; step = 1; ask(); });
     } else if (step === 1) {
-      sheet('<b style="font-size:18px">And music words?</b>' +
-        '<div class="measured" style="margin-top:8px">Things like <i>pitch</i>, <i>key</i>, ' +
-        '<i>semitone</i>, <i>the third</i>.</div>' +
+      sheet('<b style="font-size:18px">And the jargon?</b>' +
+        '<div class="measured" style="margin-top:8px">Every craft has its own words. Singing has ' +
+        '<i>pitch</i>, <i>key</i>, <i>semitone</i>, <i>the third</i>. How much of that do you want ' +
+        'thrown at you?</div>' +
         '<div class="rp-lab" style="margin-top:20px">WHICH IS CLOSEST?</div>' +
-        opt('w', 'plain', 'They lose me', 'I will keep it in plain English and explain any word you tap.') +
-        opt('w', 'some', 'I know some', 'Normal words, and anything unusual is one tap from an explanation.') +
-        opt('w', 'technical', 'I am comfortable', 'I will use the proper terms and not slow down for them.'));
+        opt('w', 'plain', 'Skip it', 'Plain English throughout, and any word you tap gets explained.') +
+        opt('w', 'some', 'Some of it', 'Normal words, and anything unusual is one tap from an explanation.') +
+        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.'));
       wire('w', function (v) { ME.words = v; step = 2; saveMe(); ask(); });
     } else {
       // say back what we heard, so it does not feel like a test with no result
       var e = ME.experience, w = ME.words;
       var line = (e === 1 ? 'Starting you on the beginner exercises'
                 : e === 2 ? 'Starting you on the beginner and intermediate exercises'
-                : 'All the exercises are open to you') +
-        (w === 'plain' ? ', in plain English, and every exercise says what it actually is before you tap it.'
-         : w === 'some' ? '. Tap any underlined word and I will explain it in one line.'
-         : ', with the proper terms.');
+                : 'Every exercise is open to you') +
+        (w === 'plain' ? ', in plain English, and each one says what it actually is before you tap it.'
+         : w === 'some' ? '. Tap any underlined word and you get one plain sentence back.'
+         : ', with the proper terms and no hand-holding.');
       sheet('<b style="font-size:18px">Got it.</b>' +
         '<div style="font-size:14px;line-height:1.55;margin-top:10px">' + esc(line) + '</div>' +
         '<div class="measured" style="margin-top:12px">You can change either answer any time — ' +
@@ -353,7 +355,7 @@
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">How I talk to you</div>' +
       '<div class="rp-sub">' + (plain() ? 'Plain English' : ME.words === 'some' ? 'Normal words, tap to explain' : 'Proper terms') +
-      ' · ' + (ME.experience === 1 ? 'new to singing' : ME.experience === 2 ? 'sung a bit' : 'sung a lot') + '</div></div>' +
+      ' · ' + (ME.experience === 1 ? 'beginner' : ME.experience === 2 ? 'intermediate' : 'experienced') + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', function () { ME.ask(0); });
     // only ever place it among this screen's own direct children

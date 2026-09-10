@@ -248,12 +248,24 @@
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
         '<div class="measured" style="margin-top:8px">Coaches are learners too — the student view gives you the AI coach for your own practice.</div>';
     }
+    if (RP.coach) {
+      h += '<div class="rp-card" style="margin-top:14px">' +
+        '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+        '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(RP.coach.display_name) + '\u2019s colours</div>' +
+        '<div class="rp-sub">Off by default. Repertoire looks like Repertoire unless you want their look.</div></div>' +
+        '<button class="btn' + (RP.useCoachColours ? ' primary' : '') + '" id="rpCoachCol" ' +
+        'style="padding:9px 14px;font-size:12.5px">' + (RP.useCoachColours ? 'On' : 'Off') + '</button></div></div>';
+    }
     h += '<button class="btn" id="rpOut" style="margin-top:16px;width:100%;padding:12px">Sign out</button>';
     h += '<button class="btn" id="rpX" style="margin-top:8px;width:100%;padding:11px">Close</button>';
     sheet(h);
     on($('rpX'), 'click', closeSheet);
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
+    on($('rpCoachCol'), 'click', function () {
+      RP.setCoachColours(!RP.useCoachColours);
+      openAccount();
+    });
     on($('rpBeCoach'), 'click', function () {
       var b = $('rpBeCoach');
       b.disabled = true; b.textContent = 'Switching it on…';
@@ -469,18 +481,32 @@
     if (!document.hidden && RP.user) refresh();
   });
 
-  /* Whose colours am I looking at? Mine if I teach, my coach's if I have one,
-     Repertoire's otherwise. Signed out is always Repertoire. */
+  /* Whose colours am I looking at?
+       · A coach sees his own brand. It is his app as much as anyone's.
+       · A student keeps REPERTOIRE unless they ask for their coach's look.
+         Robert: "I like our colours the way they are, I don't want them to
+         change." So this is off until someone turns it on, per person, per
+         phone — never done to them.
+     Signed out is always Repertoire. */
+  try { RP.useCoachColours = localStorage.getItem('rp_coachcolours') === '1'; } catch (e) {}
+
   function brand() {
     var t = 'repertoire';
     if (RP.profile && RP.profile.is_coach) t = RP.profile.theme || 'inflow';
-    else if (RP.coach) t = RP.coach.theme || 'inflow';
+    else if (RP.coach && RP.useCoachColours) t = RP.coach.theme || 'inflow';
     var b = document.body;
     ['inflow'].forEach(function (name) {
       b.classList.toggle('rp-brand-' + name, t === name);
     });
   }
   RP.brand = brand;
+
+  RP.setCoachColours = function (on) {
+    RP.useCoachColours = !!on;
+    try { localStorage.setItem('rp_coachcolours', on ? '1' : '0'); } catch (e) {}
+    brand();
+    rerender();
+  };
 
   function rerender() {
     brand();
