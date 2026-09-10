@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js; do node --check "$f"; done
+test -s src/rp-skin.css
 
 python3 - <<'PY'
 base = open('index.html', encoding='utf-8').read()
@@ -32,7 +33,7 @@ for anchor, replacement in PATCHES:
     assert n == 1, 'anchor found %d times, expected 1: %r' % (n, anchor[:60])
     base = base.replace(anchor, replacement, 1)
 
-mods = []
+mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
 for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \

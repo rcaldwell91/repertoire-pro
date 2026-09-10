@@ -1,0 +1,35 @@
+/* ======================================================================
+   Ja Ronn — brown, gold, burnt orange, off the That '70s FLOW poster.
+
+   This redefines the palette rather than restyling components, so every
+   panel, button and tab in v10.1 follows without being touched. The rules
+   the theme already set still hold: the glow belongs to live music, the
+   gradient belongs to the brand, everything else stays flat.
+
+   In tune / out of tune keep their own colours. They mean something, and a
+   singer has to read them at a glance — they are not decoration.
+   ====================================================================== */
+:root{
+  --bg:#120c07; --bg2:#1a110b; --panel:#1d150c; --panel2:#291d10; --line:#3b2a17;
+  --ink:#f7efe3; --ink-dim:#b49b7c; --ink-faint:#8a7258;
+  --gold:#e8b34a; --gold-deep:#c08a24;
+  --hit:#7bb352; --miss:#e2604f;
+  --accent:#d2601f; --accent2:#e8b34a; --pink:#a9451a;
+  --grad:linear-gradient(135deg,#6b3f1d 0%,#c1521d 52%,#e8b34a 100%);
+  --glow:0 0 22px rgba(210,96,31,.42);
+  --stage:#0d0805; --stage-line:rgba(255,236,210,.06);
+}
+body.light{
+  --bg:#f6efe4; --bg2:#efe3d3; --panel:#fffbf4; --panel2:#f2e7d6; --line:#e0d0b7;
+  --ink:#241a10; --ink-dim:#6d5a45; --ink-faint:#9a866d;
+  --gold:#a9781a; --gold-deep:#8a5f10;
+  --hit:#4a7f2b; --miss:#c0402f;
+  --accent:#b8501a; --accent2:#a9781a; --pink:#8f3d16;
+  --glow:0 4px 16px rgba(184,80,26,.24);
+  --stage:#fffbf4; --stage-line:rgba(36,26,16,.06);
+}
+
+/* the piano keys were the one place the old purple was written in by hand */
+.kbdkey.white.down{background:#f0dcb4;}
+.kbdkey.white.lit{background:linear-gradient(180deg,#e8b34a,#c1521d);}
+.kbdkey.black.lit{background:linear-gradient(180deg,#c1521d,#6b3f1d);}

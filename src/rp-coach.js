@@ -110,8 +110,15 @@
       '<div class="rp-brandbar"></div>';
     if (!coach) {
       h += '<b style="font-size:15px">Your coach</b>' +
-        '<div class="rp-empty">You are signed in as <b>' + esc(RP.profile.display_name) + '</b>. ' +
-        'No coach has added you yet. The moment one does, the week he sets shows up right here.</div>';
+        '<div class="rp-sub" style="margin-top:6px">Got a coach? Ask them for their code and put it in ' +
+        'here. Six letters and numbers.</div>' +
+        '<div class="row" style="margin-top:10px;gap:7px;flex-wrap:nowrap">' +
+        '<input id="rpCode" class="rp-inp" placeholder="ABC123" maxlength="6" autocapitalize="characters" ' +
+        'autocomplete="off" spellcheck="false" style="flex:1;letter-spacing:3px;font-weight:800;text-transform:uppercase">' +
+        '<button class="btn primary" id="rpCodeGo" style="padding:11px 15px">Join</button></div>' +
+        '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>' +
+        '<div class="measured" style="margin-top:10px">No coach? Everything below is yours anyway — the ' +
+        'app coaches you itself.</div>';
       h += '</div>';
       return h;
     }
@@ -180,6 +187,8 @@
           });
       });
     });
+    on($('rpCodeGo'), 'click', joinByCode);
+    on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
     on($('rpSendTake'), 'click', sendTakeSheet);
     on($('rpMsgGo'), 'click', function () {
       var i = $('rpMsgIn');
@@ -190,6 +199,25 @@
         .then(function (r) { r.error ? fail(r.error) : RP.refresh(); });
     });
     on($('rpMsgIn'), 'keydown', function (e) { if (e.key === 'Enter') $('rpMsgGo').click(); });
+  }
+
+  function joinByCode() {
+    var i = $('rpCode'), m = $('rpCodeMsg');
+    var code = (i.value || '').trim().toUpperCase();
+    if (code.length < 6) { m.textContent = 'It is six characters.'; m.style.color = 'var(--miss)'; return; }
+    m.textContent = 'Checking…'; m.style.color = 'var(--ink-dim)';
+    $('rpCodeGo').disabled = true;
+    RP.sb.rpc('join_with_code', { p_code: code }).then(function (r) {
+      $('rpCodeGo').disabled = false;
+      if (r.error) {
+        m.textContent = /did not match/.test(r.error.message)
+          ? 'That code did not match a coach. Check it and try again.' : r.error.message;
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      RP.toast(r.data + ' is now your coach.');
+      RP.refresh();
+    });
   }
 
   function sendTakeSheet() {
@@ -232,7 +260,8 @@
     var h = '<div class="rp-brandbar"></div>' +
       '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
       '<div><h1 style="margin:0 0 2px">Coach</h1>' +
-      '<div class="rp-sub" style="margin:0">' + esc(me.display_name) + ' · teaching</div></div>' +
+      '<div class="rp-sub" style="margin:0">' + esc(me.display_name) + ' · code <b style="letter-spacing:2px;' +
+      'color:var(--gold)">' + esc(me.coach_code || '') + '</b></div></div>' +
       '<button class="btn" id="rpToStudent" style="padding:7px 11px;font-size:12px">My practice</button></div>';
 
     h += '<div class="rp-seg">' +
@@ -269,8 +298,9 @@
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
     if (!RP.students.length) {
-      h += '<div class="rp-empty">Nobody yet. Tap <b>Add student</b> — anyone who has signed up in the ' +
-        'app shows up in the list.</div>';
+      h += '<div class="rp-empty">Nobody yet. Read a student your code — ' +
+        '<b style="letter-spacing:2px;color:var(--gold)">' + esc((RP.profile || {}).coach_code || '') +
+        '</b> — and they join themselves, or tap <b>Add student</b> to do it from here.</div>';
       return h;
     }
     RP.students.forEach(function (s) {
@@ -294,12 +324,13 @@
 
   function addStudentSheet() {
     var h = '<b style="font-size:16px">Add a student</b>' +
-      '<div class="measured" style="margin-top:6px">Everyone who has signed up as a student. ' +
-      'Tap a name to take them on.</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
+      '<div class="measured" style="margin-top:6px">Or just read them your code — ' +
+      '<b style="letter-spacing:2px">' + esc((RP.profile || {}).coach_code || '') + '</b> — and they join ' +
+      'themselves. Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:10px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
-    RP.sb.from('profiles').select('*').eq('role', 'student').order('created_at')
+    RP.sb.from('profiles').select('*').order('created_at')
       .then(function (r) {
         var have = RP.students.map(function (s) { return s.id; });
         var list = (r.data || []).filter(function (p) { return have.indexOf(p.id) < 0 && p.id !== RP.user.id; });

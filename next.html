@@ -10776,6 +10776,44 @@ renderJourney();
 <!-- ===== /v10 ===== -->
 
 <!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->
+<style>
+/* ======================================================================
+   Ja Ronn — brown, gold, burnt orange, off the That '70s FLOW poster.
+
+   This redefines the palette rather than restyling components, so every
+   panel, button and tab in v10.1 follows without being touched. The rules
+   the theme already set still hold: the glow belongs to live music, the
+   gradient belongs to the brand, everything else stays flat.
+
+   In tune / out of tune keep their own colours. They mean something, and a
+   singer has to read them at a glance — they are not decoration.
+   ====================================================================== */
+:root{
+  --bg:#120c07; --bg2:#1a110b; --panel:#1d150c; --panel2:#291d10; --line:#3b2a17;
+  --ink:#f7efe3; --ink-dim:#b49b7c; --ink-faint:#8a7258;
+  --gold:#e8b34a; --gold-deep:#c08a24;
+  --hit:#7bb352; --miss:#e2604f;
+  --accent:#d2601f; --accent2:#e8b34a; --pink:#a9451a;
+  --grad:linear-gradient(135deg,#6b3f1d 0%,#c1521d 52%,#e8b34a 100%);
+  --glow:0 0 22px rgba(210,96,31,.42);
+  --stage:#0d0805; --stage-line:rgba(255,236,210,.06);
+}
+body.light{
+  --bg:#f6efe4; --bg2:#efe3d3; --panel:#fffbf4; --panel2:#f2e7d6; --line:#e0d0b7;
+  --ink:#241a10; --ink-dim:#6d5a45; --ink-faint:#9a866d;
+  --gold:#a9781a; --gold-deep:#8a5f10;
+  --hit:#4a7f2b; --miss:#c0402f;
+  --accent:#b8501a; --accent2:#a9781a; --pink:#8f3d16;
+  --glow:0 4px 16px rgba(184,80,26,.24);
+  --stage:#fffbf4; --stage-line:rgba(36,26,16,.06);
+}
+
+/* the piano keys were the one place the old purple was written in by hand */
+.kbdkey.white.down{background:#f0dcb4;}
+.kbdkey.white.lit{background:linear-gradient(180deg,#e8b34a,#c1521d);}
+.kbdkey.black.lit{background:linear-gradient(180deg,#c1521d,#6b3f1d);}
+
+</style>
 <script>
 /* ======================================================================
    Repertoire Pro — cloud layer (accounts, coach↔student, live assignments)
@@ -10932,9 +10970,8 @@ renderJourney();
       '" placeholder="At least 6 characters" style="width:100%;margin-bottom:12px">';
 
     if (up) {
-      h += '<div class="row" style="align-items:center;gap:10px;margin-bottom:14px">' +
-        '<button class="btn" id="rpRole" data-role="student" style="padding:9px 12px;font-size:12.5px">I am a student</button>' +
-        '<div class="measured" style="margin:0">Tap to switch. Ja Ronn taps this to <b>I am a coach</b>.</div></div>';
+      h += '<div class="measured" style="margin-bottom:14px">That is all. If you teach, you switch ' +
+        'that on afterwards from your name at the top — you stay a singer either way.</div>';
     }
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
@@ -10948,13 +10985,6 @@ renderJourney();
     on($('rpTabUp'), 'click', function () { authTab = 'up'; openAuth(); });
     on($('rpTabIn'), 'click', function () { authTab = 'in'; openAuth(); });
     on($('rpX'), 'click', closeSheet);
-    var roleBtn = $('rpRole');
-    on(roleBtn, 'click', function () {
-      var coach = roleBtn.dataset.role === 'student';
-      roleBtn.dataset.role = coach ? 'coach' : 'student';
-      roleBtn.textContent = coach ? 'I am a coach' : 'I am a student';
-      roleBtn.classList.toggle('primary', coach);
-    });
     on($('rpGo'), 'click', function () { authTab === 'up' ? doSignUp() : doSignIn(); });
     on($('rpLink'), 'click', doMagicLink);
     box.querySelectorAll('input').forEach(function (i) {
@@ -10972,13 +11002,12 @@ renderJourney();
     var name = ($('rpName') || {}).value || '';
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
-    var role = ($('rpRole') || {}).dataset ? $('rpRole').dataset.role : 'student';
     if (!email || !pass) return msg('Email and password, please.', true);
     if (pass.length < 6) return msg('Password needs at least 6 characters.', true);
     msg('Creating your account…');
     RP.sb.auth.signUp({
       email: email, password: pass,
-      options: { data: { display_name: name.trim() || email.split('@')[0], role: role },
+      options: { data: { display_name: name.trim() || email.split('@')[0] },
                  emailRedirectTo: location.href.split('#')[0] }
     }).then(function (r) {
       if (r.error) return msg(r.error.message, true);
@@ -11018,9 +11047,19 @@ renderJourney();
   function openAccount() {
     var p = RP.profile || {};
     var h = '<b style="font-size:16px">' + esc(p.display_name || 'Account') + '</b>' +
-      '<div class="measured" style="margin-top:6px">' + esc(p.email || '') + ' · ' +
-      (p.role === 'coach' ? 'Coach' : 'Student') + '</div>';
-    if (p.role === 'coach') {
+      '<div class="measured" style="margin-top:6px">' + esc(p.email || '') +
+      (p.is_coach ? ' · teaching' : '') + '</div>';
+
+    if (p.is_coach) {
+      h += '<div class="rp-card hot" style="margin-top:14px"><div class="rp-lab">YOUR COACH CODE</div>' +
+        '<div style="font-size:31px;font-weight:900;letter-spacing:3px">' + esc(p.coach_code || '') + '</div>' +
+        '<div class="rp-sub">Read this out to a student. They enter it in their Coach tab and you are paired.</div></div>';
+    } else {
+      h += '<button class="btn" id="rpBeCoach" style="margin-top:14px;width:100%;padding:12px">I teach singing</button>' +
+        '<div class="measured" style="margin-top:6px">Turns on the teaching side. You keep everything you ' +
+        'have as a singer — coaches practise too.</div>';
+    }
+    if (p.is_coach) {
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
@@ -11032,6 +11071,14 @@ renderJourney();
     on($('rpX'), 'click', closeSheet);
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
+    on($('rpBeCoach'), 'click', function () {
+      var b = $('rpBeCoach');
+      b.disabled = true; b.textContent = 'Switching it on…';
+      RP.sb.rpc('become_coach').then(function (r) {
+        if (r.error) { b.disabled = false; b.textContent = 'I teach singing'; return RP.toast(r.error.message); }
+        RP.refresh().then(function () { openAccount(); RP.toast('Your code is ' + r.data); });
+      });
+    });
     on($('rpOut'), 'click', function () {
       RP.sb.auth.signOut().then(function () { closeSheet(); toast('Signed out. The app still works.'); });
     });
@@ -11048,7 +11095,7 @@ renderJourney();
   /* data                                                              */
   /* ---------------------------------------------------------------- */
   function isCoachFace() {
-    return !!(RP.profile && RP.profile.role === 'coach' && RP.face !== 'student');
+    return !!(RP.profile && RP.profile.is_coach && RP.face !== 'student');
   }
   RP.isCoachFace = isCoachFace;
 
@@ -11068,8 +11115,12 @@ renderJourney();
       }
     }).then(function () {
       if (!RP.profile) return;
-      if (RP.profile.role === 'coach') return loadCoach(uid);
-      return loadStudent(uid);
+      // Everyone is a singer, so the singer's side always loads. If you also
+      // teach, the teaching side loads on top of it.
+      return loadStudent(uid).then(function () {
+        if (RP.profile.is_coach) return loadCoach(uid);
+        RP.students = []; RP.exercises = [];
+      });
     }).then(syncHeaderButton);
   }
 
@@ -11103,15 +11154,19 @@ renderJourney();
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50)
     ]).then(function (r) {
       RP.exercises = r[1].data || [];
-      RP.assignments = r[2].data || [];
-      RP.takes = r[3].data || [];
-      RP.messages = r[4].data || [];
+      // keep the singer's own rows loaded a moment ago, and add the ones we set
+      RP.assignments = merge(RP.assignments, r[2].data || []);
+      RP.takes       = merge(RP.takes,       r[3].data || []);
+      RP.messages    = merge(RP.messages,    r[4].data || []);
       var ids = (r[0].data || []).map(function (x) { return x.student_id; });
       if (!ids.length) { RP.students = []; RP.results = []; return; }
       return Promise.all([
         sb.from('profiles').select('*').in('id', ids),
         sb.from('results').select('*').in('student_id', ids).order('created_at', { ascending: false }).limit(600)
-      ]).then(function (p) { RP.students = p[0].data || []; RP.results = p[1].data || []; });
+      ]).then(function (p) {
+        RP.students = p[0].data || [];
+        RP.results = merge(RP.results, p[1].data || []);
+      });
     }).then(function () {
       if (!RP.exercises.length) return seedExercises(uid);
     });
@@ -11146,13 +11201,29 @@ renderJourney();
   /* ---------------------------------------------------------------- */
   /* live sync                                                         */
   /* ---------------------------------------------------------------- */
+  function merge(a, b) {
+    var seen = {}, out = [];
+    (a || []).concat(b || []).forEach(function (r) {
+      var k = r.id || JSON.stringify(r);
+      if (seen[k]) return;
+      seen[k] = 1; out.push(r);
+    });
+    return out;
+  }
+
   var channel = null;
   function subscribe() {
     if (!RP.user) return;
     unsubscribe();
     var uid = RP.user.id;
-    var coach = RP.profile && RP.profile.role === 'coach';
+    var coach = RP.profile && RP.profile.is_coach;
     var ch = RP.sb.channel('rp-' + uid);
+
+    // the singer's side, for everybody — coaches practise too
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'student_id=eq.' + uid },
+      function (p) { bump('assignment', p); });
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'student_id=eq.' + uid },
+      function () { refresh(); });
 
     if (coach) {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'takes', filter: 'coach_id=eq.' + uid },
@@ -11162,11 +11233,6 @@ renderJourney();
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
       ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'results' },
-        function () { refresh(); });
-    } else {
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'student_id=eq.' + uid },
-        function (p) { bump('assignment', p); });
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'student_id=eq.' + uid },
         function () { refresh(); });
     }
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'to_id=eq.' + uid },
@@ -11383,8 +11449,15 @@ renderJourney();
       '<div class="rp-brandbar"></div>';
     if (!coach) {
       h += '<b style="font-size:15px">Your coach</b>' +
-        '<div class="rp-empty">You are signed in as <b>' + esc(RP.profile.display_name) + '</b>. ' +
-        'No coach has added you yet. The moment one does, the week he sets shows up right here.</div>';
+        '<div class="rp-sub" style="margin-top:6px">Got a coach? Ask them for their code and put it in ' +
+        'here. Six letters and numbers.</div>' +
+        '<div class="row" style="margin-top:10px;gap:7px;flex-wrap:nowrap">' +
+        '<input id="rpCode" class="rp-inp" placeholder="ABC123" maxlength="6" autocapitalize="characters" ' +
+        'autocomplete="off" spellcheck="false" style="flex:1;letter-spacing:3px;font-weight:800;text-transform:uppercase">' +
+        '<button class="btn primary" id="rpCodeGo" style="padding:11px 15px">Join</button></div>' +
+        '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>' +
+        '<div class="measured" style="margin-top:10px">No coach? Everything below is yours anyway — the ' +
+        'app coaches you itself.</div>';
       h += '</div>';
       return h;
     }
@@ -11453,6 +11526,8 @@ renderJourney();
           });
       });
     });
+    on($('rpCodeGo'), 'click', joinByCode);
+    on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
     on($('rpSendTake'), 'click', sendTakeSheet);
     on($('rpMsgGo'), 'click', function () {
       var i = $('rpMsgIn');
@@ -11463,6 +11538,25 @@ renderJourney();
         .then(function (r) { r.error ? fail(r.error) : RP.refresh(); });
     });
     on($('rpMsgIn'), 'keydown', function (e) { if (e.key === 'Enter') $('rpMsgGo').click(); });
+  }
+
+  function joinByCode() {
+    var i = $('rpCode'), m = $('rpCodeMsg');
+    var code = (i.value || '').trim().toUpperCase();
+    if (code.length < 6) { m.textContent = 'It is six characters.'; m.style.color = 'var(--miss)'; return; }
+    m.textContent = 'Checking…'; m.style.color = 'var(--ink-dim)';
+    $('rpCodeGo').disabled = true;
+    RP.sb.rpc('join_with_code', { p_code: code }).then(function (r) {
+      $('rpCodeGo').disabled = false;
+      if (r.error) {
+        m.textContent = /did not match/.test(r.error.message)
+          ? 'That code did not match a coach. Check it and try again.' : r.error.message;
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      RP.toast(r.data + ' is now your coach.');
+      RP.refresh();
+    });
   }
 
   function sendTakeSheet() {
@@ -11505,7 +11599,8 @@ renderJourney();
     var h = '<div class="rp-brandbar"></div>' +
       '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
       '<div><h1 style="margin:0 0 2px">Coach</h1>' +
-      '<div class="rp-sub" style="margin:0">' + esc(me.display_name) + ' · teaching</div></div>' +
+      '<div class="rp-sub" style="margin:0">' + esc(me.display_name) + ' · code <b style="letter-spacing:2px;' +
+      'color:var(--gold)">' + esc(me.coach_code || '') + '</b></div></div>' +
       '<button class="btn" id="rpToStudent" style="padding:7px 11px;font-size:12px">My practice</button></div>';
 
     h += '<div class="rp-seg">' +
@@ -11542,8 +11637,9 @@ renderJourney();
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
     if (!RP.students.length) {
-      h += '<div class="rp-empty">Nobody yet. Tap <b>Add student</b> — anyone who has signed up in the ' +
-        'app shows up in the list.</div>';
+      h += '<div class="rp-empty">Nobody yet. Read a student your code — ' +
+        '<b style="letter-spacing:2px;color:var(--gold)">' + esc((RP.profile || {}).coach_code || '') +
+        '</b> — and they join themselves, or tap <b>Add student</b> to do it from here.</div>';
       return h;
     }
     RP.students.forEach(function (s) {
@@ -11567,12 +11663,13 @@ renderJourney();
 
   function addStudentSheet() {
     var h = '<b style="font-size:16px">Add a student</b>' +
-      '<div class="measured" style="margin-top:6px">Everyone who has signed up as a student. ' +
-      'Tap a name to take them on.</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
+      '<div class="measured" style="margin-top:6px">Or just read them your code — ' +
+      '<b style="letter-spacing:2px">' + esc((RP.profile || {}).coach_code || '') + '</b> — and they join ' +
+      'themselves. Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:10px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
-    RP.sb.from('profiles').select('*').eq('role', 'student').order('created_at')
+    RP.sb.from('profiles').select('*').order('created_at')
       .then(function (r) {
         var have = RP.students.map(function (s) { return s.id; });
         var list = (r.data || []).filter(function (p) { return have.indexOf(p.id) < 0 && p.id !== RP.user.id; });

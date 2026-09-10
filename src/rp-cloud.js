@@ -153,9 +153,8 @@
       '" placeholder="At least 6 characters" style="width:100%;margin-bottom:12px">';
 
     if (up) {
-      h += '<div class="row" style="align-items:center;gap:10px;margin-bottom:14px">' +
-        '<button class="btn" id="rpRole" data-role="student" style="padding:9px 12px;font-size:12.5px">I am a student</button>' +
-        '<div class="measured" style="margin:0">Tap to switch. Ja Ronn taps this to <b>I am a coach</b>.</div></div>';
+      h += '<div class="measured" style="margin-bottom:14px">That is all. If you teach, you switch ' +
+        'that on afterwards from your name at the top — you stay a singer either way.</div>';
     }
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
@@ -169,13 +168,6 @@
     on($('rpTabUp'), 'click', function () { authTab = 'up'; openAuth(); });
     on($('rpTabIn'), 'click', function () { authTab = 'in'; openAuth(); });
     on($('rpX'), 'click', closeSheet);
-    var roleBtn = $('rpRole');
-    on(roleBtn, 'click', function () {
-      var coach = roleBtn.dataset.role === 'student';
-      roleBtn.dataset.role = coach ? 'coach' : 'student';
-      roleBtn.textContent = coach ? 'I am a coach' : 'I am a student';
-      roleBtn.classList.toggle('primary', coach);
-    });
     on($('rpGo'), 'click', function () { authTab === 'up' ? doSignUp() : doSignIn(); });
     on($('rpLink'), 'click', doMagicLink);
     box.querySelectorAll('input').forEach(function (i) {
@@ -193,13 +185,12 @@
     var name = ($('rpName') || {}).value || '';
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
-    var role = ($('rpRole') || {}).dataset ? $('rpRole').dataset.role : 'student';
     if (!email || !pass) return msg('Email and password, please.', true);
     if (pass.length < 6) return msg('Password needs at least 6 characters.', true);
     msg('Creating your account…');
     RP.sb.auth.signUp({
       email: email, password: pass,
-      options: { data: { display_name: name.trim() || email.split('@')[0], role: role },
+      options: { data: { display_name: name.trim() || email.split('@')[0] },
                  emailRedirectTo: location.href.split('#')[0] }
     }).then(function (r) {
       if (r.error) return msg(r.error.message, true);
@@ -239,9 +230,19 @@
   function openAccount() {
     var p = RP.profile || {};
     var h = '<b style="font-size:16px">' + esc(p.display_name || 'Account') + '</b>' +
-      '<div class="measured" style="margin-top:6px">' + esc(p.email || '') + ' · ' +
-      (p.role === 'coach' ? 'Coach' : 'Student') + '</div>';
-    if (p.role === 'coach') {
+      '<div class="measured" style="margin-top:6px">' + esc(p.email || '') +
+      (p.is_coach ? ' · teaching' : '') + '</div>';
+
+    if (p.is_coach) {
+      h += '<div class="rp-card hot" style="margin-top:14px"><div class="rp-lab">YOUR COACH CODE</div>' +
+        '<div style="font-size:31px;font-weight:900;letter-spacing:3px">' + esc(p.coach_code || '') + '</div>' +
+        '<div class="rp-sub">Read this out to a student. They enter it in their Coach tab and you are paired.</div></div>';
+    } else {
+      h += '<button class="btn" id="rpBeCoach" style="margin-top:14px;width:100%;padding:12px">I teach singing</button>' +
+        '<div class="measured" style="margin-top:6px">Turns on the teaching side. You keep everything you ' +
+        'have as a singer — coaches practise too.</div>';
+    }
+    if (p.is_coach) {
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
@@ -253,6 +254,14 @@
     on($('rpX'), 'click', closeSheet);
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
+    on($('rpBeCoach'), 'click', function () {
+      var b = $('rpBeCoach');
+      b.disabled = true; b.textContent = 'Switching it on…';
+      RP.sb.rpc('become_coach').then(function (r) {
+        if (r.error) { b.disabled = false; b.textContent = 'I teach singing'; return RP.toast(r.error.message); }
+        RP.refresh().then(function () { openAccount(); RP.toast('Your code is ' + r.data); });
+      });
+    });
     on($('rpOut'), 'click', function () {
       RP.sb.auth.signOut().then(function () { closeSheet(); toast('Signed out. The app still works.'); });
     });
@@ -269,7 +278,7 @@
   /* data                                                              */
   /* ---------------------------------------------------------------- */
   function isCoachFace() {
-    return !!(RP.profile && RP.profile.role === 'coach' && RP.face !== 'student');
+    return !!(RP.profile && RP.profile.is_coach && RP.face !== 'student');
   }
   RP.isCoachFace = isCoachFace;
 
@@ -289,8 +298,12 @@
       }
     }).then(function () {
       if (!RP.profile) return;
-      if (RP.profile.role === 'coach') return loadCoach(uid);
-      return loadStudent(uid);
+      // Everyone is a singer, so the singer's side always loads. If you also
+      // teach, the teaching side loads on top of it.
+      return loadStudent(uid).then(function () {
+        if (RP.profile.is_coach) return loadCoach(uid);
+        RP.students = []; RP.exercises = [];
+      });
     }).then(syncHeaderButton);
   }
 
@@ -324,15 +337,19 @@
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50)
     ]).then(function (r) {
       RP.exercises = r[1].data || [];
-      RP.assignments = r[2].data || [];
-      RP.takes = r[3].data || [];
-      RP.messages = r[4].data || [];
+      // keep the singer's own rows loaded a moment ago, and add the ones we set
+      RP.assignments = merge(RP.assignments, r[2].data || []);
+      RP.takes       = merge(RP.takes,       r[3].data || []);
+      RP.messages    = merge(RP.messages,    r[4].data || []);
       var ids = (r[0].data || []).map(function (x) { return x.student_id; });
       if (!ids.length) { RP.students = []; RP.results = []; return; }
       return Promise.all([
         sb.from('profiles').select('*').in('id', ids),
         sb.from('results').select('*').in('student_id', ids).order('created_at', { ascending: false }).limit(600)
-      ]).then(function (p) { RP.students = p[0].data || []; RP.results = p[1].data || []; });
+      ]).then(function (p) {
+        RP.students = p[0].data || [];
+        RP.results = merge(RP.results, p[1].data || []);
+      });
     }).then(function () {
       if (!RP.exercises.length) return seedExercises(uid);
     });
@@ -367,13 +384,29 @@
   /* ---------------------------------------------------------------- */
   /* live sync                                                         */
   /* ---------------------------------------------------------------- */
+  function merge(a, b) {
+    var seen = {}, out = [];
+    (a || []).concat(b || []).forEach(function (r) {
+      var k = r.id || JSON.stringify(r);
+      if (seen[k]) return;
+      seen[k] = 1; out.push(r);
+    });
+    return out;
+  }
+
   var channel = null;
   function subscribe() {
     if (!RP.user) return;
     unsubscribe();
     var uid = RP.user.id;
-    var coach = RP.profile && RP.profile.role === 'coach';
+    var coach = RP.profile && RP.profile.is_coach;
     var ch = RP.sb.channel('rp-' + uid);
+
+    // the singer's side, for everybody — coaches practise too
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'student_id=eq.' + uid },
+      function (p) { bump('assignment', p); });
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'student_id=eq.' + uid },
+      function () { refresh(); });
 
     if (coach) {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'takes', filter: 'coach_id=eq.' + uid },
@@ -383,11 +416,6 @@
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
       ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'results' },
-        function () { refresh(); });
-    } else {
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'student_id=eq.' + uid },
-        function (p) { bump('assignment', p); });
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'student_id=eq.' + uid },
         function () { refresh(); });
     }
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'to_id=eq.' + uid },
