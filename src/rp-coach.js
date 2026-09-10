@@ -371,6 +371,20 @@
     h += '<h2 style="margin:12px 0 2px;font-size:19px">' + esc(s.display_name) + '</h2>';
     h += '<div class="rp-sub" style="margin:0 0 4px">' + esc(s.email) + '</div>';
 
+    // How they answered on first open. This is the most useful thing on the
+    // screen before he has met them: it tells him how to talk to them.
+    var W = { plain: 'Music words lose them — keep it plain.',
+              some: 'Knows some music words.',
+              technical: 'Comfortable with the proper terms.' };
+    var E = { 1: 'New to singing', 2: 'Has sung a bit', 3: 'Has sung a lot' };
+    if (s.words || s.experience) {
+      h += '<div class="rp-card hot" style="margin-top:12px;padding:11px">' +
+        '<div class="rp-lab">HOW TO TALK TO THEM</div>' +
+        '<div class="rp-ttl" style="font-weight:700;font-size:13px">' +
+        esc(E[s.experience] || '') + '. ' + esc(W[s.words] || '') + '</div>' +
+        '<div class="rp-sub">Their own answer when they opened the app.</div></div>';
+    }
+
     h += '<div class="rp-lab" style="margin-top:16px">THIS WEEK</div>';
     if (!mine.length) h += '<div class="rp-empty" style="padding:6px 2px">Nothing set yet.</div>';
     mine.forEach(function (a) {
