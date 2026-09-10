@@ -304,7 +304,7 @@
         if (RP.profile.is_coach) return loadCoach(uid);
         RP.students = []; RP.exercises = [];
       });
-    }).then(syncHeaderButton);
+    }).then(function () { brand(); syncHeaderButton(); });
   }
 
   function loadStudent(uid) {
@@ -469,7 +469,21 @@
     if (!document.hidden && RP.user) refresh();
   });
 
+  /* Whose colours am I looking at? Mine if I teach, my coach's if I have one,
+     Repertoire's otherwise. Signed out is always Repertoire. */
+  function brand() {
+    var t = 'repertoire';
+    if (RP.profile && RP.profile.is_coach) t = RP.profile.theme || 'inflow';
+    else if (RP.coach) t = RP.coach.theme || 'inflow';
+    var b = document.body;
+    ['inflow'].forEach(function (name) {
+      b.classList.toggle('rp-brand-' + name, t === name);
+    });
+  }
+  RP.brand = brand;
+
   function rerender() {
+    brand();
     syncHeaderButton();
     try {
       if (window.state && window.state.mode === 'coach' && window.V10 && window.V10.renderCoach) {

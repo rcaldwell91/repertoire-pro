@@ -28,6 +28,36 @@ PATCHES = [
      "    try { if (window.RP && RP.logResult) RP.logResult({ kind: 'sustain',\n"
      "      label: 'Steady note', pct: pct, seconds: SUS.dur }); } catch (e) {}"),
 ]
+# ---------------------------------------------------------------------
+# Home, in plain words with a sense of where you are in the session.
+# "scale ladder", "note maps" and "key guardrails" told a beginner nothing.
+# ---------------------------------------------------------------------
+WORDS = [
+    ('<div class="js">scale ladder &middot; 5 min</div>', '<div class="js">Step 1 &middot; 5 min</div>'),
+    ('<div class="js">scale ladder · 5 min</div>',        '<div class="js">Step 1 · 5 min</div>'),
+    ('<div class="js">note match · 5 min</div>',          '<div class="js">Step 2 · 5 min</div>'),
+    ('<div class="js">your song · 5 min</div>',           '<div class="js">Step 3 · 5 min</div>'),
+    ('<p>Warmups &amp; exercises, on the keys</p>',
+     '<p>Exercises that build your voice, a level at a time</p>'),
+    ('<p>Your song &mdash; note bars, words, scoring</p>',
+     '<p>Sing a song and see every note you hit</p>'),
+    ('<p>Sing with any video &mdash; key guardrails</p>',
+     '<p>Sing along to any video, kept in your range</p>'),
+    ('<p>Songs, takes &amp; note maps</p>',
+     '<p>Your songs, and every take you have recorded</p>'),
+    ('<p>Your voice, live on the keyboard</p>',
+     '<p>See your voice on the keys as you sing</p>'),
+    ('<p>Note bars, words &amp; scoring &mdash; your songs, takes or built-ins</p>',
+     '<p>Sing a song and see every note you hit</p>'),
+    ('<p>Karaoke over songs you own, with key rails</p>',
+     '<p>Sing over songs you own, kept in your range</p>'),
+    ('<p>Live pitch on the keys — see the exact note</p>',
+     '<p>See your voice on the keys as you sing</p>'),
+]
+for a, r in WORDS:
+    if a in base:
+        base = base.replace(a, r)
+
 for anchor, replacement in PATCHES:
     n = base.count(anchor)
     assert n == 1, 'anchor found %d times, expected 1: %r' % (n, anchor[:60])

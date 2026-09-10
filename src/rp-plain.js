@@ -372,8 +372,26 @@
     document.head.appendChild(s);
   })();
 
+  /* The microphone dialog is a wall for a first-timer. It keeps its Close
+     button; it now also closes on a tap outside it or on escape, and it no
+     longer covers the tabs (see rp-skin.css). */
+  function tameMicDialog() {
+    var d = $('micHelp');
+    if (!d || d.dataset.rpTame) return;
+    d.dataset.rpTame = '1';
+    d.addEventListener('click', function (e) {
+      if (e.target === d) d.style.display = 'none';
+    });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var d = $('micHelp');
+    if (d && d.style.display !== 'none') d.style.display = 'none';
+  });
+
   function boot() {
     watch();
+    setInterval(tameMicDialog, 1200);
     apply();
     var host = $('modeYou');
     setInterval(mountProfileRow, 1500);
