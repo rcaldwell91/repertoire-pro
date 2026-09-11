@@ -135,7 +135,10 @@
     }
   }
 
-  window.__applyForTest = applyFx;
+  /* Exposed so the effect settings can be checked from outside — there is no
+     other way to prove an effect actually changed the sound rather than just
+     lighting up a button. Reads nothing, changes nothing on its own. */
+  window.__rpApplyFx = applyFx;
 
   function live() {
     if (typeof ctx === 'undefined' || !ctx) return null;
