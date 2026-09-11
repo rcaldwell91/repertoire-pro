@@ -298,13 +298,11 @@
     d.id = 'rpTakes';
     d.className = 'panel';
     d.style.cssText = 'margin-top:10px;padding:12px';
-    d.innerHTML = '<b style="font-size:13px">Sing over a take</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Any take you have kept — yours, or one your ' +
-      'coach recorded for you — can play while the app listens to you.</div>' +
-      '<select id="rpTakeSel" style="width:100%;min-width:0"></select>' +
-      '<button class="btn" id="rpTakeLoad" style="width:100%;padding:10px;margin-top:8px">Load it</button>';
+    d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
+      '<div class="notice" style="margin:8px 0 9px">Sing over one, keep it on your phone, or send it ' +
+      'to your coach — the notes go with it, so he sees where you were as well as hears it.</div>' +
+      '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
-    on($('rpTakeLoad'), 'click', loadTake);
     fillTakes();
   }
 
@@ -316,24 +314,14 @@
   }
 
   function fillTakes() {
-    var sel = $('rpTakeSel');
-    if (!sel) return;
-    var list = takes();
-    if (!list.length) {
-      sel.innerHTML = '<option value="">No takes kept yet</option>';
-      return;
-    }
-    sel.innerHTML = list.map(function (s) {
-      return '<option value="' + esc(s.id) + '">' + esc(s.title) +
-        (s.notes && s.notes.length ? ' · has the pitch line' : '') + '</option>';
-    }).join('');
+    var box = $('rpTakeList');
+    if (!box || !window.RPSend) return;
+    box.innerHTML = RPSend.listHtml('pitch');
+    RPSend.wireList(box, 'pitch', loadTake);
   }
 
-  function loadTake() {
-    var sel = $('rpTakeSel');
-    if (!sel || !sel.value) return say('Keep a take first.');
-    var s = takes().find(function (x) { return x.id === sel.value; });
-    if (!s) return say('That take has gone.');
+  function loadTake(s) {
+    if (!s) return say('Keep a take first.');
     var a = $('freeAudio');
     if (!a) return;
     try {

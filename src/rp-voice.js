@@ -199,6 +199,10 @@
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
+    h += '<div class="panel" style="margin-top:10px;padding:12px">' +
+      '<b style="font-size:13px">Your songs</b>' +
+      '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on your phone, or send it to ' +
+      'your coach.</div><div id="rpVList"></div></div>';
 
     host.innerHTML = h;
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
@@ -212,6 +216,14 @@
       });
     });
     wireRec();
+    fillList();
+  }
+
+  function fillList() {
+    var box = $('rpVList');
+    if (!box || !window.RPSend) return;
+    box.innerHTML = RPSend.listHtml('song');
+    RPSend.wireList(box, 'song');
   }
 
   function recHtml() {
@@ -389,7 +401,7 @@
     try { await dbPut('songs', song); }
     catch (e) { return say('Could not save it — storage may be full.'); }
     try { LIB.songs.push(song); libRenderPlaylists(); libRender(); } catch (e) {}
-    drop(); V.activeMs = 0; redrawRec();
+    drop(); V.activeMs = 0; redrawRec(); fillList();
     say('Kept, in My Recordings.');
   }
 

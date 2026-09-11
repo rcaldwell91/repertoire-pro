@@ -11521,6 +11521,44 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     if (s < 86400) return Math.floor(s / 3600) + 'h ago';
     return Math.floor(s / 86400) + 'd ago';
   }
+  /* The note line that travelled with the take. Same rule as the big chart:
+     break the line where the voice was not there, rather than drawing a
+     slide nobody sang. */
+  function notesSvg(notes) {
+    var pts = (notes || []).filter(function (p) { return p && p.m != null; });
+    if (pts.length < 4) return '';
+    var lo = Math.min.apply(null, pts.map(function (p) { return p.m; })) - 1;
+    var hi = Math.max.apply(null, pts.map(function (p) { return p.m; })) + 1;
+    if (hi - lo < 6) { var mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
+    var t1 = notes[notes.length - 1].t || 1;
+    var W = 300, H = 64;
+    var d = '', pen = false, prev = null;
+    notes.forEach(function (p) {
+      if (p.m == null) { pen = false; prev = null; return; }
+      var x = (p.t / t1) * W;
+      var y = H - ((p.m - lo) / (hi - lo)) * H;
+      var leap = prev && Math.abs(p.m - prev.m) > 6;
+      d += (!pen || leap ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      pen = true; prev = p;
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
+      'style="width:100%;height:64px;display:block;margin-top:8px;background:var(--panel2);' +
+      'border-radius:8px"><path d="' + d + '" fill="none" stroke="var(--accent2)" ' +
+      'stroke-width="2" stroke-linejoin="round"/></svg>';
+  }
+
+  function noteRange(notes) {
+    var pts = (notes || []).filter(function (p) { return p && p.m != null; });
+    if (!pts.length) return '';
+    var lo = Math.round(Math.min.apply(null, pts.map(function (p) { return p.m; })));
+    var hi = Math.round(Math.max.apply(null, pts.map(function (p) { return p.m; })));
+    var nm = function (m) {
+      try { return V10.midiName ? V10.midiName(m) : (window.midiName ? midiName(m) : m); }
+      catch (e) { return m; }
+    };
+    return nm(lo) + ' to ' + nm(hi);
+  }
+
   function nameOf(id) {
     if (RP.profile && RP.profile.id === id) return 'You';
     if (RP.coach && RP.coach.id === id) return RP.coach.display_name;
@@ -11835,7 +11873,15 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     takes.slice(0, 10).forEach(function (t) {
       h += '<div class="rp-card"><div class="rp-ttl">' + esc(t.title) +
         '<span class="rp-tag">' + ago(t.created_at) + '</span></div>' +
-        (t.note ? '<div class="rp-sub">' + esc(t.note) + '</div>' : '') + '</div>';
+        (t.note ? '<div class="rp-sub">' + esc(t.note) + '</div>' : '');
+      if (t.audio_path) {
+        h += '<button class="btn" data-hear="' + esc(t.id) + '" style="margin-top:8px;padding:8px 13px;font-size:12.5px">Listen</button>';
+      }
+      if (t.notes && t.notes.length) {
+        h += '<div class="rp-sub" style="margin-top:7px">Sang ' + esc(noteRange(t.notes)) + '</div>' +
+             notesSvg(t.notes);
+      }
+      h += '</div>';
     });
 
     h += '<div class="row" style="margin-top:14px;gap:7px;flex-wrap:nowrap">' +
@@ -11845,6 +11891,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
 
   function wireStudentDetail(host) {
+    wireTakeAudio(host);
     on($('rpBack'), 'click', function () { openStudent = null; renderTeacher(); });
     on($('rpAssign'), 'click', function () { assignSheet(openStudent); });
     each(host, '[data-drop]', function (b) {
@@ -11983,7 +12030,15 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       if (i.kind === 'take') {
         h += '<div class="rp-card hot"><div class="rp-ttl">' + esc(nameOf(i.o.student_id)) +
           ' sent a take<span class="rp-tag">' + ago(i.at) + '</span></div>' +
-          '<div class="rp-sub"><b>' + esc(i.o.title) + '</b>' + (i.o.note ? ' — ' + esc(i.o.note) : '') + '</div></div>';
+          '<div class="rp-sub"><b>' + esc(i.o.title) + '</b>' + (i.o.note ? ' — ' + esc(i.o.note) : '') + '</div>';
+        if (i.o.audio_path) {
+          h += '<button class="btn" data-hear="' + esc(i.o.id) + '" style="margin-top:8px;padding:8px 13px;font-size:12.5px">Listen</button>';
+        }
+        if (i.o.notes && i.o.notes.length) {
+          h += '<div class="rp-sub" style="margin-top:7px">Sang ' + esc(noteRange(i.o.notes)) + '</div>' +
+               notesSvg(i.o.notes);
+        }
+        h += '</div>';
       } else {
         h += '<div class="rp-card"><div class="rp-sub" style="margin:0"><b>' + esc(nameOf(i.o.from_id)) +
           '</b> · ' + ago(i.at) + '</div><div style="font-size:13px;margin-top:4px">' + esc(i.o.body) + '</div></div>';
@@ -11991,7 +12046,27 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     });
     return h;
   }
-  function wireInbox() {}
+  function wireTakeAudio(host) {
+    if (!host) return;
+    each(host, '[data-hear]', function (b) {
+      on(b, 'click', async function () {
+        var t = (RP.takes || []).find(function (x) { return x.id === b.dataset.hear; });
+        if (!t || !t.audio_path) return RP.toast('No audio on that one.');
+        b.disabled = true; b.textContent = 'Loading…';
+        var url = window.RPSend ? await RPSend.playable(t.audio_path) : null;
+        b.disabled = false; b.textContent = 'Listen';
+        if (!url) return RP.toast('Could not fetch that take.');
+        try {
+          if (wireTakeAudio._a) wireTakeAudio._a.pause();
+          var a = new Audio(url);
+          wireTakeAudio._a = a;
+          a.play().catch(function () { RP.toast('The phone would not play it.'); });
+        } catch (e) { RP.toast('Could not play it.'); }
+      });
+    });
+  }
+
+  function wireInbox(host) { wireTakeAudio(host); }
 
   /* ================================================================ */
   /* the switch                                                        */
@@ -12669,6 +12744,195 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 </script>
 <script>
 /* ======================================================================
+   Repertoire Pro — getting a take off the phone.
+
+   Three things, which Robert asked for as three things:
+     · SEND to your coach — the audio, and for a Pitch Tracker take the note
+       line with it, so he can see where you were as well as hear it.
+     · DOWNLOAD to the phone, so a take is yours and not trapped in an app.
+     · SHARE a Free Sing song the same way.
+
+   Audio goes to a PRIVATE bucket, in a folder named after you. Nobody can
+   reach it with a link alone: your coach gets it because the database says
+   he teaches you, and the app asks for a signed address that expires.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+  function say(m) { if (window.RP && RP.toast) RP.toast(m); }
+
+  var S = window.RPSend = {};
+
+  function takes() {
+    try {
+      return (LIB.songs || [])
+        .filter(function (s) { return s.kind === 'recording' && s.blob; })
+        .sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
+    } catch (e) { return []; }
+  }
+
+  function ext(type) {
+    if (!type) return 'webm';
+    if (type.indexOf('mp4') >= 0) return 'm4a';
+    if (type.indexOf('mpeg') >= 0) return 'mp3';
+    if (type.indexOf('wav') >= 0) return 'wav';
+    if (type.indexOf('ogg') >= 0) return 'ogg';
+    return 'webm';
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* download — the take belongs to the singer                         */
+  /* ---------------------------------------------------------------- */
+  S.download = function (song) {
+    try {
+      var url = URL.createObjectURL(song.blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (song.title || 'take').replace(/[^\w\- ]+/g, '') + '.' + ext(song.blob.type);
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 4000);
+      say('Saved to your phone.');
+    } catch (e) {
+      say('This browser would not save it: ' + (e.message || e));
+    }
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* send to the coach                                                 */
+  /* ---------------------------------------------------------------- */
+  S.canSend = function () {
+    return !!(window.RP && RP.user && RP.sb && RP.coach);
+  };
+
+  S.send = async function (song, note, btn) {
+    if (!window.RP || !RP.user || !RP.sb) { say('Sign in first.'); return false; }
+    if (!RP.coach) { say('No coach yet — put their code in on the Coach tab.'); return false; }
+    if (!song || !song.blob) { say('That take has no audio.'); return false; }
+    if (song.blob.size > 25 * 1024 * 1024) {
+      say('That take is too big to send (over 25MB). Record a shorter one.');
+      return false;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+    var path = RP.user.id + '/' + (song.id || Date.now()) + '.' + ext(song.blob.type);
+    try {
+      var up = await RP.sb.storage.from('takes').upload(path, song.blob, {
+        contentType: song.blob.type || 'audio/webm', upsert: true
+      });
+      if (up.error) throw up.error;
+
+      var row = {
+        student_id: RP.user.id,
+        coach_id: RP.coach.id,
+        title: song.title || 'A take',
+        note: note || '',
+        audio_path: path,
+        duration: song.duration || null,
+        kind: song.notes && song.notes.length ? 'practice' : 'song'
+      };
+      if (song.notes && song.notes.length) row.notes = song.notes;
+
+      var ins = await RP.sb.from('takes').insert(row);
+      if (ins.error) throw ins.error;
+
+      song.sentAt = Date.now();
+      try { await dbPut('songs', song); } catch (e) {}
+      say('Sent to ' + RP.coach.display_name + '.');
+      if (RP.refresh) RP.refresh();
+      return true;
+    } catch (e) {
+      say('Could not send it: ' + ((e && e.message) || e));
+      return false;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Send to coach'; }
+    }
+  };
+
+  /* a signed address, good for an hour, so audio is never public */
+  S.playable = async function (path) {
+    if (!window.RP || !RP.sb || !path) return null;
+    try {
+      var r = await RP.sb.storage.from('takes').createSignedUrl(path, 3600);
+      if (r.error) return null;
+      return r.data && r.data.signedUrl;
+    } catch (e) { return null; }
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* the list of your takes, with what you can do with each            */
+  /* ---------------------------------------------------------------- */
+  S.listHtml = function (kind) {
+    var list = takes();
+    if (!list.length) {
+      return '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>';
+    }
+    var h = '';
+    list.slice(0, 12).forEach(function (s) {
+      var hasNotes = !!(s.notes && s.notes.length);
+      h += '<div class="rp-card" style="padding:11px">' +
+        '<div class="rp-ttl">' + esc(s.title) +
+        (hasNotes ? '<span class="rp-tag">notes</span>' : '') +
+        (s.fx ? '<span class="rp-tag">effects</span>' : '') +
+        (s.sentAt ? '<span class="rp-tag">sent</span>' : '') + '</div>' +
+        '<div class="row" style="gap:6px;margin-top:8px">' +
+        (kind === 'pitch'
+          ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
+          : '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>') +
+        '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
+        '<button class="btn primary" data-send="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Send to coach</button>' +
+        '</div></div>';
+    });
+    return h;
+  };
+
+  S.wireList = function (root, kind, onLoad) {
+    if (!root) return;
+    function find(id) { return takes().find(function (x) { return x.id === id; }); }
+    root.querySelectorAll('[data-dl]').forEach(function (b) {
+      on(b, 'click', function () { var s = find(b.dataset.dl); if (s) S.download(s); });
+    });
+    root.querySelectorAll('[data-send]').forEach(function (b) {
+      on(b, 'click', function () {
+        var s = find(b.dataset.send);
+        if (!s) return;
+        if (!S.canSend()) {
+          return say(window.RP && RP.user
+            ? 'No coach yet — put their code in on the Coach tab.'
+            : 'Sign in first, then you can send it to your coach.');
+        }
+        S.send(s, '', b);
+      });
+    });
+    root.querySelectorAll('[data-load]').forEach(function (b) {
+      on(b, 'click', function () { var s = find(b.dataset.load); if (s && onLoad) onLoad(s); });
+    });
+    root.querySelectorAll('[data-hear]').forEach(function (b) {
+      on(b, 'click', function () {
+        var s = find(b.dataset.hear);
+        if (!s) return;
+        try {
+          if (S._a) { S._a.pause(); URL.revokeObjectURL(S._a._u); }
+          var a = new Audio(); a._u = URL.createObjectURL(s.blob); a.src = a._u;
+          a.play(); S._a = a;
+        } catch (e) { say('Could not play that one.'); }
+      });
+    });
+  };
+})();
+
+</script>
+<script>
+/* ======================================================================
    Repertoire Pro — the take recorder on the pitch screen.
 
    Record · Pause · Listen back · Keep or Discard, without saving anything
@@ -12968,13 +13232,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     d.id = 'rpTakes';
     d.className = 'panel';
     d.style.cssText = 'margin-top:10px;padding:12px';
-    d.innerHTML = '<b style="font-size:13px">Sing over a take</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Any take you have kept — yours, or one your ' +
-      'coach recorded for you — can play while the app listens to you.</div>' +
-      '<select id="rpTakeSel" style="width:100%;min-width:0"></select>' +
-      '<button class="btn" id="rpTakeLoad" style="width:100%;padding:10px;margin-top:8px">Load it</button>';
+    d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
+      '<div class="notice" style="margin:8px 0 9px">Sing over one, keep it on your phone, or send it ' +
+      'to your coach — the notes go with it, so he sees where you were as well as hears it.</div>' +
+      '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
-    on($('rpTakeLoad'), 'click', loadTake);
     fillTakes();
   }
 
@@ -12986,24 +13248,14 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
 
   function fillTakes() {
-    var sel = $('rpTakeSel');
-    if (!sel) return;
-    var list = takes();
-    if (!list.length) {
-      sel.innerHTML = '<option value="">No takes kept yet</option>';
-      return;
-    }
-    sel.innerHTML = list.map(function (s) {
-      return '<option value="' + esc(s.id) + '">' + esc(s.title) +
-        (s.notes && s.notes.length ? ' · has the pitch line' : '') + '</option>';
-    }).join('');
+    var box = $('rpTakeList');
+    if (!box || !window.RPSend) return;
+    box.innerHTML = RPSend.listHtml('pitch');
+    RPSend.wireList(box, 'pitch', loadTake);
   }
 
-  function loadTake() {
-    var sel = $('rpTakeSel');
-    if (!sel || !sel.value) return say('Keep a take first.');
-    var s = takes().find(function (x) { return x.id === sel.value; });
-    if (!s) return say('That take has gone.');
+  function loadTake(s) {
+    if (!s) return say('Keep a take first.');
     var a = $('freeAudio');
     if (!a) return;
     try {
@@ -13258,6 +13510,10 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
+    h += '<div class="panel" style="margin-top:10px;padding:12px">' +
+      '<b style="font-size:13px">Your songs</b>' +
+      '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on your phone, or send it to ' +
+      'your coach.</div><div id="rpVList"></div></div>';
 
     host.innerHTML = h;
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
@@ -13271,6 +13527,14 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       });
     });
     wireRec();
+    fillList();
+  }
+
+  function fillList() {
+    var box = $('rpVList');
+    if (!box || !window.RPSend) return;
+    box.innerHTML = RPSend.listHtml('song');
+    RPSend.wireList(box, 'song');
   }
 
   function recHtml() {
@@ -13448,7 +13712,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     try { await dbPut('songs', song); }
     catch (e) { return say('Could not save it — storage may be full.'); }
     try { LIB.songs.push(song); libRenderPlaylists(); libRender(); } catch (e) {}
-    drop(); V.activeMs = 0; redrawRec();
+    drop(); V.activeMs = 0; redrawRec(); fillList();
     say('Kept, in My Recordings.');
   }
 

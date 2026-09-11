@@ -90,6 +90,44 @@
     if (s < 86400) return Math.floor(s / 3600) + 'h ago';
     return Math.floor(s / 86400) + 'd ago';
   }
+  /* The note line that travelled with the take. Same rule as the big chart:
+     break the line where the voice was not there, rather than drawing a
+     slide nobody sang. */
+  function notesSvg(notes) {
+    var pts = (notes || []).filter(function (p) { return p && p.m != null; });
+    if (pts.length < 4) return '';
+    var lo = Math.min.apply(null, pts.map(function (p) { return p.m; })) - 1;
+    var hi = Math.max.apply(null, pts.map(function (p) { return p.m; })) + 1;
+    if (hi - lo < 6) { var mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
+    var t1 = notes[notes.length - 1].t || 1;
+    var W = 300, H = 64;
+    var d = '', pen = false, prev = null;
+    notes.forEach(function (p) {
+      if (p.m == null) { pen = false; prev = null; return; }
+      var x = (p.t / t1) * W;
+      var y = H - ((p.m - lo) / (hi - lo)) * H;
+      var leap = prev && Math.abs(p.m - prev.m) > 6;
+      d += (!pen || leap ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      pen = true; prev = p;
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
+      'style="width:100%;height:64px;display:block;margin-top:8px;background:var(--panel2);' +
+      'border-radius:8px"><path d="' + d + '" fill="none" stroke="var(--accent2)" ' +
+      'stroke-width="2" stroke-linejoin="round"/></svg>';
+  }
+
+  function noteRange(notes) {
+    var pts = (notes || []).filter(function (p) { return p && p.m != null; });
+    if (!pts.length) return '';
+    var lo = Math.round(Math.min.apply(null, pts.map(function (p) { return p.m; })));
+    var hi = Math.round(Math.max.apply(null, pts.map(function (p) { return p.m; })));
+    var nm = function (m) {
+      try { return V10.midiName ? V10.midiName(m) : (window.midiName ? midiName(m) : m); }
+      catch (e) { return m; }
+    };
+    return nm(lo) + ' to ' + nm(hi);
+  }
+
   function nameOf(id) {
     if (RP.profile && RP.profile.id === id) return 'You';
     if (RP.coach && RP.coach.id === id) return RP.coach.display_name;
@@ -404,7 +442,15 @@
     takes.slice(0, 10).forEach(function (t) {
       h += '<div class="rp-card"><div class="rp-ttl">' + esc(t.title) +
         '<span class="rp-tag">' + ago(t.created_at) + '</span></div>' +
-        (t.note ? '<div class="rp-sub">' + esc(t.note) + '</div>' : '') + '</div>';
+        (t.note ? '<div class="rp-sub">' + esc(t.note) + '</div>' : '');
+      if (t.audio_path) {
+        h += '<button class="btn" data-hear="' + esc(t.id) + '" style="margin-top:8px;padding:8px 13px;font-size:12.5px">Listen</button>';
+      }
+      if (t.notes && t.notes.length) {
+        h += '<div class="rp-sub" style="margin-top:7px">Sang ' + esc(noteRange(t.notes)) + '</div>' +
+             notesSvg(t.notes);
+      }
+      h += '</div>';
     });
 
     h += '<div class="row" style="margin-top:14px;gap:7px;flex-wrap:nowrap">' +
@@ -414,6 +460,7 @@
   }
 
   function wireStudentDetail(host) {
+    wireTakeAudio(host);
     on($('rpBack'), 'click', function () { openStudent = null; renderTeacher(); });
     on($('rpAssign'), 'click', function () { assignSheet(openStudent); });
     each(host, '[data-drop]', function (b) {
@@ -552,7 +599,15 @@
       if (i.kind === 'take') {
         h += '<div class="rp-card hot"><div class="rp-ttl">' + esc(nameOf(i.o.student_id)) +
           ' sent a take<span class="rp-tag">' + ago(i.at) + '</span></div>' +
-          '<div class="rp-sub"><b>' + esc(i.o.title) + '</b>' + (i.o.note ? ' — ' + esc(i.o.note) : '') + '</div></div>';
+          '<div class="rp-sub"><b>' + esc(i.o.title) + '</b>' + (i.o.note ? ' — ' + esc(i.o.note) : '') + '</div>';
+        if (i.o.audio_path) {
+          h += '<button class="btn" data-hear="' + esc(i.o.id) + '" style="margin-top:8px;padding:8px 13px;font-size:12.5px">Listen</button>';
+        }
+        if (i.o.notes && i.o.notes.length) {
+          h += '<div class="rp-sub" style="margin-top:7px">Sang ' + esc(noteRange(i.o.notes)) + '</div>' +
+               notesSvg(i.o.notes);
+        }
+        h += '</div>';
       } else {
         h += '<div class="rp-card"><div class="rp-sub" style="margin:0"><b>' + esc(nameOf(i.o.from_id)) +
           '</b> · ' + ago(i.at) + '</div><div style="font-size:13px;margin-top:4px">' + esc(i.o.body) + '</div></div>';
@@ -560,7 +615,27 @@
     });
     return h;
   }
-  function wireInbox() {}
+  function wireTakeAudio(host) {
+    if (!host) return;
+    each(host, '[data-hear]', function (b) {
+      on(b, 'click', async function () {
+        var t = (RP.takes || []).find(function (x) { return x.id === b.dataset.hear; });
+        if (!t || !t.audio_path) return RP.toast('No audio on that one.');
+        b.disabled = true; b.textContent = 'Loading…';
+        var url = window.RPSend ? await RPSend.playable(t.audio_path) : null;
+        b.disabled = false; b.textContent = 'Listen';
+        if (!url) return RP.toast('Could not fetch that take.');
+        try {
+          if (wireTakeAudio._a) wireTakeAudio._a.pause();
+          var a = new Audio(url);
+          wireTakeAudio._a = a;
+          a.play().catch(function () { RP.toast('The phone would not play it.'); });
+        } catch (e) { RP.toast('Could not play it.'); }
+      });
+    });
+  }
+
+  function wireInbox(host) { wireTakeAudio(host); }
 
   /* ================================================================ */
   /* the switch                                                        */
