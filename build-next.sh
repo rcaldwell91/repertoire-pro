@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -143,14 +143,14 @@ WORDS = [
      '<p>Sing along to any video, kept in your range</p>'),
     ('<p>Songs, takes &amp; note maps</p>',
      '<p>Your songs, and every take you have recorded</p>'),
-    ('<p>Your voice, live on the keyboard</p>',
-     '<p>See your voice on the keys as you sing</p>'),
+    ('<h4>Pitch Monitor</h4><p>Your voice, live on the keyboard</p>',
+     '<h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p>'),
     ('<p>Note bars, words &amp; scoring &mdash; your songs, takes or built-ins</p>',
      '<p>Sing a song and see every note you hit</p>'),
     ('<p>Karaoke over songs you own, with key rails</p>',
      '<p>Sing over songs you own, kept in your range</p>'),
-    ('<p>Live pitch on the keys — see the exact note</p>',
-     '<p>See your voice on the keys as you sing</p>'),
+    ('<h4>Pitch Monitor</h4><p>Live pitch on the keys — see the exact note</p>',
+     '<h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p>'),
 ]
 for a, r in WORDS:
     if a in base:
@@ -162,7 +162,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-studio.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'
