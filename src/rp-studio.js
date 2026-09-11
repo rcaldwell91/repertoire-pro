@@ -43,7 +43,21 @@
   /* ---------------------------------------------------------------- */
   /* the panel                                                         */
   /* ---------------------------------------------------------------- */
+  function title() {
+    var host = $('modeFree');
+    if (!host || $('rpPitchTitle')) return;
+    var back = host.querySelector('.backpill');
+    var t = document.createElement('div');
+    t.id = 'rpPitchTitle';
+    t.innerHTML = '<h1 style="margin:0 0 2px">Pitch Tracker</h1>' +
+      '<div class="rp-sub" style="margin:0 0 12px">Every note you sing, measured. Record a take and ' +
+      'the notes are kept with it.</div>';
+    if (back && back.parentNode === host) host.insertBefore(t, back.nextSibling);
+    else host.insertBefore(t, host.firstChild);
+  }
+
   function mount() {
+    title();
     var host = $('modeFree');
     if (!host || $('rpStudio')) return;
     var hud = host.querySelector('.hud');

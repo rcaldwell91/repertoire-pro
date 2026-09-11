@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -120,6 +120,19 @@ PATCHES = [
   const center = near.length ? near[near.length >> 1]
                : (vals.length ? vals[vals.length-1] : 57);"""),
 
+    # 6. Free Sing and the Pitch Tracker are two different features. The Sing
+    #    menu and the Home card now open Free Sing (a screen of its own); the
+    #    old pitch screen belongs to Train, so its back button goes there
+    #    instead of offering a "Sing menu" nobody came from.
+    ("""$('mcFree').addEventListener('click', ()=>switchMode('free'));""",
+     """$('mcFree').addEventListener('click', ()=>switchMode('voice'));"""),
+    ("""$('shFree').addEventListener('click', ()=>switchMode('free'));""",
+     """$('shFree').addEventListener('click', ()=>switchMode('voice'));"""),
+    ("""$('bsFree').addEventListener('click', ()=>switchMode('singhub'));""",
+     """$('bsFree').addEventListener('click', ()=>switchMode('train'));"""),
+    ('<button class="pill backpill" id="bsFree">\u2190 Sing menu</button>',
+     '<button class="pill backpill" id="bsFree">\u2190 Train</button>'),
+
     # 2. Steady note: the percentage of the hold that stayed inside the window.
     ("    $('susResult').textContent = pct+'% steady — '+msg;",
      "    $('susResult').textContent = pct+'% steady — '+msg;\n"
@@ -162,7 +175,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-studio.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-studio.js', 'src/rp-voice.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'
