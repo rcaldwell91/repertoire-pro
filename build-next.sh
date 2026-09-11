@@ -79,6 +79,47 @@ PATCHES = [
   /* go straight to what worked next time, instead of walking the ladder again */
   if(stream){ try{ localStorage.setItem('rep_micprof', String(MIC_PROFILES.indexOf(prof))); }catch(e){} }"""),
 
+    # 4. THE PITCH MONITOR'S VERTICAL BLUE LINES.
+    #    Robert, singing into a headset: "the line would come from the top of
+    #    the box all the way down to the note, this giant vertical blue line".
+    #    The tracker reads an octave out for a frame or two — every tracker
+    #    does — and the chart joined that stray reading to the notes either
+    #    side, drawing a slide nobody sang. Lift the pen across a jump no
+    #    voice could make. A gap is true; a vertical line is not.
+    #    The note and cents readout is untouched: it still reports exactly
+    #    what was measured.
+    ("""  c2.beginPath(); let started=false;
+  for(const p of trail){
+    if(p.m===null){ started=false; continue; }
+    const x = W - (now-p.t)*pps;
+    const y = yOf(p.m);
+    if(!started){ c2.moveTo(x,y); started=true; } else c2.lineTo(x,y);
+  }""",
+     """  c2.beginPath(); let started=false, prev=null;
+  for(const p of trail){
+    if(p.m===null){ started=false; prev=null; continue; }
+    const x = W - (now-p.t)*pps;
+    const y = yOf(p.m);
+    /* Frames arrive about every 16ms. A real leap, even a fast one, passes
+       through the notes between it and leaves frames along the way; the
+       tracker's slips do not — they are a clean jump of an octave, or
+       sometimes a fifth. Break above a fifth, so genuine melodic leaps stay
+       joined and only the slips are cut. */
+    const leap = prev && (Math.abs(p.m - prev.m) > 6 || (p.t - prev.t) > 0.15);
+    if(!started || leap){ c2.moveTo(x,y); started=true; } else c2.lineTo(x,y);
+    prev = p;
+  }"""),
+
+    # 5. ...and the same stray frame used to yank the whole view, because the
+    #    window centred on the single newest reading. It now centres on the
+    #    median of the last moment, so one bad frame cannot move the chart.
+    ("""  const vals = trail.filter(p=>p.m!==null).map(p=>p.m);
+  const center = vals.length? vals[vals.length-1] : 57;""",
+     """  const vals = trail.filter(p=>p.m!==null).map(p=>p.m);
+  const near = trail.filter(p=>p.m!==null && now-p.t < 0.7).map(p=>p.m).sort((a,b)=>a-b);
+  const center = near.length ? near[near.length >> 1]
+               : (vals.length ? vals[vals.length-1] : 57);"""),
+
     # 2. Steady note: the percentage of the hold that stayed inside the window.
     ("    $('susResult').textContent = pct+'% steady — '+msg;",
      "    $('susResult').textContent = pct+'% steady — '+msg;\n"
