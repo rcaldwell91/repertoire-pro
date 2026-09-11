@@ -162,7 +162,8 @@
     if (!t) return;
     e.preventDefault(); e.stopPropagation();
     var term = t.dataset.term;
-    say(t.textContent, G[term] || '');
+    var shown = t.textContent;
+    say(shown.charAt(0).toUpperCase() + shown.slice(1), G[term] || '');
   }, true);
 
   function say(word, meaning) {
@@ -176,7 +177,7 @@
       document.body.appendChild(o);
       on(o, 'click', function () { o.style.display = 'none'; });
     }
-    o.innerHTML = '<div style="font-size:14px;font-weight:900;text-transform:capitalize">' + esc(word) + '</div>' +
+    o.innerHTML = '<div style="font-size:14px;font-weight:900">' + esc(word) + '</div>' +
       '<div style="font-size:13px;color:var(--ink-dim);line-height:1.5;margin-top:4px">' + esc(meaning) + '</div>' +
       '<div style="font-size:10.5px;color:var(--ink-faint);margin-top:7px">Tap to close</div>';
     o.style.display = 'block';
@@ -379,11 +380,36 @@
      longer covers the tabs (see rp-skin.css). */
   function tameMicDialog() {
     var d = $('micHelp');
-    if (!d || d.dataset.rpTame) return;
-    d.dataset.rpTame = '1';
-    d.addEventListener('click', function (e) {
-      if (e.target === d) d.style.display = 'none';
-    });
+    if (!d) return;
+    if (!d.dataset.rpTame) {
+      d.dataset.rpTame = '1';
+      d.addEventListener('click', function (e) {
+        if (e.target === d) d.style.display = 'none';
+      });
+    }
+    // A first-timer who cannot free the microphone has nowhere to go: both
+    // buttons assume they can fix it. Plenty of the app does not need a mic,
+    // so say so and let them get on with it.
+    var row = d.querySelector('.row');
+    if (row && !$('rpNoMic')) {
+      var b = document.createElement('button');
+      b.className = 'btn ghost';
+      b.id = 'rpNoMic';
+      b.style.cssText = 'margin-right:auto';
+      b.textContent = 'Carry on without it';
+      on(b, 'click', function () {
+        d.style.display = 'none';
+        noMicNote();
+      });
+      row.insertBefore(b, row.firstChild);
+    }
+  }
+
+  function noMicNote() {
+    say('Without a microphone',
+      'Plenty still works: the breathing exercises, Higher or lower in the ear drills, ' +
+      'every theory game, and all of the Learn tab. Anything that listens to you will ' +
+      'wait until the mic is free.');
   }
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;

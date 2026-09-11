@@ -22,6 +22,18 @@ PATCHES = [
      "      label: 'Ear · ' + EAR.kind, score: EAR.score, out_of: EAR.rounds, cents: avg }); } catch (e) {}\n"
      "    V10.markPractised('Ear training');"),
 
+    # 3. Android hands the microphone back a beat late when another app has
+    #    just let go of it. One retry after 350ms was not patient enough on
+    #    Briar's phone, so this waits longer and tries twice more.
+    ("""      micRelease();
+      await new Promise(r => setTimeout(r, 350));
+      try{ stream = await ask(want); err = null; }catch(e2){ err = e2; }""",
+     """      micRelease();
+      for(const wait of [350, 900, 1800]){
+        await new Promise(r => setTimeout(r, wait));
+        try{ stream = await ask(want); err = null; break; }catch(e2){ err = e2; }
+      }"""),
+
     # 2. Steady note: the percentage of the hold that stayed inside the window.
     ("    $('susResult').textContent = pct+'% steady — '+msg;",
      "    $('susResult').textContent = pct+'% steady — '+msg;\n"
