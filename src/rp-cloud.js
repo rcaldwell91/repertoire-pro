@@ -533,12 +533,17 @@
   function rerender() {
     brand();
     syncHeaderButton();
+    /* `state` is a top-level const in the build, so window.state is undefined
+       and this used to never fire — an assignment arriving live raised the
+       toast but left the list exactly as it was until you navigated away and
+       back. That is the one thing the whole live-sync idea rests on. */
     try {
-      if (window.state && window.state.mode === 'coach' && window.V10 && window.V10.renderCoach) {
-        window.V10.renderCoach();
-      }
+      var mode = (typeof state !== 'undefined' && state) ? state.mode : null;
+      if (mode === 'coach' && window.V10 && V10.renderCoach) V10.renderCoach();
     } catch (e) {}
   }
+
+  RP.rerender = rerender;   // so this path can actually be tested
 
   /* ---------------------------------------------------------------- */
   /* boot                                                              */

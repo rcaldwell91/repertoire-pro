@@ -298,8 +298,9 @@
     var h = '<div class="rp-brandbar"></div>' +
       '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
       '<div><h1 style="margin:0 0 2px">Coach</h1>' +
-      '<div class="rp-sub" style="margin:0">' + esc(me.display_name) + ' · code <b style="letter-spacing:2px;' +
-      'color:var(--gold)">' + esc(me.coach_code || '') + '</b></div></div>' +
+      '<div class="rp-sub" style="margin:0">' + esc(me.display_name) +
+      (me.coach_code ? ' · code <b style="letter-spacing:2px;color:var(--gold)">' +
+        esc(me.coach_code) + '</b>' : '') + '</div></div>' +
       '<button class="btn" id="rpToStudent" style="padding:7px 11px;font-size:12px">My practice</button></div>';
 
     h += '<div class="rp-seg">' +
@@ -336,9 +337,11 @@
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
     if (!RP.students.length) {
-      h += '<div class="rp-empty">Nobody yet. Read a student your code — ' +
-        '<b style="letter-spacing:2px;color:var(--gold)">' + esc((RP.profile || {}).coach_code || '') +
-        '</b> — and they join themselves, or tap <b>Add student</b> to do it from here.</div>';
+      h += '<div class="rp-empty">Nobody yet. ' +
+        ((RP.profile || {}).coach_code
+          ? 'Read a student your code — <b style="letter-spacing:2px;color:var(--gold)">' +
+            esc(RP.profile.coach_code) + '</b> — and they join themselves, or tap <b>Add student</b>.'
+          : 'Tap <b>Add student</b> to take someone on.') + '</div>';
       return h;
     }
     RP.students.forEach(function (s) {
@@ -362,9 +365,12 @@
 
   function addStudentSheet() {
     var h = '<b style="font-size:16px">Add a student</b>' +
-      '<div class="measured" style="margin-top:6px">Or just read them your code — ' +
-      '<b style="letter-spacing:2px">' + esc((RP.profile || {}).coach_code || '') + '</b> — and they join ' +
-      'themselves. Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
+      '<div class="measured" style="margin-top:6px">' +
+      ((RP.profile || {}).coach_code
+        ? 'Or just read them your code — <b style="letter-spacing:2px">' +
+          esc(RP.profile.coach_code) + '</b> — and they join themselves. '
+        : '') +
+      'Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:10px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
