@@ -1394,7 +1394,11 @@ async function startMic(opts){
   let saved = null; try{ saved = localStorage.getItem('rep_micdev') || null; }catch(e){}
   if(MIC.badDev && saved === MIC.badDev) saved = null;   // that one took the phone down
   const wanted = opts.deviceId || MIC.deviceId || saved || null;
-  const prof = MIC_PROFILES[(opts.profile != null) ? opts.profile : 0];
+  let savedProf = null;
+  try{ const sp = localStorage.getItem('rep_micprof'); if(sp !== null && sp !== '') savedProf = +sp; }catch(e){}
+  const profIdx = (opts.profile != null) ? opts.profile
+                : (savedProf != null && MIC_PROFILES[savedProf]) ? savedProf : 0;
+  let prof = MIC_PROFILES[profIdx];
   let audio = (prof.c === true) ? {} : Object.assign({}, prof.c);
   if(wanted) audio.deviceId = {exact: wanted};
   const ask = (c) => { MIC.asks = (MIC.asks||0) + 1; return navigator.mediaDevices.getUserMedia({audio: c}); };
@@ -1406,21 +1410,30 @@ async function startMic(opts){
      time and must not be retried automatically. */
   try{ if(wanted) localStorage.setItem('rep_micpending', wanted); }catch(e){}
   let stream = null, err = null;
-  try{ stream = await ask(want); }
-  catch(e1){
-    err = e1;
-    if(micIsBusyErr(e1)){
-      // it may be US holding it. Let go, give the OS a breath, ask once more.
-      micRelease();
-      for(const wait of [350, 900, 1800]){
-        await new Promise(r => setTimeout(r, wait));
-        try{ stream = await ask(want); err = null; break; }catch(e2){ err = e2; }
+  /* preferred first, then the same thing without the named device, then every
+     other capture mode. One release-and-retry per rung, because Android hands
+     the microphone back a beat after another app lets go of it. */
+  const rungs = [{p: prof, dev: wanted}];
+  if(wanted) rungs.push({p: prof, dev: null});
+  MIC_PROFILES.forEach((pp, i) => { if(i !== profIdx) rungs.push({p: pp, dev: null}); });
+
+  for(const rung of rungs){
+    const cc = (rung.p.c === true)
+      ? (rung.dev ? {deviceId:{exact:rung.dev}} : true)
+      : Object.assign({}, rung.p.c, rung.dev ? {deviceId:{exact:rung.dev}} : {});
+    try{ stream = await ask(cc); err = null; }
+    catch(eA){
+      err = eA;
+      if(micIsBusyErr(eA)){
+        micRelease();
+        await new Promise(r => setTimeout(r, 400));
+        try{ stream = await ask(cc); err = null; }catch(eB){ err = eB; }
       }
     }
-    if(!stream && wanted){            // that device may be gone — retry without it
-      try{ stream = await ask(prof.c === true ? true : prof.c); err = null; }catch(e3){ err = e3; }
-    }
+    if(stream){ prof = rung.p; break; }
   }
+  /* go straight to what worked next time, instead of walking the ladder again */
+  if(stream){ try{ localStorage.setItem('rep_micprof', String(MIC_PROFILES.indexOf(prof))); }catch(e){} }
   try{ localStorage.removeItem('rep_micpending'); }catch(e){}   // we survived
   if(!stream){ micFillDevices(); micCheckUpdate(); throw err; }
   ensureCtx();                         // now, on the settled audio path
@@ -10901,18 +10914,40 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   /* ---------------------------------------------------------------- */
   /* account button in the header                                      */
   /* ---------------------------------------------------------------- */
+  /* The header was a flex row with space-between and four separate children,
+     so the gear ended up floating on its own between the logo and the rest —
+     centred on nothing. Everything that is not the logo now sits in one group
+     pinned to the right, which is where a row of controls belongs. */
+  function tidyHeader() {
+    var head = document.querySelector('header');
+    if (!head) return null;
+    var group = head.querySelector('.rp-headtools');
+    if (group) return group;
+    var logo = head.querySelector('.logo');
+    group = document.createElement('div');
+    group.className = 'rp-headtools';
+    group.style.cssText = 'display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap';
+    Array.prototype.slice.call(head.children).forEach(function (el) {
+      if (el !== logo) group.appendChild(el);
+    });
+    head.appendChild(group);
+    // the old per-button margins fought the gap
+    group.querySelectorAll('.btn, .pill').forEach(function (el) { el.style.marginRight = '0'; });
+    return group;
+  }
+
   function mountHeaderButton() {
     if ($('rpAccount')) return;
     var head = document.querySelector('header');
     if (!head) return;
+    var group = tidyHeader();
     var b = document.createElement('button');
     b.id = 'rpAccount';
     b.className = 'btn';
-    b.style.cssText = 'padding:7px 11px;font-size:12px;margin-right:6px';
+    b.style.cssText = 'padding:7px 11px;font-size:12px';
     b.textContent = 'Sign in';
     on(b, 'click', function () { RP.user ? openAccount() : openAuth(); });
-    var pill = $('micPillTop');
-    pill ? head.insertBefore(b, pill) : head.appendChild(b);
+    (group || head).appendChild(b);
     syncHeaderButton();
   }
   function syncHeaderButton() {

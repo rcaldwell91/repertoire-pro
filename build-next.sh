@@ -22,17 +22,62 @@ PATCHES = [
      "      label: 'Ear · ' + EAR.kind, score: EAR.score, out_of: EAR.rounds, cents: avg }); } catch (e) {}\n"
      "    V10.markPractised('Ear training');"),
 
-    # 3. Android hands the microphone back a beat late when another app has
-    #    just let go of it. One retry after 350ms was not patient enough on
-    #    Briar's phone, so this waits longer and tries twice more.
-    ("""      micRelease();
+    # 3. THE MICROPHONE LADDER.
+    #    'raw' capture — echo cancellation, noise suppression and gain control
+    #    all off — is the best input for reading pitch, so it is asked for
+    #    first and that does not change. But a lot of Android phones cannot
+    #    open the unprocessed path at all and answer NotReadableError however
+    #    many times you ask. The old code retried the SAME constraints twice
+    #    and then gave up, which is why Briar's phone could never work and why
+    #    closing tabs and restarting made no difference. Now, if the phone says
+    #    no, we ask for something it is likelier to be able to give, and we
+    #    remember whatever finally worked.
+    ("""  const prof = MIC_PROFILES[(opts.profile != null) ? opts.profile : 0];""",
+     """  let savedProf = null;
+  try{ const sp = localStorage.getItem('rep_micprof'); if(sp !== null && sp !== '') savedProf = +sp; }catch(e){}
+  const profIdx = (opts.profile != null) ? opts.profile
+                : (savedProf != null && MIC_PROFILES[savedProf]) ? savedProf : 0;
+  let prof = MIC_PROFILES[profIdx];"""),
+
+    ("""  let stream = null, err = null;
+  try{ stream = await ask(want); }
+  catch(e1){
+    err = e1;
+    if(micIsBusyErr(e1)){
+      // it may be US holding it. Let go, give the OS a breath, ask once more.
+      micRelease();
       await new Promise(r => setTimeout(r, 350));
-      try{ stream = await ask(want); err = null; }catch(e2){ err = e2; }""",
-     """      micRelease();
-      for(const wait of [350, 900, 1800]){
-        await new Promise(r => setTimeout(r, wait));
-        try{ stream = await ask(want); err = null; break; }catch(e2){ err = e2; }
-      }"""),
+      try{ stream = await ask(want); err = null; }catch(e2){ err = e2; }
+    }
+    if(!stream && wanted){            // that device may be gone — retry without it
+      try{ stream = await ask(prof.c === true ? true : prof.c); err = null; }catch(e3){ err = e3; }
+    }
+  }""",
+     """  let stream = null, err = null;
+  /* preferred first, then the same thing without the named device, then every
+     other capture mode. One release-and-retry per rung, because Android hands
+     the microphone back a beat after another app lets go of it. */
+  const rungs = [{p: prof, dev: wanted}];
+  if(wanted) rungs.push({p: prof, dev: null});
+  MIC_PROFILES.forEach((pp, i) => { if(i !== profIdx) rungs.push({p: pp, dev: null}); });
+
+  for(const rung of rungs){
+    const cc = (rung.p.c === true)
+      ? (rung.dev ? {deviceId:{exact:rung.dev}} : true)
+      : Object.assign({}, rung.p.c, rung.dev ? {deviceId:{exact:rung.dev}} : {});
+    try{ stream = await ask(cc); err = null; }
+    catch(eA){
+      err = eA;
+      if(micIsBusyErr(eA)){
+        micRelease();
+        await new Promise(r => setTimeout(r, 400));
+        try{ stream = await ask(cc); err = null; }catch(eB){ err = eB; }
+      }
+    }
+    if(stream){ prof = rung.p; break; }
+  }
+  /* go straight to what worked next time, instead of walking the ladder again */
+  if(stream){ try{ localStorage.setItem('rep_micprof', String(MIC_PROFILES.indexOf(prof))); }catch(e){} }"""),
 
     # 2. Steady note: the percentage of the hold that stayed inside the window.
     ("    $('susResult').textContent = pct+'% steady — '+msg;",

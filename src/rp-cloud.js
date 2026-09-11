@@ -76,18 +76,40 @@
   /* ---------------------------------------------------------------- */
   /* account button in the header                                      */
   /* ---------------------------------------------------------------- */
+  /* The header was a flex row with space-between and four separate children,
+     so the gear ended up floating on its own between the logo and the rest —
+     centred on nothing. Everything that is not the logo now sits in one group
+     pinned to the right, which is where a row of controls belongs. */
+  function tidyHeader() {
+    var head = document.querySelector('header');
+    if (!head) return null;
+    var group = head.querySelector('.rp-headtools');
+    if (group) return group;
+    var logo = head.querySelector('.logo');
+    group = document.createElement('div');
+    group.className = 'rp-headtools';
+    group.style.cssText = 'display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:nowrap';
+    Array.prototype.slice.call(head.children).forEach(function (el) {
+      if (el !== logo) group.appendChild(el);
+    });
+    head.appendChild(group);
+    // the old per-button margins fought the gap
+    group.querySelectorAll('.btn, .pill').forEach(function (el) { el.style.marginRight = '0'; });
+    return group;
+  }
+
   function mountHeaderButton() {
     if ($('rpAccount')) return;
     var head = document.querySelector('header');
     if (!head) return;
+    var group = tidyHeader();
     var b = document.createElement('button');
     b.id = 'rpAccount';
     b.className = 'btn';
-    b.style.cssText = 'padding:7px 11px;font-size:12px;margin-right:6px';
+    b.style.cssText = 'padding:7px 11px;font-size:12px';
     b.textContent = 'Sign in';
     on(b, 'click', function () { RP.user ? openAccount() : openAuth(); });
-    var pill = $('micPillTop');
-    pill ? head.insertBefore(b, pill) : head.appendChild(b);
+    (group || head).appendChild(b);
     syncHeaderButton();
   }
   function syncHeaderButton() {
