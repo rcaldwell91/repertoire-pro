@@ -11114,6 +11114,18 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       '<div class="measured" style="margin-top:6px">' + esc(p.email || '') +
       (p.is_coach ? ' · teaching' : '') + '</div>';
 
+    /* Requiring a name at sign-up only helps people who have not signed up
+       yet. Robert's own account was made before that and is still called
+       "lyonxdewitt" on his coach's phone, and deleting the account to fix a
+       name is not a thing anyone should have to do. */
+    h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
+      '<label class="rp-lab">THE NAME YOUR COACH SEES</label>' +
+      '<div class="row" style="gap:7px;margin-top:6px;flex-wrap:nowrap">' +
+      '<input id="rpNewName" class="rp-inp" style="flex:1" maxlength="40" ' +
+      'autocomplete="name" value="' + esc(p.display_name || '') + '">' +
+      '<button class="btn primary" id="rpNameGo" style="padding:11px 15px">Save</button></div>' +
+      '<div id="rpNameMsg" class="measured" style="margin-top:7px"></div></div>';
+
     if (p.is_coach) {
       h += '<div class="rp-card hot" style="margin-top:14px"><div class="rp-lab">YOUR COACH CODE</div>' +
         '<div style="font-size:31px;font-weight:900;letter-spacing:3px">' + esc(p.coach_code || '') + '</div>' +
@@ -11141,6 +11153,8 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     h += '<button class="btn" id="rpX" style="margin-top:8px;width:100%;padding:11px">Close</button>';
     sheet(h);
     on($('rpX'), 'click', closeSheet);
+    on($('rpNameGo'), 'click', saveName);
+    on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
     on($('rpCoachCol'), 'click', function () {
@@ -11158,6 +11172,40 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     on($('rpOut'), 'click', function () {
       RP.sb.auth.signOut().then(function () { closeSheet(); toast('Signed out. The app still works.'); });
     });
+  }
+
+  function saveName() {
+    var i = $('rpNewName'), m = $('rpNameMsg'), b = $('rpNameGo');
+    var name = (i.value || '').trim();
+    if (name.length < 2) {
+      m.textContent = 'That is a bit short for a name.';
+      m.style.color = 'var(--miss)';
+      return;
+    }
+    if (name === (RP.profile && RP.profile.display_name)) {
+      m.textContent = 'That is already your name.';
+      m.style.color = 'var(--ink-dim)';
+      return;
+    }
+    b.disabled = true;
+    m.textContent = 'Saving…'; m.style.color = 'var(--ink-dim)';
+    RP.sb.from('profiles').update({ display_name: name }).eq('id', RP.user.id)
+      .then(function (r) {
+        b.disabled = false;
+        if (r.error) {
+          m.textContent = r.error.message;
+          m.style.color = 'var(--miss)';
+          return;
+        }
+        /* The profiles row is what everyone else reads, so that is what had to
+           change. The auth record keeps its own copy of the name; bring it
+           along so a fresh sign-in does not put the old one back. */
+        try { RP.sb.auth.updateUser({ data: { display_name: name } }); } catch (e) {}
+        RP.refresh().then(function () {
+          openAccount();
+          toast('You are ' + name + ' now.');
+        });
+      });
   }
 
   function setFace(f) {
@@ -11693,9 +11741,12 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     if (mine.length) {
       h += '<div class="rp-lab" style="margin-top:12px">YOUR TAKES · ON THIS PHONE</div>';
       mine.forEach(function (t) {
+        var svg = (t.notes && t.notes.length && window.RPStudio && RPStudio.lineHtml)
+          ? RPStudio.lineHtml(t.notes, t.id) : '';
         h += '<div class="rp-card" style="padding:10px;margin-top:7px">' +
           '<div class="rp-ttl" style="font-size:13px">' + esc(t.title) +
           (t.sentAt ? '<span class="rp-tag">submitted</span>' : '') + '</div>' +
+          svg +
           '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap">' +
           '<button class="btn" data-ahear="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Listen</button>' +
           '<button class="btn" data-adl="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Download</button>' +
@@ -11740,6 +11791,9 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
           var au = new Audio(wireAssignmentCards._u);
           wireAssignmentCards._a = au;
           au.play().catch(function () { RP.toast('The phone would not play it.'); });
+          var svg = host.querySelector('[data-pl="' +
+            (window.CSS && CSS.escape ? CSS.escape(t.id) : t.id) + '"]');
+          if (svg && window.RPStudio && RPStudio.followLine) RPStudio.followLine(svg, au);
         } catch (e) { RP.toast('Could not play that one.'); }
       });
     });
@@ -12002,6 +12056,16 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
   function assignSheet(studentId) {
     var s = RP.students.find(function (x) { return x.id === studentId; });
+    /* One assign in four silently did nothing during testing and could not be
+       reproduced. The shape of that failure — a sheet that opens fine and an
+       insert that never lands — is what an unset studentId looks like, since
+       a background refresh can reset which student is open underneath a sheet
+       that is already up. Rather than guess at the cause, refuse to open a
+       sheet that cannot possibly work, and say why. */
+    if (!studentId || !s) {
+      RP.toast('Lost track of which student that was — open them again.');
+      return;
+    }
     var h = '<b style="font-size:16px">Assign to ' + esc(s ? s.display_name : '') + '</b>' +
       '<div class="measured" style="margin-top:6px">Pick the exercise and it opens on their phone ' +
       'already set up — they will not have to go and find it.</div>';
@@ -12031,6 +12095,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       '<div style="margin-top:10px"><label class="rp-lab">A NOTE FOR THEM</label>' +
       '<textarea id="rpAsN" class="rp-inp" rows="3" placeholder="Optional — what to watch for."></textarea></div>' +
       '<button class="btn primary" id="rpAsGo" style="width:100%;padding:13px;margin-top:14px">Assign it</button>' +
+      '<div id="rpAsMsg" class="measured" style="margin-top:8px"></div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:8px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
@@ -12134,10 +12199,20 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
         app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null)
       };
       $('rpAsGo').disabled = true;
-      RP.sb.from('assignments').insert(row).then(function (r) {
-        if (r.error) { $('rpAsGo').disabled = false; return fail(r.error); }
+      var m = $('rpAsMsg');
+      if (m) { m.textContent = 'Sending it over\u2026'; m.style.color = 'var(--ink-dim)'; }
+      /* The error goes on the sheet, not only into a toast. A toast that is
+         missed is the same as no message at all, and this is the one action
+         the whole coaching side rests on. */
+      RP.sb.from('assignments').insert(row).select().then(function (r) {
+        if (r.error || !r.data || !r.data.length) {
+          $('rpAsGo').disabled = false;
+          var why = (r.error && r.error.message) || 'the database accepted nothing back';
+          if (m) { m.textContent = 'It did not send: ' + why; m.style.color = 'var(--miss)'; }
+          return fail(r.error || new Error(why));
+        }
         RP.closeSheet();
-        RP.toast('Assigned to ' + (s ? s.display_name.split(' ')[0] : 'them'));
+        RP.toast('Assigned to ' + s.display_name.split(' ')[0]);
         RP.refresh();
       });
     });
@@ -13106,16 +13181,22 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     var h = '';
     list.slice(0, 12).forEach(function (s) {
       var hasNotes = !!(s.notes && s.notes.length);
+      /* The pitch line, drawn on the take itself. Hearing it back without
+         seeing where you were is the half that teaches you nothing. */
+      var svg = (hasNotes && window.RPStudio && RPStudio.lineHtml)
+        ? RPStudio.lineHtml(s.notes, s.id) : '';
       h += '<div class="rp-card" style="padding:11px">' +
         '<div class="rp-ttl">' + esc(s.title) +
         (hasNotes ? '<span class="rp-tag">notes</span>' : '') +
         (s.fx ? '<span class="rp-tag">effects</span>' : '') +
         (s.sentAt ? '<span class="rp-tag">sent</span>' : '') + '</div>' +
         (s.sentAt ? '<div class="rp-sub" style="margin:4px 0 0">Sent to your coach.</div>' : '') +
+        svg +
         '<div class="row" style="gap:6px;margin-top:8px">' +
+        '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>' +
         (kind === 'pitch'
           ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
-          : '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>') +
+          : '') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
         '<button class="btn' + (s.sentAt ? '' : ' primary') + '" data-send="' + esc(s.id) +
         '" style="flex:1;padding:9px;font-size:12px">' + (s.sentAt ? 'Send again' : 'Send to coach') + '</button>' +
@@ -13155,6 +13236,8 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
           if (S._a) { S._a.pause(); URL.revokeObjectURL(S._a._u); }
           var a = new Audio(); a._u = URL.createObjectURL(s.blob); a.src = a._u;
           a.play(); S._a = a;
+          var svg = root.querySelector('[data-pl="' + (window.CSS && CSS.escape ? CSS.escape(s.id) : s.id) + '"]');
+          if (svg && window.RPStudio && RPStudio.followLine) RPStudio.followLine(svg, a);
         } catch (e) { say('Could not play that one.'); }
       });
     });
@@ -13272,7 +13355,12 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       var n = ST.notes.filter(function (x) { return x.m != null; }).length;
       h += '<div class="notice" style="margin:8px 0 10px">' + fmt(ST.activeMs) +
         ' recorded' + (n ? ', with the pitch line' : '') + '. Keep it or throw it away.</div>';
-      h += '<div class="row" style="gap:7px">' +
+      /* The line goes in BEFORE the buttons, because deciding whether to keep
+         a take is a question about where you were, not only how it sounded. */
+      var svg = ST.lineHtml(ST.notes, 'pending');
+      if (svg) h += svg + '<div class="measured" style="margin-top:6px;font-size:11.5px">' +
+        'Where you actually were. Press play and the marker follows.</div>';
+      h += '<div class="row" style="gap:7px;margin-top:9px">' +
         '<button class="btn" id="rpStPlay" style="flex:1;padding:11px">' +
         (ST.playing ? 'Stop' : 'Play it back') + '</button>' +
         '<button class="btn primary" id="rpStKeep" style="flex:1;padding:11px">Keep</button></div>' +
@@ -13380,6 +13468,113 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     try { ST.rec.stop(); } catch (e) { ST.state = 'idle'; draw(); }
   }
 
+  /* ================================================================ */
+  /* THE PITCH LINE, DRAWN BACK                                        */
+  /*                                                                   */
+  /* Robert: "I wanna make sure that when you record a take on the     */
+  /* pitch tracker, it tracks the notes on the map with the blue line. */
+  /* Then when you listen back to it, or if you save it and then       */
+  /* listen back to it, it also shows the notes, because that's        */
+  /* what's important — to try to match the pitch."                    */
+  /*                                                                   */
+  /* The notes were always being stored with the audio. They were      */
+  /* only ever drawn on the coach's phone. Hearing a take without      */
+  /* seeing where you were is the half that does not teach you         */
+  /* anything, so it is drawn here too, with a playhead that follows   */
+  /* the audio — otherwise you can see the shape but not which bit of  */
+  /* it you are listening to.                                          */
+  /* ================================================================ */
+  var LINE_H = 96;
+
+  function noteName(m) {
+    try { return midiName(Math.round(m)); } catch (e) { return ''; }
+  }
+
+  function lineBounds(notes) {
+    var pts = (notes || []).filter(function (p) { return p && p.m != null; });
+    if (pts.length < 2) return null;
+    var ms = pts.map(function (p) { return p.m; });
+    var lo = Math.min.apply(null, ms) - 1.5;
+    var hi = Math.max.apply(null, ms) + 1.5;
+    if (hi - lo < 7) { var mid = (hi + lo) / 2; lo = mid - 3.5; hi = mid + 3.5; }
+    var last = notes[notes.length - 1];
+    var dur = (last && last.t) || 1;
+    return { lo: lo, hi: hi, dur: dur, n: pts.length };
+  }
+
+  /* An SVG the width of its box. The horizontal rules are semitones, named
+     down the left, so "am I on the note" is a question you can answer by
+     looking — which is the whole point of drawing it. */
+  ST.lineHtml = function (notes, id) {
+    var b = lineBounds(notes);
+    if (!b) return '';
+    var W = 300, H = LINE_H, PAD = 26;
+    var y = function (m) { return H - ((m - b.lo) / (b.hi - b.lo)) * H; };
+    var x = function (t) { return PAD + (t / b.dur) * (W - PAD); };
+
+    var g = '', labels = '';
+    var step = (b.hi - b.lo) > 18 ? 12 : ((b.hi - b.lo) > 10 ? 2 : 1);
+    for (var m = Math.ceil(b.lo); m <= b.hi; m++) {
+      if ((m - Math.ceil(b.lo)) % step) continue;
+      var yy = y(m).toFixed(1);
+      g += '<line x1="' + PAD + '" y1="' + yy + '" x2="' + W + '" y2="' + yy +
+        '" stroke="var(--line)" stroke-width="0.6"/>';
+      /* keep the name inside the box — the lowest rule sits on the floor and
+         its label was being cut in half */
+      var ly = Math.max(7, Math.min(H - 1.5, +yy + 3));
+      labels += '<text x="2" y="' + ly.toFixed(1) + '" font-size="7.5" ' +
+        'fill="var(--ink-faint)" font-weight="700">' + esc(noteName(m)) + '</text>';
+    }
+
+    var d = '', pen = false, prev = null;
+    (notes || []).forEach(function (p) {
+      if (p.m == null) { pen = false; prev = null; return; }
+      var leap = prev && Math.abs(p.m - prev.m) > 6;
+      d += (!pen || leap ? 'M' : 'L') + x(p.t).toFixed(1) + ' ' + y(p.m).toFixed(1) + ' ';
+      pen = true; prev = p;
+    });
+
+    return '<svg data-pl="' + esc(id || '') + '" data-dur="' + b.dur +
+      '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
+      'style="width:100%;height:' + H + 'px;display:block;margin-top:9px;' +
+      'background:var(--panel2);border-radius:9px">' +
+      g + labels +
+      '<path d="' + d + '" fill="none" stroke="var(--accent2)" stroke-width="2" ' +
+      'stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<line class="rp-ph" x1="' + PAD + '" y1="0" x2="' + PAD + '" y2="' + H +
+      '" stroke="var(--gold)" stroke-width="1.4" opacity="0"/></svg>';
+  };
+
+  /* Move the playhead with the audio. One loop at a time — a second Listen
+     takes the loop over rather than leaving two running. */
+  var follow = null;
+  ST.followLine = function (svg, audio) {
+    ST.unfollow();
+    if (!svg || !audio) return;
+    var ph = svg.querySelector('.rp-ph');
+    if (!ph) return;
+    var dur = +svg.getAttribute('data-dur') || 0;
+    var W = 300, PAD = 26;
+    follow = { svg: svg, audio: audio, raf: 0 };
+    ph.setAttribute('opacity', '1');
+    (function step() {
+      if (!follow || follow.svg !== svg) return;
+      var d = dur || audio.duration || 0;
+      if (d > 0 && isFinite(d)) {
+        var frac = Math.max(0, Math.min(1, (audio.currentTime || 0) / d));
+        var px = (PAD + frac * (W - PAD)).toFixed(1);
+        ph.setAttribute('x1', px); ph.setAttribute('x2', px);
+      }
+      if (audio.paused || audio.ended) { ph.setAttribute('opacity', '.35'); }
+      else { ph.setAttribute('opacity', '1'); }
+      follow.raf = requestAnimationFrame(step);
+    })();
+  };
+  ST.unfollow = function () {
+    if (follow && follow.raf) cancelAnimationFrame(follow.raf);
+    follow = null;
+  };
+
   /* ---------------------------------------------------------------- */
   /* listening back                                                    */
   /* ---------------------------------------------------------------- */
@@ -13389,6 +13584,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     return new Blob(ST.chunks, { type: (ST.rec && ST.rec.mimeType) || 'audio/webm' });
   }
   function stopPlay() {
+    ST.unfollow();
     if (ST.audio) { try { ST.audio.pause(); } catch (e) {} ST.audio = null; }
     if (ST.url) { URL.revokeObjectURL(ST.url); ST.url = null; }
     ST.playing = false;
@@ -13408,9 +13604,15 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     stopPlay();
     ST.url = URL.createObjectURL(b);
     ST.audio = new Audio(ST.url);
-    ST.audio.onended = function () { ST.playing = false; draw(); };
-    ST.audio.play().then(function () { ST.playing = true; draw(); })
-      .catch(function () { say('The phone would not play it back.'); });
+    ST.audio.onended = function () { ST.playing = false; ST.unfollow(); draw(); };
+    ST.audio.play().then(function () {
+      ST.playing = true;
+      draw();
+      /* draw() rebuilt the panel, so the svg to follow is the new one */
+      var d = $('rpStudio');
+      var svg = d && d.querySelector('[data-pl="pending"]');
+      if (svg) ST.followLine(svg, ST.audio);
+    }).catch(function () { say('The phone would not play it back.'); });
     draw();
   }
 
@@ -13581,6 +13783,62 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else setTimeout(boot, 400);
+})();
+
+/* ======================================================================
+   DuckDuckGo's browser and the microphone.
+
+   Robert, 12 Sep: "I figured out what was going on with Briar's phone. It
+   was when the app loaded on the browser, DuckDuckGo. But it worked on
+   Chrome. It didn't work on DuckDuckGo. It always had the same screenshot
+   I sent you last time about the mic."
+
+   So the mic ladder was never the whole story. DuckDuckGo's own browser
+   does not hand a web page the microphone the way Chrome and Safari do —
+   its getUserMedia has been reported broken since 2022 and is still not
+   right. Nothing this app does will change that.
+
+   What we CAN stop doing is giving her the wrong advice. Until now every
+   mic failure told her to close other apps and restart the phone, which is
+   the same wrong turn as last time, in a new costume. If the browser is
+   DuckDuckGo, say it is the browser and name the one that works.
+
+   HONESTY NOTE: DuckDuckGo cannot be installed in the sandbox this was
+   written in, so the FAILURE itself has not been reproduced here — only
+   Robert's report of it. What has been tested is that this message is the
+   one that appears when the browser identifies itself as DuckDuckGo.
+   ====================================================================== */
+(function () {
+  'use strict';
+  function isDDG() {
+    try { return /DuckDuckGo\//i.test(navigator.userAgent || ''); } catch (e) { return false; }
+  }
+  window.RPIsDDG = isDDG;
+
+  if (typeof window.micErrorHelp !== 'function') return;
+  var orig = window.micErrorHelp;
+  window.micErrorHelp = function (err) {
+    if (isDDG()) {
+      var where = 'this page';
+      try { where = location.href.split('#')[0]; } catch (e) {}
+      return {
+        title: 'DuckDuckGo will not give the app the microphone',
+        why: 'This is the DuckDuckGo browser, and it does not pass the microphone '
+           + 'through to web pages properly. It is not your phone and it is not the '
+           + 'permissions — the same page works in Chrome or Safari.',
+        steps: [
+          'Open Chrome (Android) or Safari (iPhone).',
+          'Go to ' + where,
+          'Allow the microphone when it asks.',
+          'Everything you have saved stays on the browser you saved it in, so if you '
+          + 'have takes here, they will not follow you across.'
+        ],
+        name: (err && err.name) || 'DuckDuckGoBrowser',
+        msg: (err && err.message) || ''
+      };
+    }
+    return orig.apply(this, arguments);
+  };
 })();
 
 </script>

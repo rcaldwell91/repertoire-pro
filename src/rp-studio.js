@@ -107,7 +107,12 @@
       var n = ST.notes.filter(function (x) { return x.m != null; }).length;
       h += '<div class="notice" style="margin:8px 0 10px">' + fmt(ST.activeMs) +
         ' recorded' + (n ? ', with the pitch line' : '') + '. Keep it or throw it away.</div>';
-      h += '<div class="row" style="gap:7px">' +
+      /* The line goes in BEFORE the buttons, because deciding whether to keep
+         a take is a question about where you were, not only how it sounded. */
+      var svg = ST.lineHtml(ST.notes, 'pending');
+      if (svg) h += svg + '<div class="measured" style="margin-top:6px;font-size:11.5px">' +
+        'Where you actually were. Press play and the marker follows.</div>';
+      h += '<div class="row" style="gap:7px;margin-top:9px">' +
         '<button class="btn" id="rpStPlay" style="flex:1;padding:11px">' +
         (ST.playing ? 'Stop' : 'Play it back') + '</button>' +
         '<button class="btn primary" id="rpStKeep" style="flex:1;padding:11px">Keep</button></div>' +
@@ -215,6 +220,113 @@
     try { ST.rec.stop(); } catch (e) { ST.state = 'idle'; draw(); }
   }
 
+  /* ================================================================ */
+  /* THE PITCH LINE, DRAWN BACK                                        */
+  /*                                                                   */
+  /* Robert: "I wanna make sure that when you record a take on the     */
+  /* pitch tracker, it tracks the notes on the map with the blue line. */
+  /* Then when you listen back to it, or if you save it and then       */
+  /* listen back to it, it also shows the notes, because that's        */
+  /* what's important — to try to match the pitch."                    */
+  /*                                                                   */
+  /* The notes were always being stored with the audio. They were      */
+  /* only ever drawn on the coach's phone. Hearing a take without      */
+  /* seeing where you were is the half that does not teach you         */
+  /* anything, so it is drawn here too, with a playhead that follows   */
+  /* the audio — otherwise you can see the shape but not which bit of  */
+  /* it you are listening to.                                          */
+  /* ================================================================ */
+  var LINE_H = 96;
+
+  function noteName(m) {
+    try { return midiName(Math.round(m)); } catch (e) { return ''; }
+  }
+
+  function lineBounds(notes) {
+    var pts = (notes || []).filter(function (p) { return p && p.m != null; });
+    if (pts.length < 2) return null;
+    var ms = pts.map(function (p) { return p.m; });
+    var lo = Math.min.apply(null, ms) - 1.5;
+    var hi = Math.max.apply(null, ms) + 1.5;
+    if (hi - lo < 7) { var mid = (hi + lo) / 2; lo = mid - 3.5; hi = mid + 3.5; }
+    var last = notes[notes.length - 1];
+    var dur = (last && last.t) || 1;
+    return { lo: lo, hi: hi, dur: dur, n: pts.length };
+  }
+
+  /* An SVG the width of its box. The horizontal rules are semitones, named
+     down the left, so "am I on the note" is a question you can answer by
+     looking — which is the whole point of drawing it. */
+  ST.lineHtml = function (notes, id) {
+    var b = lineBounds(notes);
+    if (!b) return '';
+    var W = 300, H = LINE_H, PAD = 26;
+    var y = function (m) { return H - ((m - b.lo) / (b.hi - b.lo)) * H; };
+    var x = function (t) { return PAD + (t / b.dur) * (W - PAD); };
+
+    var g = '', labels = '';
+    var step = (b.hi - b.lo) > 18 ? 12 : ((b.hi - b.lo) > 10 ? 2 : 1);
+    for (var m = Math.ceil(b.lo); m <= b.hi; m++) {
+      if ((m - Math.ceil(b.lo)) % step) continue;
+      var yy = y(m).toFixed(1);
+      g += '<line x1="' + PAD + '" y1="' + yy + '" x2="' + W + '" y2="' + yy +
+        '" stroke="var(--line)" stroke-width="0.6"/>';
+      /* keep the name inside the box — the lowest rule sits on the floor and
+         its label was being cut in half */
+      var ly = Math.max(7, Math.min(H - 1.5, +yy + 3));
+      labels += '<text x="2" y="' + ly.toFixed(1) + '" font-size="7.5" ' +
+        'fill="var(--ink-faint)" font-weight="700">' + esc(noteName(m)) + '</text>';
+    }
+
+    var d = '', pen = false, prev = null;
+    (notes || []).forEach(function (p) {
+      if (p.m == null) { pen = false; prev = null; return; }
+      var leap = prev && Math.abs(p.m - prev.m) > 6;
+      d += (!pen || leap ? 'M' : 'L') + x(p.t).toFixed(1) + ' ' + y(p.m).toFixed(1) + ' ';
+      pen = true; prev = p;
+    });
+
+    return '<svg data-pl="' + esc(id || '') + '" data-dur="' + b.dur +
+      '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" ' +
+      'style="width:100%;height:' + H + 'px;display:block;margin-top:9px;' +
+      'background:var(--panel2);border-radius:9px">' +
+      g + labels +
+      '<path d="' + d + '" fill="none" stroke="var(--accent2)" stroke-width="2" ' +
+      'stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<line class="rp-ph" x1="' + PAD + '" y1="0" x2="' + PAD + '" y2="' + H +
+      '" stroke="var(--gold)" stroke-width="1.4" opacity="0"/></svg>';
+  };
+
+  /* Move the playhead with the audio. One loop at a time — a second Listen
+     takes the loop over rather than leaving two running. */
+  var follow = null;
+  ST.followLine = function (svg, audio) {
+    ST.unfollow();
+    if (!svg || !audio) return;
+    var ph = svg.querySelector('.rp-ph');
+    if (!ph) return;
+    var dur = +svg.getAttribute('data-dur') || 0;
+    var W = 300, PAD = 26;
+    follow = { svg: svg, audio: audio, raf: 0 };
+    ph.setAttribute('opacity', '1');
+    (function step() {
+      if (!follow || follow.svg !== svg) return;
+      var d = dur || audio.duration || 0;
+      if (d > 0 && isFinite(d)) {
+        var frac = Math.max(0, Math.min(1, (audio.currentTime || 0) / d));
+        var px = (PAD + frac * (W - PAD)).toFixed(1);
+        ph.setAttribute('x1', px); ph.setAttribute('x2', px);
+      }
+      if (audio.paused || audio.ended) { ph.setAttribute('opacity', '.35'); }
+      else { ph.setAttribute('opacity', '1'); }
+      follow.raf = requestAnimationFrame(step);
+    })();
+  };
+  ST.unfollow = function () {
+    if (follow && follow.raf) cancelAnimationFrame(follow.raf);
+    follow = null;
+  };
+
   /* ---------------------------------------------------------------- */
   /* listening back                                                    */
   /* ---------------------------------------------------------------- */
@@ -224,6 +336,7 @@
     return new Blob(ST.chunks, { type: (ST.rec && ST.rec.mimeType) || 'audio/webm' });
   }
   function stopPlay() {
+    ST.unfollow();
     if (ST.audio) { try { ST.audio.pause(); } catch (e) {} ST.audio = null; }
     if (ST.url) { URL.revokeObjectURL(ST.url); ST.url = null; }
     ST.playing = false;
@@ -243,9 +356,15 @@
     stopPlay();
     ST.url = URL.createObjectURL(b);
     ST.audio = new Audio(ST.url);
-    ST.audio.onended = function () { ST.playing = false; draw(); };
-    ST.audio.play().then(function () { ST.playing = true; draw(); })
-      .catch(function () { say('The phone would not play it back.'); });
+    ST.audio.onended = function () { ST.playing = false; ST.unfollow(); draw(); };
+    ST.audio.play().then(function () {
+      ST.playing = true;
+      draw();
+      /* draw() rebuilt the panel, so the svg to follow is the new one */
+      var d = $('rpStudio');
+      var svg = d && d.querySelector('[data-pl="pending"]');
+      if (svg) ST.followLine(svg, ST.audio);
+    }).catch(function () { say('The phone would not play it back.'); });
     draw();
   }
 
@@ -416,4 +535,60 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else setTimeout(boot, 400);
+})();
+
+/* ======================================================================
+   DuckDuckGo's browser and the microphone.
+
+   Robert, 12 Sep: "I figured out what was going on with Briar's phone. It
+   was when the app loaded on the browser, DuckDuckGo. But it worked on
+   Chrome. It didn't work on DuckDuckGo. It always had the same screenshot
+   I sent you last time about the mic."
+
+   So the mic ladder was never the whole story. DuckDuckGo's own browser
+   does not hand a web page the microphone the way Chrome and Safari do —
+   its getUserMedia has been reported broken since 2022 and is still not
+   right. Nothing this app does will change that.
+
+   What we CAN stop doing is giving her the wrong advice. Until now every
+   mic failure told her to close other apps and restart the phone, which is
+   the same wrong turn as last time, in a new costume. If the browser is
+   DuckDuckGo, say it is the browser and name the one that works.
+
+   HONESTY NOTE: DuckDuckGo cannot be installed in the sandbox this was
+   written in, so the FAILURE itself has not been reproduced here — only
+   Robert's report of it. What has been tested is that this message is the
+   one that appears when the browser identifies itself as DuckDuckGo.
+   ====================================================================== */
+(function () {
+  'use strict';
+  function isDDG() {
+    try { return /DuckDuckGo\//i.test(navigator.userAgent || ''); } catch (e) { return false; }
+  }
+  window.RPIsDDG = isDDG;
+
+  if (typeof window.micErrorHelp !== 'function') return;
+  var orig = window.micErrorHelp;
+  window.micErrorHelp = function (err) {
+    if (isDDG()) {
+      var where = 'this page';
+      try { where = location.href.split('#')[0]; } catch (e) {}
+      return {
+        title: 'DuckDuckGo will not give the app the microphone',
+        why: 'This is the DuckDuckGo browser, and it does not pass the microphone '
+           + 'through to web pages properly. It is not your phone and it is not the '
+           + 'permissions — the same page works in Chrome or Safari.',
+        steps: [
+          'Open Chrome (Android) or Safari (iPhone).',
+          'Go to ' + where,
+          'Allow the microphone when it asks.',
+          'Everything you have saved stays on the browser you saved it in, so if you '
+          + 'have takes here, they will not follow you across.'
+        ],
+        name: (err && err.name) || 'DuckDuckGoBrowser',
+        msg: (err && err.message) || ''
+      };
+    }
+    return orig.apply(this, arguments);
+  };
 })();

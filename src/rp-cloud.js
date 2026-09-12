@@ -267,6 +267,18 @@
       '<div class="measured" style="margin-top:6px">' + esc(p.email || '') +
       (p.is_coach ? ' · teaching' : '') + '</div>';
 
+    /* Requiring a name at sign-up only helps people who have not signed up
+       yet. Robert's own account was made before that and is still called
+       "lyonxdewitt" on his coach's phone, and deleting the account to fix a
+       name is not a thing anyone should have to do. */
+    h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
+      '<label class="rp-lab">THE NAME YOUR COACH SEES</label>' +
+      '<div class="row" style="gap:7px;margin-top:6px;flex-wrap:nowrap">' +
+      '<input id="rpNewName" class="rp-inp" style="flex:1" maxlength="40" ' +
+      'autocomplete="name" value="' + esc(p.display_name || '') + '">' +
+      '<button class="btn primary" id="rpNameGo" style="padding:11px 15px">Save</button></div>' +
+      '<div id="rpNameMsg" class="measured" style="margin-top:7px"></div></div>';
+
     if (p.is_coach) {
       h += '<div class="rp-card hot" style="margin-top:14px"><div class="rp-lab">YOUR COACH CODE</div>' +
         '<div style="font-size:31px;font-weight:900;letter-spacing:3px">' + esc(p.coach_code || '') + '</div>' +
@@ -294,6 +306,8 @@
     h += '<button class="btn" id="rpX" style="margin-top:8px;width:100%;padding:11px">Close</button>';
     sheet(h);
     on($('rpX'), 'click', closeSheet);
+    on($('rpNameGo'), 'click', saveName);
+    on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
     on($('rpCoachCol'), 'click', function () {
@@ -311,6 +325,40 @@
     on($('rpOut'), 'click', function () {
       RP.sb.auth.signOut().then(function () { closeSheet(); toast('Signed out. The app still works.'); });
     });
+  }
+
+  function saveName() {
+    var i = $('rpNewName'), m = $('rpNameMsg'), b = $('rpNameGo');
+    var name = (i.value || '').trim();
+    if (name.length < 2) {
+      m.textContent = 'That is a bit short for a name.';
+      m.style.color = 'var(--miss)';
+      return;
+    }
+    if (name === (RP.profile && RP.profile.display_name)) {
+      m.textContent = 'That is already your name.';
+      m.style.color = 'var(--ink-dim)';
+      return;
+    }
+    b.disabled = true;
+    m.textContent = 'Saving…'; m.style.color = 'var(--ink-dim)';
+    RP.sb.from('profiles').update({ display_name: name }).eq('id', RP.user.id)
+      .then(function (r) {
+        b.disabled = false;
+        if (r.error) {
+          m.textContent = r.error.message;
+          m.style.color = 'var(--miss)';
+          return;
+        }
+        /* The profiles row is what everyone else reads, so that is what had to
+           change. The auth record keeps its own copy of the name; bring it
+           along so a fresh sign-in does not put the old one back. */
+        try { RP.sb.auth.updateUser({ data: { display_name: name } }); } catch (e) {}
+        RP.refresh().then(function () {
+          openAccount();
+          toast('You are ' + name + ' now.');
+        });
+      });
   }
 
   function setFace(f) {

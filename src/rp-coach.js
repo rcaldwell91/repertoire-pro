@@ -245,9 +245,12 @@
     if (mine.length) {
       h += '<div class="rp-lab" style="margin-top:12px">YOUR TAKES · ON THIS PHONE</div>';
       mine.forEach(function (t) {
+        var svg = (t.notes && t.notes.length && window.RPStudio && RPStudio.lineHtml)
+          ? RPStudio.lineHtml(t.notes, t.id) : '';
         h += '<div class="rp-card" style="padding:10px;margin-top:7px">' +
           '<div class="rp-ttl" style="font-size:13px">' + esc(t.title) +
           (t.sentAt ? '<span class="rp-tag">submitted</span>' : '') + '</div>' +
+          svg +
           '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap">' +
           '<button class="btn" data-ahear="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Listen</button>' +
           '<button class="btn" data-adl="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Download</button>' +
@@ -292,6 +295,9 @@
           var au = new Audio(wireAssignmentCards._u);
           wireAssignmentCards._a = au;
           au.play().catch(function () { RP.toast('The phone would not play it.'); });
+          var svg = host.querySelector('[data-pl="' +
+            (window.CSS && CSS.escape ? CSS.escape(t.id) : t.id) + '"]');
+          if (svg && window.RPStudio && RPStudio.followLine) RPStudio.followLine(svg, au);
         } catch (e) { RP.toast('Could not play that one.'); }
       });
     });
@@ -554,6 +560,16 @@
 
   function assignSheet(studentId) {
     var s = RP.students.find(function (x) { return x.id === studentId; });
+    /* One assign in four silently did nothing during testing and could not be
+       reproduced. The shape of that failure — a sheet that opens fine and an
+       insert that never lands — is what an unset studentId looks like, since
+       a background refresh can reset which student is open underneath a sheet
+       that is already up. Rather than guess at the cause, refuse to open a
+       sheet that cannot possibly work, and say why. */
+    if (!studentId || !s) {
+      RP.toast('Lost track of which student that was — open them again.');
+      return;
+    }
     var h = '<b style="font-size:16px">Assign to ' + esc(s ? s.display_name : '') + '</b>' +
       '<div class="measured" style="margin-top:6px">Pick the exercise and it opens on their phone ' +
       'already set up — they will not have to go and find it.</div>';
@@ -583,6 +599,7 @@
       '<div style="margin-top:10px"><label class="rp-lab">A NOTE FOR THEM</label>' +
       '<textarea id="rpAsN" class="rp-inp" rows="3" placeholder="Optional — what to watch for."></textarea></div>' +
       '<button class="btn primary" id="rpAsGo" style="width:100%;padding:13px;margin-top:14px">Assign it</button>' +
+      '<div id="rpAsMsg" class="measured" style="margin-top:8px"></div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:8px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
@@ -686,10 +703,20 @@
         app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null)
       };
       $('rpAsGo').disabled = true;
-      RP.sb.from('assignments').insert(row).then(function (r) {
-        if (r.error) { $('rpAsGo').disabled = false; return fail(r.error); }
+      var m = $('rpAsMsg');
+      if (m) { m.textContent = 'Sending it over\u2026'; m.style.color = 'var(--ink-dim)'; }
+      /* The error goes on the sheet, not only into a toast. A toast that is
+         missed is the same as no message at all, and this is the one action
+         the whole coaching side rests on. */
+      RP.sb.from('assignments').insert(row).select().then(function (r) {
+        if (r.error || !r.data || !r.data.length) {
+          $('rpAsGo').disabled = false;
+          var why = (r.error && r.error.message) || 'the database accepted nothing back';
+          if (m) { m.textContent = 'It did not send: ' + why; m.style.color = 'var(--miss)'; }
+          return fail(r.error || new Error(why));
+        }
         RP.closeSheet();
-        RP.toast('Assigned to ' + (s ? s.display_name.split(' ')[0] : 'them'));
+        RP.toast('Assigned to ' + s.display_name.split(' ')[0]);
         RP.refresh();
       });
     });

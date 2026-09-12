@@ -172,16 +172,22 @@
     var h = '';
     list.slice(0, 12).forEach(function (s) {
       var hasNotes = !!(s.notes && s.notes.length);
+      /* The pitch line, drawn on the take itself. Hearing it back without
+         seeing where you were is the half that teaches you nothing. */
+      var svg = (hasNotes && window.RPStudio && RPStudio.lineHtml)
+        ? RPStudio.lineHtml(s.notes, s.id) : '';
       h += '<div class="rp-card" style="padding:11px">' +
         '<div class="rp-ttl">' + esc(s.title) +
         (hasNotes ? '<span class="rp-tag">notes</span>' : '') +
         (s.fx ? '<span class="rp-tag">effects</span>' : '') +
         (s.sentAt ? '<span class="rp-tag">sent</span>' : '') + '</div>' +
         (s.sentAt ? '<div class="rp-sub" style="margin:4px 0 0">Sent to your coach.</div>' : '') +
+        svg +
         '<div class="row" style="gap:6px;margin-top:8px">' +
+        '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>' +
         (kind === 'pitch'
           ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
-          : '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>') +
+          : '') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
         '<button class="btn' + (s.sentAt ? '' : ' primary') + '" data-send="' + esc(s.id) +
         '" style="flex:1;padding:9px;font-size:12px">' + (s.sentAt ? 'Send again' : 'Send to coach') + '</button>' +
@@ -221,6 +227,8 @@
           if (S._a) { S._a.pause(); URL.revokeObjectURL(S._a._u); }
           var a = new Audio(); a._u = URL.createObjectURL(s.blob); a.src = a._u;
           a.play(); S._a = a;
+          var svg = root.querySelector('[data-pl="' + (window.CSS && CSS.escape ? CSS.escape(s.id) : s.id) + '"]');
+          if (svg && window.RPStudio && RPStudio.followLine) RPStudio.followLine(svg, a);
         } catch (e) { say('Could not play that one.'); }
       });
     });
