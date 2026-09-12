@@ -200,6 +200,11 @@
       o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
         'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
       document.body.appendChild(o);
+      on(o, 'click', function (e) {
+        if (e.target !== o) return;                       // only the dark area
+        if (!o.querySelector('[data-skip]')) return;      // only the skippable questions
+        saveMe(); shut(); apply();
+      });
     }
     o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
       'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
@@ -208,6 +213,51 @@
     return o.firstChild;
   }
   function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+
+  /* Tapping the dark area outside, and the escape key, are what everybody
+     already tries first when a thing appears over the app. Both work. */
+  (function escapeHatch() {
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      var o = $('rpSheet');
+      if (o && o.style.display !== 'none' && o.querySelector('[data-skip]')) {
+        saveMe(); shut(); apply();
+      }
+    });
+  })();
+
+  /* Robert, 12 Sep: "you have to be able to exit out that little
+     questionnaire when you first open the app for the first time. You
+     shouldn't force people to answer those questions."
+
+     He is right, and it was worse than rude: the app's whole argument is that
+     it never pretends, and an unskippable form on first open is the app
+     demanding something before it has given anything. The defaults are
+     perfectly good — middle of the road on both — and both answers are
+     changeable in Profile whenever they feel like it. */
+  function skipRow(where) {
+    return '<button class="btn" data-skip="1" style="width:100%;padding:11px;margin-top:14px;' +
+      'font-size:12.5px;color:var(--ink-dim)">Skip this \u2014 just let me in</button>' +
+      '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
+      'Nothing is lost. Both answers live in <b>Profile</b> under <b>How I talk to you</b>, ' +
+      'and you can set them whenever you want.</div>';
+  }
+
+  function wireSkip(box) {
+    var b = (box || document).querySelector('[data-skip]');
+    if (!b) return;
+    on(b, 'click', function () {
+      /* Remember that we ASKED, so it does not nag on every launch, but do
+         not pretend they answered: whatever is in ME already is the default,
+         and it is written down as the default rather than as their choice. */
+      saveMe();
+      shut();
+      apply();
+      try {
+        if (window.RP && RP.toast) RP.toast('No problem. It is all in Profile if you change your mind.');
+      } catch (e) {}
+    });
+  }
 
   var step = 0;
   function ask() {
@@ -223,8 +273,10 @@
            same thing are now one that says both. */
         opt('exp', 1, 'New to it', 'Never been taught \u2014 or you sing, but you have never trained.') +
         opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
-        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.'));
+        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.') +
+        skipRow());
       wire('exp', function (v) { ME.experience = v; step = 1; ask(); });
+      wireSkip($('rpSheet'));
     } else if (step === 1) {
       sheet('<b style="font-size:18px">And the jargon?</b>' +
         '<div class="measured" style="margin-top:8px">Every craft has its own words. Singing has ' +
@@ -233,8 +285,10 @@
         '<div class="rp-lab" style="margin-top:20px">WHICH IS CLOSEST?</div>' +
         opt('w', 'plain', 'Skip it', 'Plain English throughout, and any word you tap gets explained.') +
         opt('w', 'some', 'Some of it', 'Normal words, and anything unusual is one tap from an explanation.') +
-        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.'));
+        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.') +
+        skipRow());
       wire('w', function (v) { ME.words = v; step = 2; saveMe(); ask(); });
+      wireSkip($('rpSheet'));
     } else {
       // say back what we heard, so it does not feel like a test with no result
       var e = ME.experience, w = ME.words;

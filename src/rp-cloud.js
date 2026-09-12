@@ -166,7 +166,11 @@
 
     if (up) {
       h += '<label class="lab">YOUR NAME</label>' +
-        '<input id="rpName" class="inp" placeholder="Lyon" autocomplete="name" ' +
+        /* This said "Lyon" — a placeholder, so it showed ROBERT'S name to every
+           person who ever opened the sign-up box, looking for all the world
+           like the browser had filled it in for them. A placeholder should
+           say what to type, not name a stranger. */
+        '<input id="rpName" class="inp" placeholder="First name is fine" autocomplete="name" ' +
         'style="width:100%;margin-bottom:4px">' +
         '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
         'sees, so use the name he knows you by.</div>';
@@ -258,6 +262,35 @@
      screen, NO screen. Anyone who forgot theirs was locked out of their own
      account for good, and the only fix was deleting the account. Supabase has
      always been able to send the email; nothing ever asked it to. */
+  /* Supabase limits how often it will email the same address, and returns
+     "For security purposes, you can only request this after 6 seconds." Robert
+     saw that in red under the button after asking for a sign-in link straight
+     after a password reset, and he is right that it reads like the app is
+     broken: it names a rule nobody agreed to, in a colour that means error,
+     for something that is not an error. It is one email already on its way.
+
+     So: say that, count it down, and put the button back when it is over. */
+  function waitSeconds(m) {
+    var x = /after (\d+) second/i.exec(m || '');
+    return x ? +x[1] : 0;
+  }
+  function isRateLimit(m) {
+    return /only request this after|rate limit|too many requests/i.test(m || '');
+  }
+  function holdButton(btn, secs, label) {
+    if (!btn) return;
+    var text = btn.textContent;
+    btn.disabled = true;
+    var left = secs;
+    (function tick() {
+      if (!btn.isConnected) return;
+      btn.textContent = label + ' (' + left + ')';
+      if (left <= 0) { btn.disabled = false; btn.textContent = text; return; }
+      left--;
+      setTimeout(tick, 1000);
+    })();
+  }
+
   function doForgot() {
     var email = ($('rpEmail').value || '').trim();
     if (!email) {
@@ -271,6 +304,12 @@
     }).then(function (r) {
       if (r.error) {
         var m = String(r.error.message || '');
+        if (isRateLimit(m)) {
+          var w = waitSeconds(m) || 15;
+          holdButton($('rpForgot'), w, 'I have forgotten my password');
+          return msg('One is already on its way — give it ' + w + ' seconds before asking again. ' +
+                     'Check your spam folder too; the first one often lands there.');
+        }
         if (/invalid/i.test(m) && /email/i.test(m)) {
           return msg('That address was refused as undeliverable. Check it for a typo.', true);
         }
@@ -330,7 +369,21 @@
       options: { emailRedirectTo: location.href.split('#')[0],
                  shouldCreateUser: authTab === 'up' }
     }).then(function (r) {
-      msg(r.error ? r.error.message : 'Link sent. Open it on this phone and you are in.', !!r.error);
+      if (!r.error) {
+        return msg('Link sent. Open it on this phone and you are in. ' +
+                   'If it is not there in a minute, check your spam folder.');
+      }
+      var m = String(r.error.message || '');
+      if (isRateLimit(m)) {
+        var w = waitSeconds(m) || 15;
+        holdButton($('rpLink'), w, 'Email me a sign-in link');
+        return msg('An email has just gone to that address — give it ' + w +
+                   ' seconds before asking for another.');
+      }
+      if (/invalid/i.test(m) && /email/i.test(m)) {
+        return msg('That address was refused as undeliverable. Check it for a typo.', true);
+      }
+      msg(m, true);
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 

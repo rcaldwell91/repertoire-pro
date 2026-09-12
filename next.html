@@ -11047,7 +11047,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     if (up) {
       h += '<label class="lab">YOUR NAME</label>' +
-        '<input id="rpName" class="inp" placeholder="Lyon" autocomplete="name" ' +
+        /* This said "Lyon" — a placeholder, so it showed ROBERT'S name to every
+           person who ever opened the sign-up box, looking for all the world
+           like the browser had filled it in for them. A placeholder should
+           say what to type, not name a stranger. */
+        '<input id="rpName" class="inp" placeholder="First name is fine" autocomplete="name" ' +
         'style="width:100%;margin-bottom:4px">' +
         '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
         'sees, so use the name he knows you by.</div>';
@@ -11139,6 +11143,35 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      screen, NO screen. Anyone who forgot theirs was locked out of their own
      account for good, and the only fix was deleting the account. Supabase has
      always been able to send the email; nothing ever asked it to. */
+  /* Supabase limits how often it will email the same address, and returns
+     "For security purposes, you can only request this after 6 seconds." Robert
+     saw that in red under the button after asking for a sign-in link straight
+     after a password reset, and he is right that it reads like the app is
+     broken: it names a rule nobody agreed to, in a colour that means error,
+     for something that is not an error. It is one email already on its way.
+
+     So: say that, count it down, and put the button back when it is over. */
+  function waitSeconds(m) {
+    var x = /after (\d+) second/i.exec(m || '');
+    return x ? +x[1] : 0;
+  }
+  function isRateLimit(m) {
+    return /only request this after|rate limit|too many requests/i.test(m || '');
+  }
+  function holdButton(btn, secs, label) {
+    if (!btn) return;
+    var text = btn.textContent;
+    btn.disabled = true;
+    var left = secs;
+    (function tick() {
+      if (!btn.isConnected) return;
+      btn.textContent = label + ' (' + left + ')';
+      if (left <= 0) { btn.disabled = false; btn.textContent = text; return; }
+      left--;
+      setTimeout(tick, 1000);
+    })();
+  }
+
   function doForgot() {
     var email = ($('rpEmail').value || '').trim();
     if (!email) {
@@ -11152,6 +11185,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }).then(function (r) {
       if (r.error) {
         var m = String(r.error.message || '');
+        if (isRateLimit(m)) {
+          var w = waitSeconds(m) || 15;
+          holdButton($('rpForgot'), w, 'I have forgotten my password');
+          return msg('One is already on its way — give it ' + w + ' seconds before asking again. ' +
+                     'Check your spam folder too; the first one often lands there.');
+        }
         if (/invalid/i.test(m) && /email/i.test(m)) {
           return msg('That address was refused as undeliverable. Check it for a typo.', true);
         }
@@ -11211,7 +11250,21 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       options: { emailRedirectTo: location.href.split('#')[0],
                  shouldCreateUser: authTab === 'up' }
     }).then(function (r) {
-      msg(r.error ? r.error.message : 'Link sent. Open it on this phone and you are in.', !!r.error);
+      if (!r.error) {
+        return msg('Link sent. Open it on this phone and you are in. ' +
+                   'If it is not there in a minute, check your spam folder.');
+      }
+      var m = String(r.error.message || '');
+      if (isRateLimit(m)) {
+        var w = waitSeconds(m) || 15;
+        holdButton($('rpLink'), w, 'Email me a sign-in link');
+        return msg('An email has just gone to that address — give it ' + w +
+                   ' seconds before asking for another.');
+      }
+      if (/invalid/i.test(m) && /email/i.test(m)) {
+        return msg('That address was refused as undeliverable. Check it for a typo.', true);
+      }
+      msg(m, true);
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
@@ -13272,6 +13325,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
         'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
       document.body.appendChild(o);
+      on(o, 'click', function (e) {
+        if (e.target !== o) return;                       // only the dark area
+        if (!o.querySelector('[data-skip]')) return;      // only the skippable questions
+        saveMe(); shut(); apply();
+      });
     }
     o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
       'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
@@ -13280,6 +13338,51 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return o.firstChild;
   }
   function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+
+  /* Tapping the dark area outside, and the escape key, are what everybody
+     already tries first when a thing appears over the app. Both work. */
+  (function escapeHatch() {
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      var o = $('rpSheet');
+      if (o && o.style.display !== 'none' && o.querySelector('[data-skip]')) {
+        saveMe(); shut(); apply();
+      }
+    });
+  })();
+
+  /* Robert, 12 Sep: "you have to be able to exit out that little
+     questionnaire when you first open the app for the first time. You
+     shouldn't force people to answer those questions."
+
+     He is right, and it was worse than rude: the app's whole argument is that
+     it never pretends, and an unskippable form on first open is the app
+     demanding something before it has given anything. The defaults are
+     perfectly good — middle of the road on both — and both answers are
+     changeable in Profile whenever they feel like it. */
+  function skipRow(where) {
+    return '<button class="btn" data-skip="1" style="width:100%;padding:11px;margin-top:14px;' +
+      'font-size:12.5px;color:var(--ink-dim)">Skip this \u2014 just let me in</button>' +
+      '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
+      'Nothing is lost. Both answers live in <b>Profile</b> under <b>How I talk to you</b>, ' +
+      'and you can set them whenever you want.</div>';
+  }
+
+  function wireSkip(box) {
+    var b = (box || document).querySelector('[data-skip]');
+    if (!b) return;
+    on(b, 'click', function () {
+      /* Remember that we ASKED, so it does not nag on every launch, but do
+         not pretend they answered: whatever is in ME already is the default,
+         and it is written down as the default rather than as their choice. */
+      saveMe();
+      shut();
+      apply();
+      try {
+        if (window.RP && RP.toast) RP.toast('No problem. It is all in Profile if you change your mind.');
+      } catch (e) {}
+    });
+  }
 
   var step = 0;
   function ask() {
@@ -13295,8 +13398,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
            same thing are now one that says both. */
         opt('exp', 1, 'New to it', 'Never been taught \u2014 or you sing, but you have never trained.') +
         opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
-        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.'));
+        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.') +
+        skipRow());
       wire('exp', function (v) { ME.experience = v; step = 1; ask(); });
+      wireSkip($('rpSheet'));
     } else if (step === 1) {
       sheet('<b style="font-size:18px">And the jargon?</b>' +
         '<div class="measured" style="margin-top:8px">Every craft has its own words. Singing has ' +
@@ -13305,8 +13410,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div class="rp-lab" style="margin-top:20px">WHICH IS CLOSEST?</div>' +
         opt('w', 'plain', 'Skip it', 'Plain English throughout, and any word you tap gets explained.') +
         opt('w', 'some', 'Some of it', 'Normal words, and anything unusual is one tap from an explanation.') +
-        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.'));
+        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.') +
+        skipRow());
       wire('w', function (v) { ME.words = v; step = 2; saveMe(); ask(); });
+      wireSkip($('rpSheet'));
     } else {
       // say back what we heard, so it does not feel like a test with no result
       var e = ME.experience, w = ME.words;
