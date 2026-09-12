@@ -11223,8 +11223,20 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
   RP.isCoachFace = isCoachFace;
 
+  /* A query that FAILED and a query that found NOTHING are not the same
+     thing, and `r.data || []` read them as the same thing. One dropped
+     request during a refresh therefore blanked the screen: "Nothing assigned
+     yet" on a phone with six assignments on it. Keep what we had, and mark
+     the load as incomplete so the app can say so rather than quietly lie. */
+  var loadOk = true;
+  function rows(r, keep) {
+    if (!r || r.error) { loadOk = false; return keep || []; }
+    return r.data || [];
+  }
+
   function loadAll() {
     if (!RP.user) return Promise.resolve();
+    loadOk = true;
     var uid = RP.user.id;
     var sb = RP.sb;
     return sb.from('profiles').select('*').eq('id', uid).maybeSingle().then(function (r) {
@@ -11257,10 +11269,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       sb.from('takes').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(50),
       sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300)
     ]).then(function (r) {
-      RP.assignments = r[1].data || [];
-      RP.messages = r[2].data || [];
-      RP.takes = r[3].data || [];
-      RP.results = r[4].data || [];
+      RP.assignments = rows(r[1], RP.assignments);
+      RP.messages    = rows(r[2], RP.messages);
+      RP.takes       = rows(r[3], RP.takes);
+      RP.results     = rows(r[4], RP.results);
+      if (r[0] && r[0].error) { loadOk = false; return; }   // keep the coach we had
       var link = (r[0].data || [])[0];
       if (!link) { RP.coach = null; return; }
       return sb.from('profiles').select('*').eq('id', link.coach_id).maybeSingle()
@@ -11277,19 +11290,20 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       sb.from('takes').select('*').eq('coach_id', uid).order('created_at', { ascending: false }).limit(50),
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50)
     ]).then(function (r) {
-      RP.exercises = r[1].data || [];
+      RP.exercises = rows(r[1], RP.exercises);
       // keep the singer's own rows loaded a moment ago, and add the ones we set
-      RP.assignments = merge(RP.assignments, r[2].data || []);
-      RP.takes       = merge(RP.takes,       r[3].data || []);
-      RP.messages    = merge(RP.messages,    r[4].data || []);
+      RP.assignments = merge(RP.assignments, rows(r[2], []));
+      RP.takes       = merge(RP.takes,       rows(r[3], []));
+      RP.messages    = merge(RP.messages,    rows(r[4], []));
+      if (r[0] && r[0].error) { loadOk = false; return; }   // keep the students we had
       var ids = (r[0].data || []).map(function (x) { return x.student_id; });
       if (!ids.length) { RP.students = []; RP.results = []; return; }
       return Promise.all([
         sb.from('profiles').select('*').in('id', ids),
         sb.from('results').select('*').in('student_id', ids).order('created_at', { ascending: false }).limit(600)
       ]).then(function (p) {
-        RP.students = p[0].data || [];
-        RP.results = merge(RP.results, p[1].data || []);
+        RP.students = rows(p[0], RP.students);
+        RP.results = merge(RP.results, rows(p[1], []));
       });
     }).then(function () {
       if (!RP.exercises.length) return seedExercises(uid);
@@ -11336,11 +11350,13 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
 
   var channel = null;
+  var channelFor = null;          // the uid + coach flag the open channel was built for
   function subscribe() {
     if (!RP.user) return;
     unsubscribe();
     var uid = RP.user.id;
-    var coach = RP.profile && RP.profile.is_coach;
+    var coach = !!(RP.profile && RP.profile.is_coach);
+    channelFor = uid + '|' + coach;
     var ch = RP.sb.channel('rp-' + uid);
 
     // the singer's side, for everybody — coaches practise too
@@ -11367,6 +11383,26 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
   function unsubscribe() {
     if (channel) { try { RP.sb.removeChannel(channel); } catch (e) {} channel = null; }
+    channelFor = null;
+  }
+
+  /* The coach-side listeners — a student pairing with you, a take arriving,
+     an assignment changing — are only attached when the channel is built AND
+     you are already a coach. subscribe() ran once, at sign-in.
+
+     So anyone who signed up and THEN tapped "I teach singing" spent the rest
+     of that session with no coach listeners at all. Ja Ronn reads his code
+     out, his student types it in, and his phone shows nothing until he
+     reloads the page. Same for takes landing and assignments changing. That
+     is the one feature this whole thing rests on, and it was off for exactly
+     the person it matters to on exactly the day he starts.
+
+     So: after any reload of the data, if what the channel was built for no
+     longer matches who you now are, build it again. */
+  function resubscribeIfNeeded() {
+    if (!RP.user) return;
+    var want = RP.user.id + '|' + !!(RP.profile && RP.profile.is_coach);
+    if (channelFor !== want) subscribe();
   }
 
   function bump(kind, payload) {
@@ -11397,12 +11433,56 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   };
 
   var refreshing = null;
+  /* What Robert hit: he pressed Assign, the app said "Assigned to Lyon", and
+     the list did not change. The insert had worked. The refresh that follows
+     it had not — and a failed refresh did nothing at all, so the screen sat
+     there showing the truth from a moment ago and said nothing about it.
+     Silence that looks like success is the failure mode this whole app is
+     supposed to refuse.
+
+     So: try again, and if it still will not load, SAY SO on screen. */
   function refresh() {
     if (refreshing) return refreshing;
-    refreshing = loadAll().then(function () { refreshing = null; rerender(); })
-      .catch(function () { refreshing = null; });
+    refreshing = loadAll()
+      .then(function () { return loadOk ? true : retryOnce(); })
+      .catch(function () { return retryOnce(); })
+      .then(function (good) {
+        refreshing = null;
+        RP.stale = !good;
+        resubscribeIfNeeded();
+        rerender();
+        showStale();
+      });
     return refreshing;
   }
+
+  function retryOnce() {
+    return new Promise(function (res) { setTimeout(res, 1200); })
+      .then(function () { return loadAll(); })
+      .then(function () { return loadOk; })
+      .catch(function () { return false; });
+  }
+
+  /* One line, at the top, only when it is true. It clears itself the moment a
+     load succeeds. */
+  function showStale() {
+    var b = $('rpStale');
+    if (!RP.stale) { if (b) b.remove(); return; }
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'rpStale';
+      b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:70;padding:9px 12px;' +
+        'background:var(--miss);color:#fff;font-size:12.5px;font-weight:700;text-align:center;' +
+        'cursor:pointer';
+      b.textContent = 'Could not reach the server — this screen may be out of date. Tap to try again.';
+      b.addEventListener('click', function () {
+        b.textContent = 'Trying…';
+        refresh();
+      });
+      document.body.appendChild(b);
+    }
+  }
+  RP.showStale = showStale;
   RP.refresh = refresh;
 
   // refresh-on-open, so a phone that slept still shows the truth
@@ -12211,8 +12291,14 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
           if (m) { m.textContent = 'It did not send: ' + why; m.style.color = 'var(--miss)'; }
           return fail(r.error || new Error(why));
         }
+        /* The insert handed the row straight back, so the screen can be right
+           immediately and does not depend on the refresh that follows landing.
+           That is what went wrong for Robert: the assign worked, the refresh
+           after it did not, and the list stayed as it was. */
+        RP.assignments = [r.data[0]].concat(RP.assignments || []);
         RP.closeSheet();
         RP.toast('Assigned to ' + s.display_name.split(' ')[0]);
+        if (RP.rerender) RP.rerender();
         RP.refresh();
       });
     });

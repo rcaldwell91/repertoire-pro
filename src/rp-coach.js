@@ -715,8 +715,14 @@
           if (m) { m.textContent = 'It did not send: ' + why; m.style.color = 'var(--miss)'; }
           return fail(r.error || new Error(why));
         }
+        /* The insert handed the row straight back, so the screen can be right
+           immediately and does not depend on the refresh that follows landing.
+           That is what went wrong for Robert: the assign worked, the refresh
+           after it did not, and the list stayed as it was. */
+        RP.assignments = [r.data[0]].concat(RP.assignments || []);
         RP.closeSheet();
         RP.toast('Assigned to ' + s.display_name.split(' ')[0]);
+        if (RP.rerender) RP.rerender();
         RP.refresh();
       });
     });
