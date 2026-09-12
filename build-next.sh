@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# Builds next.html = index.html (v10.1) + the cloud layer + two tiny hooks.
-# index.html itself is never modified. Run this after editing anything in src/.
+# Builds next.html = base.html (v10.1) + the cloud layer + the hooks.
+#
+# base.html is v10.1 exactly as it shipped and is NEVER modified — every change
+# lives in src/ and is applied here, so the base can always be diffed against
+# what is live.
+#
+# next.html is the WORKING copy: the one to open while something is half built.
+# index.html is the RELEASED app, and only ./release.sh moves next into index.
+# That is the whole reason there are two: the link people have can stay solid
+# while the next thing is still in pieces.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -8,7 +16,7 @@ for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-
 test -s src/rp-skin.css
 
 python3 - <<'PY'
-base = open('index.html', encoding='utf-8').read()
+base = open('base.html', encoding='utf-8').read()
 
 # ---------------------------------------------------------------------
 # Two hooks into the places where the app has ALREADY worked a number out
