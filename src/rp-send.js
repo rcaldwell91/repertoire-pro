@@ -113,11 +113,32 @@
          submit that one. It sends off. Now that assignment's checked off."
          So we do not also ask him to press Mark done. */
       if (forId) {
-        var d = await RP.sb.from('assignments')
-          .update({ done_at: new Date().toISOString() })
-          .eq('id', forId).is('done_at', null);
-        if (d.error) say('Sent, but it did not tick off: ' + d.error.message);
-        else say('Submitted to ' + RP.coach.display_name + '. That one is done.');
+        /* A DAILY assignment is never finished — it is done, or not done, for
+           each day, and the calendar works that out from the takes actually
+           submitted. Stamping done_at on one would retire it after a single
+           day, which is the opposite of what "every day" means. */
+        var asg = (RP.assignments || []).find(function (x) { return x.id === forId; });
+        /* A submitted take is practice that demonstrably happened, so it
+           counts towards the week — days practised, and the seven-day strip
+           on both phones. This is not an invented number: the audio is in the
+           bucket and the row is in the table. Without it Robert could do his
+           assignment every morning and the scorecard would still read
+           "nothing measured yet", which would be the app lying by omission. */
+        try {
+          if (RP.logResult) RP.logResult({
+            kind: 'practice',
+            label: (asg && asg.title) || song.title || 'Assignment'
+          });
+        } catch (e) {}
+        if (asg && asg.cadence === 'daily') {
+          say('Submitted to ' + RP.coach.display_name + '. Today is ticked off.');
+        } else {
+          var d = await RP.sb.from('assignments')
+            .update({ done_at: new Date().toISOString() })
+            .eq('id', forId).is('done_at', null);
+          if (d.error) say('Sent, but it did not tick off: ' + d.error.message);
+          else say('Submitted to ' + RP.coach.display_name + '. That one is done.');
+        }
       } else {
         say('Sent to ' + RP.coach.display_name + '.');
       }

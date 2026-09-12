@@ -87,6 +87,11 @@
       susBest: sus.length ? Math.max.apply(null, sus.map(function (r) { return r.pct; })) : null,
       starSum: starSum,
       starOutOf: (V10.GAMES || []).length * 3,
+      /* Counting only assignments that are FINISHED FOREVER made a daily one
+         permanently unfinished, so this card said "1 of 2" on the same screen
+         as a week strip saying "2 of 2". Both now ask the same question: how
+         much of the work this week was due, and how much of it happened. */
+      week: (RP.weekProgress ? RP.weekProgress(studentId, 0) : null),
       assignedOpen: as.filter(function (a) { return !a.done_at; }).length,
       assignedDone: as.filter(function (a) { return a.done_at; }).length,
       practisedLabels: labelCounts(wk)
@@ -137,8 +142,13 @@
     h += bars(null, studentId);
     h += '<div class="rp-tiles">';
     h += tile(c.daysThisWeek + '<span class="rp-of">/7</span>', 'days practised', c.daysThisWeek >= 4 ? 'good' : 'warn');
-    h += tile(c.assignedDone + '<span class="rp-of">/' + (c.assignedDone + c.assignedOpen) + '</span>', 'assignments done',
-              c.assignedOpen === 0 && c.assignedDone > 0 ? 'good' : '');
+    if (c.week && c.week.due) {
+      h += tile(c.week.done + '<span class="rp-of">/' + c.week.due + '</span>', 'set this week',
+                c.week.done === c.week.due ? 'good' : (c.week.done ? 'warn' : ''));
+    } else {
+      h += tile(c.assignedDone + '<span class="rp-of">/' + (c.assignedDone + c.assignedOpen) + '</span>',
+                'assignments done', c.assignedOpen === 0 && c.assignedDone > 0 ? 'good' : '');
+    }
     if (c.susRuns) h += tile(c.susBest + '%', 'steadiest hold', c.susBest >= 70 ? 'good' : 'warn');
     if (c.earRuns) h += tile(c.earCentsBest + '<span class="rp-of">¢</span>', 'closest to the note', c.earCentsBest <= 25 ? 'good' : 'warn');
     if (c.starSum) h += tile(c.starSum + '<span class="rp-of">/' + c.starOutOf + '</span>', 'theory stars', '');

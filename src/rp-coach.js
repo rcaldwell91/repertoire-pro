@@ -160,37 +160,39 @@
       h += '</div>';
       return h;
     }
+    h += weekCss();
     h += '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<b style="font-size:15px">From ' + esc(coach.display_name) + '</b>' +
       '<span class="rp-sub" style="margin:0">' + (open.length ? open.length + ' to do' : 'all done') +
       '</span></div>';
 
-    if (!open.length && !done.length) {
-      h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
-        ' sets something on his phone it lands here — you will not need to refresh.</div>';
-    }
+    h += weekStrip(RP.user.id);
 
-    open.forEach(function (a) { h += assignmentCard(a); });
-
-    if (done.length) {
-      h += '<div class="rp-lab" style="margin-top:14px">DONE</div>';
-      done.slice(0, 6).forEach(function (a) {
-        var kept = window.RPWork ? RPWork.takesFor(a.id) : [];
-        h += '<div class="rp-card rp-done"><div class="rp-ttl">' + esc(a.title) +
-          '<span class="rp-tag">' + ago(a.done_at) + '</span></div>';
-        /* Ticking it off must not make your own recordings disappear. They
-           are yours; the card is just where they live. */
-        kept.forEach(function (t) {
-          h += '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap;align-items:center">' +
-            '<div style="flex:1;min-width:0;font-size:12px;font-weight:700;white-space:nowrap;' +
-            'overflow:hidden;text-overflow:ellipsis">' + esc(t.title) +
-            (t.sentAt ? ' · submitted' : '') + '</div>' +
-            '<button class="btn" data-ahear="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Listen</button>' +
-            '<button class="btn" data-adl="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Save</button>' +
-            '</div>';
+    if (pickedDay) {
+      /* ONE DAY. What you are supposed to do today, and nothing else. */
+      var dl = dueOn(new Date(pickedDay + 'T12:00:00'), RP.user.id);
+      var isToday = pickedDay === dkey(new Date());
+      h += '<div class="rp-lab" style="margin-top:14px">' +
+        (isToday ? 'TODAY' : dayLabel(pickedDay)) + '</div>';
+      if (!dl.length) {
+        h += '<div class="rp-empty">Nothing set for that day.</div>';
+      } else {
+        dl.forEach(function (x) {
+          h += x.done && !isToday ? doneCard(x.a, pickedDay) : assignmentCard(x.a, pickedDay);
         });
-        h += '</div>';
-      });
+      }
+      h += '<button class="btn" data-day="' + esc(pickedDay) + '" ' +
+        'style="width:100%;padding:10px;margin-top:10px;font-size:12px">Show the whole week</button>';
+    } else {
+      if (!open.length && !done.length) {
+        h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
+          ' sets something on his phone it lands here — you will not need to refresh.</div>';
+      }
+      open.forEach(function (a) { h += assignmentCard(a, null); });
+      if (done.length) {
+        h += '<div class="rp-lab" style="margin-top:14px">DONE</div>';
+        done.slice(0, 6).forEach(function (a) { h += doneCard(a, null); });
+      }
     }
 
     if (RP.scorecardHTML) h += RP.scorecardHTML(RP.user.id, 'you');
@@ -210,6 +212,200 @@
     return h;
   }
 
+  /* ================================================================ */
+  /* THE WEEK                                                          */
+  /*                                                                   */
+  /* Robert, 12 Sep: "when you open up the calendar, it just shows a   */
+  /* week at a time. It can either show the day — what you're supposed */
+  /* to do the day — or the week at a time so you can see what your    */
+  /* progress is for that week."                                       */
+  /*                                                                   */
+  /* A DAILY assignment is due every day from the day it was set. A    */
+  /* ONE-OFF is due on the day it was set and stays due until it is    */
+  /* done. Whether a day was done is NOT a stored flag — it is read    */
+  /* off the takes actually submitted that day. So the week can only   */
+  /* ever show work that really happened, which is the same rule as    */
+  /* everything else in here.                                          */
+  /* ================================================================ */
+  var weekOffset = 0;       // 0 = this week, -1 = last week
+  var pickedDay = null;     // yyyy-mm-dd, or null for "the whole week"
+
+  function dkey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function startOfWeek(off) {
+    var n = new Date();
+    n.setHours(0, 0, 0, 0);
+    n.setDate(n.getDate() - n.getDay() + (off * 7));   // Sunday-first, as the app already draws it
+    return n;
+  }
+  function weekDays(off) {
+    var s0 = startOfWeek(off), out = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(s0.getTime());
+      d.setDate(s0.getDate() + i);
+      out.push(d);
+    }
+    return out;
+  }
+
+  /* every take this student has submitted, by the day it was submitted */
+  function submittedOn(dayK, assignmentId) {
+    return (RP.takes || []).some(function (t) {
+      return t.assignment_id === assignmentId && dkey(new Date(t.created_at)) === dayK;
+    });
+  }
+
+  /* what is due on one day, for one student */
+  function dueOn(d, studentId) {
+    var k = dkey(d);
+    var today = dkey(new Date());
+    var future = k > today;
+    return (RP.assignments || []).filter(function (a) {
+      if (a.student_id !== studentId) return false;
+      var made = dkey(new Date(a.created_at));
+      if (made > k) return false;                       // not set yet on that day
+      if (a.cadence === 'daily') return !a.done_at || dkey(new Date(a.done_at)) >= k;
+      if (a.done_at) return made === k || dkey(new Date(a.done_at)) === k;
+      return made === k || (k === today);               // still open: sits on today too
+    }).map(function (a) {
+      return { a: a, done: a.cadence === 'daily'
+        ? submittedOn(k, a.id)
+        : (!!a.done_at && dkey(new Date(a.done_at)) <= k), future: future };
+    });
+  }
+
+  /* One source of truth for "how much of this week is done", so the week
+     strip and the scorecard cannot disagree with each other on the same
+     screen — which they did: the strip said 2 of 2 and the card said 1 of 2,
+     because the card was counting assignments that are FINISHED FOREVER and a
+     daily one never is. Both now count days of work due and days done. */
+  RP.weekProgress = function (studentId, offset) {
+    var today = dkey(new Date()), due = 0, done = 0;
+    weekDays(offset == null ? weekOffset : offset).forEach(function (d) {
+      if (dkey(d) > today) return;         // days that have not happened are not owed
+      var l = dueOn(d, studentId);
+      due += l.length;
+      done += l.filter(function (x) { return x.done; }).length;
+    });
+    return { due: due, done: done };
+  };
+
+  /* how many days of a daily assignment this week actually happened */
+  RP.dailyDays = function (assignment) {
+    var today = dkey(new Date()), due = 0, done = 0;
+    weekDays(weekOffset).forEach(function (d) {
+      var k = dkey(d);
+      if (k > today) return;
+      if (dkey(new Date(assignment.created_at)) > k) return;
+      due++;
+      if (submittedOn(k, assignment.id)) done++;
+    });
+    return { due: due, done: done };
+  };
+
+  function weekStrip(studentId) {
+    var days = weekDays(weekOffset);
+    var today = dkey(new Date());
+    var h = '<div class="rp-wk">';
+    days.forEach(function (d) {
+      var k = dkey(d);
+      var list = dueOn(d, studentId);
+      var done = list.filter(function (x) { return x.done; }).length;
+      var cls = 'rp-wd';
+      if (k === today) cls += ' today';
+      if (pickedDay === k) cls += ' picked';
+      if (list.length && done === list.length) cls += ' all';
+      else if (done) cls += ' some';
+      h += '<button class="' + cls + '" data-day="' + k + '">' +
+        '<span class="rp-wdn">' + 'SMTWTFS'[d.getDay()] + '</span>' +
+        '<span class="rp-wdd">' + d.getDate() + '</span>' +
+        '<span class="rp-wdc">' + (list.length ? done + '/' + list.length : '\u00b7') + '</span>' +
+        '</button>';
+    });
+    h += '</div>';
+
+    var total = 0, got = 0;
+    days.forEach(function (d) {
+      if (dkey(d) > today) return;                      // do not count days that have not happened
+      var l = dueOn(d, studentId);
+      total += l.length;
+      got += l.filter(function (x) { return x.done; }).length;
+    });
+    h += '<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px">' +
+      '<button class="btn" data-wk="-1" style="padding:6px 10px;font-size:11.5px">\u2039 Last week</button>' +
+      '<div class="rp-sub" style="margin:0;text-align:center;flex:1">' +
+      (total ? got + ' of ' + total + ' done so far this week' : 'Nothing set for this week yet') +
+      '</div>' +
+      (weekOffset < 0
+        ? '<button class="btn" data-wk="1" style="padding:6px 10px;font-size:11.5px">This week \u203a</button>'
+        : '<span style="width:64px"></span>') +
+      '</div>';
+    return h;
+  }
+
+  function weekCss() {
+    if ($('rpWkCss')) return '';
+    return '<style id="rpWkCss">' +
+      '.rp-wk{display:flex;gap:4px;margin-top:10px}' +
+      '.rp-wd{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);' +
+      'border-radius:9px;padding:7px 2px;display:flex;flex-direction:column;align-items:center;' +
+      'gap:2px;cursor:pointer;color:var(--ink-dim)}' +
+      '.rp-wd.today{border-color:var(--gold)}' +
+      '.rp-wd.picked{background:var(--gold);color:#1a1207}' +
+      '.rp-wd.some{color:var(--gold)}' +
+      '.rp-wd.all{color:var(--hit)}' +
+      '.rp-wd.picked.some,.rp-wd.picked.all{color:#1a1207}' +
+      '.rp-wdn{font-size:9.5px;font-weight:800;letter-spacing:.5px;opacity:.75}' +
+      '.rp-wdd{font-size:14px;font-weight:900;color:var(--ink)}' +
+      '.rp-wd.picked .rp-wdd{color:#1a1207}' +
+      '.rp-wdc{font-size:9px;font-weight:800}' +
+      '</style>';
+  }
+
+  function wireWeek(host, onChange) {
+    each(host, '[data-day]', function (b) {
+      on(b, 'click', function () {
+        pickedDay = (pickedDay === b.dataset.day) ? null : b.dataset.day;
+        onChange();
+      });
+    });
+    each(host, '[data-wk]', function (b) {
+      on(b, 'click', function () {
+        weekOffset += (+b.dataset.wk);
+        if (weekOffset > 0) weekOffset = 0;
+        pickedDay = null;
+        onChange();
+      });
+    });
+  }
+
+  function dayLabel(k) {
+    var d = new Date(k + 'T12:00:00');
+    return ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][d.getDay()] +
+      ' ' + d.getDate();
+  }
+
+  function doneCard(a, dayK) {
+    var kept = window.RPWork ? RPWork.takesFor(a.id) : [];
+    if (dayK) kept = kept.filter(function (t) { return dkey(new Date(t.addedAt || Date.now())) === dayK; });
+    var h = '<div class="rp-card rp-done"><div class="rp-ttl">' + esc(a.title) +
+      '<span class="rp-tag">' + (a.cadence === 'daily' ? 'done that day' : ago(a.done_at)) + '</span></div>';
+    /* Ticking it off must not make your own recordings disappear. They are
+       yours; the card is just where they live. */
+    kept.forEach(function (t) {
+      h += '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap;align-items:center">' +
+        '<div style="flex:1;min-width:0;font-size:12px;font-weight:700;white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis">' + esc(t.title) +
+        (t.sentAt ? ' \u00b7 submitted' : '') + '</div>' +
+        '<button class="btn" data-ahear="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Listen</button>' +
+        '<button class="btn" data-adl="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Save</button>' +
+        '</div>';
+    });
+    return h + '</div>';
+  }
+
   /* ------------------------------------------------------------------ */
   /* ONE ASSIGNMENT = ONE CARD, with its own takes on it.                */
   /*                                                                      */
@@ -221,13 +417,18 @@
   /* open the card, it puts you in the exercise the coach chose, and      */
   /* every take you save while you are there is already this card's.      */
   /* ------------------------------------------------------------------ */
-  function assignmentCard(a) {
+  function assignmentCard(a, dayK) {
     var ex = null;
     try { ex = a.app_ex_id && V10.exById ? V10.exById(a.app_ex_id) : null; } catch (e) {}
     var mine = window.RPWork ? RPWork.takesFor(a.id) : [];
     var working = !!(window.RPWork && RPWork.current && RPWork.current.id === a.id);
+    var daily = a.cadence === 'daily';
+    var todayK = dkey(new Date());
+    var sentToday = daily && submittedOn(dayK || todayK, a.id);
 
     var h = '<div class="rp-card hot"><div class="rp-ttl">' + esc(a.title) +
+      (daily ? '<span class="rp-tag">every day</span>' : '') +
+      (sentToday ? '<span class="rp-tag">sent</span>' : '') +
       (working ? '<span class="rp-tag">doing it now</span>' : '') + '</div>';
     if (a.note) h += '<div class="rp-sub">' + esc(a.note) + '</div>';
     if (ex) {
@@ -236,6 +437,13 @@
     } else {
       h += '<div class="rp-sub" style="margin-top:4px">' + esc(coachName()) +
         ' wrote this one out — there is no exercise screen for it, so record it as you do it.</div>';
+    }
+
+    if (daily) {
+      h += '<div class="rp-sub" style="margin-top:4px">' +
+        (sentToday ? 'Sent for this day. Do it again if you want — only the day counts.'
+                   : 'Every day. Sending one take ticks off that day, not the whole thing.') +
+        '</div>';
     }
 
     h += '<button class="btn primary" data-work="' + esc(a.id) + '" ' +
@@ -261,7 +469,7 @@
       });
       h += '<div class="measured" style="margin-top:8px;font-size:11.5px">Saved takes stay on your ' +
         'phone whether you submit them or not. Submitting sends that one take to ' + esc(coachName()) +
-        ' and ticks this off.</div>';
+        (daily ? ' and ticks off that day.' : ' and ticks this off.') + '</div>';
     }
 
     h += '</div>';
@@ -322,6 +530,7 @@
 
   function wireStudentChannel(host) {
     wireAssignmentCards(host);
+    wireWeek(host, function () { if (RP.rerender) RP.rerender(); });
     on($('rpCodeGo'), 'click', joinByCode);
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
     on($('rpMsgGo'), 'click', function () {
@@ -502,10 +711,17 @@
     h += '<div class="rp-lab" style="margin-top:16px">THIS WEEK</div>';
     if (!mine.length) h += '<div class="rp-empty" style="padding:6px 2px">Nothing set yet.</div>';
     mine.forEach(function (a) {
+      /* A daily assignment never gets a tick, so showing one would be a
+         tick that never comes. Show the days instead — that is the thing
+         Ja Ronn actually wants to know. */
+      var dd = (a.cadence === 'daily' && RP.dailyDays) ? RP.dailyDays(a) : null;
       h += '<div class="rp-card' + (a.done_at ? ' rp-done' : ' hot') + '">' +
         '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
         '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(a.title) +
+        (a.cadence === 'daily' ? '<span class="rp-tag">every day</span>' : '') +
         (a.done_at ? '<span class="rp-tag">done</span>' : '') + '</div>' +
+        (dd ? '<div class="rp-sub" style="margin:3px 0 0"><b>' + dd.done + ' of ' + dd.due +
+              '</b> day' + (dd.due === 1 ? '' : 's') + ' this week</div>' : '') +
         (a.note ? '<div class="rp-sub">' + esc(a.note) + '</div>' : '') + '</div>' +
         '<button class="btn" data-drop="' + esc(a.id) + '" style="padding:6px 10px;font-size:11.5px">Drop</button>' +
         '</div></div>';
@@ -593,6 +809,13 @@
       '<input id="rpAsFind" class="rp-inp" placeholder="Search — five note, straw, sirens…" ' +
       'autocomplete="off" spellcheck="false">' +
       '<div id="rpAsHits" style="margin-top:8px"></div>';
+
+    h += '<div class="rp-lab" style="margin-top:16px">HOW OFTEN</div>' +
+      '<div class="row" style="gap:8px;margin-top:6px">' +
+      '<button class="btn primary" data-cad="once" style="flex:1;padding:11px">Just once</button>' +
+      '<button class="btn" data-cad="daily" style="flex:1;padding:11px">Every day</button></div>' +
+      '<div id="rpCadWhy" class="measured" style="margin-top:6px;font-size:11.5px">' +
+      'They do it, they send you a take, it is done.</div>';
 
     h += '<div class="rp-lab" style="margin-top:16px">OR WRITE ONE</div>' +
       '<input id="rpAsT" class="rp-inp" placeholder="Straw into a glass, 2 minutes">' +
@@ -692,6 +915,18 @@
     on($('rpAsFind'), 'input', drawHits);
     drawHits();
 
+    var cadence = 'once';
+    each(box, '[data-cad]', function (b) {
+      on(b, 'click', function () {
+        cadence = b.dataset.cad;
+        each(box, '[data-cad]', function (o) { o.classList.toggle('primary', o.dataset.cad === cadence); });
+        var w = $('rpCadWhy');
+        if (w) w.textContent = cadence === 'daily'
+          ? 'It shows up on their week, every day, until you take it off. Each day counts on its own.'
+          : 'They do it, they send you a take, it is done.';
+      });
+    });
+
     on($('rpAsGo'), 'click', function () {
       var title = ($('rpAsT').value || '').trim() ||
         (chosen ? chosen.title : (chosenApp ? chosenApp.name : ''));
@@ -700,7 +935,8 @@
         coach_id: RP.user.id, student_id: studentId, title: title,
         note: ($('rpAsN').value || '').trim(),
         exercise_id: chosen ? chosen.id : null,
-        app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null)
+        app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null),
+        cadence: cadence
       };
       $('rpAsGo').disabled = true;
       var m = $('rpAsMsg');
