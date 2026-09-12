@@ -11421,6 +11421,23 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return r.data || [];
   }
 
+  /* Somebody with a request open is not your coach and not your student, so
+     they are in none of the loaded lists — and the profiles table is shut, so
+     their name cannot just be looked up. The policy lets the two of you read
+     each other while a request is pending; this is the bit that actually goes
+     and does it. Without it both sides read "Someone", which is a poor way to
+     ask a stranger to teach you. */
+  RP.people = RP.people || {};
+  function learnNames(ids) {
+    var want = (ids || []).filter(function (id) { return id && !RP.people[id]; });
+    if (!want.length) return;
+    RP.sb.from('profiles').select('id,display_name,email').in('id', want)
+      .then(function (r) {
+        (r.data || []).forEach(function (p) { RP.people[p.id] = p; });
+        if (r.data && r.data.length) { try { rerender(); } catch (e) {} }
+      });
+  }
+
   function loadAll() {
     if (!RP.user) return Promise.resolve();
     loadOk = true;
@@ -11454,17 +11471,30 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       sb.from('assignments').select('*').eq('student_id', uid).order('created_at', { ascending: false }),
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
       sb.from('takes').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(50),
-      sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300)
+      sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300),
+      sb.from('coach_requests').select('*').eq('student_id', uid).order('created_at', { ascending: false }),
+      sb.from('coach_students').select('*').eq('student_id', uid)
     ]).then(function (r) {
       RP.assignments = rows(r[1], RP.assignments);
       RP.messages    = rows(r[2], RP.messages);
       RP.takes       = rows(r[3], RP.takes);
       RP.results     = rows(r[4], RP.results);
+      RP.myRequests  = rows(r[5], RP.myRequests);
+      learnNames((RP.myRequests || []).map(function (x) { return x.coach_id; }));
+      RP.myPairing = ((r[6] && r[6].data) || [])[0] || RP.myPairing || null;
       if (r[0] && r[0].error) { loadOk = false; return; }   // keep the coach we had
       var link = (r[0].data || [])[0];
       if (!link) { RP.coach = null; return; }
       return sb.from('profiles').select('*').eq('id', link.coach_id).maybeSingle()
-        .then(function (c) { RP.coach = c.data || null; });
+        .then(function (c) {
+          RP.coach = c.data || null;
+          if (!RP.coach) return;
+          /* his ladder, so the student can see the rung above the one they
+             are on rather than just a bare name with no context */
+          return sb.from('coach_levels').select('*').eq('coach_id', RP.coach.id)
+            .order('sort').order('created_at')
+            .then(function (l) { RP.coachLevels = rows(l, RP.coachLevels); });
+        });
     });
   }
 
@@ -11475,8 +11505,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       sb.from('exercises').select('*').eq('coach_id', uid).order('sort').order('created_at'),
       sb.from('assignments').select('*').eq('coach_id', uid).order('created_at', { ascending: false }),
       sb.from('takes').select('*').eq('coach_id', uid).order('created_at', { ascending: false }).limit(50),
-      sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50)
+      sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
+      sb.from('coach_requests').select('*').eq('coach_id', uid).eq('status', 'pending').order('created_at'),
+      sb.from('coach_levels').select('*').eq('coach_id', uid).order('sort').order('created_at'),
+      sb.from('coach_students').select('*').eq('coach_id', uid)
     ]).then(function (r) {
+      RP.requests  = rows(r[5], RP.requests);
+      RP.levels    = rows(r[6], RP.levels);
+      RP.pairings  = rows(r[7], RP.pairings);
+      learnNames((RP.requests || []).map(function (x) { return x.student_id; }));
       RP.exercises = rows(r[1], RP.exercises);
       // keep the singer's own rows loaded a moment ago, and add the ones we set
       RP.assignments = merge(RP.assignments, rows(r[2], []));
@@ -11551,11 +11588,19 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       function (p) { bump('assignment', p); });
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'student_id=eq.' + uid },
       function () { refresh(); });
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_requests', filter: 'student_id=eq.' + uid },
+      function () { refresh(); });
 
     if (coach) {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'takes', filter: 'coach_id=eq.' + uid },
         function (p) { bump('take', p); });
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'coach_id=eq.' + uid },
+        function () { refresh(); });
+      /* somebody asking to be taught should land on his phone the moment they
+         ask, the same as everything else here */
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_requests', filter: 'coach_id=eq.' + uid },
+        function (p) { bump('request', p); });
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_levels', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
@@ -11601,6 +11646,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         toast('New take: ' + (n.title || 'from a student'));
       } else if (kind === 'message' && n) {
         toast('New message');
+      } else if (kind === 'request' && payload.eventType === 'INSERT' && n) {
+        toast('Somebody has asked you to teach them.');
       }
     });
   }
@@ -11758,7 +11805,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           return;
         }
         if (!RP.user) {
-          RP.profile = null; RP.coach = null; RP.students = [];
+          RP.profile = null; RP.coach = null; RP.students = []; RP.requests = []; RP.myRequests = []; RP.levels = []; RP.coachLevels = []; RP.pairings = []; RP.myPairing = null;
           RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];
           unsubscribe(); syncHeaderButton(); rerender();
           return;
@@ -11921,7 +11968,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (RP.profile && RP.profile.id === id) return 'You';
     if (RP.coach && RP.coach.id === id) return RP.coach.display_name;
     var s = RP.students.find(function (x) { return x.id === id; });
-    return s ? s.display_name : 'Someone';
+    if (s) return s.display_name;
+    /* somebody with a request open, who is in none of those lists yet */
+    var p = RP.people && RP.people[id];
+    return (p && p.display_name) || 'Someone';
   }
 
   /* ================================================================ */
@@ -11943,8 +11993,36 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<input id="rpCode" class="rp-inp" placeholder="ABC123" maxlength="6" autocapitalize="characters" ' +
         'autocomplete="off" spellcheck="false" style="flex:1;letter-spacing:3px;font-weight:800;text-transform:uppercase">' +
         '<button class="btn primary" id="rpCodeGo" style="padding:11px 15px">Join</button></div>' +
-        '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>' +
-        '<div class="measured" style="margin-top:10px">No coach? Everything below is yours anyway — the ' +
+        '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>';
+
+      /* Robert, 13 Sep: "make it so students can request a coach for coaching."
+         The code is the coach's move — he reads it out. This is the student's:
+         they ask, and the coach says yes or no. Nobody ends up teaching someone
+         they never agreed to. */
+      var asked = (RP.myRequests || []).filter(function (r) { return r.status === 'pending'; });
+      h += '<div class="rp-lab" style="margin-top:18px">OR ASK SOMEONE TO TEACH YOU</div>';
+      if (asked.length) {
+        asked.forEach(function (r) {
+          h += '<div class="rp-card" style="padding:11px;margin-top:7px">' +
+            '<div class="rp-ttl">Waiting on ' + esc(nameOf(r.coach_id)) +
+            '<span class="rp-tag">asked ' + ago(r.created_at) + '</span></div>' +
+            '<div class="rp-sub">They decide. Nothing happens until they say yes.</div>' +
+            '<button class="btn" data-unask="' + esc(r.id) + '" style="width:100%;padding:9px;' +
+            'margin-top:8px;font-size:12px;color:var(--miss)">Take it back</button></div>';
+        });
+      } else {
+        h += '<div class="measured" style="margin-bottom:8px">Know a coach who is on here? ' +
+          'Use the email address they signed up with.</div>' +
+          '<div class="row" style="gap:7px;flex-wrap:nowrap">' +
+          '<input id="rpAskEmail" class="rp-inp" type="email" placeholder="them@example.com" ' +
+          'autocapitalize="off" spellcheck="false" style="flex:1">' +
+          '<button class="btn primary" id="rpAskGo" style="padding:11px 15px">Ask</button></div>' +
+          '<textarea id="rpAskNote" class="rp-inp" rows="2" style="margin-top:8px" ' +
+          'placeholder="Anything you want them to know (optional)"></textarea>' +
+          '<div id="rpAskMsg" class="measured" style="margin-top:8px"></div>';
+      }
+
+      h += '<div class="measured" style="margin-top:14px">No coach? Everything below is yours anyway — the ' +
         'app coaches you itself.</div>';
       h += '</div>';
       return h;
@@ -11954,6 +12032,29 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<b style="font-size:15px">From ' + esc(coach.display_name) + '</b>' +
       '<span class="rp-sub" style="margin:0">' + (open.length ? open.length + ' to do' : 'all done') +
       '</span></div>';
+
+    /* Where his coach has put him, in his coach's words — shown as a
+       judgement, above the week, because it is the thing a student most
+       wants to know and the app cannot work it out. */
+    var myPair = RP.myPairing;
+    var myLvlId = myPair && myPair.level_id;
+    if (myLvlId) {
+      var ladder = RP.coachLevels || [];
+      var idx = ladder.findIndex(function (x) { return x.id === myLvlId; });
+      var lv = idx >= 0 ? ladder[idx] : null;
+      var nextUp = idx >= 0 && ladder[idx + 1] ? ladder[idx + 1] : null;
+      if (lv) {
+        h += '<div class="rp-card hot" style="margin-top:12px;padding:12px">' +
+          '<div class="rp-lab">' + esc(coach.display_name.toUpperCase()) + ' HAS YOU AT</div>' +
+          '<div style="font-size:17px;font-weight:900;margin-top:2px">' + esc(lv.name) + '</div>' +
+          (lv.blurb ? '<div class="rp-sub">' + esc(lv.blurb) + '</div>' : '') +
+          (nextUp ? '<div class="rp-sub" style="margin-top:6px">Next: <b>' + esc(nextUp.name) + '</b>' +
+            (nextUp.blurb ? ' \u2014 ' + esc(nextUp.blurb) : '') + '</div>' : '') +
+          '<div class="measured" style="margin-top:8px;font-size:11.5px">This is ' +
+          esc(coach.display_name) + '\u2019s judgement, not something the app measured. ' +
+          'He moves it when he thinks you are ready.</div></div>';
+      }
+    }
 
     h += weekStrip(RP.user.id);
 
@@ -12322,6 +12423,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     wireWeek(host, function () { if (RP.rerender) RP.rerender(); });
     on($('rpCodeGo'), 'click', joinByCode);
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
+    on($('rpAskGo'), 'click', askCoach);
+    on($('rpAskEmail'), 'keydown', function (e) { if (e.key === 'Enter') askCoach(); });
+    each(host, '[data-unask]', function (b) {
+      on(b, 'click', function () {
+        b.disabled = true;
+        RP.sb.from('coach_requests').delete().eq('id', b.dataset.unask).then(function (r) {
+          if (r.error) { b.disabled = false; return fail(r.error); }
+          RP.toast('Taken back.');
+          RP.refresh();
+        });
+      });
+    });
     on($('rpMsgGo'), 'click', function () {
       var i = $('rpMsgIn');
       var body = (i.value || '').trim();
@@ -12331,6 +12444,29 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         .then(function (r) { r.error ? fail(r.error) : RP.refresh(); });
     });
     on($('rpMsgIn'), 'keydown', function (e) { if (e.key === 'Enter') $('rpMsgGo').click(); });
+  }
+
+  function askCoach() {
+    var i = $('rpAskEmail'), m = $('rpAskMsg'), b = $('rpAskGo');
+    var email = (i.value || '').trim();
+    var note = (($('rpAskNote') || {}).value || '').trim();
+    if (!email || email.indexOf('@') < 0) {
+      m.textContent = 'That does not look like an email address.';
+      m.style.color = 'var(--miss)';
+      return;
+    }
+    b.disabled = true;
+    m.textContent = 'Asking\u2026'; m.style.color = 'var(--ink-dim)';
+    RP.sb.rpc('request_coach_by_email', { p_email: email, p_note: note }).then(function (r) {
+      b.disabled = false;
+      if (r.error) {
+        m.textContent = r.error.message;
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      RP.toast('Asked ' + r.data + '. It is on their phone now.');
+      RP.refresh();
+    });
   }
 
   function joinByCode() {
@@ -12378,7 +12514,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       (RP.takes.length ? '<span class="rp-tag">' + RP.takes.length + '</span>' : '') + '</button></div>';
 
     if (tab === 'students') h += openStudent ? studentDetail() : studentList();
-    else if (tab === 'exercises') h += exerciseList();
+    else if (tab === 'exercises') h += exerciseList() + levelsSection();
     else h += inbox();
 
     host.innerHTML = h;
@@ -12395,7 +12531,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     });
 
     if (tab === 'students') openStudent ? wireStudentDetail(host) : wireStudentList(host);
-    else if (tab === 'exercises') wireExercises(host);
+    else if (tab === 'exercises') { wireExercises(host); wireLevelsSection(host); }
     else wireInbox(host);
   }
 
@@ -12404,7 +12540,25 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">' +
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
-    if (!RP.students.length) {
+    var pend = (RP.requests || []).filter(function (r) { return r.status === 'pending'; });
+    if (pend.length) {
+      h += '<div class="rp-lab" style="margin-top:14px">ASKING TO BE TAUGHT</div>';
+      pend.forEach(function (r) {
+        h += '<div class="rp-card hot" style="padding:12px;margin-top:7px">' +
+          '<div class="rp-ttl">' + esc(nameOf(r.student_id)) +
+          '<span class="rp-tag">' + ago(r.created_at) + '</span></div>' +
+          (r.note ? '<div class="rp-sub">\u201c' + esc(r.note) + '\u201d</div>' : '') +
+          '<div class="row" style="gap:7px;margin-top:9px;flex-wrap:nowrap">' +
+          '<button class="btn" data-req-no="' + esc(r.id) + '" style="flex:1;padding:9px;font-size:12px">No thanks</button>' +
+          '<button class="btn primary" data-req-yes="' + esc(r.id) + '" style="flex:1;padding:9px;font-size:12px">Take them on</button>' +
+          '</div></div>';
+      });
+    }
+
+    /* This has to come BEFORE the "nobody yet" note, or a coach on his very
+       first day — the one most likely to have somebody waiting — would never
+       see the person asking. */
+    if (!RP.students.length && !pend.length) {
       h += '<div class="rp-empty">Nobody yet. ' +
         ((RP.profile || {}).coach_code
           ? 'Read a student your code — <b style="letter-spacing:2px;color:var(--gold)">' +
@@ -12429,6 +12583,21 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       on(c, 'click', function () { openStudent = c.dataset.stu; renderTeacher(); });
     });
     on($('rpAddStu'), 'click', addStudentSheet);
+    function answer(id, yes, btn) {
+      btn.disabled = true;
+      btn.textContent = yes ? 'Adding\u2026' : 'Declining\u2026';
+      RP.sb.rpc('answer_request', { p_id: id, p_yes: yes }).then(function (r) {
+        if (r.error) { btn.disabled = false; return fail(r.error); }
+        RP.toast(yes ? r.data + ' is now your student.' : 'Declined.');
+        RP.refresh();
+      });
+    }
+    each(host, '[data-req-yes]', function (b) {
+      on(b, 'click', function () { answer(b.dataset.reqYes, true, b); });
+    });
+    each(host, '[data-req-no]', function (b) {
+      on(b, 'click', function () { answer(b.dataset.reqNo, false, b); });
+    });
   }
 
   /* Adding a student used to mean scrolling a list of EVERYONE who had ever
@@ -12485,6 +12654,145 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     on($('rpAddEmail'), 'keydown', function (e) { if (e.key === 'Enter') go(); });
   }
 
+  /* ================================================================ */
+  /* THE COACH'S OWN LEVELS                                            */
+  /*                                                                   */
+  /* Robert, in the September to-do: "what describes his levels" — a   */
+  /* coach may want to define the levels for his own students, rather  */
+  /* than the app defining them for everyone.                          */
+  /*                                                                   */
+  /* So the app now has THREE kinds of level and never confuses them:  */
+  /*                                                                   */
+  /*   the app's level  — how much you have DONE. Counted.             */
+  /*   the test         — how good you are. Measured, in cents and %.  */
+  /*   the coach's      — where your coach says you are. His judgement,*/
+  /*                      in his words, shown as his.                  */
+  /*                                                                   */
+  /* The app cannot measure "ready for the next stage". A coach can.   */
+  /* This stores his opinion AS his opinion.                           */
+  /* ================================================================ */
+  function levelName(id) {
+    var l = (RP.levels || []).find(function (x) { return x.id === id; });
+    return l ? l.name : null;
+  }
+
+  function pairingFor(studentId) {
+    return (RP.pairings || []).find(function (x) { return x.student_id === studentId; }) || null;
+  }
+
+  function coachLevelCard(s) {
+    var ladder = RP.levels || [];
+    var pair = pairingFor(s.id);
+    var on = pair && pair.level_id ? levelName(pair.level_id) : null;
+
+    var h = '<div class="rp-card" style="margin-top:9px;padding:11px">' +
+      '<div class="rp-lab">WHERE YOU HAVE PUT THEM</div>';
+    if (!ladder.length) {
+      h += '<div class="rp-sub" style="margin-top:4px">You have not written your levels yet. ' +
+        'They are yours — your words, your stages. Set them up under <b>Exercises</b>.</div>';
+    } else {
+      h += '<div class="rp-ttl" style="font-weight:700;font-size:13px">' +
+        (on ? esc(on) : 'Not placed yet') + '</div>' +
+        '<div class="rp-sub">Your call, in your words. The app shows it to them as yours.</div>' +
+        '<div style="margin-top:9px">';
+      ladder.forEach(function (l) {
+        var here = pair && pair.level_id === l.id;
+        h += '<button class="btn' + (here ? ' primary' : '') + '" data-setlvl="' + esc(l.id) +
+          '" data-stu="' + esc(s.id) + '" style="width:100%;padding:9px;margin-bottom:6px;' +
+          'font-size:12.5px;text-align:left">' + esc(l.name) +
+          (l.blurb ? ' <span style="font-weight:600;opacity:.75">\u00b7 ' + esc(l.blurb) + '</span>' : '') +
+          '</button>';
+      });
+      if (on) {
+        h += '<button class="btn" data-setlvl="" data-stu="' + esc(s.id) +
+          '" style="width:100%;padding:8px;font-size:12px;color:var(--miss)">Take them off a level</button>';
+      }
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+
+  function wireCoachLevels(host) {
+    each(host, '[data-setlvl]', function (b) {
+      on(b, 'click', function () {
+        var id = b.dataset.setlvl || null;
+        b.disabled = true;
+        RP.sb.from('coach_students')
+          .update({ level_id: id, level_set_at: id ? new Date().toISOString() : null })
+          .eq('coach_id', RP.user.id).eq('student_id', b.dataset.stu)
+          .then(function (r) {
+            b.disabled = false;
+            if (r.error) return fail(r.error);
+            RP.toast(id ? 'Moved them to ' + levelName(id) + '.' : 'Taken off a level.');
+            RP.refresh();
+          });
+      });
+    });
+  }
+
+  /* the ladder itself, written by him, under Exercises */
+  function levelsSection() {
+    var ladder = RP.levels || [];
+    var h = '<div class="rp-lab" style="margin-top:22px">YOUR LEVELS</div>' +
+      '<div class="measured" style="margin:5px 0 9px">Your own stages, in your own words. The app ' +
+      'has its own level — that one just counts how much somebody has done. This one is your ' +
+      'judgement about where they are, and it is shown to them as yours.</div>';
+    if (!ladder.length) {
+      h += '<div class="rp-empty" style="padding:6px 2px">None yet. Most coaches have three or ' +
+        'four \u2014 whatever you already say out loud.</div>';
+    }
+    ladder.forEach(function (l, i) {
+      h += '<div class="rp-card" style="padding:10px;margin-bottom:6px">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">' +
+        '<div style="flex:1;min-width:0"><div class="rp-ttl">' + (i + 1) + '. ' + esc(l.name) + '</div>' +
+        (l.blurb ? '<div class="rp-sub">' + esc(l.blurb) + '</div>' : '') + '</div>' +
+        '<button class="btn" data-dellvl="' + esc(l.id) + '" style="padding:6px 10px;font-size:11.5px;' +
+        'color:var(--miss)">Remove</button></div></div>';
+    });
+    h += '<div class="row" style="gap:7px;flex-wrap:nowrap;margin-top:8px">' +
+      '<input id="rpLvName" class="rp-inp" placeholder="Name it \u2014 e.g. Foundations" style="flex:1">' +
+      '<button class="btn primary" id="rpLvAdd" style="padding:11px 15px">Add</button></div>' +
+      '<input id="rpLvBlurb" class="rp-inp" style="margin-top:7px" ' +
+      'placeholder="What it means, in one line (optional)">' +
+      '<div id="rpLvMsg" class="measured" style="margin-top:7px"></div>';
+    return h;
+  }
+
+  function wireLevelsSection(host) {
+    function add() {
+      var n = $('rpLvName'), b = $('rpLvBlurb'), m = $('rpLvMsg');
+      var name = (n.value || '').trim();
+      if (!name) { m.textContent = 'Give it a name first.'; m.style.color = 'var(--miss)'; return; }
+      $('rpLvAdd').disabled = true;
+      m.textContent = 'Adding\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.from('coach_levels').insert({
+        coach_id: RP.user.id, name: name, blurb: (b.value || '').trim(),
+        sort: (RP.levels || []).length
+      }).select().then(function (r) {
+        $('rpLvAdd').disabled = false;
+        if (r.error || !r.data || !r.data.length) {
+          m.textContent = 'It did not save: ' + ((r.error && r.error.message) || 'nothing came back');
+          m.style.color = 'var(--miss)';
+          return;
+        }
+        RP.levels = (RP.levels || []).concat(r.data);
+        n.value = ''; b.value = '';
+        RP.refresh();
+      });
+    }
+    on($('rpLvAdd'), 'click', add);
+    on($('rpLvName'), 'keydown', function (e) { if (e.key === 'Enter') add(); });
+    each(host, '[data-dellvl]', function (btn) {
+      on(btn, 'click', function () {
+        btn.disabled = true;
+        RP.sb.from('coach_levels').delete().eq('id', btn.dataset.dellvl).then(function (r) {
+          if (r.error) { btn.disabled = false; return fail(r.error); }
+          RP.refresh();
+        });
+      });
+    });
+  }
+
   function studentDetail() {
     var s = RP.students.find(function (x) { return x.id === openStudent; });
     if (!s) { openStudent = null; return studentList(); }
@@ -12504,12 +12812,46 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
               technical: 'Comfortable with the proper terms.' };
     var E = { 1: 'New to singing', 2: 'Has sung a bit', 3: 'Has sung a lot' };
     if (s.words || s.experience) {
+      /* Where the placement came from matters to a teacher more than the
+         placement does. "They told us" and "we watched them do it" are very
+         different pieces of information, and until now the coach saw neither —
+         he saw a word with no provenance at all. */
+      var pl = s.placement || {};
+      var meas = pl.measured || null;
       h += '<div class="rp-card hot" style="margin-top:12px;padding:11px">' +
         '<div class="rp-lab">HOW TO TALK TO THEM</div>' +
         '<div class="rp-ttl" style="font-weight:700;font-size:13px">' +
         esc(E[s.experience] || '') + '. ' + esc(W[s.words] || '') + '</div>' +
-        '<div class="rp-sub">Their own answer when they opened the app.</div></div>';
+        '<div class="rp-sub">' +
+        (meas ? 'Measured by the app, not just asked.' :
+         pl.answers ? 'Their own answer when they opened the app.' :
+                      'The app\u2019s default \u2014 they have not answered or been measured.') +
+        '</div>';
+      if (meas && meas.why && meas.why.length) {
+        h += '<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">' +
+          '<div class="rp-lab">WHAT THE TEST ACTUALLY SAW</div>';
+        meas.why.forEach(function (w) {
+          h += '<div style="font-size:12.5px;line-height:1.5">\u00b7 ' + esc(w) + '</div>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
     }
+
+    /* How much work they have put in — the app's own level, which counts and
+       does not judge. Useful to a coach for exactly one thing: telling apart
+       "cannot do it" from "has not been doing it". */
+    if (RP.levelFor) {
+      var wk = RP.levelFor(s.id);
+      h += '<div class="rp-card" style="margin-top:9px;padding:11px">' +
+        '<div class="rp-lab">HOW MUCH THEY HAVE DONE</div>' +
+        '<div class="rp-ttl" style="font-weight:700;font-size:13px">Level ' + wk.level +
+        ' \u00b7 ' + esc(wk.name) + '</div>' +
+        '<div class="rp-sub">' + wk.points + ' points, counted from things they actually did. ' +
+        'This is effort, not ability.</div></div>';
+    }
+
+    h += coachLevelCard(s);
 
     h += '<div class="rp-lab" style="margin-top:16px">THIS WEEK</div>';
     if (!mine.length) h += '<div class="rp-empty" style="padding:6px 2px">Nothing set yet.</div>';
@@ -12555,6 +12897,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   function wireStudentDetail(host) {
+    wireCoachLevels(host);
     wireTakeAudio(host);
     on($('rpBack'), 'click', function () { openStudent = null; renderTeacher(); });
     on($('rpAssign'), 'click', function () { assignSheet(openStudent); });
@@ -13173,6 +13516,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     ME.experience = +(localStorage.getItem('rp_exp') || 2);
     ME.taught = +(localStorage.getItem('rp_taught') || 2);
     ME.answers = JSON.parse(localStorage.getItem('rp_answers') || 'null');
+    ME.measured = JSON.parse(localStorage.getItem('rp_measured') || 'null');
   } catch (e) {}
 
   /* ------------------------------------------------------------------ */
@@ -13228,6 +13572,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       localStorage.setItem('rp_exp', String(ME.experience));
       localStorage.setItem('rp_taught', String(ME.taught));
       if (ME.answers) localStorage.setItem('rp_answers', JSON.stringify(ME.answers));
+      if (ME.measured) localStorage.setItem('rp_measured', JSON.stringify(ME.measured));
       localStorage.setItem('rp_asked', '1');
     } catch (e) {}
     var RP = window.RP;
@@ -13236,7 +13581,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       /* the raw answers travel too, so a later change to the questions or the
          mapping can re-place everybody instead of stranding them on whatever
          rule happened to be running the day they signed up */
-      if (ME.answers) row.placement = { answers: ME.answers, at: new Date().toISOString() };
+      /* The MEASURED placement used to live only on the phone that measured it,
+         so a coach looking at a student could not tell whether "intermediate"
+         was something they said or something the app watched them do. Those
+         are very different pieces of information for a teacher, so both travel. */
+      if (ME.answers || ME.measured) {
+        row.placement = { at: new Date().toISOString() };
+        if (ME.answers) row.placement.answers = ME.answers;
+        if (ME.measured) row.placement.measured = ME.measured;
+      }
       RP.sb.from('profiles').update(row).eq('id', RP.user.id).then(function () {
         RP.profile.words = ME.words;
         RP.profile.experience = ME.experience;
@@ -15632,6 +15985,750 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   setInterval(mountRow, 1500);
   setTimeout(mountRow, 900);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — levels.
+
+   Robert, 13 Sep: "do the levels and gamify the app through warm ups,
+   exercises, trivia, and theory. Don't make it like too much, let's try to
+   lean on the subtle side. That's not the main point of the app, it's just
+   an additional subconscious psychological driver."
+
+   ----------------------------------------------------------------------
+   THE ONE DECISION THIS FILE RESTS ON
+   ----------------------------------------------------------------------
+   A level here is HOW MUCH YOU HAVE DONE. It is not how good you are.
+
+   That distinction is the only reason this can exist in an app that has
+   refused, everywhere else, to put a number on screen it did not measure.
+   "How good are you" is a real question with a real answer and the app
+   already has one — the placement test, which measures steadiness in per
+   cent and pitch in cents. Inventing a second, vaguer answer and dressing
+   it up as progress would be exactly the fake XP bar the to-do doc warned
+   about in September.
+
+   So: every single point below is a count of something that actually
+   happened and is written down in the results table. Nothing is awarded
+   for opening the app, for looking at a screen, or for "engagement". Tap
+   the level and it shows you the arithmetic.
+
+   ----------------------------------------------------------------------
+   AND IT STAYS QUIET
+   ----------------------------------------------------------------------
+   Subtle was the instruction and subtle is the design: one small line on
+   Home, one row in Profile, and a single toast on the day you actually
+   move up. No bar filling on every tap, no confetti, no streak that
+   scolds you for missing Tuesday. If somebody never looks at it, the app
+   is unchanged.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var L = window.RPLevel = {};
+
+  /* ------------------------------------------------------------------ */
+  /* WHAT A POINT IS WORTH                                               */
+  /*                                                                     */
+  /* These weights are judgements, not measurements, so they live in one */
+  /* place where they can be argued with — same rule as the placement    */
+  /* thresholds. The ordering is the argument: a day you turned up at    */
+  /* all is worth more than any single drill, and a take you actually    */
+  /* sent your coach is worth more than either, because it is the        */
+  /* hardest thing to do and the easiest to avoid.                       */
+  /* ------------------------------------------------------------------ */
+  var WORTH = {
+    practice: 10,     // a warm-up or exercise finished
+    ear: 10,          // an ear drill run
+    sustain: 10,      // a note held to the end
+    star: 15,         // a theory star, counted at your best per game
+    trivia: 5,        // the word of the day, right first time
+    submitted: 25,    // a take sent to your coach
+    day: 20           // any day you did something at all
+  };
+
+  /* Names for what you have put in, NOT for how well you sing. Nothing
+     here claims an ability, because none of it measures one. */
+  var NAMES = ['', 'Day one', 'Getting going', 'Turning up', 'Regular',
+               'In the habit', 'Committed', 'Dedicated', 'Relentless'];
+  var STEPS = [0, 60, 150, 300, 520, 820, 1200, 1700];
+
+  function dayKey(d) {
+    d = new Date(d);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* the arithmetic, kept open                                           */
+  /* ------------------------------------------------------------------ */
+  L.count = function (studentId) {
+    var uid = studentId || ((window.RP && RP.user) ? RP.user.id : null);
+    var rs = (window.RP && RP.results ? RP.results : [])
+      .filter(function (r) { return !uid || r.student_id === uid; });
+
+    var n = { practice: 0, ear: 0, sustain: 0, trivia: 0 };
+    var best = {}, days = {};
+    rs.forEach(function (r) {
+      if (r.kind === 'game') {
+        if (r.score != null) best[r.label] = Math.max(best[r.label] || 0, r.score);
+      } else if (n[r.kind] != null) {
+        n[r.kind]++;
+      }
+      if (r.created_at) days[dayKey(r.created_at)] = true;
+    });
+    var stars = Object.keys(best).reduce(function (a, k) { return a + best[k]; }, 0);
+
+    var submitted = (window.RP && RP.takes ? RP.takes : []).filter(function (t) {
+      return (!uid || t.student_id === uid) && t.assignment_id;
+    }).length;
+
+    var dayCount = Object.keys(days).length;
+
+    var lines = [
+      { n: n.practice, worth: WORTH.practice, what: 'warm-up or exercise finished', each: 'warm-ups and exercises' },
+      { n: n.ear,      worth: WORTH.ear,      what: 'ear drill',                    each: 'ear drills' },
+      { n: n.sustain,  worth: WORTH.sustain,  what: 'note held to the end',         each: 'notes held' },
+      { n: stars,      worth: WORTH.star,     what: 'theory star',                  each: 'theory stars' },
+      { n: n.trivia,   worth: WORTH.trivia,   what: 'word of the day',              each: 'words of the day' },
+      { n: submitted,  worth: WORTH.submitted,what: 'take sent to your coach',      each: 'takes sent to your coach' },
+      { n: dayCount,   worth: WORTH.day,      what: 'day you practised',            each: 'days you practised' }
+    ].filter(function (x) { return x.n > 0; });
+
+    var points = lines.reduce(function (a, x) { return a + x.n * x.worth; }, 0);
+
+    var lvl = 1;
+    for (var i = 0; i < STEPS.length; i++) if (points >= STEPS[i]) lvl = i + 1;
+    var name = NAMES[Math.min(lvl, NAMES.length - 1)] || 'Relentless';
+    var next = STEPS[lvl] != null ? STEPS[lvl] : null;
+
+    return {
+      points: points, level: lvl, name: name,
+      next: next, toGo: next == null ? null : next - points,
+      lines: lines, days: dayCount
+    };
+  };
+
+  /* A coach looking at a student wants this too — it is the one number that
+     tells "cannot do it" apart from "has not been doing it". Same arithmetic,
+     pointed at somebody else's results. */
+  RP.levelFor = function (studentId) { return L.count(studentId); };
+
+  /* ------------------------------------------------------------------ */
+  /* the quiet part: notice a level change, say it once                  */
+  /* ------------------------------------------------------------------ */
+  function seen() {
+    try { return +(localStorage.getItem('rp_level_seen') || 0); } catch (e) { return 0; }
+  }
+  function remember(l) {
+    try { localStorage.setItem('rp_level_seen', String(l)); } catch (e) {}
+  }
+  L.checkMoved = function () {
+    var c = L.count();
+    var was = seen();
+    if (!was) { remember(c.level); return; }        // first run: no fanfare
+    if (c.level > was) {
+      remember(c.level);
+      try {
+        if (window.RP && RP.toast) {
+          RP.toast('Level ' + c.level + ' — ' + c.name + '. That is ' + c.points + ' points of work.');
+        }
+      } catch (e) {}
+    } else if (c.level < was) {
+      remember(c.level);                            // data cleared; no announcement
+    }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* the breakdown — the whole point of being allowed to do this at all  */
+  /* ------------------------------------------------------------------ */
+  function sheet(html) {
+    var o = $('rpSheet');
+    if (!o) {
+      o = document.createElement('div');
+      o.id = 'rpSheet';
+      o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
+        'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+      document.body.appendChild(o);
+    }
+    o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
+      'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
+      'calc(24px + env(safe-area-inset-bottom,0px));max-height:94vh;overflow-y:auto">' + html + '</div>';
+    o.style.display = 'flex';
+    return o.firstChild;
+  }
+  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+
+  L.open = function () {
+    var c = L.count();
+    var h = '<div class="rp-lab">LEVEL ' + c.level + '</div>' +
+      '<b style="font-size:22px;display:block;margin-top:2px">' + esc(c.name) + '</b>' +
+      '<div class="measured" style="margin-top:8px">This is <b>how much you have done</b>. ' +
+      'It is not how good you are — that is the test, and it measures rather than counts.</div>';
+
+    if (!c.lines.length) {
+      h += '<div class="rp-empty" style="margin-top:14px">Nothing counted yet. Do a warm-up, an ear ' +
+        'drill or the word of the day and it starts adding up.</div>';
+    } else {
+      h += '<div class="rp-lab" style="margin-top:18px">WHERE THE ' + c.points + ' CAME FROM</div>';
+      c.lines.forEach(function (x) {
+        h += '<div class="row" style="justify-content:space-between;align-items:baseline;' +
+          'padding:7px 0;border-bottom:1px solid var(--line)">' +
+          '<div style="font-size:13px"><b>' + x.n + '</b> ' +
+          esc(x.n === 1 ? x.what : x.each) + '</div>' +
+          '<div style="font-size:12px;color:var(--ink-dim)">' + x.n + ' × ' + x.worth +
+          ' = <b style="color:var(--gold)">' + (x.n * x.worth) + '</b></div></div>';
+      });
+      h += '<div class="row" style="justify-content:space-between;margin-top:9px">' +
+        '<b style="font-size:14px">Total</b>' +
+        '<b style="font-size:14px;color:var(--gold)">' + c.points + '</b></div>';
+    }
+
+    if (c.next != null) {
+      h += '<div class="measured" style="margin-top:14px">' + c.toGo + ' more and you are ' +
+        esc(NAMES[Math.min(c.level + 1, NAMES.length - 1)]) + '.</div>';
+    }
+
+    h += '<div class="measured" style="margin-top:14px;font-size:11.5px">Every point above is a ' +
+      'count of something you actually did and the app wrote down. Nothing is awarded for opening ' +
+      'the app or looking at a screen.</div>';
+    h += '<button class="btn" id="rpLvX" style="width:100%;padding:12px;margin-top:16px">Close</button>';
+    sheet(h);
+    on($('rpLvX'), 'click', shut);
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* where it shows: one line on Home, one row in Profile. That is all.  */
+  /* ------------------------------------------------------------------ */
+  function mountHome() {
+    var host = $('modeHome');
+    if (!host) return;
+    var c = L.count();
+    var d = $('rpLevelLine');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpLevelLine';
+      d.style.cssText = 'display:flex;align-items:center;gap:8px;margin:2px 0 12px;cursor:pointer;' +
+        'font-size:12px;color:var(--ink-dim)';
+    }
+    d.innerHTML = '<span style="font-weight:900;color:var(--gold);font-size:12.5px">Level ' +
+      c.level + '</span>' +
+      '<span style="font-weight:700">' + esc(c.name) + '</span>' +
+      '<span style="opacity:.6">· ' + c.points + ' points</span>';
+    if (fresh) {
+      on(d, 'click', L.open);
+      try { host.insertBefore(d, host.firstChild); } catch (e) {}
+    }
+  }
+
+  function mountProfile() {
+    var host = $('modeYou');
+    if (!host) return;
+    var c = L.count();
+    var d = $('rpLevelRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpLevelRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+    }
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Level ' + c.level + ' · ' + esc(c.name) + '</div>' +
+      '<div class="rp-sub">' + c.points + ' points of work' +
+      (c.toGo != null ? ' · ' + c.toGo + ' to the next' : '') + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    if (fresh) {
+      on(d, 'click', L.open);
+      try { host.appendChild(d); } catch (e) {}
+    }
+  }
+
+  setInterval(function () { mountHome(); mountProfile(); }, 1500);
+  setTimeout(function () { mountHome(); mountProfile(); L.checkMoved(); }, 1200);
+
+  /* and after anything that could have earned a point */
+  var lastPoints = -1;
+  setInterval(function () {
+    var p = L.count().points;
+    if (p !== lastPoints) {
+      lastPoints = p;
+      mountHome(); mountProfile();
+      L.checkMoved();
+    }
+  }, 3000);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the word of the day.
+
+   Robert, 13 Sep: "gamify the app through warm ups, exercises, trivia, and
+   theory."
+
+   Warm-ups, exercises and theory already exist and already keep score. The
+   missing one was trivia, and the temptation was to sit down and invent a
+   few hundred questions.
+
+   We did not, for the reason this app does most things: the glossary is
+   already there, it is already 56 terms, and every definition in it has
+   been written to be true in one plain sentence. So the question is built
+   FROM the glossary — here is a definition, which word is it? — and the
+   answer is the app's own answer. There is no second source to get wrong
+   and nothing new to fact-check.
+
+   One a day. Deliberately one: it is a nudge, not a quiz app bolted onto a
+   singing app, and Robert asked for subtle. It changes at midnight, the
+   same word for everybody on the same day, and answering it once is the
+   end of it — no grinding it for points.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var T = window.RPTrivia = {};
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* The glossary holds plurals and near-synonyms pointing at the same
+     sentence ("semitone" and "semitones"). Asking somebody to pick between
+     two words with an identical definition is not a question, it is a coin
+     toss — so one word per distinct meaning. */
+  function pool() {
+    var G = null;
+    try { G = window.RPPlain && RPPlain.glossary; } catch (e) {}
+    if (!G) return [];
+    var bySentence = {};
+    Object.keys(G).forEach(function (word) {
+      var def = G[word];
+      if (!bySentence[def] || word.length < bySentence[def].length) bySentence[def] = word;
+    });
+    return Object.keys(bySentence).map(function (def) {
+      return { word: bySentence[def], def: def };
+    }).sort(function (a, b) { return a.word < b.word ? -1 : 1; });
+  }
+
+  /* same word for everyone, all day, different tomorrow */
+  function pickFor(dayStr, list) {
+    if (!list.length) return null;
+    var h = 0;
+    for (var i = 0; i < dayStr.length; i++) h = (h * 31 + dayStr.charCodeAt(i)) >>> 0;
+    return { i: h % list.length, h: h };
+  }
+
+  T.question = function () {
+    var list = pool();
+    var p = pickFor(today(), list);
+    if (!p) return null;
+    var right = list[p.i];
+
+    /* three wrong ones, chosen the same way so the options do not reshuffle
+       every time the screen redraws */
+    var others = [], h = p.h;
+    var used = {};
+    used[p.i] = 1;
+    while (others.length < 3 && others.length < list.length - 1) {
+      h = (h * 1103515245 + 12345) >>> 0;
+      var j = h % list.length;
+      if (used[j]) continue;
+      used[j] = 1;
+      others.push(list[j]);
+    }
+    var opts = others.concat([right]);
+    /* deterministic shuffle */
+    for (var k = opts.length - 1; k > 0; k--) {
+      h = (h * 1103515245 + 12345) >>> 0;
+      var m = h % (k + 1);
+      var t = opts[k]; opts[k] = opts[m]; opts[m] = t;
+    }
+    return { right: right, opts: opts };
+  };
+
+  function answeredKey() { return 'rp_trivia_' + today(); }
+  T.answered = function () {
+    try { return localStorage.getItem(answeredKey()); } catch (e) { return null; }
+  };
+
+  /* ------------------------------------------------------------------ */
+  function sheet(html) {
+    var o = $('rpSheet');
+    if (!o) {
+      o = document.createElement('div');
+      o.id = 'rpSheet';
+      o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
+        'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+      document.body.appendChild(o);
+    }
+    o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
+      'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
+      'calc(24px + env(safe-area-inset-bottom,0px));max-height:94vh;overflow-y:auto">' + html + '</div>';
+    o.style.display = 'flex';
+    return o.firstChild;
+  }
+  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+
+  T.open = function () {
+    var q = T.question();
+    if (!q) return;
+    var already = T.answered();
+
+    var h = '<div class="rp-lab">WORD OF THE DAY</div>' +
+      '<div class="measured" style="margin-top:8px">Which word means this?</div>' +
+      '<div class="rp-card" style="margin-top:10px;padding:14px">' +
+      '<div style="font-size:15px;line-height:1.5">' + esc(q.right.def) + '</div></div>';
+
+    if (already) {
+      var got = already === q.right.word;
+      h += '<div class="rp-card' + (got ? ' hot' : '') + '" style="margin-top:12px;padding:13px">' +
+        '<div class="rp-ttl">' + esc(q.right.word) + '</div>' +
+        '<div class="rp-sub">' + (got ? 'You had it.' : 'You said “' + esc(already) + '”.') +
+        '</div></div>' +
+        '<div class="measured" style="margin-top:10px">One a day. There is a new one tomorrow.</div>';
+    } else {
+      h += '<div style="margin-top:12px">';
+      q.opts.forEach(function (o) {
+        h += '<button class="btn" data-word="' + esc(o.word) + '" style="width:100%;padding:12px;' +
+          'margin-bottom:7px;font-size:14px;font-weight:800">' + esc(o.word) + '</button>';
+      });
+      h += '</div>';
+      h += '<div class="measured" style="margin-top:4px;font-size:11.5px">No wrong answer costs you ' +
+        'anything. The definition is the app’s own — it is the same sentence you get when you ' +
+        'tap the word anywhere else.</div>';
+    }
+
+    h += '<button class="btn" id="rpTvX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
+    var box = sheet(h);
+    on($('rpTvX'), 'click', shut);
+
+    box.querySelectorAll('[data-word]').forEach(function (b) {
+      on(b, 'click', function () {
+        var chose = b.dataset.word;
+        try { localStorage.setItem(answeredKey(), chose); } catch (e) {}
+        var got = chose === q.right.word;
+        /* Only a right answer scores, and only the first one — the key is
+           the date, so there is nothing to grind. */
+        if (got) {
+          try {
+            if (window.RP && RP.logResult) {
+              RP.logResult({ kind: 'trivia', label: 'Word of the day: ' + q.right.word,
+                             score: 1, out_of: 1 });
+            }
+          } catch (e) {}
+        }
+        T.open();
+        try {
+          if (window.RP && RP.toast) {
+            RP.toast(got ? 'Right — ' + q.right.word + '.'
+                         : 'It was “' + q.right.word + '”. Now you know it.');
+          }
+        } catch (e) {}
+      });
+    });
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* one small row on Learn, where words belong                          */
+  /* ------------------------------------------------------------------ */
+  function mount() {
+    var host = $('modeLearn');
+    if (!host) return;
+    var q = T.question();
+    if (!q) return;
+    var done = T.answered();
+    var d = $('rpTriviaRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpTriviaRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+      d.style.marginTop = '10px';
+    }
+    d.classList.toggle('hot', !done);
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Word of the day' +
+      (done ? '<span class="rp-tag">done</span>' : '') + '</div>' +
+      '<div class="rp-sub">' + (done
+        ? 'It was “' + esc(q.right.word) + '”. A new one tomorrow.'
+        : 'One question, ten seconds.') + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    if (fresh) {
+      on(d, 'click', T.open);
+      try { host.insertBefore(d, host.firstChild); } catch (e) {}
+    }
+  }
+
+  setInterval(mount, 1500);
+  setTimeout(mount, 1100);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the body, before the voice.
+
+   Robert, 13 Sep: "let's do the massage and stretches — you're doing the
+   research. Do a deep dive. I'll add the accounts I find later, or
+   whenever; we should try to update our catalogues over time anyway."
+
+   The research is in Drive: "RESEARCH: stretches, self-massage and the body
+   before the voice". Three things came out of it that shaped this file, and
+   two of them are refusals.
+
+   1. THE APP MUST NEVER TELL ANYONE TO MASSAGE THEIR LARYNX.
+      The technique with real evidence behind it — manual circumlaryngeal
+      therapy — is a trained clinician doing it TO you. The middle of the
+      neck carries the carotid artery, the jugular, the vagus nerve, the
+      thyroid and a hyoid bone that breaks. There is a published case report
+      of an ischaemic stroke from self-administered carotid sinus massage.
+      So there is no throat item in here, there is no diagram of where to
+      press, and the safety panel says so in the app's own voice. What IS
+      here is jaw, tongue, face, shoulders and posture — which is where a
+      great deal of singing tension actually lives anyway, because the
+      tongue root hangs off the hyoid that carries the larynx.
+
+   2. LONG STATIC STRETCHES MAKE YOU WEAKER.
+      Held past about a minute, static stretching costs real strength and
+      power. Held briefly, inside a warm-up that also moves, it costs almost
+      nothing and may protect you. So every hold in here is short and every
+      item says so, and the section is placed BEFORE the voice work rather
+      than sold as a separate wellness corner.
+
+   3. ONE ITEM IS NOT EVIDENCED AND IS LABELLED AS SUCH.
+      Shaking — the thing Robert saw on Instagram — is almost certainly TRE.
+      The mechanism is plausible and the practice is harmless and common,
+      but what I could find was practitioner material and the method's own
+      literature. It is in, because performers really do this and it costs
+      nothing. It is labelled "what singers do" rather than "what is shown
+      to work", because those are different sentences and this app has never
+      blurred them.
+
+   A NOTE ON NUMBERS: the sandbox could search the web but was blocked from
+   opening the journals themselves. So not one figure from that research is
+   printed on screen here. The guidance is directional and written as
+   guidance; the moment somebody wants to put "4 to 7 per cent" in front of
+   a user, they open the paper first.
+
+   THE CATALOGUE IS MEANT TO GROW. Robert is finding an Instagram account and
+   expects to add to this over time. Every item is one entry in ITEMS below,
+   with the same shape, so adding one is adding an object.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var B = window.RPBody = {};
+
+  /* Each item: what it is · how long · how · what it is NOT · how sure we are.
+     `sure` is the honest label, and it is shown: 'why' means there is a
+     mechanism and a literature behind it, 'practice' means singers do it and
+     it is harmless, which is a weaker claim and says so. */
+  var ITEMS = [
+    {
+      id: 'stand', name: 'Stand up', secs: 30, sure: 'why',
+      what: 'Ribs over hips, head back over your shoulders, knees soft.',
+      how: 'Feet under your hips. Let your arms hang. Grow tall from the top of your head rather ' +
+           'than pulling your shoulders back. Unlock your knees — locked knees stiffen everything above them.',
+      why: 'A head carried forward compresses the whole neck and the larynx with it, and stops the ' +
+           'ribs moving. Of everything on this screen this is the one with the most direct line to ' +
+           'your voice, and it is free.',
+      not: 'Not standing to attention. Effort in the posture is the problem, not the fix.'
+    },
+    {
+      id: 'roll', name: 'Shoulders and arms', secs: 45, sure: 'why',
+      what: 'Roll the shoulders, swing the arms. Keep moving.',
+      how: 'Ten slow shoulder rolls back. Then let your arms swing across your body, loose, ' +
+           'like you are not in charge of them. Breathe normally throughout.',
+      why: 'Moving warms tissue in a way holding does not, and the research on warm-ups is fairly ' +
+           'blunt that getting the body going first does something vocal exercises alone do not.',
+      not: 'Not a stretch. Nothing is held here.'
+    },
+    {
+      id: 'neck', name: 'Sides of the neck', secs: 40, sure: 'why',
+      what: 'A short lean to each side. Sides only.',
+      how: 'Drop one ear toward that shoulder until you feel a stretch down the side of your neck. ' +
+           'Hold about fifteen seconds, breathe, come back up slowly. Other side. Twice each is plenty.',
+      why: 'Short is deliberate. Held much past a minute, a static stretch measurably costs you ' +
+           'strength and power — so this is brief, and it sits inside a warm-up rather than instead of one.',
+      not: 'NOT the front of your throat, and no hands involved. Do not pull your head down with ' +
+           'your arm, and do not roll your head backwards in a circle.'
+    },
+    {
+      id: 'jaw', name: 'Let the jaw go', secs: 45, sure: 'why',
+      what: 'Unclench, and let it hang.',
+      how: 'Rest the heels of your hands on the muscle at the side of your face, above the back ' +
+           'teeth — the one that bulges when you clench. Small slow circles, gently. Then let your ' +
+           'jaw hang open and wag it side to side, loose. Nothing forced.',
+      why: 'When the jaw does not move freely, the muscles under your chin take up the slack and ' +
+           'the larynx rides up with them. This is one of the places singing tension genuinely ' +
+           'lives, and it is nowhere near anything fragile.',
+      not: 'Not opening as wide as you can. If your jaw clicks or hurts, stop — that is a dentist ' +
+           'or a physio, not an app.'
+    },
+    {
+      id: 'tongue', name: 'The back of the tongue', secs: 45, sure: 'why',
+      what: 'The bit you cannot see, and the bit that pulls on your voice.',
+      how: 'Rest a thumb gently in the soft place under your chin — no pressure, just resting — and ' +
+           'say "ng… ah… ng… ah". You are feeling whether it stiffens. Then stick your tongue out, ' +
+           'let it lie there heavy, and sigh. Then roll it around the outside of your teeth, both ways.',
+      why: 'The root of your tongue attaches to the hyoid bone, and the hyoid carries your larynx. ' +
+           'A tight tongue root pulls on the voice directly, which is why it can sound like a ' +
+           'throat problem when it is not.',
+      not: 'Resting, not pressing. No pushing up into the soft tissue under your chin.'
+    },
+    {
+      id: 'face', name: 'Face and lips', secs: 30, sure: 'why',
+      what: 'Wake up the bits that make the words.',
+      how: 'Screw your whole face up tight for three seconds, then let it go completely. Twice. ' +
+           'Then blow through loose lips like a horse until it comes easily.',
+      why: 'It costs thirty seconds and it wakes the articulators. The lip blow is also the gentlest ' +
+           'way into making sound at all, which is why it opens the warm-ups too.',
+      not: 'Not a workout. If the lip blow will not go, your lips are probably dry — have a drink.'
+    },
+    {
+      id: 'shake', name: 'Shake it out', secs: 60, sure: 'practice',
+      what: 'Arms out, and shake. Sixty seconds of looking daft.',
+      how: 'Hold your arms out in front of you and shake your hands fast and loose. Let it travel ' +
+           'up into your arms and shoulders. Add your legs. Then stop dead and stand still for a ' +
+           'few breaths and notice what changed.',
+      why: 'Performers do this everywhere, and the idea behind it is that a deliberate shake lets ' +
+           'the nervous system stand down before you sing.',
+      not: 'HONESTLY: this is the one thing on this screen we cannot point at good evidence for. ' +
+           'The research is thin and mostly comes from the people who teach it. It is here because ' +
+           'it is free, it is harmless, and a great many singers swear by it — not because it has ' +
+           'been shown to work.'
+    }
+  ];
+  B.items = ITEMS;
+
+  /* ------------------------------------------------------------------ */
+  function sheet(html) {
+    var o = $('rpSheet');
+    if (!o) {
+      o = document.createElement('div');
+      o.id = 'rpSheet';
+      o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
+        'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+      document.body.appendChild(o);
+    }
+    o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
+      'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
+      'calc(24px + env(safe-area-inset-bottom,0px));max-height:94vh;overflow-y:auto">' + html + '</div>';
+    o.style.display = 'flex';
+    return o.firstChild;
+  }
+  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+
+  function mins() {
+    var t = ITEMS.reduce(function (a, x) { return a + x.secs; }, 0);
+    return Math.round(t / 60 * 10) / 10;
+  }
+
+  B.open = function (openId) {
+    var h = '<b style="font-size:18px">Before the voice</b>' +
+      '<div class="measured" style="margin-top:8px">About ' + mins() + ' minutes, and none of it ' +
+      'makes a sound. Do the lot or pick one — it is not a routine you can fail.</div>';
+
+    /* The safety panel is not small print and is not at the bottom. */
+    h += '<div class="rp-card" style="margin-top:14px;padding:13px;border-left:3px solid var(--miss)">' +
+      '<div class="rp-lab" style="color:var(--miss)">THE ONE RULE</div>' +
+      '<div style="font-size:13.5px;line-height:1.55;margin-top:5px">' +
+      '<b>Nothing here touches the front of your throat.</b> You will find videos telling singers ' +
+      'to massage their own voice box. We are not going to, and neither should you on your own: the ' +
+      'front of the neck carries the artery to your brain and a bone that breaks, and people have ' +
+      'been seriously hurt doing it to themselves.</div>' +
+      '<div style="font-size:13px;line-height:1.55;margin-top:8px;color:var(--ink-dim)">' +
+      'That work is real and it helps — but it is a voice therapist’s hands, in a room with you. ' +
+      'If your throat feels tight and it will not settle, that is who to see. An app cannot do it ' +
+      'and should not pretend.</div></div>';
+
+    ITEMS.forEach(function (x) {
+      var open = x.id === openId;
+      h += '<div class="rp-card" style="margin-top:9px;padding:12px">' +
+        '<div class="row" style="justify-content:space-between;align-items:center;cursor:pointer" ' +
+        'data-body="' + esc(x.id) + '">' +
+        '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(x.name) +
+        (x.sure === 'practice' ? '<span class="rp-tag">what singers do</span>' : '') + '</div>' +
+        '<div class="rp-sub">' + esc(x.what) + '</div></div>' +
+        '<div style="color:var(--ink-faint);font-size:19px">' + (open ? '‹' : '›') + '</div></div>';
+      if (open) {
+        h += '<div style="margin-top:9px;border-top:1px solid var(--line);padding-top:9px">' +
+          '<div class="rp-lab">HOW</div>' +
+          '<div style="font-size:13.5px;line-height:1.6;margin-top:3px">' + esc(x.how) + '</div>' +
+          '<div class="rp-lab" style="margin-top:11px">WHY</div>' +
+          '<div class="measured" style="margin-top:3px">' + esc(x.why) + '</div>' +
+          '<div class="rp-lab" style="margin-top:11px;color:var(--gold)">WHAT IT IS NOT</div>' +
+          '<div class="measured" style="margin-top:3px">' + esc(x.not) + '</div></div>';
+      }
+      h += '</div>';
+    });
+
+    h += '<div class="measured" style="margin-top:14px;font-size:11.5px">Hold anything here briefly ' +
+      'and keep moving. A long stretch before you sing takes strength out of you rather than ' +
+      'putting it in — which is the opposite of what most people have been told.</div>';
+    h += '<button class="btn" id="rpBodyX" style="width:100%;padding:12px;margin-top:14px">Close</button>';
+
+    var box = sheet(h);
+    on($('rpBodyX'), 'click', shut);
+    box.querySelectorAll('[data-body]').forEach(function (el) {
+      on(el, 'click', function () {
+        B.open(el.dataset.body === openId ? null : el.dataset.body);
+      });
+    });
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* where it lives: the top of Train, before the singing               */
+  /* ------------------------------------------------------------------ */
+  function mount() {
+    var host = $('modeTrain');
+    if (!host || $('rpBodyRow')) return;
+    var d = document.createElement('div');
+    d.id = 'rpBodyRow';
+    d.className = 'exrow';
+    d.style.cursor = 'pointer';
+    d.innerHTML = '<div class="exhead">' +
+      '<div class="exname">Before the voice</div>' +
+      '<button class="btn" id="rpBodyGo" style="padding:7px 12px;font-size:12px">Open</button>' +
+      '</div>' +
+      '<div class="exsyl" style="margin-top:6px;font-weight:600">Posture, jaw, tongue, shoulders. ' +
+      'About ' + mins() + ' minutes, no sound.</div>' +
+      '<div class="measured">The body first. Nothing here goes near your throat, and one of them ' +
+      'says plainly that it is not evidenced.</div>';
+    host.insertBefore(d, host.firstChild);
+    on($('rpBodyGo'), 'click', function (e) { e.stopPropagation(); B.open(); });
+    on(d, 'click', function () { B.open(); });
+  }
+
+  setInterval(mount, 1500);
+  setTimeout(mount, 1000);
 })();
 
 </script>
