@@ -3739,7 +3739,7 @@ function susFrame(dt, um){
   $('susBar').style.width = Math.min(100, SUS.t/SUS.dur*100)+'%';
   if(SUS.t>=SUS.dur){
     SUS.running=false;
-    const pct = Math.round(100*SUS.within/SUS.dur);
+    const pct = Math.min(100, Math.round(100*SUS.within/SUS.dur));
     const msg = pct>=90?'Rock solid.':pct>=70?'Very steady.':pct>=45?'Getting there — support with breath.':'Try a comfier note with slow, steady air.';
     $('susResult').textContent = pct+'% steady — '+msg;
     try { if (window.RP && RP.logResult) RP.logResult({ kind: 'sustain',
@@ -10837,6 +10837,40 @@ body.rp-brand-inflow .kbdkey.white.down{background:#f0dcb4;}
 body.rp-brand-inflow .kbdkey.white.lit{background:linear-gradient(180deg,#e8b34a,#c1521d);}
 body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d,#6b3f1d);}
 
+/* ----------------------------------------------------------------------
+   A SECOND COACH'S COLOURS.
+
+   Until now every coach who switched teaching on got In Flow's brown and
+   gold — Ja Ronn's brand, on somebody else's students' phones. The class is
+   keyed to profiles.theme, so a coach picking "Deep" gets this instead and
+   Ja Ronn keeps his.
+
+   Blue-green and copper: far enough from In Flow that the two do not read as
+   the same app, and dark enough that the pitch line still shows against it.
+   In tune and out of tune are NOT rebranded here either. They mean something
+   while you are singing.
+   ---------------------------------------------------------------------- */
+body.rp-brand-deep{
+  --bg:#070d10; --bg2:#0b141a; --panel:#0d1920; --panel2:#12242e; --line:#1d3a47;
+  --ink:#e8f4f7; --ink-dim:#89a8b4; --ink-faint:#5f7f8c;
+  --gold:#4ec9c1; --gold-deep:#2a9d95;
+  --accent:#c9703a; --accent2:#4ec9c1; --pink:#a85430;
+  --grad:linear-gradient(135deg,#123a42 0%,#2a9d95 55%,#c9703a 100%);
+  --glow:0 0 22px rgba(78,201,193,.36);
+  --stage:#050a0d; --stage-line:rgba(210,240,246,.06);
+}
+body.rp-brand-deep.light{
+  --bg:#eef5f7; --bg2:#e0ebef; --panel:#ffffff; --panel2:#e7f1f4; --line:#c3d8df;
+  --ink:#0d1c23; --ink-dim:#456069; --ink-faint:#6d8a94;
+  --gold:#177a73; --gold-deep:#0f5b56; 
+  --accent:#a8551f; --accent2:#177a73; --pink:#8c4419;
+  --glow:0 4px 16px rgba(23,122,115,.22);
+  --stage:#ffffff; --stage-line:rgba(13,28,35,.06);
+}
+body.rp-brand-deep .kbdkey.white.down{background:#cfe9e7;}
+body.rp-brand-deep .kbdkey.white.lit{background:linear-gradient(180deg,#4ec9c1,#2a9d95);}
+body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#123a42);}
+
 /* The microphone dialog used to cover the screen including the bottom bar,
    so a first-timer who did not understand it had nowhere to go. It now stops
    above the tabs, and closes on a tap outside or the escape key. */
@@ -10993,6 +11027,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     return o.firstChild;
   }
   function closeSheet() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function sheetEl() { return $('rpSheet'); }
   RP.closeSheet = closeSheet;
 
   var authTab = 'up';
@@ -11012,7 +11047,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
     if (up) {
       h += '<label class="lab">YOUR NAME</label>' +
-        '<input id="rpName" class="inp" placeholder="Lyon" autocomplete="name" ' +
+        /* This said "Lyon" — a placeholder, so it showed ROBERT'S name to every
+           person who ever opened the sign-up box, looking for all the world
+           like the browser had filled it in for them. A placeholder should
+           say what to type, not name a stranger. */
+        '<input id="rpName" class="inp" placeholder="First name is fine" autocomplete="name" ' +
         'style="width:100%;margin-bottom:4px">' +
         '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
         'sees, so use the name he knows you by.</div>';
@@ -11031,6 +11070,10 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
       (up ? 'Create my account' : 'Sign in') + '</button>';
+    if (!up) {
+      h += '<button class="btn" id="rpForgot" style="width:100%;padding:11px;margin-top:8px;' +
+        'font-size:12.5px">I have forgotten my password</button>';
+    }
     h += '<div style="text-align:center;margin:12px 0 8px;color:var(--ink-faint);font-size:12px">or</div>';
     h += '<button class="btn" id="rpLink" style="width:100%;padding:12px">Email me a sign-in link</button>';
     h += '<div id="rpMsg" class="measured" style="margin-top:12px"></div>';
@@ -11042,6 +11085,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     on($('rpX'), 'click', closeSheet);
     on($('rpGo'), 'click', function () { authTab === 'up' ? doSignUp() : doSignIn(); });
     on($('rpLink'), 'click', doMagicLink);
+    on($('rpForgot'), 'click', doForgot);
     box.querySelectorAll('input').forEach(function (i) {
       on(i, 'keydown', function (e) { if (e.key === 'Enter') $('rpGo').click(); });
     });
@@ -11095,6 +11139,108 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
+  /* Until now there was no way back from a forgotten password — not a bad
+     screen, NO screen. Anyone who forgot theirs was locked out of their own
+     account for good, and the only fix was deleting the account. Supabase has
+     always been able to send the email; nothing ever asked it to. */
+  /* Supabase limits how often it will email the same address, and returns
+     "For security purposes, you can only request this after 6 seconds." Robert
+     saw that in red under the button after asking for a sign-in link straight
+     after a password reset, and he is right that it reads like the app is
+     broken: it names a rule nobody agreed to, in a colour that means error,
+     for something that is not an error. It is one email already on its way.
+
+     So: say that, count it down, and put the button back when it is over. */
+  function waitSeconds(m) {
+    var x = /after (\d+) second/i.exec(m || '');
+    return x ? +x[1] : 0;
+  }
+  function isRateLimit(m) {
+    return /only request this after|rate limit|too many requests/i.test(m || '');
+  }
+  function holdButton(btn, secs, label) {
+    if (!btn) return;
+    var text = btn.textContent;
+    btn.disabled = true;
+    var left = secs;
+    (function tick() {
+      if (!btn.isConnected) return;
+      btn.textContent = label + ' (' + left + ')';
+      if (left <= 0) { btn.disabled = false; btn.textContent = text; return; }
+      left--;
+      setTimeout(tick, 1000);
+    })();
+  }
+
+  function doForgot() {
+    var email = ($('rpEmail').value || '').trim();
+    if (!email) {
+      msg('Put your email address in above first, then tap this again.', true);
+      try { $('rpEmail').focus(); } catch (e) {}
+      return;
+    }
+    msg('Sending\u2026');
+    RP.sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.href.split('#')[0]
+    }).then(function (r) {
+      if (r.error) {
+        var m = String(r.error.message || '');
+        if (isRateLimit(m)) {
+          var w = waitSeconds(m) || 15;
+          holdButton($('rpForgot'), w, 'I have forgotten my password');
+          return msg('One is already on its way — give it ' + w + ' seconds before asking again. ' +
+                     'Check your spam folder too; the first one often lands there.');
+        }
+        if (/invalid/i.test(m) && /email/i.test(m)) {
+          return msg('That address was refused as undeliverable. Check it for a typo.', true);
+        }
+        return msg(m, true);
+      }
+      /* Deliberately does not say whether that address has an account: that
+         would tell a stranger who is signed up here. */
+      msg('If there is an account for ' + email + ', a reset link is on its way. ' +
+          'Open it on this phone and you can choose a new password.');
+    }).catch(function (e) { msg(String(e.message || e), true); });
+  }
+
+  /* Coming back from that email. Supabase puts the session in the URL and
+     fires PASSWORD_RECOVERY; at that point the person is signed in but has to
+     be given somewhere to type the new one, or they just land on the app with
+     no idea anything happened. */
+  function newPasswordSheet() {
+    var h = '<b style="font-size:16px">Choose a new password</b>' +
+      '<div class="measured" style="margin-top:6px">You are signed in from the link. ' +
+      'Set a password you will remember and this is done.</div>' +
+      '<label class="lab" style="margin-top:14px;display:block">NEW PASSWORD</label>' +
+      '<input id="rpNewPw" class="inp" type="password" autocomplete="new-password" ' +
+      'placeholder="At least 6 characters" style="width:100%;margin-bottom:10px">' +
+      '<label class="lab">AND AGAIN</label>' +
+      '<input id="rpNewPw2" class="inp" type="password" autocomplete="new-password" ' +
+      'style="width:100%;margin-bottom:12px">' +
+      '<button class="btn primary" id="rpPwGo" style="width:100%;padding:13px">Save it</button>' +
+      '<div id="rpPwMsg" class="measured" style="margin-top:10px"></div>' +
+      '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:8px">Not now</button>';
+    sheet(h);
+    on($('rpX'), 'click', closeSheet);
+    function save() {
+      var a = $('rpNewPw').value || '', b = $('rpNewPw2').value || '', m = $('rpPwMsg');
+      function bad(t) { m.textContent = t; m.style.color = 'var(--miss)'; }
+      if (a.length < 6) return bad('Six characters or more, please.');
+      if (a !== b) return bad('Those two do not match.');
+      $('rpPwGo').disabled = true;
+      m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ password: a }).then(function (r) {
+        $('rpPwGo').disabled = false;
+        if (r.error) return bad(r.error.message);
+        closeSheet();
+        toast('New password saved. You are signed in.');
+      });
+    }
+    on($('rpPwGo'), 'click', save);
+    on($('rpNewPw2'), 'keydown', function (e) { if (e.key === 'Enter') save(); });
+  }
+  RP.newPasswordSheet = newPasswordSheet;
+
   function doMagicLink() {
     var email = ($('rpEmail').value || '').trim();
     if (!email) return msg('Put your email in first, then tap this.', true);
@@ -11104,7 +11250,21 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       options: { emailRedirectTo: location.href.split('#')[0],
                  shouldCreateUser: authTab === 'up' }
     }).then(function (r) {
-      msg(r.error ? r.error.message : 'Link sent. Open it on this phone and you are in.', !!r.error);
+      if (!r.error) {
+        return msg('Link sent. Open it on this phone and you are in. ' +
+                   'If it is not there in a minute, check your spam folder.');
+      }
+      var m = String(r.error.message || '');
+      if (isRateLimit(m)) {
+        var w = waitSeconds(m) || 15;
+        holdButton($('rpLink'), w, 'Email me a sign-in link');
+        return msg('An email has just gone to that address — give it ' + w +
+                   ' seconds before asking for another.');
+      }
+      if (/invalid/i.test(m) && /email/i.test(m)) {
+        return msg('That address was refused as undeliverable. Check it for a typo.', true);
+      }
+      msg(m, true);
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
@@ -11136,6 +11296,22 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
         'have as a singer — coaches practise too.</div>';
     }
     if (p.is_coach) {
+      var mine = p.theme == null || p.theme === '' ? 'inflow' : p.theme;
+      h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
+        '<div class="rp-lab">YOUR COLOURS</div>' +
+        '<div class="measured" style="margin:5px 0 9px">What you see, and what the students you ' +
+        'sign up see if they ask for your look.</div>';
+      RP.THEMES.forEach(function (x) {
+        var on = (x.id || 'repertoire') === (mine || 'repertoire');
+        h += '<button class="btn' + (on ? ' primary' : '') + '" data-theme="' + esc(x.id) +
+          '" style="width:100%;padding:10px;margin-bottom:6px;text-align:left">' +
+          '<b>' + esc(x.name) + '</b> \u00b7 <span style="font-weight:600;opacity:.8">' +
+          esc(x.note) + '</span></button>';
+      });
+      h += '</div>';
+    }
+
+    if (p.is_coach) {
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
@@ -11154,6 +11330,17 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     sheet(h);
     on($('rpX'), 'click', closeSheet);
     on($('rpNameGo'), 'click', saveName);
+    (sheetEl() || document).querySelectorAll('[data-theme]').forEach(function (b) {
+      on(b, 'click', function () {
+        var t = b.dataset.theme;
+        RP.sb.from('profiles').update({ theme: t }).eq('id', RP.user.id).then(function (r) {
+          if (r.error) return toast(r.error.message);
+          RP.profile.theme = t;
+          brand();
+          RP.refresh().then(function () { openAccount(); });
+        });
+      });
+    });
     on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
@@ -11420,14 +11607,24 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
   /* Everything the app measures comes through here. Signed out, nothing
      leaves the phone — the app keeps its own local record as it always did. */
+  /* The local copy used to be the object we SENT, which has no created_at —
+     the database fills that in. So a result you had just earned came back
+     with no date on it, and anything that reads a date off it quietly failed:
+     the scorecard's "days practised" counted it under an invalid day, and the
+     placement test could not see it at all. Keep what the database actually
+     stored, not what we asked it to store. */
   RP.logResult = function (row) {
     try {
       if (!RP.user || !RP.sb || !RP.profile) return;
       var r = { student_id: RP.user.id, coach_id: RP.coach ? RP.coach.id : null };
       Object.keys(row || {}).forEach(function (k) { if (row[k] != null) r[k] = row[k]; });
-      RP.sb.from('results').insert(r).then(function (x) {
+      return RP.sb.from('results').insert(r).select().then(function (x) {
         if (x.error) return;
-        RP.results.unshift(r);
+        var saved = (x.data && x.data[0]) || null;
+        if (!saved) { saved = r; saved.created_at = new Date().toISOString(); }
+        RP.results.unshift(saved);
+        try { rerender(); } catch (e) {}
+        return saved;
       });
     } catch (e) {}
   };
@@ -11499,13 +11696,22 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
      Signed out is always Repertoire. */
   try { RP.useCoachColours = localStorage.getItem('rp_coachcolours') === '1'; } catch (e) {}
 
+  /* A coach's colours belong to the coach. Until now there was only one set,
+     so every coach who switched teaching on got In Flow's brown and gold —
+     Ja Ronn's brand, on another coach's students' phones. */
+  RP.THEMES = [
+    { id: 'inflow', name: 'In Flow', note: 'Brown, gold and burnt orange.' },
+    { id: 'deep',   name: 'Deep',    note: 'Blue-green and copper.' },
+    { id: '',       name: 'Repertoire', note: 'The app\u2019s own colours. No branding.' }
+  ];
+
   function brand() {
     var t = 'repertoire';
     if (RP.profile && RP.profile.is_coach) t = RP.profile.theme || 'inflow';
     else if (RP.coach && RP.useCoachColours) t = RP.coach.theme || 'inflow';
     var b = document.body;
-    ['inflow'].forEach(function (name) {
-      b.classList.toggle('rp-brand-' + name, t === name);
+    RP.THEMES.forEach(function (x) {
+      if (x.id) b.classList.toggle('rp-brand-' + x.id, t === x.id);
     });
   }
   RP.brand = brand;
@@ -11544,6 +11750,13 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       RP.ready = true;
       RP.sb.auth.onAuthStateChange(function (ev, session) {
         RP.user = session ? session.user : null;
+        if (ev === 'PASSWORD_RECOVERY') {
+          /* after the data has loaded, or the sheet opens over a blank app */
+          loadAll().then(function () {
+            subscribe(); rerender(); newPasswordSheet();
+          });
+          return;
+        }
         if (!RP.user) {
           RP.profile = null; RP.coach = null; RP.students = [];
           RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];
@@ -11736,37 +11949,39 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       h += '</div>';
       return h;
     }
+    h += weekCss();
     h += '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<b style="font-size:15px">From ' + esc(coach.display_name) + '</b>' +
       '<span class="rp-sub" style="margin:0">' + (open.length ? open.length + ' to do' : 'all done') +
       '</span></div>';
 
-    if (!open.length && !done.length) {
-      h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
-        ' sets something on his phone it lands here — you will not need to refresh.</div>';
-    }
+    h += weekStrip(RP.user.id);
 
-    open.forEach(function (a) { h += assignmentCard(a); });
-
-    if (done.length) {
-      h += '<div class="rp-lab" style="margin-top:14px">DONE</div>';
-      done.slice(0, 6).forEach(function (a) {
-        var kept = window.RPWork ? RPWork.takesFor(a.id) : [];
-        h += '<div class="rp-card rp-done"><div class="rp-ttl">' + esc(a.title) +
-          '<span class="rp-tag">' + ago(a.done_at) + '</span></div>';
-        /* Ticking it off must not make your own recordings disappear. They
-           are yours; the card is just where they live. */
-        kept.forEach(function (t) {
-          h += '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap;align-items:center">' +
-            '<div style="flex:1;min-width:0;font-size:12px;font-weight:700;white-space:nowrap;' +
-            'overflow:hidden;text-overflow:ellipsis">' + esc(t.title) +
-            (t.sentAt ? ' · submitted' : '') + '</div>' +
-            '<button class="btn" data-ahear="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Listen</button>' +
-            '<button class="btn" data-adl="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Save</button>' +
-            '</div>';
+    if (pickedDay) {
+      /* ONE DAY. What you are supposed to do today, and nothing else. */
+      var dl = dueOn(new Date(pickedDay + 'T12:00:00'), RP.user.id);
+      var isToday = pickedDay === dkey(new Date());
+      h += '<div class="rp-lab" style="margin-top:14px">' +
+        (isToday ? 'TODAY' : dayLabel(pickedDay)) + '</div>';
+      if (!dl.length) {
+        h += '<div class="rp-empty">Nothing set for that day.</div>';
+      } else {
+        dl.forEach(function (x) {
+          h += x.done && !isToday ? doneCard(x.a, pickedDay) : assignmentCard(x.a, pickedDay);
         });
-        h += '</div>';
-      });
+      }
+      h += '<button class="btn" data-day="' + esc(pickedDay) + '" ' +
+        'style="width:100%;padding:10px;margin-top:10px;font-size:12px">Show the whole week</button>';
+    } else {
+      if (!open.length && !done.length) {
+        h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
+          ' sets something on his phone it lands here — you will not need to refresh.</div>';
+      }
+      open.forEach(function (a) { h += assignmentCard(a, null); });
+      if (done.length) {
+        h += '<div class="rp-lab" style="margin-top:14px">DONE</div>';
+        done.slice(0, 6).forEach(function (a) { h += doneCard(a, null); });
+      }
     }
 
     if (RP.scorecardHTML) h += RP.scorecardHTML(RP.user.id, 'you');
@@ -11786,6 +12001,200 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     return h;
   }
 
+  /* ================================================================ */
+  /* THE WEEK                                                          */
+  /*                                                                   */
+  /* Robert, 12 Sep: "when you open up the calendar, it just shows a   */
+  /* week at a time. It can either show the day — what you're supposed */
+  /* to do the day — or the week at a time so you can see what your    */
+  /* progress is for that week."                                       */
+  /*                                                                   */
+  /* A DAILY assignment is due every day from the day it was set. A    */
+  /* ONE-OFF is due on the day it was set and stays due until it is    */
+  /* done. Whether a day was done is NOT a stored flag — it is read    */
+  /* off the takes actually submitted that day. So the week can only   */
+  /* ever show work that really happened, which is the same rule as    */
+  /* everything else in here.                                          */
+  /* ================================================================ */
+  var weekOffset = 0;       // 0 = this week, -1 = last week
+  var pickedDay = null;     // yyyy-mm-dd, or null for "the whole week"
+
+  function dkey(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function startOfWeek(off) {
+    var n = new Date();
+    n.setHours(0, 0, 0, 0);
+    n.setDate(n.getDate() - n.getDay() + (off * 7));   // Sunday-first, as the app already draws it
+    return n;
+  }
+  function weekDays(off) {
+    var s0 = startOfWeek(off), out = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(s0.getTime());
+      d.setDate(s0.getDate() + i);
+      out.push(d);
+    }
+    return out;
+  }
+
+  /* every take this student has submitted, by the day it was submitted */
+  function submittedOn(dayK, assignmentId) {
+    return (RP.takes || []).some(function (t) {
+      return t.assignment_id === assignmentId && dkey(new Date(t.created_at)) === dayK;
+    });
+  }
+
+  /* what is due on one day, for one student */
+  function dueOn(d, studentId) {
+    var k = dkey(d);
+    var today = dkey(new Date());
+    var future = k > today;
+    return (RP.assignments || []).filter(function (a) {
+      if (a.student_id !== studentId) return false;
+      var made = dkey(new Date(a.created_at));
+      if (made > k) return false;                       // not set yet on that day
+      if (a.cadence === 'daily') return !a.done_at || dkey(new Date(a.done_at)) >= k;
+      if (a.done_at) return made === k || dkey(new Date(a.done_at)) === k;
+      return made === k || (k === today);               // still open: sits on today too
+    }).map(function (a) {
+      return { a: a, done: a.cadence === 'daily'
+        ? submittedOn(k, a.id)
+        : (!!a.done_at && dkey(new Date(a.done_at)) <= k), future: future };
+    });
+  }
+
+  /* One source of truth for "how much of this week is done", so the week
+     strip and the scorecard cannot disagree with each other on the same
+     screen — which they did: the strip said 2 of 2 and the card said 1 of 2,
+     because the card was counting assignments that are FINISHED FOREVER and a
+     daily one never is. Both now count days of work due and days done. */
+  RP.weekProgress = function (studentId, offset) {
+    var today = dkey(new Date()), due = 0, done = 0;
+    weekDays(offset == null ? weekOffset : offset).forEach(function (d) {
+      if (dkey(d) > today) return;         // days that have not happened are not owed
+      var l = dueOn(d, studentId);
+      due += l.length;
+      done += l.filter(function (x) { return x.done; }).length;
+    });
+    return { due: due, done: done };
+  };
+
+  /* how many days of a daily assignment this week actually happened */
+  RP.dailyDays = function (assignment) {
+    var today = dkey(new Date()), due = 0, done = 0;
+    weekDays(weekOffset).forEach(function (d) {
+      var k = dkey(d);
+      if (k > today) return;
+      if (dkey(new Date(assignment.created_at)) > k) return;
+      due++;
+      if (submittedOn(k, assignment.id)) done++;
+    });
+    return { due: due, done: done };
+  };
+
+  function weekStrip(studentId) {
+    var days = weekDays(weekOffset);
+    var today = dkey(new Date());
+    var h = '<div class="rp-wk">';
+    days.forEach(function (d) {
+      var k = dkey(d);
+      var list = dueOn(d, studentId);
+      var done = list.filter(function (x) { return x.done; }).length;
+      var cls = 'rp-wd';
+      if (k === today) cls += ' today';
+      if (pickedDay === k) cls += ' picked';
+      if (list.length && done === list.length) cls += ' all';
+      else if (done) cls += ' some';
+      h += '<button class="' + cls + '" data-day="' + k + '">' +
+        '<span class="rp-wdn">' + 'SMTWTFS'[d.getDay()] + '</span>' +
+        '<span class="rp-wdd">' + d.getDate() + '</span>' +
+        '<span class="rp-wdc">' + (list.length ? done + '/' + list.length : '\u00b7') + '</span>' +
+        '</button>';
+    });
+    h += '</div>';
+
+    var total = 0, got = 0;
+    days.forEach(function (d) {
+      if (dkey(d) > today) return;                      // do not count days that have not happened
+      var l = dueOn(d, studentId);
+      total += l.length;
+      got += l.filter(function (x) { return x.done; }).length;
+    });
+    h += '<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px">' +
+      '<button class="btn" data-wk="-1" style="padding:6px 10px;font-size:11.5px">\u2039 Last week</button>' +
+      '<div class="rp-sub" style="margin:0;text-align:center;flex:1">' +
+      (total ? got + ' of ' + total + ' done so far this week' : 'Nothing set for this week yet') +
+      '</div>' +
+      (weekOffset < 0
+        ? '<button class="btn" data-wk="1" style="padding:6px 10px;font-size:11.5px">This week \u203a</button>'
+        : '<span style="width:64px"></span>') +
+      '</div>';
+    return h;
+  }
+
+  function weekCss() {
+    if ($('rpWkCss')) return '';
+    return '<style id="rpWkCss">' +
+      '.rp-wk{display:flex;gap:4px;margin-top:10px}' +
+      '.rp-wd{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);' +
+      'border-radius:9px;padding:7px 2px;display:flex;flex-direction:column;align-items:center;' +
+      'gap:2px;cursor:pointer;color:var(--ink-dim)}' +
+      '.rp-wd.today{border-color:var(--gold)}' +
+      '.rp-wd.picked{background:var(--gold);color:#1a1207}' +
+      '.rp-wd.some{color:var(--gold)}' +
+      '.rp-wd.all{color:var(--hit)}' +
+      '.rp-wd.picked.some,.rp-wd.picked.all{color:#1a1207}' +
+      '.rp-wdn{font-size:9.5px;font-weight:800;letter-spacing:.5px;opacity:.75}' +
+      '.rp-wdd{font-size:14px;font-weight:900;color:var(--ink)}' +
+      '.rp-wd.picked .rp-wdd{color:#1a1207}' +
+      '.rp-wdc{font-size:9px;font-weight:800}' +
+      '</style>';
+  }
+
+  function wireWeek(host, onChange) {
+    each(host, '[data-day]', function (b) {
+      on(b, 'click', function () {
+        pickedDay = (pickedDay === b.dataset.day) ? null : b.dataset.day;
+        onChange();
+      });
+    });
+    each(host, '[data-wk]', function (b) {
+      on(b, 'click', function () {
+        weekOffset += (+b.dataset.wk);
+        if (weekOffset > 0) weekOffset = 0;
+        pickedDay = null;
+        onChange();
+      });
+    });
+  }
+
+  function dayLabel(k) {
+    var d = new Date(k + 'T12:00:00');
+    return ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][d.getDay()] +
+      ' ' + d.getDate();
+  }
+
+  function doneCard(a, dayK) {
+    var kept = window.RPWork ? RPWork.takesFor(a.id) : [];
+    if (dayK) kept = kept.filter(function (t) { return dkey(new Date(t.addedAt || Date.now())) === dayK; });
+    var h = '<div class="rp-card rp-done"><div class="rp-ttl">' + esc(a.title) +
+      '<span class="rp-tag">' + (a.cadence === 'daily' ? 'done that day' : ago(a.done_at)) + '</span></div>';
+    /* Ticking it off must not make your own recordings disappear. They are
+       yours; the card is just where they live. */
+    kept.forEach(function (t) {
+      h += '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap;align-items:center">' +
+        '<div style="flex:1;min-width:0;font-size:12px;font-weight:700;white-space:nowrap;' +
+        'overflow:hidden;text-overflow:ellipsis">' + esc(t.title) +
+        (t.sentAt ? ' \u00b7 submitted' : '') + '</div>' +
+        '<button class="btn" data-ahear="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Listen</button>' +
+        '<button class="btn" data-adl="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Save</button>' +
+        '</div>';
+    });
+    return h + '</div>';
+  }
+
   /* ------------------------------------------------------------------ */
   /* ONE ASSIGNMENT = ONE CARD, with its own takes on it.                */
   /*                                                                      */
@@ -11797,13 +12206,18 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   /* open the card, it puts you in the exercise the coach chose, and      */
   /* every take you save while you are there is already this card's.      */
   /* ------------------------------------------------------------------ */
-  function assignmentCard(a) {
+  function assignmentCard(a, dayK) {
     var ex = null;
     try { ex = a.app_ex_id && V10.exById ? V10.exById(a.app_ex_id) : null; } catch (e) {}
     var mine = window.RPWork ? RPWork.takesFor(a.id) : [];
     var working = !!(window.RPWork && RPWork.current && RPWork.current.id === a.id);
+    var daily = a.cadence === 'daily';
+    var todayK = dkey(new Date());
+    var sentToday = daily && submittedOn(dayK || todayK, a.id);
 
     var h = '<div class="rp-card hot"><div class="rp-ttl">' + esc(a.title) +
+      (daily ? '<span class="rp-tag">every day</span>' : '') +
+      (sentToday ? '<span class="rp-tag">sent</span>' : '') +
       (working ? '<span class="rp-tag">doing it now</span>' : '') + '</div>';
     if (a.note) h += '<div class="rp-sub">' + esc(a.note) + '</div>';
     if (ex) {
@@ -11812,6 +12226,13 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     } else {
       h += '<div class="rp-sub" style="margin-top:4px">' + esc(coachName()) +
         ' wrote this one out — there is no exercise screen for it, so record it as you do it.</div>';
+    }
+
+    if (daily) {
+      h += '<div class="rp-sub" style="margin-top:4px">' +
+        (sentToday ? 'Sent for this day. Do it again if you want — only the day counts.'
+                   : 'Every day. Sending one take ticks off that day, not the whole thing.') +
+        '</div>';
     }
 
     h += '<button class="btn primary" data-work="' + esc(a.id) + '" ' +
@@ -11837,7 +12258,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       });
       h += '<div class="measured" style="margin-top:8px;font-size:11.5px">Saved takes stay on your ' +
         'phone whether you submit them or not. Submitting sends that one take to ' + esc(coachName()) +
-        ' and ticks this off.</div>';
+        (daily ? ' and ticks off that day.' : ' and ticks this off.') + '</div>';
     }
 
     h += '</div>';
@@ -11898,6 +12319,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
   function wireStudentChannel(host) {
     wireAssignmentCards(host);
+    wireWeek(host, function () { if (RP.rerender) RP.rerender(); });
     on($('rpCodeGo'), 'click', joinByCode);
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
     on($('rpMsgGo'), 'click', function () {
@@ -12009,44 +12431,58 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     on($('rpAddStu'), 'click', addStudentSheet);
   }
 
+  /* Adding a student used to mean scrolling a list of EVERYONE who had ever
+     signed up — every name and every email in the database, to anybody with an
+     account. That was fine for three people at a pitch and indefensible for
+     strangers, so the profiles table is shut now and this asks for the exact
+     address instead. The coach code is still the better way: he reads out six
+     characters and they join themselves. This is for when they are not in the
+     room. */
   function addStudentSheet() {
-    var h = '<b style="font-size:16px">Add a student</b>' +
-      '<div class="measured" style="margin-top:6px">' +
-      ((RP.profile || {}).coach_code
-        ? 'Or just read them your code — <b style="letter-spacing:2px">' +
-          esc(RP.profile.coach_code) + '</b> — and they join themselves. '
-        : '') +
-      'Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
+    var code = (RP.profile || {}).coach_code;
+    var h = '<b style="font-size:16px">Add a student</b>';
+    if (code) {
+      h += '<div class="rp-card hot" style="margin-top:12px"><div class="rp-lab">EASIEST WAY</div>' +
+        '<div style="font-size:29px;font-weight:900;letter-spacing:3px">' + esc(code) + '</div>' +
+        '<div class="rp-sub">Read them your code. They put it in on their Coach tab and you are paired ' +
+        '— you do not need their email at all.</div></div>';
+    }
+    h += '<div class="rp-lab" style="margin-top:16px">OR BY EMAIL</div>' +
+      '<div class="measured" style="margin-bottom:8px">The address they signed up with, exactly. ' +
+      'You cannot browse other people\u2019s accounts.</div>' +
+      '<div class="row" style="gap:7px;flex-wrap:nowrap">' +
+      '<input id="rpAddEmail" class="rp-inp" type="email" placeholder="them@example.com" ' +
+      'autocapitalize="off" spellcheck="false" style="flex:1">' +
+      '<button class="btn primary" id="rpAddGo" style="padding:11px 15px">Add</button></div>' +
+      '<div id="rpAddMsg" class="measured" style="margin-top:8px"></div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:10px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
-    RP.sb.from('profiles').select('*').order('created_at')
-      .then(function (r) {
-        var have = RP.students.map(function (s) { return s.id; });
-        var list = (r.data || []).filter(function (p) { return have.indexOf(p.id) < 0 && p.id !== RP.user.id; });
-        var el = $('rpStuList');
-        if (!el) return;
-        if (!list.length) {
-          el.innerHTML = 'Nobody new. Everyone who has signed up is already on your list.';
+
+    function go() {
+      var i = $('rpAddEmail'), m = $('rpAddMsg'), b = $('rpAddGo');
+      var email = (i.value || '').trim();
+      if (!email || email.indexOf('@') < 0) {
+        m.textContent = 'That does not look like an email address.';
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      b.disabled = true;
+      m.textContent = 'Looking\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.rpc('add_student_by_email', { p_email: email }).then(function (r) {
+        b.disabled = false;
+        if (r.error) {
+          m.textContent = r.error.message;
+          m.style.color = 'var(--miss)';
           return;
         }
-        el.className = '';
-        el.innerHTML = list.map(function (p) {
-          return '<div class="rp-card" data-add="' + esc(p.id) + '" style="cursor:pointer">' +
-            '<div class="rp-ttl">' + esc(p.display_name) + '</div>' +
-            '<div class="rp-sub">' + esc(p.email) + '</div></div>';
-        }).join('');
-        each(el, '[data-add]', function (c) {
-          on(c, 'click', function () {
-            c.style.opacity = '.5';
-            RP.sb.from('coach_students').insert({ coach_id: RP.user.id, student_id: c.dataset.add })
-              .then(function (r2) {
-                if (r2.error) { c.style.opacity = ''; return fail(r2.error); }
-                RP.closeSheet(); RP.toast('Added'); RP.refresh();
-              });
-          });
-        });
+        RP.closeSheet();
+        RP.toast(r.data + ' is now your student.');
+        RP.refresh();
       });
+    }
+    on($('rpAddGo'), 'click', go);
+    on($('rpAddEmail'), 'keydown', function (e) { if (e.key === 'Enter') go(); });
   }
 
   function studentDetail() {
@@ -12078,10 +12514,17 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     h += '<div class="rp-lab" style="margin-top:16px">THIS WEEK</div>';
     if (!mine.length) h += '<div class="rp-empty" style="padding:6px 2px">Nothing set yet.</div>';
     mine.forEach(function (a) {
+      /* A daily assignment never gets a tick, so showing one would be a
+         tick that never comes. Show the days instead — that is the thing
+         Ja Ronn actually wants to know. */
+      var dd = (a.cadence === 'daily' && RP.dailyDays) ? RP.dailyDays(a) : null;
       h += '<div class="rp-card' + (a.done_at ? ' rp-done' : ' hot') + '">' +
         '<div class="row" style="justify-content:space-between;align-items:flex-start">' +
         '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(a.title) +
+        (a.cadence === 'daily' ? '<span class="rp-tag">every day</span>' : '') +
         (a.done_at ? '<span class="rp-tag">done</span>' : '') + '</div>' +
+        (dd ? '<div class="rp-sub" style="margin:3px 0 0"><b>' + dd.done + ' of ' + dd.due +
+              '</b> day' + (dd.due === 1 ? '' : 's') + ' this week</div>' : '') +
         (a.note ? '<div class="rp-sub">' + esc(a.note) + '</div>' : '') + '</div>' +
         '<button class="btn" data-drop="' + esc(a.id) + '" style="padding:6px 10px;font-size:11.5px">Drop</button>' +
         '</div></div>';
@@ -12169,6 +12612,13 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       '<input id="rpAsFind" class="rp-inp" placeholder="Search — five note, straw, sirens…" ' +
       'autocomplete="off" spellcheck="false">' +
       '<div id="rpAsHits" style="margin-top:8px"></div>';
+
+    h += '<div class="rp-lab" style="margin-top:16px">HOW OFTEN</div>' +
+      '<div class="row" style="gap:8px;margin-top:6px">' +
+      '<button class="btn primary" data-cad="once" style="flex:1;padding:11px">Just once</button>' +
+      '<button class="btn" data-cad="daily" style="flex:1;padding:11px">Every day</button></div>' +
+      '<div id="rpCadWhy" class="measured" style="margin-top:6px;font-size:11.5px">' +
+      'They do it, they send you a take, it is done.</div>';
 
     h += '<div class="rp-lab" style="margin-top:16px">OR WRITE ONE</div>' +
       '<input id="rpAsT" class="rp-inp" placeholder="Straw into a glass, 2 minutes">' +
@@ -12268,6 +12718,18 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     on($('rpAsFind'), 'input', drawHits);
     drawHits();
 
+    var cadence = 'once';
+    each(box, '[data-cad]', function (b) {
+      on(b, 'click', function () {
+        cadence = b.dataset.cad;
+        each(box, '[data-cad]', function (o) { o.classList.toggle('primary', o.dataset.cad === cadence); });
+        var w = $('rpCadWhy');
+        if (w) w.textContent = cadence === 'daily'
+          ? 'It shows up on their week, every day, until you take it off. Each day counts on its own.'
+          : 'They do it, they send you a take, it is done.';
+      });
+    });
+
     on($('rpAsGo'), 'click', function () {
       var title = ($('rpAsT').value || '').trim() ||
         (chosen ? chosen.title : (chosenApp ? chosenApp.name : ''));
@@ -12276,7 +12738,8 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
         coach_id: RP.user.id, student_id: studentId, title: title,
         note: ($('rpAsN').value || '').trim(),
         exercise_id: chosen ? chosen.id : null,
-        app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null)
+        app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null),
+        cadence: cadence
       };
       $('rpAsGo').disabled = true;
       var m = $('rpAsMsg');
@@ -12560,6 +13023,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       susBest: sus.length ? Math.max.apply(null, sus.map(function (r) { return r.pct; })) : null,
       starSum: starSum,
       starOutOf: (V10.GAMES || []).length * 3,
+      /* Counting only assignments that are FINISHED FOREVER made a daily one
+         permanently unfinished, so this card said "1 of 2" on the same screen
+         as a week strip saying "2 of 2". Both now ask the same question: how
+         much of the work this week was due, and how much of it happened. */
+      week: (RP.weekProgress ? RP.weekProgress(studentId, 0) : null),
       assignedOpen: as.filter(function (a) { return !a.done_at; }).length,
       assignedDone: as.filter(function (a) { return a.done_at; }).length,
       practisedLabels: labelCounts(wk)
@@ -12610,8 +13078,13 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     h += bars(null, studentId);
     h += '<div class="rp-tiles">';
     h += tile(c.daysThisWeek + '<span class="rp-of">/7</span>', 'days practised', c.daysThisWeek >= 4 ? 'good' : 'warn');
-    h += tile(c.assignedDone + '<span class="rp-of">/' + (c.assignedDone + c.assignedOpen) + '</span>', 'assignments done',
-              c.assignedOpen === 0 && c.assignedDone > 0 ? 'good' : '');
+    if (c.week && c.week.due) {
+      h += tile(c.week.done + '<span class="rp-of">/' + c.week.due + '</span>', 'set this week',
+                c.week.done === c.week.due ? 'good' : (c.week.done ? 'warn' : ''));
+    } else {
+      h += tile(c.assignedDone + '<span class="rp-of">/' + (c.assignedDone + c.assignedOpen) + '</span>',
+                'assignments done', c.assignedOpen === 0 && c.assignedDone > 0 ? 'good' : '');
+    }
     if (c.susRuns) h += tile(c.susBest + '%', 'steadiest hold', c.susBest >= 70 ? 'good' : 'warn');
     if (c.earRuns) h += tile(c.earCentsBest + '<span class="rp-of">¢</span>', 'closest to the note', c.earCentsBest <= 25 ? 'good' : 'warn');
     if (c.starSum) h += tile(c.starSum + '<span class="rp-of">/' + c.starOutOf + '</span>', 'theory stars', '');
@@ -12690,24 +13163,85 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
 
   var ME = window.RPPlain = {
-    words: 'some',      // 'plain' | 'some' | 'technical'
-    experience: 2       // 1 new · 2 some · 3 lots
+    words: 'some',      // 'plain' | 'some' | 'technical'  — DERIVED, never asked
+    experience: 2,      // 1 new · 2 some · 3 lots          — the singing side
+    taught: 2,          // 1 none · 2 some · 3 a lot        — the music side
+    answers: null       // what they actually said, kept raw
   };
   try {
     ME.words = localStorage.getItem('rp_words') || 'some';
     ME.experience = +(localStorage.getItem('rp_exp') || 2);
+    ME.taught = +(localStorage.getItem('rp_taught') || 2);
+    ME.answers = JSON.parse(localStorage.getItem('rp_answers') || 'null');
   } catch (e) {}
+
+  /* ------------------------------------------------------------------ */
+  /* WORKING THE LEVELS OUT FROM THE ANSWERS                             */
+  /*                                                                     */
+  /* Robert's rule, and it is the whole redesign: "to ask a question     */
+  /* about jargon would throw any regular person off. They have no idea  */
+  /* what they're talking about."                                        */
+  /*                                                                     */
+  /* So nobody is asked to rate their own vocabulary. Two questions ask  */
+  /* what their singing actually does, two ask what they have actually   */
+  /* been taught, and every one of them is answerable by somebody who    */
+  /* knows nothing. The levels — and the language the app uses — are     */
+  /* worked out from that.                                               */
+  /* ------------------------------------------------------------------ */
+  /* An AVERAGE rather than a total, so stopping half way still places you on
+     what you did say instead of throwing it away. Level 3 deliberately needs
+     mostly top answers: it means every exercise unlocked and the proper terms
+     with no hand-holding, which is not where "I know roughly" belongs. */
+  function band(vals) {
+    var got = vals.filter(function (v) { return v > 0; });
+    if (!got.length) return null;
+    var avg = got.reduce(function (a, b) { return a + b; }, 0) / got.length;
+    return avg <= 1.8 ? 1 : avg < 3.34 ? 2 : 3;
+  }
+
+  ME.derive = function (a) {
+    if (!a) return null;
+    var sing   = band([+a.history || 0, +a.pitch || 0, +a.high || 0]);
+    var taught = band([+a.terms || 0, +a.reading || 0, +a.key || 0]);
+
+    /* The high-note question tells whoever answers "it hurts, or nothing
+       comes out" that they get the gentle work first WHATEVER ELSE they
+       answer. Without this line that sentence was not true: an otherwise
+       confident singer averaged straight back up past it.
+
+       Pain is not a level, it is a reason to start gently, and the app cannot
+       tell the difference between a bad technique and a bad week. So it caps,
+       and anybody who disagrees can move it in Profile or go and measure it. */
+    if (+a.high === 1) sing = 1;
+    if (sing == null && taught == null) return null;
+    var t = taught == null ? ME.taught : taught;
+    return {
+      experience: sing == null ? ME.experience : sing,
+      taught: t,
+      words: t === 1 ? 'plain' : t === 2 ? 'some' : 'technical'
+    };
+  };
 
   function saveMe() {
     try {
       localStorage.setItem('rp_words', ME.words);
       localStorage.setItem('rp_exp', String(ME.experience));
+      localStorage.setItem('rp_taught', String(ME.taught));
+      if (ME.answers) localStorage.setItem('rp_answers', JSON.stringify(ME.answers));
       localStorage.setItem('rp_asked', '1');
     } catch (e) {}
     var RP = window.RP;
     if (RP && RP.user && RP.sb && RP.profile) {
-      RP.sb.from('profiles').update({ words: ME.words, experience: ME.experience })
-        .eq('id', RP.user.id).then(function () { RP.profile.words = ME.words; RP.profile.experience = ME.experience; });
+      var row = { words: ME.words, experience: ME.experience, taught: ME.taught };
+      /* the raw answers travel too, so a later change to the questions or the
+         mapping can re-place everybody instead of stranding them on whatever
+         rule happened to be running the day they signed up */
+      if (ME.answers) row.placement = { answers: ME.answers, at: new Date().toISOString() };
+      RP.sb.from('profiles').update(row).eq('id', RP.user.id).then(function () {
+        RP.profile.words = ME.words;
+        RP.profile.experience = ME.experience;
+        RP.profile.taught = ME.taught;
+      });
     }
   }
   ME.save = saveMe;
@@ -12862,6 +13396,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
         'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
       document.body.appendChild(o);
+      on(o, 'click', function (e) {
+        if (e.target !== o) return;                       // only the dark area
+        if (!o.querySelector('[data-skip]')) return;      // only the skippable questions
+        saveMe(); shut(); apply();
+      });
     }
     o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
       'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
@@ -12871,46 +13410,224 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
   function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
 
-  var step = 0;
-  function ask() {
-    if (step === 0) {
-      sheet('<b style="font-size:18px">Before we start — two questions.</b>' +
-        '<div class="measured" style="margin-top:8px">So the app pitches itself at the right level. ' +
-        'There is no wrong answer and you can change both later.</div>' +
-        '<div class="rp-lab" style="margin-top:20px">WHERE WOULD YOU PUT YOURSELF?</div>' +
-        opt('exp', 1, 'New', 'Never been taught any of this.') +
-        opt('exp', 1, 'Beginner', 'You sing, but you have never trained.') +
-        opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
-        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.'));
-      wire('exp', function (v) { ME.experience = v; step = 1; ask(); });
-    } else if (step === 1) {
-      sheet('<b style="font-size:18px">And the jargon?</b>' +
-        '<div class="measured" style="margin-top:8px">Every craft has its own words. Singing has ' +
-        '<i>pitch</i>, <i>key</i>, <i>semitone</i>, <i>the third</i>. How much of that do you want ' +
-        'thrown at you?</div>' +
-        '<div class="rp-lab" style="margin-top:20px">WHICH IS CLOSEST?</div>' +
-        opt('w', 'plain', 'Skip it', 'Plain English throughout, and any word you tap gets explained.') +
-        opt('w', 'some', 'Some of it', 'Normal words, and anything unusual is one tap from an explanation.') +
-        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.'));
-      wire('w', function (v) { ME.words = v; step = 2; saveMe(); ask(); });
-    } else {
-      // say back what we heard, so it does not feel like a test with no result
-      var e = ME.experience, w = ME.words;
-      var line = (e === 1 ? 'Starting you on the beginner exercises'
-                : e === 2 ? 'Starting you on the beginner and intermediate exercises'
-                : 'Every exercise is open to you') +
-        (w === 'plain' ? ', in plain English, and each one says what it actually is before you tap it.'
-         : w === 'some' ? '. Tap any underlined word and you get one plain sentence back.'
-         : ', with the proper terms and no hand-holding.');
-      sheet('<b style="font-size:18px">Got it.</b>' +
-        '<div style="font-size:14px;line-height:1.55;margin-top:10px">' + esc(line) + '</div>' +
-        '<div class="measured" style="margin-top:12px">You can change either answer any time — ' +
-        'it is in <b>Profile</b>, under <b>How I talk to you</b>.</div>' +
-        '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:18px;font-size:15px">Start</button>');
-      on($('rpOK'), 'click', function () { shut(); apply(); });
-    }
+  /* Tapping the dark area outside, and the escape key, are what everybody
+     already tries first when a thing appears over the app. Both work. */
+  (function escapeHatch() {
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      var o = $('rpSheet');
+      if (o && o.style.display !== 'none' && o.querySelector('[data-skip]')) {
+        saveMe(); shut(); apply();
+      }
+    });
+  })();
+
+  /* Robert, 12 Sep: "you have to be able to exit out that little
+     questionnaire when you first open the app for the first time. You
+     shouldn't force people to answer those questions."
+
+     He is right, and it was worse than rude: the app's whole argument is that
+     it never pretends, and an unskippable form on first open is the app
+     demanding something before it has given anything. The defaults are
+     perfectly good — middle of the road on both — and both answers are
+     changeable in Profile whenever they feel like it. */
+  function skipRow(where) {
+    return '<button class="btn" data-skip="1" style="width:100%;padding:11px;margin-top:14px;' +
+      'font-size:12.5px;color:var(--ink-dim)">Skip this \u2014 just let me in</button>' +
+      '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
+      'Nothing is lost. It all lives in <b>Profile</b> under <b>Where I have got you</b>, ' +
+      'and you can set them whenever you want.</div>';
   }
-  ME.ask = function (from) { step = from || 0; ask(); };
+
+  function wireSkip(box) {
+    var b = (box || document).querySelector('[data-skip]');
+    if (!b) return;
+    on(b, 'click', function () {
+      /* Stopping half way KEEPS what was already said. Six questions is only
+         reasonable because leaving after two is not punished — throwing those
+         two away would make quitting cost something, which is the opposite of
+         what "you don't have to answer these" means.
+
+         Nothing is invented for the ones not reached: the average is taken
+         over what was actually answered. */
+      var got = Object.keys(answers || {}).length;
+      if (got) {
+        var d = ME.derive(answers);
+        if (d) {
+          ME.answers = answers;
+          ME.experience = d.experience;
+          ME.taught = d.taught;
+          ME.words = d.words;
+        }
+      }
+      saveMe();
+      shut();
+      apply();
+      try {
+        if (window.RP && RP.toast) {
+          RP.toast(got ? 'Kept the ' + got + ' you answered. The rest is in Profile.'
+                       : 'No problem. It is all in Profile if you change your mind.');
+        }
+      } catch (e) {}
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* THE PLACEMENT QUESTIONS                                             */
+  /*                                                                     */
+  /* Four cards, numbered so it is visibly finite, and offered rather    */
+  /* than imposed. Robert: "It's not a force thing. If they don't wanna  */
+  /* take the test, they wanna just start dabbling around in the whole   */
+  /* thing, that's fine."                                                */
+  /*                                                                     */
+  /* Every option is written so somebody who has never had a lesson can  */
+  /* pick one honestly. Question 3 is the old jargon question, asked the */
+  /* way round that a beginner can answer: not "how much terminology do  */
+  /* you want", but "here is a sentence a teacher would say — what would */
+  /* you do?", with "no idea where to start" as a first-class answer.    */
+  /* ------------------------------------------------------------------ */
+  var QS = [
+    { key: 'history', lab: 'YOUR SINGING',
+      q: 'How much singing have you actually done?',
+      why: '',
+      opts: [
+        [1, 'Not much, or only on my own', 'In the car, in the shower, nowhere anybody can hear.'],
+        [2, 'I sing a lot \u2014 nobody has taught me', 'Plenty of practice, no instruction.'],
+        [3, 'Lessons, a choir or a band at some point', 'Somebody has corrected you before.'],
+        [4, 'Trained, and I have stuck at it', 'You have been doing this properly for a while.']
+      ] },
+    { key: 'pitch', lab: 'YOUR SINGING',
+      q: 'When you sing along to a record, what usually happens?',
+      why: 'This is the one that decides which warm-ups you get first.',
+      opts: [
+        [1, 'I honestly cannot tell if I am on the right note', 'Most people start here. It is a skill, not a gift.'],
+        [2, 'I hear when I am off, but I cannot always fix it', 'Your ear is ahead of your voice \u2014 very common.'],
+        [3, 'Usually on it, and I know when I am not', ''],
+        [4, 'On it, and I can adjust while I am singing', '']
+      ] },
+    { key: 'high', lab: 'YOUR SINGING',
+      q: 'When you reach for a high note, what happens?',
+      why: 'This one is about keeping you safe, not about how good you are.',
+      opts: [
+        [1, 'It hurts, or nothing comes out', 'Then you get the gentle work first, whatever else you answer.'],
+        [2, 'It comes out, but it feels like shouting', 'Very common, and the thing most worth fixing.'],
+        [3, 'A stretch, but it works', ''],
+        [4, 'Comfortable \u2014 I know where my limit is', '']
+      ] },
+    { key: 'terms', lab: 'WORDS AND MUSIC',
+      q: 'A teacher says \u201cgo up to the fifth and hold it\u201d. What do you do?',
+      why: 'No wrong answer. This decides how the app words things, nothing else.',
+      opts: [
+        [1, 'No idea where to start', 'Then the app will not talk like that to you.'],
+        [2, 'I would guess', ''],
+        [3, 'I know roughly what they mean', ''],
+        [4, 'I would just do it', '']
+      ] },
+    { key: 'key', lab: 'WORDS AND MUSIC',
+      q: 'Do you know what key a song is in while you are singing it?',
+      why: '',
+      opts: [
+        [1, 'I do not know what that means', 'Fine. It is one of the first things the Learn tab explains.'],
+        [2, 'I have heard of it, but I could not tell you', ''],
+        [3, 'Usually, if I think about it', ''],
+        [4, 'Yes \u2014 and I can move a song into another one', '']
+      ] },
+    { key: 'reading', lab: 'WORDS AND MUSIC',
+      q: 'Have you ever read music off a page?',
+      why: '',
+      opts: [
+        [1, 'Never', 'You will never need to here. Nothing in this app is gated behind it.'],
+        [2, 'I have tried, slowly', ''],
+        [3, 'Yes, I can read a line', ''],
+        [4, 'Yes, fluently', '']
+      ] }
+  ];
+
+  var step = 0;
+  var answers = {};
+
+  function ask() {
+    /* step 0 is the OFFER. Nothing has been asked yet and nothing has to be. */
+    if (step === 0) {
+      sheet('<b style="font-size:18px">Want me to work out where to start you?</b>' +
+        '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which ' +
+        'warm-ups you are given first and how the app words things \u2014 and you can change any of it later, ' +
+        'or ignore all of it and just have a look round.</div>' +
+        '<button class="btn primary" id="rpGoQ" style="width:100%;padding:14px;margin-top:18px;font-size:15px">' +
+        'Ask me the six questions</button>' +
+        '<button class="btn" data-skip="1" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">' +
+        'Not now \u2014 let me look round</button>' +
+        '<div class="measured" style="margin-top:8px;font-size:11.5px;text-align:center">' +
+        'It is in <b>Profile</b> whenever you want it.</div>');
+      on($('rpGoQ'), 'click', function () { step = 1; ask(); });
+      wireSkip($('rpSheet'));
+      return;
+    }
+
+    if (step <= QS.length) {
+      var Q = QS[step - 1];
+      var h = '<div class="row" style="justify-content:space-between;align-items:baseline">' +
+        '<div class="rp-lab">' + esc(Q.lab) + '</div>' +
+        '<div class="rp-lab" style="color:var(--gold)">QUESTION ' + step + ' OF ' + QS.length + '</div></div>' +
+        '<b style="font-size:17px;display:block;margin-top:8px;line-height:1.35">' + Q.q + '</b>';
+      if (Q.why) h += '<div class="measured" style="margin-top:7px">' + esc(Q.why) + '</div>';
+      h += '<div style="margin-top:14px">';
+      Q.opts.forEach(function (o) { h += opt('a', o[0], o[1], o[2]); });
+      h += '</div>';
+      h += '<div class="row" style="gap:8px;margin-top:12px">' +
+        (step > 1 ? '<button class="btn" id="rpQBack" style="flex:1;padding:11px;font-size:12.5px">\u2039 Back</button>' : '') +
+        '<button class="btn" data-skip="1" style="flex:1;padding:11px;font-size:12.5px;color:var(--ink-dim)">Skip the rest</button>' +
+        '</div>';
+      sheet(h);
+      wire('a', function (v) {
+        answers[Q.key] = v;
+        step++;
+        ask();
+      });
+      on($('rpQBack'), 'click', function () { step--; ask(); });
+      wireSkip($('rpSheet'));
+      return;
+    }
+
+    /* all four answered — say what was decided, and why */
+    var d = ME.derive(answers) || {};
+    ME.answers = answers;
+    ME.experience = d.experience;
+    ME.taught = d.taught;
+    ME.words = d.words;
+    saveMe();
+
+    var singLine = d.experience === 1
+      ? 'Starting you on the beginner warm-ups \u2014 the gentlest ones, and the ones that actually teach pitch.'
+      : d.experience === 2
+      ? 'Starting you on the beginner and intermediate warm-ups.'
+      : 'Every exercise is open to you.';
+    var wordLine = d.taught === 1
+      ? 'Plain English throughout. Any word worth knowing is explained the first time it appears, and you can tap it again later.'
+      : d.taught === 2
+      ? 'Normal words, and anything unusual is one tap from a plain sentence.'
+      : 'The proper terms, used properly, with no slowing down.';
+
+    sheet('<b style="font-size:18px">Right \u2014 here is where I am putting you.</b>' +
+      '<div class="rp-card" style="margin-top:14px;padding:12px">' +
+      '<div class="rp-lab">YOUR SINGING</div>' +
+      '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(singLine) + '</div></div>' +
+      '<div class="rp-card" style="margin-top:9px;padding:12px">' +
+      '<div class="rp-lab">WORDS AND MUSIC</div>' +
+      '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(wordLine) + '</div></div>' +
+      '<div class="measured" style="margin-top:12px">This is what you <b>told</b> me \u2014 it is not measured. ' +
+      'If it is wrong, change it in <b>Profile</b>, or take the test, which measures instead of asking.</div>' +
+      '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Start</button>' +
+      '<button class="btn" id="rpTestNow" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px">' +
+      'Test me instead \u2014 measure it</button>');
+    on($('rpOK'), 'click', function () { shut(); apply(); });
+    on($('rpTestNow'), 'click', function () {
+      shut(); apply();
+      try { if (window.RPTest) RPTest.open(); } catch (e) {}
+    });
+  }
+
+  ME.ask = function (from) { step = from || 0; answers = {}; ask(); };
 
   function opt(group, val, title, sub) {
     return '<div class="rp-card" data-' + group + '="' + val + '" style="cursor:pointer;padding:14px">' +
@@ -13010,19 +13727,32 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   /* ---------------------------------------------------------------- */
   function mountProfileRow() {
     var host = $('modeYou');
-    if (!host || $('rpTalkRow')) return;
-    var d = document.createElement('div');
-    d.id = 'rpTalkRow';
-    d.className = 'rp-card';
-    d.style.cursor = 'pointer';
+    if (!host) return;
+    /* This used to bail out the moment the row existed, so it showed whatever
+       was true the first time Profile was opened and never changed again —
+       answer the questions and it still described the old you. Build it once,
+       then keep writing the current answer into it. */
+    var d = $('rpTalkRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpTalkRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+    }
+    var sing = ME.experience === 1 ? 'beginner warm-ups'
+             : ME.experience === 2 ? 'beginner and intermediate' : 'everything';
+    var wrd  = ME.taught === 1 ? 'plain English'
+             : ME.taught === 2 ? 'normal words, tap to explain' : 'proper terms';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">How I talk to you</div>' +
-      '<div class="rp-sub">' + (plain() ? 'Plain English' : ME.words === 'some' ? 'Normal words, tap to explain' : 'Proper terms') +
-      ' · ' + (ME.experience === 1 ? 'beginner' : ME.experience === 2 ? 'intermediate' : 'experienced') + '</div></div>' +
-      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
-    on(d, 'click', function () { ME.ask(0); });
-    // only ever place it among this screen's own direct children
-    try { host.appendChild(d); } catch (e) {}
+      '<div><div class="rp-ttl">Where I have got you</div>' +
+      '<div class="rp-sub">Singing: ' + sing + ' \u00b7 Words: ' + wrd + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
+    if (fresh) {
+      on(d, 'click', function () { ME.ask(0); });
+      // only ever place it among this screen's own direct children
+      try { host.appendChild(d); } catch (e) {}
+    }
   }
 
   /* styles */
@@ -13208,11 +13938,32 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
          submit that one. It sends off. Now that assignment's checked off."
          So we do not also ask him to press Mark done. */
       if (forId) {
-        var d = await RP.sb.from('assignments')
-          .update({ done_at: new Date().toISOString() })
-          .eq('id', forId).is('done_at', null);
-        if (d.error) say('Sent, but it did not tick off: ' + d.error.message);
-        else say('Submitted to ' + RP.coach.display_name + '. That one is done.');
+        /* A DAILY assignment is never finished — it is done, or not done, for
+           each day, and the calendar works that out from the takes actually
+           submitted. Stamping done_at on one would retire it after a single
+           day, which is the opposite of what "every day" means. */
+        var asg = (RP.assignments || []).find(function (x) { return x.id === forId; });
+        /* A submitted take is practice that demonstrably happened, so it
+           counts towards the week — days practised, and the seven-day strip
+           on both phones. This is not an invented number: the audio is in the
+           bucket and the row is in the table. Without it Robert could do his
+           assignment every morning and the scorecard would still read
+           "nothing measured yet", which would be the app lying by omission. */
+        try {
+          if (RP.logResult) RP.logResult({
+            kind: 'practice',
+            label: (asg && asg.title) || song.title || 'Assignment'
+          });
+        } catch (e) {}
+        if (asg && asg.cadence === 'daily') {
+          say('Submitted to ' + RP.coach.display_name + '. Today is ticked off.');
+        } else {
+          var d = await RP.sb.from('assignments')
+            .update({ done_at: new Date().toISOString() })
+            .eq('id', forId).is('done_at', null);
+          if (d.error) say('Sent, but it did not tick off: ' + d.error.message);
+          else say('Submitted to ' + RP.coach.display_name + '. That one is done.');
+        }
       } else {
         say('Sent to ' + RP.coach.display_name + '.');
       }
@@ -14582,6 +15333,305 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }, 500);
 
   W.draw = draw;
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — "Test me and see where I'm at."
+
+   Robert, 12 Sep:
+
+     "I'm thinking maybe we can have a test — do you wanna build a 'test me
+      to see where I'm at'? After they ask those questions, if we wanna do a
+      thorough test, you can give them some warm-ups and see what they score
+      in, and let the test exercises and the test warm-ups determine where
+      their level is. Give them a quiz on some music theory and what are
+      some of the terms, see if they know what that is. That's where the
+      gamify stuff comes in. Okay, what's this interval — is it a third, is
+      it an octave, is it a fifth?"
+
+   The four placement questions ask. This MEASURES. That is the whole
+   difference, and it is the reason this is worth building: a self-reported
+   level is a guess, and everywhere else this app refuses to show a number
+   it did not measure.
+
+   So nothing here invents a score. Every step launches an exercise the app
+   already has, and reads the result that exercise already writes down:
+
+     · Steady note   → per cent of the hold that stayed inside the window
+     · Ear drill     → how many cents off the note, and how many rounds hit
+     · Theory game   → stars, out of three
+
+   It does not drive those screens automatically. It hands you to them one
+   at a time and waits, because an exercise that runs itself is an exercise
+   you are not doing.
+
+   NOT FINISHED: Robert has said this sits behind the paywall later. It is
+   free today because there is no paywall today. Nothing here assumes either
+   way.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var T = window.RPTest = {};
+
+  /* When the test was started. Only results logged AFTER that count, so an
+     old ear drill from last week cannot stand in for one you have not done. */
+  var startedAt = 0;
+  try { startedAt = +(localStorage.getItem('rp_test_at') || 0); } catch (e) {}
+
+  var STEPS = [
+    { key: 'sustain', name: 'Hold one note steady',
+      what: 'Five seconds on one note. It measures how much of the hold stayed on the note.',
+      measures: 'breath and steadiness', mode: 'train',
+      go: function () { var b = $('btnSustain'); if (b) b.click(); } },
+    { key: 'ear', name: 'Hear the note',
+      what: 'A few rounds of ear training. It measures how far off you are, in cents.',
+      measures: 'your ear', mode: 'train',
+      go: function () { try { V10.startDrill('hilo'); } catch (e) {} } },
+    { key: 'sing', name: 'Sing the note back',
+      what: 'It plays a note, you sing it. Measured the same way — distance from the note.',
+      measures: 'pitch, with your own voice', mode: 'train',
+      go: function () { try { V10.startDrill('tonic'); } catch (e) {} } },
+    { key: 'theory', name: 'Name the interval',
+      what: 'Is that a third, a fifth, an octave? Three stars if you have it.',
+      /* The theory games render into modeLearn, not modeTrain. Sending
+         somebody to Train and then starting a game there left them looking
+         at the exercise list with the game built invisibly behind it. */
+      measures: 'what you have been taught', mode: 'learn',
+      go: function () { try { V10.startGame('interval'); } catch (e) {} } }
+  ];
+
+  /* the results this test can see: mine, and since it started */
+  function mine() {
+    var uid = (window.RP && RP.user) ? RP.user.id : null;
+    return (window.RP && RP.results ? RP.results : []).filter(function (r) {
+      if (uid && r.student_id !== uid) return false;
+      var t = new Date(r.created_at).getTime();
+      /* a row with no usable date is a row that has only just been written —
+         count it rather than losing the thing they have this second done */
+      return isNaN(t) ? true : t >= startedAt;
+    });
+  }
+
+  function resultFor(key) {
+    var rs = mine();
+    if (key === 'sustain') {
+      var s = rs.filter(function (r) { return r.kind === 'sustain' && r.pct != null; });
+      return s.length ? { pct: Math.max.apply(null, s.map(function (r) { return r.pct; })) } : null;
+    }
+    if (key === 'ear' || key === 'sing') {
+      var e = rs.filter(function (r) { return r.kind === 'ear' && r.cents != null; });
+      if (!e.length) return null;
+      return { cents: Math.min.apply(null, e.map(function (r) { return r.cents; })),
+               runs: e.length };
+    }
+    if (key === 'theory') {
+      var g = rs.filter(function (r) { return r.kind === 'game' && r.score != null; });
+      if (!g.length) return null;
+      return { stars: Math.max.apply(null, g.map(function (r) { return r.score; })),
+               outOf: g[0].out_of || 3 };
+    }
+    return null;
+  }
+
+  /* Ear and sing both write kind 'ear', so the app cannot tell them apart
+     from the row alone. Say so rather than pretending they are separate
+     measurements — two runs of the same measure is what it is. */
+  function said(key, r) {
+    if (!r) return '';
+    if (key === 'sustain') return r.pct + '% of the hold stayed on the note';
+    if (key === 'ear' || key === 'sing') return 'closest was ' + r.cents + ' cents off';
+    if (key === 'theory') return r.stars + ' of ' + r.outOf + ' stars';
+    return '';
+  }
+
+  function doneCount() {
+    return STEPS.filter(function (s) { return !!resultFor(s.key); }).length;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* what the numbers mean                                               */
+  /*                                                                     */
+  /* These thresholds are judgements, not measurements, so they are      */
+  /* written here in one place where they can be argued with — and the   */
+  /* screen always shows the raw number next to the verdict, so nobody   */
+  /* has to take the verdict's word for it.                              */
+  /* ------------------------------------------------------------------ */
+  T.place = function () {
+    var sus = resultFor('sustain'), ear = resultFor('ear'), th = resultFor('theory');
+    var sing = null, taught = null, why = [];
+
+    if (sus || ear) {
+      var n = 0, tot = 0;
+      if (sus) { tot += sus.pct >= 75 ? 3 : sus.pct >= 45 ? 2 : 1; n++; }
+      if (ear) { tot += ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1; n++; }
+      sing = Math.round(tot / n);
+      if (sus) why.push('held a note ' + sus.pct + '% steady');
+      if (ear) why.push('got within ' + ear.cents + ' cents of the note');
+    }
+    if (th) {
+      taught = th.stars >= 3 ? 3 : th.stars >= 2 ? 2 : 1;
+      why.push('scored ' + th.stars + ' of ' + th.outOf + ' naming intervals');
+    }
+    return { sing: sing, taught: taught, why: why,
+             done: doneCount(), total: STEPS.length };
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* the screen                                                          */
+  /* ------------------------------------------------------------------ */
+  function sheet(html) {
+    if (window.RP && RP.sheet) return RP.sheet(html);
+    var o = $('rpSheet');
+    if (!o) {
+      o = document.createElement('div');
+      o.id = 'rpSheet';
+      o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
+        'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+      document.body.appendChild(o);
+    }
+    o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
+      'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
+      'calc(24px + env(safe-area-inset-bottom,0px));max-height:94vh;overflow-y:auto">' + html + '</div>';
+    o.style.display = 'flex';
+    return o.firstChild;
+  }
+  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+
+  T.open = function () {
+    if (!startedAt) {
+      startedAt = Date.now();
+      try { localStorage.setItem('rp_test_at', String(startedAt)); } catch (e) {}
+    }
+    draw();
+  };
+
+  function draw() {
+    var p = T.place();
+    var h = '<b style="font-size:18px">Where am I actually at?</b>' +
+      '<div class="measured" style="margin-top:8px">Four short things. Nothing here is a guess — ' +
+      'each one measures something and shows you the number. Do them in any order, stop whenever ' +
+      'you like, come back to it later.</div>';
+
+    h += '<div class="rp-lab" style="margin-top:16px">' + p.done + ' OF ' + p.total + ' DONE</div>';
+
+    STEPS.forEach(function (s) {
+      var r = resultFor(s.key);
+      h += '<div class="rp-card' + (r ? ' rp-done' : ' hot') + '" style="margin-top:8px;padding:12px">' +
+        '<div class="rp-ttl">' + esc(s.name) +
+        (r ? '<span class="rp-tag">done</span>' : '') + '</div>' +
+        '<div class="rp-sub">' + esc(s.what) + '</div>';
+      if (r) {
+        h += '<div class="rp-sub" style="margin-top:5px;color:var(--gold)"><b>' +
+          esc(said(s.key, r)) + '</b></div>';
+      }
+      h += '<button class="btn' + (r ? '' : ' primary') + '" data-go="' + esc(s.key) + '" ' +
+        'style="width:100%;padding:10px;margin-top:9px;font-size:12.5px">' +
+        (r ? 'Do it again' : 'Start') + '</button></div>';
+    });
+
+    if (p.done) {
+      h += '<div class="rp-lab" style="margin-top:18px">WHAT THAT SAYS SO FAR</div>';
+      h += '<div class="rp-card" style="padding:12px">';
+      p.why.forEach(function (w) {
+        h += '<div style="font-size:13px;line-height:1.5">· You ' + esc(w) + '.</div>';
+      });
+      if (p.sing || p.taught) {
+        h += '<div style="font-size:13.5px;line-height:1.55;margin-top:9px">' +
+          (p.sing ? 'On singing that puts you at <b>' +
+            (p.sing === 1 ? 'beginner' : p.sing === 2 ? 'intermediate' : 'experienced') + '</b>. ' : '') +
+          (p.taught ? 'On words and music, <b>' +
+            (p.taught === 1 ? 'plain English' : p.taught === 2 ? 'some terms' : 'the proper terms') + '</b>.' : '') +
+          '</div>';
+      }
+      if (p.done < p.total) {
+        h += '<div class="measured" style="margin-top:9px;font-size:11.5px">' +
+          'Based on the ' + p.done + ' you have done. The rest would make it surer.</div>';
+      }
+      h += '</div>';
+      h += '<button class="btn primary" id="rpTestApply" style="width:100%;padding:13px;margin-top:12px">' +
+        'Use this instead of my answers</button>';
+      h += '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
+        'You can always change it back in Profile.</div>';
+    }
+
+    h += '<button class="btn" id="rpTestX" style="width:100%;padding:11px;margin-top:12px">Close</button>';
+    sheet(h);
+
+    (($('rpSheet')) || document).querySelectorAll('[data-go]').forEach(function (b) {
+      on(b, 'click', function () {
+        var s = STEPS.filter(function (x) { return x.key === b.dataset.go; })[0];
+        if (!s) return;
+        shut();
+        /* Leave no other exercise open behind this one. Starting the ear drill
+           straight after the steady note otherwise landed you on Train with
+           both panels stacked up the screen. */
+        ['susPanel', 'v10Ear', 'v10Game', 'v10Guided'].forEach(function (id) {
+          var el = $(id);
+          if (el) el.style.display = 'none';
+        });
+        try { window.switchMode(s.mode || 'train'); } catch (e) {}
+        setTimeout(function () { s.go(); }, 140);
+        /* Coming back here afterwards is the singer's move, not ours — the
+           app must not yank them out of an exercise the moment it finishes. */
+      });
+    });
+    on($('rpTestX'), 'click', shut);
+    on($('rpTestApply'), 'click', function () {
+      var q = T.place();
+      var ME = window.RPPlain;
+      if (!ME) return;
+      if (q.sing) ME.experience = q.sing;
+      if (q.taught) {
+        ME.taught = q.taught;
+        ME.words = q.taught === 1 ? 'plain' : q.taught === 2 ? 'some' : 'technical';
+      }
+      ME.measured = { at: new Date().toISOString(), sing: q.sing, taught: q.taught, why: q.why };
+      ME.save();
+      shut();
+      try { if (window.RP && RP.toast) RP.toast('Done — that is measured, not guessed.'); } catch (e) {}
+      try { if (ME.apply) ME.apply(); } catch (e) {}
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* the way in, from Profile                                            */
+  /* ------------------------------------------------------------------ */
+  function mountRow() {
+    var host = $('modeYou');
+    if (!host) return;
+    var d = $('rpTestRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpTestRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+    }
+    var p = T.place();
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Test me — where am I actually at?</div>' +
+      '<div class="rp-sub">' + (p.done
+        ? p.done + ' of ' + p.total + ' done. Measured, not guessed.'
+        : 'Four short things that measure instead of asking.') + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    if (fresh) {
+      on(d, 'click', function () { T.open(); });
+      try { host.appendChild(d); } catch (e) {}
+    }
+  }
+
+  setInterval(mountRow, 1500);
+  setTimeout(mountRow, 900);
 })();
 
 </script>
