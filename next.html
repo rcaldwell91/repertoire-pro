@@ -13188,16 +13188,37 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* knows nothing. The levels — and the language the app uses — are     */
   /* worked out from that.                                               */
   /* ------------------------------------------------------------------ */
-  function band(sum) { return sum <= 3 ? 1 : sum <= 6 ? 2 : 3; }
+  /* An AVERAGE rather than a total, so stopping half way still places you on
+     what you did say instead of throwing it away. Level 3 deliberately needs
+     mostly top answers: it means every exercise unlocked and the proper terms
+     with no hand-holding, which is not where "I know roughly" belongs. */
+  function band(vals) {
+    var got = vals.filter(function (v) { return v > 0; });
+    if (!got.length) return null;
+    var avg = got.reduce(function (a, b) { return a + b; }, 0) / got.length;
+    return avg <= 1.8 ? 1 : avg < 3.34 ? 2 : 3;
+  }
 
   ME.derive = function (a) {
     if (!a) return null;
-    var sing   = band((+a.history || 1) + (+a.pitch || 1));
-    var taught = band((+a.terms || 1) + (+a.reading || 1));
+    var sing   = band([+a.history || 0, +a.pitch || 0, +a.high || 0]);
+    var taught = band([+a.terms || 0, +a.reading || 0, +a.key || 0]);
+
+    /* The high-note question tells whoever answers "it hurts, or nothing
+       comes out" that they get the gentle work first WHATEVER ELSE they
+       answer. Without this line that sentence was not true: an otherwise
+       confident singer averaged straight back up past it.
+
+       Pain is not a level, it is a reason to start gently, and the app cannot
+       tell the difference between a bad technique and a bad week. So it caps,
+       and anybody who disagrees can move it in Profile or go and measure it. */
+    if (+a.high === 1) sing = 1;
+    if (sing == null && taught == null) return null;
+    var t = taught == null ? ME.taught : taught;
     return {
-      experience: sing,
-      taught: taught,
-      words: taught === 1 ? 'plain' : taught === 2 ? 'some' : 'technical'
+      experience: sing == null ? ME.experience : sing,
+      taught: t,
+      words: t === 1 ? 'plain' : t === 2 ? 'some' : 'technical'
     };
   };
 
@@ -13422,14 +13443,31 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var b = (box || document).querySelector('[data-skip]');
     if (!b) return;
     on(b, 'click', function () {
-      /* Remember that we ASKED, so it does not nag on every launch, but do
-         not pretend they answered: whatever is in ME already is the default,
-         and it is written down as the default rather than as their choice. */
+      /* Stopping half way KEEPS what was already said. Six questions is only
+         reasonable because leaving after two is not punished — throwing those
+         two away would make quitting cost something, which is the opposite of
+         what "you don't have to answer these" means.
+
+         Nothing is invented for the ones not reached: the average is taken
+         over what was actually answered. */
+      var got = Object.keys(answers || {}).length;
+      if (got) {
+        var d = ME.derive(answers);
+        if (d) {
+          ME.answers = answers;
+          ME.experience = d.experience;
+          ME.taught = d.taught;
+          ME.words = d.words;
+        }
+      }
       saveMe();
       shut();
       apply();
       try {
-        if (window.RP && RP.toast) RP.toast('No problem. It is all in Profile if you change your mind.');
+        if (window.RP && RP.toast) {
+          RP.toast(got ? 'Kept the ' + got + ' you answered. The rest is in Profile.'
+                       : 'No problem. It is all in Profile if you change your mind.');
+        }
       } catch (e) {}
     });
   }
@@ -13467,6 +13505,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         [3, 'Usually on it, and I know when I am not', ''],
         [4, 'On it, and I can adjust while I am singing', '']
       ] },
+    { key: 'high', lab: 'YOUR SINGING',
+      q: 'When you reach for a high note, what happens?',
+      why: 'This one is about keeping you safe, not about how good you are.',
+      opts: [
+        [1, 'It hurts, or nothing comes out', 'Then you get the gentle work first, whatever else you answer.'],
+        [2, 'It comes out, but it feels like shouting', 'Very common, and the thing most worth fixing.'],
+        [3, 'A stretch, but it works', ''],
+        [4, 'Comfortable \u2014 I know where my limit is', '']
+      ] },
     { key: 'terms', lab: 'WORDS AND MUSIC',
       q: 'A teacher says \u201cgo up to the fifth and hold it\u201d. What do you do?',
       why: 'No wrong answer. This decides how the app words things, nothing else.',
@@ -13475,6 +13522,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         [2, 'I would guess', ''],
         [3, 'I know roughly what they mean', ''],
         [4, 'I would just do it', '']
+      ] },
+    { key: 'key', lab: 'WORDS AND MUSIC',
+      q: 'Do you know what key a song is in while you are singing it?',
+      why: '',
+      opts: [
+        [1, 'I do not know what that means', 'Fine. It is one of the first things the Learn tab explains.'],
+        [2, 'I have heard of it, but I could not tell you', ''],
+        [3, 'Usually, if I think about it', ''],
+        [4, 'Yes \u2014 and I can move a song into another one', '']
       ] },
     { key: 'reading', lab: 'WORDS AND MUSIC',
       q: 'Have you ever read music off a page?',
@@ -13494,11 +13550,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* step 0 is the OFFER. Nothing has been asked yet and nothing has to be. */
     if (step === 0) {
       sheet('<b style="font-size:18px">Want me to work out where to start you?</b>' +
-        '<div class="measured" style="margin-top:8px">Four questions, about a minute. They decide which ' +
+        '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which ' +
         'warm-ups you are given first and how the app words things \u2014 and you can change any of it later, ' +
         'or ignore all of it and just have a look round.</div>' +
         '<button class="btn primary" id="rpGoQ" style="width:100%;padding:14px;margin-top:18px;font-size:15px">' +
-        'Ask me the four questions</button>' +
+        'Ask me the six questions</button>' +
         '<button class="btn" data-skip="1" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">' +
         'Not now \u2014 let me look round</button>' +
         '<div class="measured" style="margin-top:8px;font-size:11.5px;text-align:center">' +
