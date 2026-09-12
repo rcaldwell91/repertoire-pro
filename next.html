@@ -12022,6 +12022,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           '<div id="rpAskMsg" class="measured" style="margin-top:8px"></div>';
       }
 
+      /* Idea bank #5: the student who does not already know a coach. The
+         email box only works if you have the email; this is for everybody
+         else. Only coaches who asked to be listed are in there. */
+      h += '<button class="btn" id="rpFindGo" style="width:100%;padding:11px;margin-top:12px;' +
+        'font-size:12.5px">Find a coach by what they teach</button>';
+
       h += '<div class="measured" style="margin-top:14px">No coach? Everything below is yours anyway — the ' +
         'app coaches you itself.</div>';
       h += '</div>';
@@ -12425,6 +12431,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
     on($('rpAskGo'), 'click', askCoach);
     on($('rpAskEmail'), 'keydown', function (e) { if (e.key === 'Enter') askCoach(); });
+    on($('rpFindGo'), 'click', function () { if (window.RPFind) RPFind.browse(); });
     each(host, '[data-unask]', function (b) {
       on(b, 'click', function () {
         b.disabled = true;
@@ -12537,7 +12544,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   /* ---- students ---- */
   function studentList() {
-    var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">' +
+    var h = (window.RPFind ? RPFind.myCard() : '');
+    h += '<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">' +
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
     var pend = (RP.requests || []).filter(function (r) { return r.status === 'pending'; });
@@ -12583,6 +12591,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       on(c, 'click', function () { openStudent = c.dataset.stu; renderTeacher(); });
     });
     on($('rpAddStu'), 'click', addStudentSheet);
+    on($('rpFbCard'), 'click', function () { if (window.RPFind) RPFind.edit(); });
     function answer(id, yes, btn) {
       btn.disabled = true;
       btn.textContent = yes ? 'Adding\u2026' : 'Declining\u2026';
@@ -16453,6 +16462,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function mount() {
     var host = $('modeLearn');
     if (!host) return;
+    /* "None" means none. Take the row away if it is already there. */
+    if (T.dose && T.dose() === 'none') {
+      var gone = $('rpTriviaRow');
+      if (gone && gone.parentElement) gone.parentElement.removeChild(gone);
+      return;
+    }
     var q = T.question();
     if (!q) return;
     var done = T.answered();
@@ -16479,8 +16494,185 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
   }
 
-  setInterval(mount, 1500);
-  setTimeout(mount, 1100);
+
+  /* ==================================================================
+     THE DOSE.
+
+     Robert, idea bank #3: "a setting controls the dose: a lot / medium /
+     a little / none." The reason he wants trivia at all is a level of
+     depth other apps do not have — not a quiz bolted on.
+
+     So the honest question was: where does a fact come from? He has a
+     standing, permanent rule — never scrape or source lyrics or audio —
+     and song and artist trivia needs a catalogue the app does not have
+     and is not allowed to go and take. That half is NOT built, and the
+     chooser says so in plain words rather than quietly leaving it out.
+
+     What IS built comes from two places the app already owns and has
+     already had to be right about: the glossary, and the paragraph
+     under every exercise explaining why it works. Nothing here is a
+     new claim. It is the app repeating something it already says,
+     at the moment it is useful, as often as you asked for it.
+     ================================================================== */
+
+  var DOSES = [
+    { k: 'lot',    name: 'A lot',      sub: 'The word of the day, and something worth knowing on every exercise.' },
+    { k: 'med',    name: 'Medium',     sub: 'The word of the day, and a note on an exercise now and then.' },
+    { k: 'little', name: 'A little',   sub: 'Just the word of the day.' },
+    { k: 'none',   name: 'None',       sub: 'Nothing extra. The exercises and lessons, and that is it.' }
+  ];
+
+  T.dose = function () {
+    try {
+      var v = localStorage.getItem('rp_trivia_dose');
+      if (v && DOSES.some(function (d) { return d.k === v; })) return v;
+    } catch (e) {}
+    return 'med';
+  };
+  T.setDose = function (v) {
+    try { localStorage.setItem('rp_trivia_dose', v); } catch (e) {}
+    /* the word-of-the-day row may need to appear or disappear right now */
+    var r = $('rpTriviaRow'); if (r && r.parentElement) r.parentElement.removeChild(r);
+    var f = $('rpFactStrip'); if (f && f.parentElement) f.parentElement.removeChild(f);
+    mount(); doseRow();
+  };
+  function doseName() {
+    var d = T.dose();
+    return (DOSES.filter(function (x) { return x.k === d; })[0] || DOSES[1]).name;
+  }
+
+  T.chooseDose = function () {
+    var cur = T.dose();
+    var h = '<b style="font-size:18px">How much extra?</b>' +
+      '<div class="measured" style="margin-top:8px">Words, and the reason an exercise works. ' +
+      'It is meant to be a nudge, not homework — so you set how much of it you want.</div>' +
+      '<div style="margin-top:14px">';
+    DOSES.forEach(function (d) {
+      h += '<div class="rp-card' + (d.k === cur ? ' hot' : '') + '" data-dose="' + d.k + '" ' +
+        'style="cursor:pointer;padding:12px;margin-bottom:7px">' +
+        '<div class="rp-ttl">' + esc(d.name) +
+        (d.k === cur ? '<span class="rp-tag">yours</span>' : '') + '</div>' +
+        '<div class="rp-sub">' + esc(d.sub) + '</div></div>';
+    });
+    h += '</div>' +
+      '<div class="rp-card" style="margin-top:6px;padding:12px;border-left:3px solid var(--gold)">' +
+      '<div style="font-size:12.5px;line-height:1.55">What you will <i>not</i> see yet is trivia about ' +
+      'songs and artists — the Grammy year, the thing the singer did in 1974. That needs a catalogue of ' +
+      'songs, and this app does not take lyrics or audio from anywhere. Until there is a source we are ' +
+      'allowed to use, saying nothing beats making something up.</div></div>' +
+      '<button class="btn" id="rpDoseX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
+    var box = sheet(h);
+    on($('rpDoseX'), 'click', shut);
+    box.querySelectorAll('[data-dose]').forEach(function (c) {
+      on(c, 'click', function () {
+        T.setDose(c.dataset.dose);
+        T.chooseDose();
+        try { if (window.RP && RP.toast) RP.toast('Extras: ' + doseName().toLowerCase() + '.'); } catch (e) {}
+      });
+    });
+  };
+
+  /* ---- the row in Profile ------------------------------------------ */
+  function doseRow() {
+    var host = $('modeYou');
+    if (!host) return;
+    var d = $('rpDoseRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpDoseRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+    }
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">Words and extras</div>' +
+      '<div class="rp-sub">' + esc(doseName()) + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    if (fresh) {
+      on(d, 'click', T.chooseDose);
+      try { host.appendChild(d); } catch (e) {}
+    }
+  }
+
+  /* ==================================================================
+     WORTH KNOWING — the line that appears next to the exercise you are
+     actually doing.
+
+     V10.noteRunning is a hook the base app already calls every time an
+     exercise starts and which does nothing. We wrap it rather than
+     touching the base: the app tells us what is running, and we put one
+     sentence of its own explanation on the screen beside it.
+     ================================================================== */
+
+  function firstSentence(html) {
+    var t = String(html || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    var m = t.match(/^[^.!?]+[.!?]/);
+    var out = m ? m[0] : t;
+    /* a very short opener ("It is not.") is not worth a card — take two */
+    if (out.length < 60 && out.length < t.length) {
+      var m2 = t.slice(out.length).trim().match(/^[^.!?]+[.!?]/);
+      if (m2) out += ' ' + m2[0];
+    }
+    return out.trim();
+  }
+
+  var shownFor = {};   /* one strip per exercise per session, not per redraw */
+
+  function factStrip(e) {
+    var d = T.dose();
+    if (d === 'none' || d === 'little') return;
+    if (!e) return;
+    /* Medium means "now and then": every other exercise, counted, not
+       random — random means two in a row and then nothing for ten. */
+    if (d === 'med') {
+      shownFor.__n = (shownFor.__n || 0) + 1;
+      if (shownFor.__n % 2 === 0) return;
+    }
+    var line = firstSentence(e.why || e.what);
+    if (!line) return;
+
+    var old = $('rpFactStrip');
+    if (old && old.parentElement) old.parentElement.removeChild(old);
+
+    var box = document.createElement('div');
+    box.id = 'rpFactStrip';
+    box.className = 'rp-card';
+    box.style.cssText = 'padding:11px;margin-top:10px;border-left:3px solid var(--gold)';
+    box.innerHTML = '<div class="rp-lab">WHY THIS ONE WORKS</div>' +
+      '<div style="font-size:13px;line-height:1.55;margin-top:5px">' + esc(line) + '</div>';
+
+    /* Guided exercises get their own panel; ladders run in the train slot.
+       Put it wherever the exercise actually is. */
+    var g = $('v10Guided');
+    var slot = $('trainSlot');
+    try {
+      if (g && g.style.display !== 'none') g.appendChild(box);
+      else if (slot && slot.parentElement) slot.parentElement.insertBefore(box, slot);
+      else return;
+    } catch (err) { return; }
+  }
+
+  (function wrapNoteRunning() {
+    function attach() {
+      if (!window.V10 || !V10.noteRunning || V10.noteRunning.__rp) return false;
+      var prev = V10.noteRunning;
+      var wrapped = function (e) {
+        try { prev.apply(this, arguments); } catch (err) {}
+        try { factStrip(e); } catch (err) {}
+      };
+      wrapped.__rp = 1;
+      V10.noteRunning = wrapped;
+      return true;
+    }
+    if (!attach()) {
+      var n = 0;
+      var iv = setInterval(function () { if (attach() || ++n > 40) clearInterval(iv); }, 300);
+    }
+  })();
+
+  setInterval(function () { mount(); doseRow(); }, 1500);
+  setTimeout(function () { mount(); doseRow(); }, 1100);
 })();
 
 </script>
@@ -16797,7 +16989,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      shown, so this list can never promise an exercise that is not there. */
   var GOALS = [
     {
-      id: 'high', name: 'Hit higher notes without it hurting',
+      id: 'high', skill: 'Higher notes', name: 'Hit higher notes without it hurting',
       sub: 'The top of your range, without the strain.',
       ex: ['siren', 'liptrill', 'yawnsigh', 'descend', 'octleap', 'nay'],
       say: 'Height comes from coordination before it comes from effort, which is why almost ' +
@@ -16807,7 +16999,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
             'signal in singing that never means progress.'
     },
     {
-      id: 'runs', name: 'Sing runs and riffs',
+      id: 'runs', skill: 'Runs and riffs', name: 'Sing runs and riffs',
       sub: 'The fast decorated bits. The proper word is melisma.',
       ex: ['ninetone', 'staccato', 'gee', 'mee', 'octrep'],
       say: 'A run is a fine motor skill, so it is built the way every fine motor skill is built: ' +
@@ -16817,7 +17009,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
             'rehearse is what you learn. The ladder lets you set the speed — use it low first.'
     },
     {
-      id: 'vibrato', name: 'Get vibrato',
+      id: 'vibrato', skill: 'Vibrato', name: 'Get vibrato',
       sub: 'The natural shimmer on a held note.',
       ex: ['messa', 'sustain', 'yawnsigh', 'hum'],
       say: 'Vibrato is not a wobble you add on top. It is an oscillation that shows up on its own ' +
@@ -16828,7 +17020,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
             'install one.'
     },
     {
-      id: 'belt', name: 'Sing loud without shouting',
+      id: 'belt', skill: 'Belting', name: 'Sing loud without shouting',
       sub: 'Power that does not cost you the next day.',
       ex: ['nay', 'bay', 'wah', 'mee', 'staccato'],
       say: 'The bright, slightly bratty sounds are the way in. They get you volume from resonance ' +
@@ -16838,7 +17030,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
             'coach, ask them to listen to this.'
     },
     {
-      id: 'flat', name: 'Stop going flat',
+      id: 'flat', skill: 'Staying in tune', name: 'Stop going flat',
       sub: 'Landing on the note and staying there.',
       ex: ['mum', 'mee', 'descend', 'sustain'],
       say: 'This is the one the app is genuinely best at, because it can measure it. The Pitch ' +
@@ -16857,7 +17049,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       note: ''
     },
     {
-      id: 'air', name: 'Not run out of air',
+      id: 'air', skill: 'Breath', name: 'Not run out of air',
       sub: 'Getting to the end of the phrase.',
       ex: ['hiss', 'farinelli', 'straw', 'liptrill'],
       say: 'Almost nobody who runs out of air is short of air. They are spending it too fast at ' +
@@ -16878,7 +17070,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       hard: true
     },
     {
-      id: 'scream', name: 'Screams and growls',
+      id: 'scream', skill: 'Screams and growls', name: 'Screams and growls',
       sub: 'Rock and metal distortion — the high scream and the low one.',
       ex: ['straw', 'liptrill', 'hum'],
       say: 'The grit is not your vocal cords tearing. It is the FALSE folds — a second pair sitting ' +
@@ -16973,9 +17165,20 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       });
     }
 
-    h += '<button class="btn" id="rpGoalX" style="width:100%;padding:12px;margin-top:14px">Close</button>';
+    /* The screams card says plainly that the app will not teach you this and
+       that you should find somebody who will. Saying that and then leaving
+       you to work out how is not much of an answer, so the coaches who put
+       their hand up for it are one tap away. */
+    if (g.skill && window.RPFind) {
+      h += '<button class="btn" id="rpGoalCoach" style="width:100%;padding:11px;margin-top:14px;' +
+        'font-size:12.5px">Find a coach who teaches ' + esc(String(g.skill).toLowerCase()) + '</button>';
+    }
+
+    h += '<button class="btn" id="rpGoalX" style="width:100%;padding:12px;margin-top:' +
+      (g.skill && window.RPFind ? '8px' : '14px') + '">Close</button>';
     var box = sheet(h);
     on($('rpGoalX'), 'click', shut);
+    on($('rpGoalCoach'), 'click', function () { RPFind.browse(g.skill); });
     on($('rpGoalBack'), 'click', function () { G.open(); });
     box.querySelectorAll('[data-start]').forEach(function (b) {
       on(b, 'click', function () {
@@ -17010,6 +17213,301 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   setInterval(mount, 1500);
   setTimeout(mount, 1050);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — what a coach teaches, and finding one who teaches it.
+
+   Idea bank #5, in Robert's words: coaches differ by genre — classical,
+   R&B, country, rock — and the exercises differ with them. So put
+   categories on coaches, "and possibly at the skill level too: the coach
+   who teaches runs, or screams."
+
+   Two halves, and the order matters.
+
+   The coach fills his in. Nothing is guessed from his name, his students
+   or what he has assigned — a coach saying "I teach belting" is a claim
+   he is making, and the app should not make it for him.
+
+   The student searches. But a directory of people is a thing you can be
+   put into without asking, so nobody appears in it until they tick
+   "list me". A coach who only teaches the people he already knows stays
+   invisible, keeps his code, and loses nothing.
+
+   The search itself runs through find_coaches() on the server, which
+   returns a name, a blurb and the tags — and deliberately not the email
+   or the join code. Reading a profile row still requires being that
+   person, their coach, their student, or mid-request.
+
+   The skills list is the same list of words as the "I just want to be
+   able to…" screen, on purpose. That screen tells somebody chasing rock
+   screams to go and find a coach; this is where they land.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+  function each(root, sel, fn) { if (root) root.querySelectorAll(sel).forEach(fn); }
+
+  var F = window.RPFind = {};
+
+  var GENRES = ['Pop', 'R&B', 'Rock', 'Metal', 'Country', 'Musical theatre',
+                'Jazz', 'Classical', 'Gospel', 'Hip-hop', 'Folk', 'Worship'];
+
+  /* the same words the goals screen uses, so the two ends meet */
+  var SKILLS = ['Complete beginners', 'Higher notes', 'Runs and riffs', 'Vibrato',
+                'Belting', 'Staying in tune', 'Breath', 'Screams and growls',
+                'Harmony', 'Performing and nerves'];
+
+  F.GENRES = GENRES;
+  F.SKILLS = SKILLS;
+
+  function arr(v) { return Object.prototype.toString.call(v) === '[object Array]' ? v : []; }
+
+  /* ------------------------------------------------------------------ */
+  function sheet(html) {
+    var o = $('rpSheet');
+    if (!o) {
+      o = document.createElement('div');
+      o.id = 'rpSheet';
+      o.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);' +
+        'display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+      document.body.appendChild(o);
+    }
+    o.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);' +
+      'border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px 16px ' +
+      'calc(24px + env(safe-area-inset-bottom,0px));max-height:94vh;overflow-y:auto">' + html + '</div>';
+    o.style.display = 'flex';
+    return o.firstChild;
+  }
+  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  F.shut = shut;
+
+  function chip(label, on_, attr) {
+    return '<button class="btn' + (on_ ? ' primary' : '') + '" ' + attr +
+      ' style="padding:7px 11px;font-size:12px;margin:0 6px 6px 0">' + esc(label) + '</button>';
+  }
+
+  function tags(g, t) {
+    var all = arr(g).concat(arr(t));
+    if (!all.length) return '';
+    return '<div style="margin-top:6px">' + all.map(function (x) {
+      return '<span class="rp-tag" style="margin:0 5px 5px 0;display:inline-block">' +
+        esc(x) + '</span>';
+    }).join('') + '</div>';
+  }
+  F.tags = tags;
+
+  /* ================================================================== */
+  /* THE COACH'S SIDE                                                    */
+  /* ================================================================== */
+  F.edit = function () {
+    var me = (window.RP && RP.profile) || {};
+    var picked = { g: arr(me.genres).slice(), t: arr(me.teaches).slice() };
+    var listed = !!me.listed;
+    var blurb = me.blurb || '';
+
+    function draw() {
+      var h = '<b style="font-size:18px">What you teach</b>' +
+        '<div class="measured" style="margin-top:8px">Your words, not the app’s. Nothing here is ' +
+        'worked out from your students or what you have assigned — a coach saying what he teaches ' +
+        'is a claim he gets to make himself.</div>';
+
+      h += '<div class="rp-lab" style="margin-top:16px">MUSIC</div><div style="margin-top:7px">';
+      GENRES.forEach(function (x) {
+        h += chip(x, picked.g.indexOf(x) >= 0, 'data-g="' + esc(x) + '"');
+      });
+      h += '</div>';
+
+      h += '<div class="rp-lab" style="margin-top:12px">WHAT YOU ARE GOOD AT</div><div style="margin-top:7px">';
+      SKILLS.forEach(function (x) {
+        h += chip(x, picked.t.indexOf(x) >= 0, 'data-t="' + esc(x) + '"');
+      });
+      h += '</div>';
+
+      h += '<div class="rp-lab" style="margin-top:12px">A LINE ABOUT YOU</div>' +
+        '<textarea id="rpFbBlurb" class="rp-inp" rows="3" maxlength="240" style="margin-top:7px" ' +
+        'placeholder="Two sentences. What a singer gets from working with you.">' +
+        esc(blurb) + '</textarea>';
+
+      h += '<div class="rp-card" style="margin-top:14px;padding:13px">' +
+        '<div class="rp-ttl">Let singers find you</div>' +
+        '<div class="rp-sub">Off, you are invisible — only people you give your code to, or who ' +
+        'know your email, can reach you. On, your name, your line and these tags show up when ' +
+        'somebody searches. Your email and your code never do, either way.</div>' +
+        '<button class="btn' + (listed ? ' primary' : '') + '" id="rpFbList" style="width:100%;' +
+        'padding:10px;margin-top:9px;font-size:12.5px">' +
+        (listed ? 'You are listed · tap to come off' : 'Not listed · tap to go on') +
+        '</button></div>';
+
+      h += '<div id="rpFbMsg" class="measured" style="margin-top:10px"></div>' +
+        '<div class="row" style="gap:7px;margin-top:8px;flex-wrap:nowrap">' +
+        '<button class="btn" id="rpFbX" style="flex:1;padding:12px">Close</button>' +
+        '<button class="btn primary" id="rpFbSave" style="flex:1;padding:12px">Save</button></div>';
+
+      var box = sheet(h);
+      each(box, '[data-g]', function (b) {
+        on(b, 'click', function () {
+          var v = b.dataset.g, i = picked.g.indexOf(v);
+          if (i >= 0) picked.g.splice(i, 1); else picked.g.push(v);
+          blurb = ($('rpFbBlurb') || {}).value || blurb;
+          draw();
+        });
+      });
+      each(box, '[data-t]', function (b) {
+        on(b, 'click', function () {
+          var v = b.dataset.t, i = picked.t.indexOf(v);
+          if (i >= 0) picked.t.splice(i, 1); else picked.t.push(v);
+          blurb = ($('rpFbBlurb') || {}).value || blurb;
+          draw();
+        });
+      });
+      on($('rpFbList'), 'click', function () {
+        listed = !listed;
+        blurb = ($('rpFbBlurb') || {}).value || blurb;
+        draw();
+      });
+      on($('rpFbX'), 'click', shut);
+      on($('rpFbSave'), 'click', function () {
+        var msg = $('rpFbMsg'), btn = $('rpFbSave');
+        blurb = (($('rpFbBlurb') || {}).value || '').trim();
+        if (listed && !picked.g.length && !picked.t.length) {
+          msg.textContent = 'Pick at least one thing first, or there is nothing to find you by.';
+          msg.style.color = 'var(--miss)';
+          return;
+        }
+        btn.disabled = true;
+        msg.textContent = 'Saving…'; msg.style.color = 'var(--ink-dim)';
+        RP.sb.from('profiles')
+          .update({ genres: picked.g, teaches: picked.t, blurb: blurb, listed: listed })
+          .eq('id', RP.user.id).select().then(function (r) {
+            btn.disabled = false;
+            if (r.error) {
+              msg.textContent = r.error.message;
+              msg.style.color = 'var(--miss)';
+              return;
+            }
+            /* keep what the server actually stored, not what we sent */
+            if (r.data && r.data[0]) RP.profile = r.data[0];
+            shut();
+            RP.toast(listed ? 'Saved. Singers can find you.' : 'Saved.');
+            try { V10.renderCoach(); } catch (e) {}
+          });
+      });
+    }
+    draw();
+  };
+
+  /* one card for the coach's own screen */
+  F.myCard = function () {
+    var me = (window.RP && RP.profile) || {};
+    var g = arr(me.genres), t = arr(me.teaches);
+    var any = g.length || t.length;
+    return '<div class="rp-card" id="rpFbCard" style="cursor:pointer;padding:12px;margin-top:12px">' +
+      '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">What you teach' +
+      (me.listed ? '<span class="rp-tag">listed</span>' : '') + '</div>' +
+      '<div class="rp-sub">' + (any
+        ? (g.length ? g.join(', ') : 'no styles set') + ' · ' +
+          (t.length ? t.join(', ') : 'no skills set')
+        : 'Styles and skills. Singers can search by these.') + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div></div>';
+  };
+
+  /* ================================================================== */
+  /* THE STUDENT'S SIDE                                                  */
+  /* ================================================================== */
+  var pick = { g: null, t: null };
+
+  F.browse = function (skill) {
+    if (skill) pick.t = skill;
+    draw([], 'loading');
+    load();
+  };
+
+  function load() {
+    if (!window.RP || !RP.sb) return draw([], 'off');
+    RP.sb.rpc('find_coaches', { p_genre: pick.g, p_skill: pick.t }).then(function (r) {
+      if (r.error) return draw([], r.error.message);
+      draw(r.data || [], null);
+    });
+  }
+
+  function draw(list, state) {
+    var h = '<b style="font-size:18px">Find a coach</b>' +
+      '<div class="measured" style="margin-top:8px">Only coaches who have asked to be listed show up ' +
+      'here. Tap one to ask them — they decide, and nothing happens until they say yes.</div>';
+
+    h += '<div class="rp-lab" style="margin-top:14px">MUSIC</div><div style="margin-top:7px">';
+    h += chip('Any', !pick.g, 'data-fg=""');
+    GENRES.forEach(function (x) { h += chip(x, pick.g === x, 'data-fg="' + esc(x) + '"'); });
+    h += '</div>';
+
+    h += '<div class="rp-lab" style="margin-top:12px">SKILL</div><div style="margin-top:7px">';
+    h += chip('Any', !pick.t, 'data-ft=""');
+    SKILLS.forEach(function (x) { h += chip(x, pick.t === x, 'data-ft="' + esc(x) + '"'); });
+    h += '</div>';
+
+    h += '<div style="margin-top:16px">';
+    if (state === 'loading') {
+      h += '<div class="measured">Looking…</div>';
+    } else if (state === 'off') {
+      h += '<div class="measured">You need to be signed in to search.</div>';
+    } else if (state) {
+      h += '<div class="measured" style="color:var(--miss)">' + esc(state) + '</div>';
+    } else if (!list.length) {
+      h += '<div class="rp-card" style="padding:13px"><div class="rp-ttl">Nobody yet</div>' +
+        '<div class="rp-sub">No listed coach matches that. This is a real answer, not a loading ' +
+        'problem — the app will not pad the list out with people who are not there. If you ' +
+        'already know a coach, ask them by email instead.</div></div>';
+    } else {
+      list.forEach(function (c) {
+        h += '<div class="rp-card" style="padding:13px;margin-bottom:8px">' +
+          '<div class="rp-ttl">' + esc(c.display_name) + '</div>' +
+          (c.blurb ? '<div class="rp-sub">' + esc(c.blurb) + '</div>' : '') +
+          tags(c.genres, c.teaches) +
+          '<button class="btn primary" data-ask="' + esc(c.id) + '" style="width:100%;padding:10px;' +
+          'margin-top:9px;font-size:12.5px">Ask ' + esc(String(c.display_name).split(' ')[0]) +
+          ' to teach me</button></div>';
+      });
+    }
+    h += '</div>';
+    h += '<div id="rpFsMsg" class="measured" style="margin-top:4px"></div>' +
+      '<button class="btn" id="rpFsX" style="width:100%;padding:12px;margin-top:10px">Close</button>';
+
+    var box = sheet(h);
+    on($('rpFsX'), 'click', shut);
+    each(box, '[data-fg]', function (b) {
+      on(b, 'click', function () { pick.g = b.dataset.fg || null; draw([], 'loading'); load(); });
+    });
+    each(box, '[data-ft]', function (b) {
+      on(b, 'click', function () { pick.t = b.dataset.ft || null; draw([], 'loading'); load(); });
+    });
+    each(box, '[data-ask]', function (b) {
+      on(b, 'click', function () {
+        var msg = $('rpFsMsg');
+        b.disabled = true; b.textContent = 'Asking…';
+        RP.sb.rpc('request_coach_by_id', { p_id: b.dataset.ask, p_note: '' }).then(function (r) {
+          if (r.error) {
+            b.disabled = false; b.textContent = 'Ask';
+            msg.textContent = r.error.message;
+            msg.style.color = 'var(--miss)';
+            return;
+          }
+          shut();
+          RP.toast('Asked ' + r.data + '. It is on their phone now.');
+          RP.refresh();
+        });
+      });
+    });
+  }
 })();
 
 </script>

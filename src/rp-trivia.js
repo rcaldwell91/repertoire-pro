@@ -180,6 +180,12 @@
   function mount() {
     var host = $('modeLearn');
     if (!host) return;
+    /* "None" means none. Take the row away if it is already there. */
+    if (T.dose && T.dose() === 'none') {
+      var gone = $('rpTriviaRow');
+      if (gone && gone.parentElement) gone.parentElement.removeChild(gone);
+      return;
+    }
     var q = T.question();
     if (!q) return;
     var done = T.answered();
@@ -206,6 +212,183 @@
     }
   }
 
-  setInterval(mount, 1500);
-  setTimeout(mount, 1100);
+
+  /* ==================================================================
+     THE DOSE.
+
+     Robert, idea bank #3: "a setting controls the dose: a lot / medium /
+     a little / none." The reason he wants trivia at all is a level of
+     depth other apps do not have — not a quiz bolted on.
+
+     So the honest question was: where does a fact come from? He has a
+     standing, permanent rule — never scrape or source lyrics or audio —
+     and song and artist trivia needs a catalogue the app does not have
+     and is not allowed to go and take. That half is NOT built, and the
+     chooser says so in plain words rather than quietly leaving it out.
+
+     What IS built comes from two places the app already owns and has
+     already had to be right about: the glossary, and the paragraph
+     under every exercise explaining why it works. Nothing here is a
+     new claim. It is the app repeating something it already says,
+     at the moment it is useful, as often as you asked for it.
+     ================================================================== */
+
+  var DOSES = [
+    { k: 'lot',    name: 'A lot',      sub: 'The word of the day, and something worth knowing on every exercise.' },
+    { k: 'med',    name: 'Medium',     sub: 'The word of the day, and a note on an exercise now and then.' },
+    { k: 'little', name: 'A little',   sub: 'Just the word of the day.' },
+    { k: 'none',   name: 'None',       sub: 'Nothing extra. The exercises and lessons, and that is it.' }
+  ];
+
+  T.dose = function () {
+    try {
+      var v = localStorage.getItem('rp_trivia_dose');
+      if (v && DOSES.some(function (d) { return d.k === v; })) return v;
+    } catch (e) {}
+    return 'med';
+  };
+  T.setDose = function (v) {
+    try { localStorage.setItem('rp_trivia_dose', v); } catch (e) {}
+    /* the word-of-the-day row may need to appear or disappear right now */
+    var r = $('rpTriviaRow'); if (r && r.parentElement) r.parentElement.removeChild(r);
+    var f = $('rpFactStrip'); if (f && f.parentElement) f.parentElement.removeChild(f);
+    mount(); doseRow();
+  };
+  function doseName() {
+    var d = T.dose();
+    return (DOSES.filter(function (x) { return x.k === d; })[0] || DOSES[1]).name;
+  }
+
+  T.chooseDose = function () {
+    var cur = T.dose();
+    var h = '<b style="font-size:18px">How much extra?</b>' +
+      '<div class="measured" style="margin-top:8px">Words, and the reason an exercise works. ' +
+      'It is meant to be a nudge, not homework — so you set how much of it you want.</div>' +
+      '<div style="margin-top:14px">';
+    DOSES.forEach(function (d) {
+      h += '<div class="rp-card' + (d.k === cur ? ' hot' : '') + '" data-dose="' + d.k + '" ' +
+        'style="cursor:pointer;padding:12px;margin-bottom:7px">' +
+        '<div class="rp-ttl">' + esc(d.name) +
+        (d.k === cur ? '<span class="rp-tag">yours</span>' : '') + '</div>' +
+        '<div class="rp-sub">' + esc(d.sub) + '</div></div>';
+    });
+    h += '</div>' +
+      '<div class="rp-card" style="margin-top:6px;padding:12px;border-left:3px solid var(--gold)">' +
+      '<div style="font-size:12.5px;line-height:1.55">What you will <i>not</i> see yet is trivia about ' +
+      'songs and artists — the Grammy year, the thing the singer did in 1974. That needs a catalogue of ' +
+      'songs, and this app does not take lyrics or audio from anywhere. Until there is a source we are ' +
+      'allowed to use, saying nothing beats making something up.</div></div>' +
+      '<button class="btn" id="rpDoseX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
+    var box = sheet(h);
+    on($('rpDoseX'), 'click', shut);
+    box.querySelectorAll('[data-dose]').forEach(function (c) {
+      on(c, 'click', function () {
+        T.setDose(c.dataset.dose);
+        T.chooseDose();
+        try { if (window.RP && RP.toast) RP.toast('Extras: ' + doseName().toLowerCase() + '.'); } catch (e) {}
+      });
+    });
+  };
+
+  /* ---- the row in Profile ------------------------------------------ */
+  function doseRow() {
+    var host = $('modeYou');
+    if (!host) return;
+    var d = $('rpDoseRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpDoseRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+    }
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">Words and extras</div>' +
+      '<div class="rp-sub">' + esc(doseName()) + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    if (fresh) {
+      on(d, 'click', T.chooseDose);
+      try { host.appendChild(d); } catch (e) {}
+    }
+  }
+
+  /* ==================================================================
+     WORTH KNOWING — the line that appears next to the exercise you are
+     actually doing.
+
+     V10.noteRunning is a hook the base app already calls every time an
+     exercise starts and which does nothing. We wrap it rather than
+     touching the base: the app tells us what is running, and we put one
+     sentence of its own explanation on the screen beside it.
+     ================================================================== */
+
+  function firstSentence(html) {
+    var t = String(html || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    var m = t.match(/^[^.!?]+[.!?]/);
+    var out = m ? m[0] : t;
+    /* a very short opener ("It is not.") is not worth a card — take two */
+    if (out.length < 60 && out.length < t.length) {
+      var m2 = t.slice(out.length).trim().match(/^[^.!?]+[.!?]/);
+      if (m2) out += ' ' + m2[0];
+    }
+    return out.trim();
+  }
+
+  var shownFor = {};   /* one strip per exercise per session, not per redraw */
+
+  function factStrip(e) {
+    var d = T.dose();
+    if (d === 'none' || d === 'little') return;
+    if (!e) return;
+    /* Medium means "now and then": every other exercise, counted, not
+       random — random means two in a row and then nothing for ten. */
+    if (d === 'med') {
+      shownFor.__n = (shownFor.__n || 0) + 1;
+      if (shownFor.__n % 2 === 0) return;
+    }
+    var line = firstSentence(e.why || e.what);
+    if (!line) return;
+
+    var old = $('rpFactStrip');
+    if (old && old.parentElement) old.parentElement.removeChild(old);
+
+    var box = document.createElement('div');
+    box.id = 'rpFactStrip';
+    box.className = 'rp-card';
+    box.style.cssText = 'padding:11px;margin-top:10px;border-left:3px solid var(--gold)';
+    box.innerHTML = '<div class="rp-lab">WHY THIS ONE WORKS</div>' +
+      '<div style="font-size:13px;line-height:1.55;margin-top:5px">' + esc(line) + '</div>';
+
+    /* Guided exercises get their own panel; ladders run in the train slot.
+       Put it wherever the exercise actually is. */
+    var g = $('v10Guided');
+    var slot = $('trainSlot');
+    try {
+      if (g && g.style.display !== 'none') g.appendChild(box);
+      else if (slot && slot.parentElement) slot.parentElement.insertBefore(box, slot);
+      else return;
+    } catch (err) { return; }
+  }
+
+  (function wrapNoteRunning() {
+    function attach() {
+      if (!window.V10 || !V10.noteRunning || V10.noteRunning.__rp) return false;
+      var prev = V10.noteRunning;
+      var wrapped = function (e) {
+        try { prev.apply(this, arguments); } catch (err) {}
+        try { factStrip(e); } catch (err) {}
+      };
+      wrapped.__rp = 1;
+      V10.noteRunning = wrapped;
+      return true;
+    }
+    if (!attach()) {
+      var n = 0;
+      var iv = setInterval(function () { if (attach() || ++n > 40) clearInterval(iv); }, 300);
+    }
+  })();
+
+  setInterval(function () { mount(); doseRow(); }, 1500);
+  setTimeout(function () { mount(); doseRow(); }, 1100);
 })();

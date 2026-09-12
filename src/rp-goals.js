@@ -62,7 +62,7 @@
      shown, so this list can never promise an exercise that is not there. */
   var GOALS = [
     {
-      id: 'high', name: 'Hit higher notes without it hurting',
+      id: 'high', skill: 'Higher notes', name: 'Hit higher notes without it hurting',
       sub: 'The top of your range, without the strain.',
       ex: ['siren', 'liptrill', 'yawnsigh', 'descend', 'octleap', 'nay'],
       say: 'Height comes from coordination before it comes from effort, which is why almost ' +
@@ -72,7 +72,7 @@
             'signal in singing that never means progress.'
     },
     {
-      id: 'runs', name: 'Sing runs and riffs',
+      id: 'runs', skill: 'Runs and riffs', name: 'Sing runs and riffs',
       sub: 'The fast decorated bits. The proper word is melisma.',
       ex: ['ninetone', 'staccato', 'gee', 'mee', 'octrep'],
       say: 'A run is a fine motor skill, so it is built the way every fine motor skill is built: ' +
@@ -82,7 +82,7 @@
             'rehearse is what you learn. The ladder lets you set the speed — use it low first.'
     },
     {
-      id: 'vibrato', name: 'Get vibrato',
+      id: 'vibrato', skill: 'Vibrato', name: 'Get vibrato',
       sub: 'The natural shimmer on a held note.',
       ex: ['messa', 'sustain', 'yawnsigh', 'hum'],
       say: 'Vibrato is not a wobble you add on top. It is an oscillation that shows up on its own ' +
@@ -93,7 +93,7 @@
             'install one.'
     },
     {
-      id: 'belt', name: 'Sing loud without shouting',
+      id: 'belt', skill: 'Belting', name: 'Sing loud without shouting',
       sub: 'Power that does not cost you the next day.',
       ex: ['nay', 'bay', 'wah', 'mee', 'staccato'],
       say: 'The bright, slightly bratty sounds are the way in. They get you volume from resonance ' +
@@ -103,7 +103,7 @@
             'coach, ask them to listen to this.'
     },
     {
-      id: 'flat', name: 'Stop going flat',
+      id: 'flat', skill: 'Staying in tune', name: 'Stop going flat',
       sub: 'Landing on the note and staying there.',
       ex: ['mum', 'mee', 'descend', 'sustain'],
       say: 'This is the one the app is genuinely best at, because it can measure it. The Pitch ' +
@@ -122,7 +122,7 @@
       note: ''
     },
     {
-      id: 'air', name: 'Not run out of air',
+      id: 'air', skill: 'Breath', name: 'Not run out of air',
       sub: 'Getting to the end of the phrase.',
       ex: ['hiss', 'farinelli', 'straw', 'liptrill'],
       say: 'Almost nobody who runs out of air is short of air. They are spending it too fast at ' +
@@ -143,7 +143,7 @@
       hard: true
     },
     {
-      id: 'scream', name: 'Screams and growls',
+      id: 'scream', skill: 'Screams and growls', name: 'Screams and growls',
       sub: 'Rock and metal distortion — the high scream and the low one.',
       ex: ['straw', 'liptrill', 'hum'],
       say: 'The grit is not your vocal cords tearing. It is the FALSE folds — a second pair sitting ' +
@@ -238,9 +238,20 @@
       });
     }
 
-    h += '<button class="btn" id="rpGoalX" style="width:100%;padding:12px;margin-top:14px">Close</button>';
+    /* The screams card says plainly that the app will not teach you this and
+       that you should find somebody who will. Saying that and then leaving
+       you to work out how is not much of an answer, so the coaches who put
+       their hand up for it are one tap away. */
+    if (g.skill && window.RPFind) {
+      h += '<button class="btn" id="rpGoalCoach" style="width:100%;padding:11px;margin-top:14px;' +
+        'font-size:12.5px">Find a coach who teaches ' + esc(String(g.skill).toLowerCase()) + '</button>';
+    }
+
+    h += '<button class="btn" id="rpGoalX" style="width:100%;padding:12px;margin-top:' +
+      (g.skill && window.RPFind ? '8px' : '14px') + '">Close</button>';
     var box = sheet(h);
     on($('rpGoalX'), 'click', shut);
+    on($('rpGoalCoach'), 'click', function () { RPFind.browse(g.skill); });
     on($('rpGoalBack'), 'click', function () { G.open(); });
     box.querySelectorAll('[data-start]').forEach(function (b) {
       on(b, 'click', function () {

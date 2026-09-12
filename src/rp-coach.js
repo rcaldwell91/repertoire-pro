@@ -186,6 +186,12 @@
           '<div id="rpAskMsg" class="measured" style="margin-top:8px"></div>';
       }
 
+      /* Idea bank #5: the student who does not already know a coach. The
+         email box only works if you have the email; this is for everybody
+         else. Only coaches who asked to be listed are in there. */
+      h += '<button class="btn" id="rpFindGo" style="width:100%;padding:11px;margin-top:12px;' +
+        'font-size:12.5px">Find a coach by what they teach</button>';
+
       h += '<div class="measured" style="margin-top:14px">No coach? Everything below is yours anyway — the ' +
         'app coaches you itself.</div>';
       h += '</div>';
@@ -589,6 +595,7 @@
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
     on($('rpAskGo'), 'click', askCoach);
     on($('rpAskEmail'), 'keydown', function (e) { if (e.key === 'Enter') askCoach(); });
+    on($('rpFindGo'), 'click', function () { if (window.RPFind) RPFind.browse(); });
     each(host, '[data-unask]', function (b) {
       on(b, 'click', function () {
         b.disabled = true;
@@ -701,7 +708,8 @@
 
   /* ---- students ---- */
   function studentList() {
-    var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">' +
+    var h = (window.RPFind ? RPFind.myCard() : '');
+    h += '<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">' +
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
     var pend = (RP.requests || []).filter(function (r) { return r.status === 'pending'; });
@@ -747,6 +755,7 @@
       on(c, 'click', function () { openStudent = c.dataset.stu; renderTeacher(); });
     });
     on($('rpAddStu'), 'click', addStudentSheet);
+    on($('rpFbCard'), 'click', function () { if (window.RPFind) RPFind.edit(); });
     function answer(id, yes, btn) {
       btn.disabled = true;
       btn.textContent = yes ? 'Adding\u2026' : 'Declining\u2026';
