@@ -165,7 +165,10 @@
 
     if (up) {
       h += '<label class="lab">YOUR NAME</label>' +
-        '<input id="rpName" class="inp" placeholder="Lyon" style="width:100%;margin-bottom:10px">';
+        '<input id="rpName" class="inp" placeholder="Lyon" autocomplete="name" ' +
+        'style="width:100%;margin-bottom:4px">' +
+        '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
+        'sees, so use the name he knows you by.</div>';
     }
     h += '<label class="lab">EMAIL</label>' +
       '<input id="rpEmail" class="inp" type="email" autocomplete="email" inputmode="email" ' +
@@ -204,15 +207,24 @@
   }
 
   function doSignUp() {
-    var name = ($('rpName') || {}).value || '';
+    var name = (($('rpName') || {}).value || '').trim();
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
+    /* It used to fall back to the email prefix, which is how Robert ended up
+       called "lyonxdewitt" on his coach's phone. A name his coach recognises
+       is worth one more required box. */
+    if (!name) {
+      msg('Your name, please — it is what your coach will see.', true);
+      try { $('rpName').focus(); } catch (e) {}
+      return;
+    }
+    if (name.length < 2) return msg('That is a bit short for a name.', true);
     if (!email || !pass) return msg('Email and password, please.', true);
     if (pass.length < 6) return msg('Password needs at least 6 characters.', true);
     msg('Creating your account…');
     RP.sb.auth.signUp({
       email: email, password: pass,
-      options: { data: { display_name: name.trim() || email.split('@')[0] },
+      options: { data: { display_name: name },
                  emailRedirectTo: location.href.split('#')[0] }
     }).then(function (r) {
       if (r.error) return msg(r.error.message, true);

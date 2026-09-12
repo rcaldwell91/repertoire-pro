@@ -11012,7 +11012,10 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
     if (up) {
       h += '<label class="lab">YOUR NAME</label>' +
-        '<input id="rpName" class="inp" placeholder="Lyon" style="width:100%;margin-bottom:10px">';
+        '<input id="rpName" class="inp" placeholder="Lyon" autocomplete="name" ' +
+        'style="width:100%;margin-bottom:4px">' +
+        '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
+        'sees, so use the name he knows you by.</div>';
     }
     h += '<label class="lab">EMAIL</label>' +
       '<input id="rpEmail" class="inp" type="email" autocomplete="email" inputmode="email" ' +
@@ -11051,15 +11054,24 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   }
 
   function doSignUp() {
-    var name = ($('rpName') || {}).value || '';
+    var name = (($('rpName') || {}).value || '').trim();
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
+    /* It used to fall back to the email prefix, which is how Robert ended up
+       called "lyonxdewitt" on his coach's phone. A name his coach recognises
+       is worth one more required box. */
+    if (!name) {
+      msg('Your name, please — it is what your coach will see.', true);
+      try { $('rpName').focus(); } catch (e) {}
+      return;
+    }
+    if (name.length < 2) return msg('That is a bit short for a name.', true);
     if (!email || !pass) return msg('Email and password, please.', true);
     if (pass.length < 6) return msg('Password needs at least 6 characters.', true);
     msg('Creating your account…');
     RP.sb.auth.signUp({
       email: email, password: pass,
-      options: { data: { display_name: name.trim() || email.split('@')[0] },
+      options: { data: { display_name: name },
                  emailRedirectTo: location.href.split('#')[0] }
     }).then(function (r) {
       if (r.error) return msg(r.error.message, true);
@@ -11598,29 +11610,34 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     }
     h += '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<b style="font-size:15px">From ' + esc(coach.display_name) + '</b>' +
-      '<button class="btn" id="rpSendTake" style="padding:7px 11px;font-size:12px">Send a take</button></div>';
+      '<span class="rp-sub" style="margin:0">' + (open.length ? open.length + ' to do' : 'all done') +
+      '</span></div>';
 
     if (!open.length && !done.length) {
       h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
         ' sets something on his phone it lands here — you will not need to refresh.</div>';
     }
 
-    open.forEach(function (a) {
-      var ex = a.app_ex_id && V10.exById ? V10.exById(a.app_ex_id) : null;
-      h += '<div class="rp-card hot"><div class="rp-ttl">' + esc(a.title) + '</div>';
-      if (a.note) h += '<div class="rp-sub">' + esc(a.note) + '</div>';
-      h += '<div class="row" style="margin-top:9px;gap:7px">';
-      if (ex) h += '<button class="btn primary" data-start="' + esc(a.app_ex_id) +
-        '" style="padding:8px 13px;font-size:12.5px">Start</button>';
-      h += '<button class="btn" data-done="' + esc(a.id) + '" style="padding:8px 13px;font-size:12.5px">Mark done</button>';
-      h += '</div></div>';
-    });
+    open.forEach(function (a) { h += assignmentCard(a); });
 
     if (done.length) {
       h += '<div class="rp-lab" style="margin-top:14px">DONE</div>';
       done.slice(0, 6).forEach(function (a) {
+        var kept = window.RPWork ? RPWork.takesFor(a.id) : [];
         h += '<div class="rp-card rp-done"><div class="rp-ttl">' + esc(a.title) +
-          '<span class="rp-tag">' + ago(a.done_at) + '</span></div></div>';
+          '<span class="rp-tag">' + ago(a.done_at) + '</span></div>';
+        /* Ticking it off must not make your own recordings disappear. They
+           are yours; the card is just where they live. */
+        kept.forEach(function (t) {
+          h += '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap;align-items:center">' +
+            '<div style="flex:1;min-width:0;font-size:12px;font-weight:700;white-space:nowrap;' +
+            'overflow:hidden;text-overflow:ellipsis">' + esc(t.title) +
+            (t.sentAt ? ' · submitted' : '') + '</div>' +
+            '<button class="btn" data-ahear="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Listen</button>' +
+            '<button class="btn" data-adl="' + esc(t.id) + '" style="padding:6px 10px;font-size:11.5px">Save</button>' +
+            '</div>';
+        });
+        h += '</div>';
       });
     }
 
@@ -11641,29 +11658,114 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     return h;
   }
 
-  function wireStudentChannel(host) {
-    each(host, '[data-start]', function (b) {
+  /* ------------------------------------------------------------------ */
+  /* ONE ASSIGNMENT = ONE CARD, with its own takes on it.                */
+  /*                                                                      */
+  /* Robert: "it's its own thing and has a take that's attached to that.  */
+  /* So I'm not recording an individual take and then now trying to       */
+  /* assign... when I submit it, select the assignment."                  */
+  /*                                                                      */
+  /* Which is why there is no assignment picker anywhere in here. You     */
+  /* open the card, it puts you in the exercise the coach chose, and      */
+  /* every take you save while you are there is already this card's.      */
+  /* ------------------------------------------------------------------ */
+  function assignmentCard(a) {
+    var ex = null;
+    try { ex = a.app_ex_id && V10.exById ? V10.exById(a.app_ex_id) : null; } catch (e) {}
+    var mine = window.RPWork ? RPWork.takesFor(a.id) : [];
+    var working = !!(window.RPWork && RPWork.current && RPWork.current.id === a.id);
+
+    var h = '<div class="rp-card hot"><div class="rp-ttl">' + esc(a.title) +
+      (working ? '<span class="rp-tag">doing it now</span>' : '') + '</div>';
+    if (a.note) h += '<div class="rp-sub">' + esc(a.note) + '</div>';
+    if (ex) {
+      h += '<div class="rp-sub" style="margin-top:4px">Opens ' + esc(ex.name) +
+        (ex.syl ? ' on <b>' + esc(ex.syl) + '</b>' : '') + '.</div>';
+    } else {
+      h += '<div class="rp-sub" style="margin-top:4px">' + esc(coachName()) +
+        ' wrote this one out — there is no exercise screen for it, so record it as you do it.</div>';
+    }
+
+    h += '<button class="btn primary" data-work="' + esc(a.id) + '" ' +
+      'style="width:100%;padding:11px;margin-top:9px">' +
+      (working ? 'Back to it' : (mine.length ? 'Have another go' : 'Do it')) + '</button>';
+
+    if (mine.length) {
+      h += '<div class="rp-lab" style="margin-top:12px">YOUR TAKES · ON THIS PHONE</div>';
+      mine.forEach(function (t) {
+        h += '<div class="rp-card" style="padding:10px;margin-top:7px">' +
+          '<div class="rp-ttl" style="font-size:13px">' + esc(t.title) +
+          (t.sentAt ? '<span class="rp-tag">submitted</span>' : '') + '</div>' +
+          '<div class="row" style="gap:6px;margin-top:7px;flex-wrap:nowrap">' +
+          '<button class="btn" data-ahear="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Listen</button>' +
+          '<button class="btn" data-adl="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Download</button>' +
+          (t.sentAt
+            ? '<button class="btn" disabled style="flex:1;padding:8px;font-size:12px;opacity:.55">Sent</button>'
+            : '<button class="btn primary" data-asub="' + esc(t.id) + '" style="flex:1;padding:8px;font-size:12px">Submit</button>') +
+          '</div></div>';
+      });
+      h += '<div class="measured" style="margin-top:8px;font-size:11.5px">Saved takes stay on your ' +
+        'phone whether you submit them or not. Submitting sends that one take to ' + esc(coachName()) +
+        ' and ticks this off.</div>';
+    }
+
+    h += '</div>';
+    return h;
+  }
+
+  function coachName() { return (RP.coach && RP.coach.display_name) || 'Your coach'; }
+
+  function findMyTake(id) {
+    try {
+      return (LIB.songs || []).find(function (s) { return s.id === id; });
+    } catch (e) { return null; }
+  }
+
+  function wireAssignmentCards(host) {
+    each(host, '[data-work]', function (b) {
       on(b, 'click', function () {
-        var id = b.dataset.start;
+        var a = (RP.assignments || []).find(function (x) { return x.id === b.dataset.work; });
+        if (!a) return;
+        if (!window.RPWork) return fail(new Error('The assignment recorder did not load.'));
+        RPWork.open(a);
+      });
+    });
+    each(host, '[data-ahear]', function (b) {
+      on(b, 'click', function () {
+        var t = findMyTake(b.dataset.ahear);
+        if (!t) return;
         try {
-          window.switchMode('train');
-          setTimeout(function () { V10.startEx(id); }, 80);
-        } catch (e) { fail(e); }
+          if (wireAssignmentCards._a) { wireAssignmentCards._a.pause(); URL.revokeObjectURL(wireAssignmentCards._u); }
+          wireAssignmentCards._u = URL.createObjectURL(t.blob);
+          var au = new Audio(wireAssignmentCards._u);
+          wireAssignmentCards._a = au;
+          au.play().catch(function () { RP.toast('The phone would not play it.'); });
+        } catch (e) { RP.toast('Could not play that one.'); }
       });
     });
-    each(host, '[data-done]', function (b) {
+    each(host, '[data-adl]', function (b) {
       on(b, 'click', function () {
-        b.disabled = true;
-        RP.sb.from('assignments').update({ done_at: new Date().toISOString() })
-          .eq('id', b.dataset.done).then(function (r) {
-            if (r.error) { b.disabled = false; return fail(r.error); }
-            RP.refresh();
-          });
+        var t = findMyTake(b.dataset.adl);
+        if (t && window.RPSend) RPSend.download(t);
       });
     });
+    each(host, '[data-asub]', function (b) {
+      on(b, 'click', async function () {
+        var t = findMyTake(b.dataset.asub);
+        if (!t) return;
+        if (!window.RPSend) return fail(new Error('The send layer did not load.'));
+        b.disabled = true; b.textContent = 'Sending…';
+        var okd = await RPSend.send(t, '', null, t.assignId);
+        if (!okd) { b.disabled = false; b.textContent = 'Submit'; }
+        RP.refresh();
+      });
+    });
+  }
+
+  function wireStudentChannel(host) {
+    wireAssignmentCards(host);
     on($('rpCodeGo'), 'click', joinByCode);
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
-    on($('rpSendTake'), 'click', sendTakeSheet);
     on($('rpMsgGo'), 'click', function () {
       var i = $('rpMsgIn');
       var body = (i.value || '').trim();
@@ -11691,32 +11793,6 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       }
       RP.toast(r.data + ' is now your coach.');
       RP.refresh();
-    });
-  }
-
-  function sendTakeSheet() {
-    var open = RP.assignments.filter(function (a) { return !a.done_at; });
-    var h = '<b style="font-size:16px">Send a take</b>' +
-      '<div class="measured" style="margin-top:6px">Tell ' + esc(RP.coach.display_name) +
-      ' what you worked on and how it went. Audio upload is not built yet — this is the note that goes with it.</div>';
-    h += '<div style="margin-top:14px"><label class="rp-lab">WHAT WAS IT</label>' +
-      '<input id="rpTkT" class="rp-inp" placeholder="' + esc(open.length ? open[0].title : 'Straw phonation') + '"></div>';
-    h += '<div style="margin-top:12px"><label class="rp-lab">HOW IT WENT</label>' +
-      '<textarea id="rpTkN" class="rp-inp" rows="4" placeholder="Where it felt easy, where it fell apart."></textarea></div>';
-    h += '<button class="btn primary" id="rpTkGo" style="width:100%;padding:13px;margin-top:14px">Send it</button>' +
-      '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:8px">Close</button>';
-    var box = sheet(h);
-    closeBtn(box);
-    on($('rpTkGo'), 'click', function () {
-      var t = ($('rpTkT').value || '').trim() || (open.length ? open[0].title : 'A take');
-      var n = ($('rpTkN').value || '').trim();
-      RP.sb.from('takes').insert({
-        student_id: RP.user.id, coach_id: RP.coach.id,
-        assignment_id: open.length ? open[0].id : null, title: t, note: n
-      }).then(function (r) {
-        if (r.error) return fail(r.error);
-        RP.closeSheet(); RP.toast('Sent to ' + RP.coach.display_name); RP.refresh();
-      });
     });
   }
 
@@ -11926,16 +12002,30 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
   function assignSheet(studentId) {
     var s = RP.students.find(function (x) { return x.id === studentId; });
-    var h = '<b style="font-size:16px">Assign to ' + esc(s ? s.display_name : '') + '</b>';
+    var h = '<b style="font-size:16px">Assign to ' + esc(s ? s.display_name : '') + '</b>' +
+      '<div class="measured" style="margin-top:6px">Pick the exercise and it opens on their phone ' +
+      'already set up — they will not have to go and find it.</div>';
     h += '<div class="rp-lab" style="margin-top:14px">FROM YOUR EXERCISES</div><div id="rpPick">';
     if (!RP.exercises.length) {
       h += '<div class="rp-empty" style="padding:6px 2px">Your set is empty — add one under Exercises.</div>';
     }
     RP.exercises.forEach(function (e) {
       h += '<div class="rp-card" data-pick="' + esc(e.id) + '" style="cursor:pointer;padding:10px">' +
-        '<div class="rp-ttl">' + esc(e.title) + '</div></div>';
+        '<div class="rp-ttl">' + esc(e.title) +
+        (e.app_ex_id ? '' : '<span class="rp-tag">no screen</span>') + '</div></div>';
     });
     h += '</div>';
+
+    /* Robert's example was the five-note major scale. That is one of the
+       app's own exercises, and until now a coach could only assign from the
+       eight seeded into his set — anything else had to be typed as a title,
+       which left the student with a card that opened nothing. The whole
+       library is the thing to assign from. */
+    h += '<div class="rp-lab" style="margin-top:16px">OR ANY EXERCISE IN THE APP</div>' +
+      '<input id="rpAsFind" class="rp-inp" placeholder="Search — five note, straw, sirens…" ' +
+      'autocomplete="off" spellcheck="false">' +
+      '<div id="rpAsHits" style="margin-top:8px"></div>';
+
     h += '<div class="rp-lab" style="margin-top:16px">OR WRITE ONE</div>' +
       '<input id="rpAsT" class="rp-inp" placeholder="Straw into a glass, 2 minutes">' +
       '<div style="margin-top:10px"><label class="rp-lab">A NOTE FOR THEM</label>' +
@@ -11945,25 +12035,103 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     var box = sheet(h);
     closeBtn(box);
 
-    var chosen = null;
+    var chosen = null;      // one of the coach's own exercise rows
+    var chosenApp = null;   // or one straight out of the app's library
+
+    function clearMarks() {
+      each(box, '[data-pick]', function (o) { o.classList.remove('hot'); });
+      each(box, '[data-app]', function (o) { o.classList.remove('hot'); });
+    }
+
     each(box, '[data-pick]', function (c) {
       on(c, 'click', function () {
         chosen = RP.exercises.find(function (e) { return e.id === c.dataset.pick; });
-        each(box, '[data-pick]', function (o) { o.classList.remove('hot'); });
+        chosenApp = null;
+        clearMarks();
         c.classList.add('hot');
         $('rpAsT').value = chosen.title;
         if (!$('rpAsN').value) $('rpAsN').value = chosen.instructions || '';
       });
     });
 
+    /* search the app's exercises */
+    function plain(t) { return String(t == null ? '' : t).replace(/<[^>]+>/g, ''); }
+
+    /* A coach types "five note major scale", not "1-2-3-4-5-4-3-2-1". The
+       shapes get the words people actually say for them, so the search finds
+       Mum and Mee — the exercises that ARE the five-note scale — and not only
+       the one with "five" in its name. */
+    var SHAPE = {
+      five:   'five note major scale five-note 12345 up and down',
+      down5:  'five note descending five-tone coming down',
+      down3:  'three note descending short',
+      arp:    'arpeggio triad one three five',
+      oct:    'octave arpeggio one three five eight',
+      octrep: 'octave repeated top',
+      nine:   'nine tone long scale',
+      oct15:  'octave and a half wide siren'
+    };
+    function hits(q) {
+      var all = [];
+      try { all = (window.V10 && V10.EX) || []; } catch (e) {}
+      q = q.trim().toLowerCase();
+      return all.filter(function (e) {
+        if (!e.engine) return false;
+        var pat = '', shape = '';
+        try {
+          pat = (e.engine.pattern && V10.PATTERNS[e.engine.pattern])
+            ? V10.PATTERNS[e.engine.pattern].label : '';
+          shape = SHAPE[e.engine.pattern] || '';
+        } catch (err) {}
+        var hay = (e.name + ' ' + (e.syl || '') + ' ' + (e.pillar || '') + ' ' + pat + ' ' +
+                   shape + ' ' + plain(e.what || '')).toLowerCase();
+        /* every word has to be in there, so "five note" is not the same as "five" */
+        return !q || q.split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; });
+      }).slice(0, 8);
+    }
+    function drawHits() {
+      var wrap = $('rpAsHits');
+      if (!wrap) return;
+      var q = ($('rpAsFind') || {}).value || '';
+      var list = hits(q);
+      if (!list.length) {
+        wrap.innerHTML = '<div class="rp-empty" style="padding:6px 2px">Nothing matches that.</div>';
+        return;
+      }
+      var hh = '';
+      list.forEach(function (e) {
+        var pat = '';
+        try { pat = (e.engine.pattern && V10.PATTERNS[e.engine.pattern])
+          ? V10.PATTERNS[e.engine.pattern].label : ''; } catch (err) {}
+        hh += '<div class="rp-card" data-app="' + esc(e.id) + '" style="cursor:pointer;padding:10px">' +
+          '<div class="rp-ttl">' + esc(e.name) + '</div>' +
+          '<div class="rp-sub" style="margin:3px 0 0">' +
+          esc(pat || (e.syl ? 'on ' + e.syl : (e.pillar || ''))) + '</div></div>';
+      });
+      wrap.innerHTML = hh;
+      each(wrap, '[data-app]', function (c) {
+        on(c, 'click', function () {
+          chosenApp = V10.exById(c.dataset.app);
+          chosen = null;
+          clearMarks();
+          c.classList.add('hot');
+          $('rpAsT').value = chosenApp.name;
+          if (!$('rpAsN').value) $('rpAsN').value = plain(chosenApp.what || '');
+        });
+      });
+    }
+    on($('rpAsFind'), 'input', drawHits);
+    drawHits();
+
     on($('rpAsGo'), 'click', function () {
-      var title = ($('rpAsT').value || '').trim() || (chosen ? chosen.title : '');
+      var title = ($('rpAsT').value || '').trim() ||
+        (chosen ? chosen.title : (chosenApp ? chosenApp.name : ''));
       if (!title) return RP.toast('Pick one, or write a title.');
       var row = {
         coach_id: RP.user.id, student_id: studentId, title: title,
         note: ($('rpAsN').value || '').trim(),
         exercise_id: chosen ? chosen.id : null,
-        app_ex_id: chosen ? chosen.app_ex_id : null
+        app_ex_id: chosenApp ? chosenApp.id : (chosen ? chosen.app_ex_id : null)
       };
       $('rpAsGo').disabled = true;
       RP.sb.from('assignments').insert(row).then(function (r) {
@@ -12039,9 +12207,19 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       'messages, both land here.</div>';
     items.slice(0, 40).forEach(function (i) {
       if (i.kind === 'take') {
+        /* Which assignment it answers, said on the card. The coach set it; he
+           should not have to work out what came back against what. */
+        var forA = null;
+        if (i.o.assignment_id) {
+          forA = (RP.assignments || []).find(function (x) { return x.id === i.o.assignment_id; });
+        }
         h += '<div class="rp-card hot"><div class="rp-ttl">' + esc(nameOf(i.o.student_id)) +
-          ' sent a take<span class="rp-tag">' + ago(i.at) + '</span></div>' +
-          '<div class="rp-sub"><b>' + esc(i.o.title) + '</b>' + (i.o.note ? ' — ' + esc(i.o.note) : '') + '</div>';
+          (forA ? ' answered an assignment' : ' sent a take') +
+          '<span class="rp-tag">' + ago(i.at) + '</span></div>';
+        if (forA) {
+          h += '<div class="rp-sub" style="margin:3px 0 0">You set: <b>' + esc(forA.title) + '</b></div>';
+        }
+        h += '<div class="rp-sub"><b>' + esc(i.o.title) + '</b>' + (i.o.note ? ' — ' + esc(i.o.note) : '') + '</div>';
         if (i.o.audio_path) {
           h += '<button class="btn" data-hear="' + esc(i.o.id) + '" style="margin-top:8px;padding:8px 13px;font-size:12.5px">Listen</button>';
         }
@@ -12825,7 +13003,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     return !!(window.RP && RP.user && RP.sb && RP.coach);
   };
 
-  S.send = async function (song, note, btn) {
+  /* `assignmentId` is what turns a take into an answer to something the
+     coach set. It is passed in by whoever owns the take — the assignment
+     card knows perfectly well which assignment it is, so the singer is
+     never asked to pick one from a list after the fact. */
+  S.send = async function (song, note, btn, assignmentId) {
     if (!window.RP || !RP.user || !RP.sb) { say('Sign in first.'); return false; }
     if (!RP.coach) { say('No coach yet — put their code in on the Coach tab.'); return false; }
     if (!song || !song.blob) { say('That take has no audio.'); return false; }
@@ -12842,9 +13024,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       });
       if (up.error) throw up.error;
 
+      var forId = assignmentId || song.assignId || null;
       var row = {
         student_id: RP.user.id,
         coach_id: RP.coach.id,
+        assignment_id: forId,
         title: song.title || 'A take',
         note: note || '',
         audio_path: path,
@@ -12858,15 +13042,43 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
       song.sentAt = Date.now();
       try { await dbPut('songs', song); } catch (e) {}
-      say('Sent to ' + RP.coach.display_name + '.');
+
+      /* Submitting the take IS finishing the assignment. Robert: "I save and
+         submit that one. It sends off. Now that assignment's checked off."
+         So we do not also ask him to press Mark done. */
+      if (forId) {
+        var d = await RP.sb.from('assignments')
+          .update({ done_at: new Date().toISOString() })
+          .eq('id', forId).is('done_at', null);
+        if (d.error) say('Sent, but it did not tick off: ' + d.error.message);
+        else say('Submitted to ' + RP.coach.display_name + '. That one is done.');
+      } else {
+        say('Sent to ' + RP.coach.display_name + '.');
+      }
+      S.redraw();
       if (RP.refresh) RP.refresh();
       return true;
     } catch (e) {
       say('Could not send it: ' + ((e && e.message) || e));
       return false;
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Send to coach'; }
+      if (btn) { btn.disabled = false; btn.textContent = song.sentAt ? 'Send again' : 'Send to coach'; }
     }
+  };
+
+  /* Until now sentAt was written to the phone and never shown: the lists
+     are built once and were never rebuilt after a send, so a submitted take
+     looked exactly like an unsubmitted one. Redraw them. */
+  S.redraw = function () {
+    try { if (window.RPStudio && RPStudio.fillTakes) RPStudio.fillTakes(); } catch (e) {}
+    try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
+    ['rpTakeList', 'rpVList'].forEach(function (id) {
+      var box = document.getElementById(id);
+      if (!box) return;
+      var kind = id === 'rpTakeList' ? 'pitch' : 'song';
+      box.innerHTML = S.listHtml(kind);
+      S.wireList(box, kind, box._rpOnLoad || null);
+    });
   };
 
   /* a signed address, good for an hour, so audio is never public */
@@ -12883,7 +13095,11 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   /* the list of your takes, with what you can do with each            */
   /* ---------------------------------------------------------------- */
   S.listHtml = function (kind) {
-    var list = takes();
+    /* Takes recorded against an assignment are NOT loose takes. They live on
+       their own assignment card and are submitted from there, so they are
+       kept out of this list rather than offering a second, contextless way
+       to send the same thing. */
+    var list = takes().filter(function (s) { return !s.assignId; });
     if (!list.length) {
       return '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>';
     }
@@ -12895,12 +13111,14 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
         (hasNotes ? '<span class="rp-tag">notes</span>' : '') +
         (s.fx ? '<span class="rp-tag">effects</span>' : '') +
         (s.sentAt ? '<span class="rp-tag">sent</span>' : '') + '</div>' +
+        (s.sentAt ? '<div class="rp-sub" style="margin:4px 0 0">Sent to your coach.</div>' : '') +
         '<div class="row" style="gap:6px;margin-top:8px">' +
         (kind === 'pitch'
           ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
           : '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
-        '<button class="btn primary" data-send="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Send to coach</button>' +
+        '<button class="btn' + (s.sentAt ? '' : ' primary') + '" data-send="' + esc(s.id) +
+        '" style="flex:1;padding:9px;font-size:12px">' + (s.sentAt ? 'Send again' : 'Send to coach') + '</button>' +
         '</div></div>';
     });
     return h;
@@ -12908,6 +13126,8 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
   S.wireList = function (root, kind, onLoad) {
     if (!root) return;
+    root._rpOnLoad = onLoad || root._rpOnLoad || null;
+    onLoad = root._rpOnLoad;
     function find(id) { return takes().find(function (x) { return x.id === id; }); }
     root.querySelectorAll('[data-dl]').forEach(function (b) {
       on(b, 'click', function () { var s = find(b.dataset.dl); if (s) S.download(s); });
@@ -12977,7 +13197,12 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     rec: null, chunks: [], state: 'idle',
     activeMs: 0, segT0: 0,
     notes: [], noteTimer: null,
-    blob: null, url: null, audio: null, playing: false
+    blob: null, url: null, audio: null, playing: false,
+    /* When the singer opened this from an assignment, the take belongs to
+       that assignment and says so from the moment it is kept. Robert: "it's
+       its own thing and has a take that's attached to that." So we do NOT
+       record a loose take and go hunting for an assignment afterwards. */
+    assign: null
   };
 
   function say(msg) {
@@ -13216,6 +13441,23 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       key: null, lrc: null, duration: ST.activeMs / 1000,
       notes: ST.notes                       // the pitch line, saved with the audio
     };
+    if (ST.assign) {                        // this one answers an assignment
+      song.assignId = ST.assign.id;
+      song.assignTitle = ST.assign.title;
+      /* The build wraps dbPut and renames any exercise take to
+         "<exercise> · <range> · <date>". That is right for a loose take and
+         wrong here: two goes at the same assignment on the same day came out
+         with identical names, which is exactly the pair Robert has to tell
+         apart before he submits one. So we name it ourselves and set the tag
+         the wrapper checks, which makes it stand down. */
+      song.exTagged = true;
+      song.exId = ST.assign.app_ex_id || null;
+      song.exTitle = ST.assign.title;
+      song.artist = 'Exercise takes';
+      song.title = ST.assign.title + ' · take ' + takeNoFor(ST.assign.id);
+      song.autoTitle = song.title;
+      try { song.exRange = midiName(RANGE.lo) + '\u2013' + midiName(RANGE.hi); } catch (e) {}
+    }
     try {
       await dbPut('songs', song);
     } catch (e) {
@@ -13229,8 +13471,21 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     ST.activeMs = 0;
     draw();
     fillTakes();
-    say('Kept, in My Recordings.');
+    if (ST.assign) {
+      say('Saved to your phone. Not sent yet — submit the one you like.');
+      try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
+    } else {
+      say('Kept, in My Recordings.');
+    }
   }
+
+  /* The assignment bar drives this same recorder rather than opening a
+     second one. One microphone, one recorder — that rule has not changed. */
+  ST.api = {
+    start: start, stop: stop, keep: keep, bin: bin, play: play,
+    pauseResume: pauseResume, blobNow: blobNow, elapsed: elapsed, fmt: fmt, draw: draw
+  };
+  ST.fillTakes = function () { try { fillTakes(); } catch (e) {} };
 
   /* ---------------------------------------------------------------- */
   /* sing over one of your takes                                       */
@@ -13256,6 +13511,16 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       return (LIB.songs || []).filter(function (s) { return s.kind === 'recording' && s.blob; })
         .sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
     } catch (e) { return []; }
+  }
+
+  /* "take 1", "take 2" — counted per assignment, so the third go at the
+     five-note scale is called the third go at the five-note scale. */
+  function takeNoFor(id) {
+    try {
+      return (LIB.songs || []).filter(function (s) {
+        return s.kind === 'recording' && s.assignId === id;
+      }).length + 1;
+    } catch (e) { return 1; }
   }
 
   function fillTakes() {
@@ -13782,6 +14047,197 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
   function boot() { install(); ensureScreen(); setInterval(install, 1500); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else setTimeout(boot, 500);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — doing an assignment.
+
+   Robert, 12 Sep, describing what this should be:
+
+     "When your coach assigns you an exercise or a warm up, that becomes,
+      like, an assignment, its own thing. Then on my side, I click that
+      assignment, and it's like, do this warmup. I press it. It's already
+      gonna have the five note scale. I do that warm up, and I can save it
+      to my phone. But still, it's its own card. And then I can submit it...
+      I don't like that take, so I save it, but I don't hit submit. Do it
+      again. That's a good one. I save and submit that one. It sends off.
+      Now that assignment's checked off."
+
+   So the ASSIGNMENT is the container, not the take. You never record a
+   loose take and then go looking for an assignment to staple it to. You
+   open the assignment, it takes you straight to the exercise the coach
+   actually chose, and everything you record while you are in there belongs
+   to that assignment from the moment you save it.
+
+   This file is the bit that makes that possible across the whole app: a
+   bar that stays pinned to the bottom of the screen while you are working
+   on an assignment. The exercises live on three different engines (the
+   note ladder, the sustained-note screen, and the guided timer), so a
+   recorder built into any one of them would only work for a third of the
+   assignments. The bar sits above all three.
+
+   Saving and submitting are deliberately two different buttons. Saving is
+   yours. Submitting is the only thing the coach ever sees.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+  function say(m) { if (window.RP && RP.toast) RP.toast(m); }
+
+  var W = window.RPWork = { current: null };
+
+  function ST() { return window.RPStudio; }
+  function api() { return window.RPStudio && RPStudio.api; }
+
+  /* ------------------------------------------------------------------ */
+  /* the takes kept against one assignment, newest first                 */
+  /* ------------------------------------------------------------------ */
+  W.takesFor = function (assignmentId) {
+    try {
+      return (LIB.songs || [])
+        .filter(function (s) { return s.kind === 'recording' && s.blob && s.assignId === assignmentId; })
+        .sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
+    } catch (e) { return []; }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* start working on one                                                */
+  /* ------------------------------------------------------------------ */
+  W.open = function (a) {
+    if (!a) return;
+    W.current = { id: a.id, title: a.title, note: a.note || '', app_ex_id: a.app_ex_id || null };
+
+    var s = ST();
+    if (s) s.assign = { id: a.id, title: a.title, app_ex_id: a.app_ex_id || null };
+
+    /* Take them to the exercise the coach chose. The whole point is that
+       they do not have to go and find it. */
+    var ex = null;
+    try { ex = a.app_ex_id && V10.exById ? V10.exById(a.app_ex_id) : null; } catch (e) {}
+    if (ex) {
+      try {
+        window.switchMode('train');
+        setTimeout(function () {
+          try { V10.startEx(a.app_ex_id); } catch (e) {}
+          draw();
+        }, 90);
+      } catch (e) {}
+    } else {
+      /* The coach wrote this one himself and did not attach an exercise.
+         There is nothing to launch, so say so rather than opening the
+         wrong screen — you still record it the same way. */
+      try { window.switchMode('train'); } catch (e) {}
+    }
+    draw();
+  };
+
+  W.close = function () {
+    var s = ST();
+    if (s && s.state !== 'idle') return say('Stop the recording first.');
+    W.current = null;
+    if (s) s.assign = null;
+    draw();
+    try { if (window.RP && RP.refresh) RP.refresh(); } catch (e) {}
+  };
+
+  W.refresh = function () { draw(); };
+
+  /* ------------------------------------------------------------------ */
+  /* the pinned bar                                                      */
+  /* ------------------------------------------------------------------ */
+  function host() {
+    var b = $('rpWorkBar');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rpWorkBar';
+    b.style.cssText =
+      'position:fixed;left:0;right:0;z-index:60;display:none;' +
+      'bottom:calc(66px + env(safe-area-inset-bottom,0px));' +
+      'padding:0 10px;pointer-events:none';
+    document.body.appendChild(b);
+    return b;
+  }
+
+  function draw() {
+    var b = host();
+    var w = W.current;
+    if (!w) { b.style.display = 'none'; b.innerHTML = ''; return; }
+
+    var s = ST() || {};
+    var kept = W.takesFor(w.id);
+    var rec = s.state === 'rec';
+    var paused = s.state === 'paused';
+    var pending = !!(api() && api().blobNow());
+
+    var h = '<div style="pointer-events:auto;max-width:560px;margin:0 auto;' +
+      'background:var(--panel);border:1px solid var(--gold);border-radius:14px;' +
+      'padding:10px 12px;box-shadow:0 8px 28px rgba(0,0,0,.5)">';
+
+    h += '<div class="row" style="justify-content:space-between;align-items:center;gap:8px">' +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="font-size:10.5px;font-weight:800;letter-spacing:1.2px;color:var(--ink-faint)">' +
+      'WORKING ON</div>' +
+      '<div style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;' +
+      'text-overflow:ellipsis">' + esc(w.title) + '</div></div>' +
+      '<button class="btn" id="rpWkX" style="padding:6px 10px;font-size:11.5px">Leave</button></div>';
+
+    if (rec || paused) {
+      h += '<div class="row" style="gap:7px;margin-top:9px;flex-wrap:nowrap">' +
+        '<div style="flex:0 0 auto;font-size:12px;font-weight:800;color:' +
+        (rec ? 'var(--miss)' : 'var(--ink-dim)') + '">' +
+        (rec ? '● ' : '⏸ ') + api().fmt(api().elapsed()) + '</div>' +
+        '<button class="btn" id="rpWkPause" style="flex:1;padding:9px;font-size:12px">' +
+        (rec ? 'Pause' : 'Carry on') + '</button>' +
+        '<button class="btn primary" id="rpWkStop" style="flex:1;padding:9px;font-size:12px">Stop</button>' +
+        '</div>';
+    } else if (pending) {
+      h += '<div class="row" style="gap:7px;margin-top:9px;flex-wrap:nowrap">' +
+        '<button class="btn" id="rpWkPlay" style="flex:1;padding:9px;font-size:12px">' +
+        (s.playing ? 'Stop' : 'Listen back') + '</button>' +
+        '<button class="btn primary" id="rpWkSave" style="flex:1;padding:9px;font-size:12px">Save</button>' +
+        '<button class="btn" id="rpWkBin" style="flex:0 0 auto;padding:9px 11px;font-size:12px;' +
+        'color:var(--miss)">Bin</button></div>' +
+        '<div class="measured" style="margin-top:7px;font-size:11.5px">Saving keeps it on your phone. ' +
+        'Nothing goes to your coach until you submit one.</div>';
+    } else {
+      h += '<button class="btn primary" id="rpWkRec" style="width:100%;padding:11px;margin-top:9px">' +
+        (kept.length ? 'Record another take' : 'Record this') + '</button>';
+      if (kept.length) {
+        h += '<div class="measured" style="margin-top:7px;font-size:11.5px">' + kept.length +
+          (kept.length === 1 ? ' take saved' : ' takes saved') +
+          ' · submit the one you like from the Coach tab.</div>';
+      }
+    }
+
+    h += '</div>';
+    b.innerHTML = h;
+    b.style.display = 'block';
+
+    on($('rpWkX'), 'click', W.close);
+    on($('rpWkRec'), 'click', function () { api().start(); setTimeout(draw, 300); });
+    on($('rpWkStop'), 'click', function () { api().stop(); setTimeout(draw, 500); });
+    on($('rpWkPause'), 'click', function () { api().pauseResume(); setTimeout(draw, 400); });
+    on($('rpWkPlay'), 'click', function () { api().play(); setTimeout(draw, 300); });
+    on($('rpWkBin'), 'click', function () { api().bin(); draw(); });
+    on($('rpWkSave'), 'click', function () { api().keep().then(draw, draw); });
+  }
+
+  /* the clock has to move while it is recording */
+  setInterval(function () {
+    if (!W.current) return;
+    var s = ST();
+    if (s && (s.state === 'rec' || s.state === 'paused')) draw();
+  }, 500);
+
+  W.draw = draw;
 })();
 
 </script>

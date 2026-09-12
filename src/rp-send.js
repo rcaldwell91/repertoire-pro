@@ -69,7 +69,11 @@
     return !!(window.RP && RP.user && RP.sb && RP.coach);
   };
 
-  S.send = async function (song, note, btn) {
+  /* `assignmentId` is what turns a take into an answer to something the
+     coach set. It is passed in by whoever owns the take — the assignment
+     card knows perfectly well which assignment it is, so the singer is
+     never asked to pick one from a list after the fact. */
+  S.send = async function (song, note, btn, assignmentId) {
     if (!window.RP || !RP.user || !RP.sb) { say('Sign in first.'); return false; }
     if (!RP.coach) { say('No coach yet — put their code in on the Coach tab.'); return false; }
     if (!song || !song.blob) { say('That take has no audio.'); return false; }
@@ -86,9 +90,11 @@
       });
       if (up.error) throw up.error;
 
+      var forId = assignmentId || song.assignId || null;
       var row = {
         student_id: RP.user.id,
         coach_id: RP.coach.id,
+        assignment_id: forId,
         title: song.title || 'A take',
         note: note || '',
         audio_path: path,
@@ -102,15 +108,43 @@
 
       song.sentAt = Date.now();
       try { await dbPut('songs', song); } catch (e) {}
-      say('Sent to ' + RP.coach.display_name + '.');
+
+      /* Submitting the take IS finishing the assignment. Robert: "I save and
+         submit that one. It sends off. Now that assignment's checked off."
+         So we do not also ask him to press Mark done. */
+      if (forId) {
+        var d = await RP.sb.from('assignments')
+          .update({ done_at: new Date().toISOString() })
+          .eq('id', forId).is('done_at', null);
+        if (d.error) say('Sent, but it did not tick off: ' + d.error.message);
+        else say('Submitted to ' + RP.coach.display_name + '. That one is done.');
+      } else {
+        say('Sent to ' + RP.coach.display_name + '.');
+      }
+      S.redraw();
       if (RP.refresh) RP.refresh();
       return true;
     } catch (e) {
       say('Could not send it: ' + ((e && e.message) || e));
       return false;
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Send to coach'; }
+      if (btn) { btn.disabled = false; btn.textContent = song.sentAt ? 'Send again' : 'Send to coach'; }
     }
+  };
+
+  /* Until now sentAt was written to the phone and never shown: the lists
+     are built once and were never rebuilt after a send, so a submitted take
+     looked exactly like an unsubmitted one. Redraw them. */
+  S.redraw = function () {
+    try { if (window.RPStudio && RPStudio.fillTakes) RPStudio.fillTakes(); } catch (e) {}
+    try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
+    ['rpTakeList', 'rpVList'].forEach(function (id) {
+      var box = document.getElementById(id);
+      if (!box) return;
+      var kind = id === 'rpTakeList' ? 'pitch' : 'song';
+      box.innerHTML = S.listHtml(kind);
+      S.wireList(box, kind, box._rpOnLoad || null);
+    });
   };
 
   /* a signed address, good for an hour, so audio is never public */
@@ -127,7 +161,11 @@
   /* the list of your takes, with what you can do with each            */
   /* ---------------------------------------------------------------- */
   S.listHtml = function (kind) {
-    var list = takes();
+    /* Takes recorded against an assignment are NOT loose takes. They live on
+       their own assignment card and are submitted from there, so they are
+       kept out of this list rather than offering a second, contextless way
+       to send the same thing. */
+    var list = takes().filter(function (s) { return !s.assignId; });
     if (!list.length) {
       return '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>';
     }
@@ -139,12 +177,14 @@
         (hasNotes ? '<span class="rp-tag">notes</span>' : '') +
         (s.fx ? '<span class="rp-tag">effects</span>' : '') +
         (s.sentAt ? '<span class="rp-tag">sent</span>' : '') + '</div>' +
+        (s.sentAt ? '<div class="rp-sub" style="margin:4px 0 0">Sent to your coach.</div>' : '') +
         '<div class="row" style="gap:6px;margin-top:8px">' +
         (kind === 'pitch'
           ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
           : '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
-        '<button class="btn primary" data-send="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Send to coach</button>' +
+        '<button class="btn' + (s.sentAt ? '' : ' primary') + '" data-send="' + esc(s.id) +
+        '" style="flex:1;padding:9px;font-size:12px">' + (s.sentAt ? 'Send again' : 'Send to coach') + '</button>' +
         '</div></div>';
     });
     return h;
@@ -152,6 +192,8 @@
 
   S.wireList = function (root, kind, onLoad) {
     if (!root) return;
+    root._rpOnLoad = onLoad || root._rpOnLoad || null;
+    onLoad = root._rpOnLoad;
     function find(id) { return takes().find(function (x) { return x.id === id; }); }
     root.querySelectorAll('[data-dl]').forEach(function (b) {
       on(b, 'click', function () { var s = find(b.dataset.dl); if (s) S.download(s); });

@@ -32,7 +32,12 @@
     rec: null, chunks: [], state: 'idle',
     activeMs: 0, segT0: 0,
     notes: [], noteTimer: null,
-    blob: null, url: null, audio: null, playing: false
+    blob: null, url: null, audio: null, playing: false,
+    /* When the singer opened this from an assignment, the take belongs to
+       that assignment and says so from the moment it is kept. Robert: "it's
+       its own thing and has a take that's attached to that." So we do NOT
+       record a loose take and go hunting for an assignment afterwards. */
+    assign: null
   };
 
   function say(msg) {
@@ -271,6 +276,23 @@
       key: null, lrc: null, duration: ST.activeMs / 1000,
       notes: ST.notes                       // the pitch line, saved with the audio
     };
+    if (ST.assign) {                        // this one answers an assignment
+      song.assignId = ST.assign.id;
+      song.assignTitle = ST.assign.title;
+      /* The build wraps dbPut and renames any exercise take to
+         "<exercise> · <range> · <date>". That is right for a loose take and
+         wrong here: two goes at the same assignment on the same day came out
+         with identical names, which is exactly the pair Robert has to tell
+         apart before he submits one. So we name it ourselves and set the tag
+         the wrapper checks, which makes it stand down. */
+      song.exTagged = true;
+      song.exId = ST.assign.app_ex_id || null;
+      song.exTitle = ST.assign.title;
+      song.artist = 'Exercise takes';
+      song.title = ST.assign.title + ' · take ' + takeNoFor(ST.assign.id);
+      song.autoTitle = song.title;
+      try { song.exRange = midiName(RANGE.lo) + '\u2013' + midiName(RANGE.hi); } catch (e) {}
+    }
     try {
       await dbPut('songs', song);
     } catch (e) {
@@ -284,8 +306,21 @@
     ST.activeMs = 0;
     draw();
     fillTakes();
-    say('Kept, in My Recordings.');
+    if (ST.assign) {
+      say('Saved to your phone. Not sent yet — submit the one you like.');
+      try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
+    } else {
+      say('Kept, in My Recordings.');
+    }
   }
+
+  /* The assignment bar drives this same recorder rather than opening a
+     second one. One microphone, one recorder — that rule has not changed. */
+  ST.api = {
+    start: start, stop: stop, keep: keep, bin: bin, play: play,
+    pauseResume: pauseResume, blobNow: blobNow, elapsed: elapsed, fmt: fmt, draw: draw
+  };
+  ST.fillTakes = function () { try { fillTakes(); } catch (e) {} };
 
   /* ---------------------------------------------------------------- */
   /* sing over one of your takes                                       */
@@ -311,6 +346,16 @@
       return (LIB.songs || []).filter(function (s) { return s.kind === 'recording' && s.blob; })
         .sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); });
     } catch (e) { return []; }
+  }
+
+  /* "take 1", "take 2" — counted per assignment, so the third go at the
+     five-note scale is called the third go at the five-note scale. */
+  function takeNoFor(id) {
+    try {
+      return (LIB.songs || []).filter(function (s) {
+        return s.kind === 'recording' && s.assignId === id;
+      }).length + 1;
+    } catch (e) { return 1; }
   }
 
   function fillTakes() {
