@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -141,6 +141,13 @@ PATCHES = [
     ('<button class="pill backpill" id="bsFree">\u2190 Sing menu</button>',
      '<button class="pill backpill" id="bsFree">\u2190 Train</button>'),
 
+    # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
+    #     the hold, so the time spent on the note could come out fractionally
+    #     longer than the hold itself. A percentage over 100 is exactly the
+    #     kind of number this app refuses everywhere else.
+    ("    const pct = Math.round(100*SUS.within/SUS.dur);",
+     "    const pct = Math.min(100, Math.round(100*SUS.within/SUS.dur));"),
+
     # 2. Steady note: the percentage of the hold that stayed inside the window.
     ("    $('susResult').textContent = pct+'% steady — '+msg;",
      "    $('susResult').textContent = pct+'% steady — '+msg;\n"
@@ -183,7 +190,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

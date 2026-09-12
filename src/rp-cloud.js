@@ -726,14 +726,24 @@
 
   /* Everything the app measures comes through here. Signed out, nothing
      leaves the phone — the app keeps its own local record as it always did. */
+  /* The local copy used to be the object we SENT, which has no created_at —
+     the database fills that in. So a result you had just earned came back
+     with no date on it, and anything that reads a date off it quietly failed:
+     the scorecard's "days practised" counted it under an invalid day, and the
+     placement test could not see it at all. Keep what the database actually
+     stored, not what we asked it to store. */
   RP.logResult = function (row) {
     try {
       if (!RP.user || !RP.sb || !RP.profile) return;
       var r = { student_id: RP.user.id, coach_id: RP.coach ? RP.coach.id : null };
       Object.keys(row || {}).forEach(function (k) { if (row[k] != null) r[k] = row[k]; });
-      RP.sb.from('results').insert(r).then(function (x) {
+      return RP.sb.from('results').insert(r).select().then(function (x) {
         if (x.error) return;
-        RP.results.unshift(r);
+        var saved = (x.data && x.data[0]) || null;
+        if (!saved) { saved = r; saved.created_at = new Date().toISOString(); }
+        RP.results.unshift(saved);
+        try { rerender(); } catch (e) {}
+        return saved;
       });
     } catch (e) {}
   };

@@ -28,24 +28,64 @@
   function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
 
   var ME = window.RPPlain = {
-    words: 'some',      // 'plain' | 'some' | 'technical'
-    experience: 2       // 1 new · 2 some · 3 lots
+    words: 'some',      // 'plain' | 'some' | 'technical'  — DERIVED, never asked
+    experience: 2,      // 1 new · 2 some · 3 lots          — the singing side
+    taught: 2,          // 1 none · 2 some · 3 a lot        — the music side
+    answers: null       // what they actually said, kept raw
   };
   try {
     ME.words = localStorage.getItem('rp_words') || 'some';
     ME.experience = +(localStorage.getItem('rp_exp') || 2);
+    ME.taught = +(localStorage.getItem('rp_taught') || 2);
+    ME.answers = JSON.parse(localStorage.getItem('rp_answers') || 'null');
   } catch (e) {}
+
+  /* ------------------------------------------------------------------ */
+  /* WORKING THE LEVELS OUT FROM THE ANSWERS                             */
+  /*                                                                     */
+  /* Robert's rule, and it is the whole redesign: "to ask a question     */
+  /* about jargon would throw any regular person off. They have no idea  */
+  /* what they're talking about."                                        */
+  /*                                                                     */
+  /* So nobody is asked to rate their own vocabulary. Two questions ask  */
+  /* what their singing actually does, two ask what they have actually   */
+  /* been taught, and every one of them is answerable by somebody who    */
+  /* knows nothing. The levels — and the language the app uses — are     */
+  /* worked out from that.                                               */
+  /* ------------------------------------------------------------------ */
+  function band(sum) { return sum <= 3 ? 1 : sum <= 6 ? 2 : 3; }
+
+  ME.derive = function (a) {
+    if (!a) return null;
+    var sing   = band((+a.history || 1) + (+a.pitch || 1));
+    var taught = band((+a.terms || 1) + (+a.reading || 1));
+    return {
+      experience: sing,
+      taught: taught,
+      words: taught === 1 ? 'plain' : taught === 2 ? 'some' : 'technical'
+    };
+  };
 
   function saveMe() {
     try {
       localStorage.setItem('rp_words', ME.words);
       localStorage.setItem('rp_exp', String(ME.experience));
+      localStorage.setItem('rp_taught', String(ME.taught));
+      if (ME.answers) localStorage.setItem('rp_answers', JSON.stringify(ME.answers));
       localStorage.setItem('rp_asked', '1');
     } catch (e) {}
     var RP = window.RP;
     if (RP && RP.user && RP.sb && RP.profile) {
-      RP.sb.from('profiles').update({ words: ME.words, experience: ME.experience })
-        .eq('id', RP.user.id).then(function () { RP.profile.words = ME.words; RP.profile.experience = ME.experience; });
+      var row = { words: ME.words, experience: ME.experience, taught: ME.taught };
+      /* the raw answers travel too, so a later change to the questions or the
+         mapping can re-place everybody instead of stranding them on whatever
+         rule happened to be running the day they signed up */
+      if (ME.answers) row.placement = { answers: ME.answers, at: new Date().toISOString() };
+      RP.sb.from('profiles').update(row).eq('id', RP.user.id).then(function () {
+        RP.profile.words = ME.words;
+        RP.profile.experience = ME.experience;
+        RP.profile.taught = ME.taught;
+      });
     }
   }
   ME.save = saveMe;
@@ -239,7 +279,7 @@
     return '<button class="btn" data-skip="1" style="width:100%;padding:11px;margin-top:14px;' +
       'font-size:12.5px;color:var(--ink-dim)">Skip this \u2014 just let me in</button>' +
       '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
-      'Nothing is lost. Both answers live in <b>Profile</b> under <b>How I talk to you</b>, ' +
+      'Nothing is lost. It all lives in <b>Profile</b> under <b>Where I have got you</b>, ' +
       'and you can set them whenever you want.</div>';
   }
 
@@ -259,54 +299,144 @@
     });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* THE PLACEMENT QUESTIONS                                             */
+  /*                                                                     */
+  /* Four cards, numbered so it is visibly finite, and offered rather    */
+  /* than imposed. Robert: "It's not a force thing. If they don't wanna  */
+  /* take the test, they wanna just start dabbling around in the whole   */
+  /* thing, that's fine."                                                */
+  /*                                                                     */
+  /* Every option is written so somebody who has never had a lesson can  */
+  /* pick one honestly. Question 3 is the old jargon question, asked the */
+  /* way round that a beginner can answer: not "how much terminology do  */
+  /* you want", but "here is a sentence a teacher would say — what would */
+  /* you do?", with "no idea where to start" as a first-class answer.    */
+  /* ------------------------------------------------------------------ */
+  var QS = [
+    { key: 'history', lab: 'YOUR SINGING',
+      q: 'How much singing have you actually done?',
+      why: '',
+      opts: [
+        [1, 'Not much, or only on my own', 'In the car, in the shower, nowhere anybody can hear.'],
+        [2, 'I sing a lot \u2014 nobody has taught me', 'Plenty of practice, no instruction.'],
+        [3, 'Lessons, a choir or a band at some point', 'Somebody has corrected you before.'],
+        [4, 'Trained, and I have stuck at it', 'You have been doing this properly for a while.']
+      ] },
+    { key: 'pitch', lab: 'YOUR SINGING',
+      q: 'When you sing along to a record, what usually happens?',
+      why: 'This is the one that decides which warm-ups you get first.',
+      opts: [
+        [1, 'I honestly cannot tell if I am on the right note', 'Most people start here. It is a skill, not a gift.'],
+        [2, 'I hear when I am off, but I cannot always fix it', 'Your ear is ahead of your voice \u2014 very common.'],
+        [3, 'Usually on it, and I know when I am not', ''],
+        [4, 'On it, and I can adjust while I am singing', '']
+      ] },
+    { key: 'terms', lab: 'WORDS AND MUSIC',
+      q: 'A teacher says \u201cgo up to the fifth and hold it\u201d. What do you do?',
+      why: 'No wrong answer. This decides how the app words things, nothing else.',
+      opts: [
+        [1, 'No idea where to start', 'Then the app will not talk like that to you.'],
+        [2, 'I would guess', ''],
+        [3, 'I know roughly what they mean', ''],
+        [4, 'I would just do it', '']
+      ] },
+    { key: 'reading', lab: 'WORDS AND MUSIC',
+      q: 'Have you ever read music off a page?',
+      why: '',
+      opts: [
+        [1, 'Never', 'You will never need to here. Nothing in this app is gated behind it.'],
+        [2, 'I have tried, slowly', ''],
+        [3, 'Yes, I can read a line', ''],
+        [4, 'Yes, fluently', '']
+      ] }
+  ];
+
   var step = 0;
+  var answers = {};
+
   function ask() {
+    /* step 0 is the OFFER. Nothing has been asked yet and nothing has to be. */
     if (step === 0) {
-      sheet('<b style="font-size:18px">Before we start — two questions.</b>' +
-        '<div class="measured" style="margin-top:8px">So the app pitches itself at the right level. ' +
-        'There is no wrong answer and you can change both later.</div>' +
-        '<div class="rp-lab" style="margin-top:20px">WHERE WOULD YOU PUT YOURSELF?</div>' +
-        /* There were FOUR options here and only three levels behind them:
-           "New" and "Beginner" both recorded 1, so one of the two choices
-           changed nothing at all. Offering a choice that does nothing is the
-           same kind of lie as a made-up number, so the two that meant the
-           same thing are now one that says both. */
-        opt('exp', 1, 'New to it', 'Never been taught \u2014 or you sing, but you have never trained.') +
-        opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
-        opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.') +
-        skipRow());
-      wire('exp', function (v) { ME.experience = v; step = 1; ask(); });
+      sheet('<b style="font-size:18px">Want me to work out where to start you?</b>' +
+        '<div class="measured" style="margin-top:8px">Four questions, about a minute. They decide which ' +
+        'warm-ups you are given first and how the app words things \u2014 and you can change any of it later, ' +
+        'or ignore all of it and just have a look round.</div>' +
+        '<button class="btn primary" id="rpGoQ" style="width:100%;padding:14px;margin-top:18px;font-size:15px">' +
+        'Ask me the four questions</button>' +
+        '<button class="btn" data-skip="1" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">' +
+        'Not now \u2014 let me look round</button>' +
+        '<div class="measured" style="margin-top:8px;font-size:11.5px;text-align:center">' +
+        'It is in <b>Profile</b> whenever you want it.</div>');
+      on($('rpGoQ'), 'click', function () { step = 1; ask(); });
       wireSkip($('rpSheet'));
-    } else if (step === 1) {
-      sheet('<b style="font-size:18px">And the jargon?</b>' +
-        '<div class="measured" style="margin-top:8px">Every craft has its own words. Singing has ' +
-        '<i>pitch</i>, <i>key</i>, <i>semitone</i>, <i>the third</i>. How much of that do you want ' +
-        'thrown at you?</div>' +
-        '<div class="rp-lab" style="margin-top:20px">WHICH IS CLOSEST?</div>' +
-        opt('w', 'plain', 'Skip it', 'Plain English throughout, and any word you tap gets explained.') +
-        opt('w', 'some', 'Some of it', 'Normal words, and anything unusual is one tap from an explanation.') +
-        opt('w', 'technical', 'All of it', 'The proper terms, used properly, with no slowing down.') +
-        skipRow());
-      wire('w', function (v) { ME.words = v; step = 2; saveMe(); ask(); });
-      wireSkip($('rpSheet'));
-    } else {
-      // say back what we heard, so it does not feel like a test with no result
-      var e = ME.experience, w = ME.words;
-      var line = (e === 1 ? 'Starting you on the beginner exercises'
-                : e === 2 ? 'Starting you on the beginner and intermediate exercises'
-                : 'Every exercise is open to you') +
-        (w === 'plain' ? ', in plain English, and each one says what it actually is before you tap it.'
-         : w === 'some' ? '. Tap any underlined word and you get one plain sentence back.'
-         : ', with the proper terms and no hand-holding.');
-      sheet('<b style="font-size:18px">Got it.</b>' +
-        '<div style="font-size:14px;line-height:1.55;margin-top:10px">' + esc(line) + '</div>' +
-        '<div class="measured" style="margin-top:12px">You can change either answer any time — ' +
-        'it is in <b>Profile</b>, under <b>How I talk to you</b>.</div>' +
-        '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:18px;font-size:15px">Start</button>');
-      on($('rpOK'), 'click', function () { shut(); apply(); });
+      return;
     }
+
+    if (step <= QS.length) {
+      var Q = QS[step - 1];
+      var h = '<div class="row" style="justify-content:space-between;align-items:baseline">' +
+        '<div class="rp-lab">' + esc(Q.lab) + '</div>' +
+        '<div class="rp-lab" style="color:var(--gold)">QUESTION ' + step + ' OF ' + QS.length + '</div></div>' +
+        '<b style="font-size:17px;display:block;margin-top:8px;line-height:1.35">' + Q.q + '</b>';
+      if (Q.why) h += '<div class="measured" style="margin-top:7px">' + esc(Q.why) + '</div>';
+      h += '<div style="margin-top:14px">';
+      Q.opts.forEach(function (o) { h += opt('a', o[0], o[1], o[2]); });
+      h += '</div>';
+      h += '<div class="row" style="gap:8px;margin-top:12px">' +
+        (step > 1 ? '<button class="btn" id="rpQBack" style="flex:1;padding:11px;font-size:12.5px">\u2039 Back</button>' : '') +
+        '<button class="btn" data-skip="1" style="flex:1;padding:11px;font-size:12.5px;color:var(--ink-dim)">Skip the rest</button>' +
+        '</div>';
+      sheet(h);
+      wire('a', function (v) {
+        answers[Q.key] = v;
+        step++;
+        ask();
+      });
+      on($('rpQBack'), 'click', function () { step--; ask(); });
+      wireSkip($('rpSheet'));
+      return;
+    }
+
+    /* all four answered — say what was decided, and why */
+    var d = ME.derive(answers) || {};
+    ME.answers = answers;
+    ME.experience = d.experience;
+    ME.taught = d.taught;
+    ME.words = d.words;
+    saveMe();
+
+    var singLine = d.experience === 1
+      ? 'Starting you on the beginner warm-ups \u2014 the gentlest ones, and the ones that actually teach pitch.'
+      : d.experience === 2
+      ? 'Starting you on the beginner and intermediate warm-ups.'
+      : 'Every exercise is open to you.';
+    var wordLine = d.taught === 1
+      ? 'Plain English throughout. Any word worth knowing is explained the first time it appears, and you can tap it again later.'
+      : d.taught === 2
+      ? 'Normal words, and anything unusual is one tap from a plain sentence.'
+      : 'The proper terms, used properly, with no slowing down.';
+
+    sheet('<b style="font-size:18px">Right \u2014 here is where I am putting you.</b>' +
+      '<div class="rp-card" style="margin-top:14px;padding:12px">' +
+      '<div class="rp-lab">YOUR SINGING</div>' +
+      '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(singLine) + '</div></div>' +
+      '<div class="rp-card" style="margin-top:9px;padding:12px">' +
+      '<div class="rp-lab">WORDS AND MUSIC</div>' +
+      '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(wordLine) + '</div></div>' +
+      '<div class="measured" style="margin-top:12px">This is what you <b>told</b> me \u2014 it is not measured. ' +
+      'If it is wrong, change it in <b>Profile</b>, or take the test, which measures instead of asking.</div>' +
+      '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Start</button>' +
+      '<button class="btn" id="rpTestNow" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px">' +
+      'Test me instead \u2014 measure it</button>');
+    on($('rpOK'), 'click', function () { shut(); apply(); });
+    on($('rpTestNow'), 'click', function () {
+      shut(); apply();
+      try { if (window.RPTest) RPTest.open(); } catch (e) {}
+    });
   }
-  ME.ask = function (from) { step = from || 0; ask(); };
+
+  ME.ask = function (from) { step = from || 0; answers = {}; ask(); };
 
   function opt(group, val, title, sub) {
     return '<div class="rp-card" data-' + group + '="' + val + '" style="cursor:pointer;padding:14px">' +
@@ -406,19 +536,32 @@
   /* ---------------------------------------------------------------- */
   function mountProfileRow() {
     var host = $('modeYou');
-    if (!host || $('rpTalkRow')) return;
-    var d = document.createElement('div');
-    d.id = 'rpTalkRow';
-    d.className = 'rp-card';
-    d.style.cursor = 'pointer';
+    if (!host) return;
+    /* This used to bail out the moment the row existed, so it showed whatever
+       was true the first time Profile was opened and never changed again —
+       answer the questions and it still described the old you. Build it once,
+       then keep writing the current answer into it. */
+    var d = $('rpTalkRow');
+    var fresh = !d;
+    if (fresh) {
+      d = document.createElement('div');
+      d.id = 'rpTalkRow';
+      d.className = 'rp-card';
+      d.style.cursor = 'pointer';
+    }
+    var sing = ME.experience === 1 ? 'beginner warm-ups'
+             : ME.experience === 2 ? 'beginner and intermediate' : 'everything';
+    var wrd  = ME.taught === 1 ? 'plain English'
+             : ME.taught === 2 ? 'normal words, tap to explain' : 'proper terms';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">How I talk to you</div>' +
-      '<div class="rp-sub">' + (plain() ? 'Plain English' : ME.words === 'some' ? 'Normal words, tap to explain' : 'Proper terms') +
-      ' · ' + (ME.experience === 1 ? 'beginner' : ME.experience === 2 ? 'intermediate' : 'experienced') + '</div></div>' +
-      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
-    on(d, 'click', function () { ME.ask(0); });
-    // only ever place it among this screen's own direct children
-    try { host.appendChild(d); } catch (e) {}
+      '<div><div class="rp-ttl">Where I have got you</div>' +
+      '<div class="rp-sub">Singing: ' + sing + ' \u00b7 Words: ' + wrd + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
+    if (fresh) {
+      on(d, 'click', function () { ME.ask(0); });
+      // only ever place it among this screen's own direct children
+      try { host.appendChild(d); } catch (e) {}
+    }
   }
 
   /* styles */
