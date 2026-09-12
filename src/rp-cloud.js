@@ -540,6 +540,23 @@
     return r.data || [];
   }
 
+  /* Somebody with a request open is not your coach and not your student, so
+     they are in none of the loaded lists — and the profiles table is shut, so
+     their name cannot just be looked up. The policy lets the two of you read
+     each other while a request is pending; this is the bit that actually goes
+     and does it. Without it both sides read "Someone", which is a poor way to
+     ask a stranger to teach you. */
+  RP.people = RP.people || {};
+  function learnNames(ids) {
+    var want = (ids || []).filter(function (id) { return id && !RP.people[id]; });
+    if (!want.length) return;
+    RP.sb.from('profiles').select('id,display_name,email').in('id', want)
+      .then(function (r) {
+        (r.data || []).forEach(function (p) { RP.people[p.id] = p; });
+        if (r.data && r.data.length) { try { rerender(); } catch (e) {} }
+      });
+  }
+
   function loadAll() {
     if (!RP.user) return Promise.resolve();
     loadOk = true;
@@ -573,12 +590,15 @@
       sb.from('assignments').select('*').eq('student_id', uid).order('created_at', { ascending: false }),
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
       sb.from('takes').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(50),
-      sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300)
+      sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300),
+      sb.from('coach_requests').select('*').eq('student_id', uid).order('created_at', { ascending: false })
     ]).then(function (r) {
       RP.assignments = rows(r[1], RP.assignments);
       RP.messages    = rows(r[2], RP.messages);
       RP.takes       = rows(r[3], RP.takes);
       RP.results     = rows(r[4], RP.results);
+      RP.myRequests  = rows(r[5], RP.myRequests);
+      learnNames((RP.myRequests || []).map(function (x) { return x.coach_id; }));
       if (r[0] && r[0].error) { loadOk = false; return; }   // keep the coach we had
       var link = (r[0].data || [])[0];
       if (!link) { RP.coach = null; return; }
@@ -594,8 +614,11 @@
       sb.from('exercises').select('*').eq('coach_id', uid).order('sort').order('created_at'),
       sb.from('assignments').select('*').eq('coach_id', uid).order('created_at', { ascending: false }),
       sb.from('takes').select('*').eq('coach_id', uid).order('created_at', { ascending: false }).limit(50),
-      sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50)
+      sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
+      sb.from('coach_requests').select('*').eq('coach_id', uid).eq('status', 'pending').order('created_at')
     ]).then(function (r) {
+      RP.requests  = rows(r[5], RP.requests);
+      learnNames((RP.requests || []).map(function (x) { return x.student_id; }));
       RP.exercises = rows(r[1], RP.exercises);
       // keep the singer's own rows loaded a moment ago, and add the ones we set
       RP.assignments = merge(RP.assignments, rows(r[2], []));
@@ -670,12 +693,18 @@
       function (p) { bump('assignment', p); });
     ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'student_id=eq.' + uid },
       function () { refresh(); });
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_requests', filter: 'student_id=eq.' + uid },
+      function () { refresh(); });
 
     if (coach) {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'takes', filter: 'coach_id=eq.' + uid },
         function (p) { bump('take', p); });
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_students', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
+      /* somebody asking to be taught should land on his phone the moment they
+         ask, the same as everything else here */
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_requests', filter: 'coach_id=eq.' + uid },
+        function (p) { bump('request', p); });
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
       ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'results' },
@@ -720,6 +749,8 @@
         toast('New take: ' + (n.title || 'from a student'));
       } else if (kind === 'message' && n) {
         toast('New message');
+      } else if (kind === 'request' && payload.eventType === 'INSERT' && n) {
+        toast('Somebody has asked you to teach them.');
       }
     });
   }
@@ -877,7 +908,7 @@
           return;
         }
         if (!RP.user) {
-          RP.profile = null; RP.coach = null; RP.students = [];
+          RP.profile = null; RP.coach = null; RP.students = []; RP.requests = []; RP.myRequests = [];
           RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];
           unsubscribe(); syncHeaderButton(); rerender();
           return;

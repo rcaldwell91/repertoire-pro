@@ -132,7 +132,10 @@
     if (RP.profile && RP.profile.id === id) return 'You';
     if (RP.coach && RP.coach.id === id) return RP.coach.display_name;
     var s = RP.students.find(function (x) { return x.id === id; });
-    return s ? s.display_name : 'Someone';
+    if (s) return s.display_name;
+    /* somebody with a request open, who is in none of those lists yet */
+    var p = RP.people && RP.people[id];
+    return (p && p.display_name) || 'Someone';
   }
 
   /* ================================================================ */
@@ -154,8 +157,36 @@
         '<input id="rpCode" class="rp-inp" placeholder="ABC123" maxlength="6" autocapitalize="characters" ' +
         'autocomplete="off" spellcheck="false" style="flex:1;letter-spacing:3px;font-weight:800;text-transform:uppercase">' +
         '<button class="btn primary" id="rpCodeGo" style="padding:11px 15px">Join</button></div>' +
-        '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>' +
-        '<div class="measured" style="margin-top:10px">No coach? Everything below is yours anyway — the ' +
+        '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>';
+
+      /* Robert, 13 Sep: "make it so students can request a coach for coaching."
+         The code is the coach's move — he reads it out. This is the student's:
+         they ask, and the coach says yes or no. Nobody ends up teaching someone
+         they never agreed to. */
+      var asked = (RP.myRequests || []).filter(function (r) { return r.status === 'pending'; });
+      h += '<div class="rp-lab" style="margin-top:18px">OR ASK SOMEONE TO TEACH YOU</div>';
+      if (asked.length) {
+        asked.forEach(function (r) {
+          h += '<div class="rp-card" style="padding:11px;margin-top:7px">' +
+            '<div class="rp-ttl">Waiting on ' + esc(nameOf(r.coach_id)) +
+            '<span class="rp-tag">asked ' + ago(r.created_at) + '</span></div>' +
+            '<div class="rp-sub">They decide. Nothing happens until they say yes.</div>' +
+            '<button class="btn" data-unask="' + esc(r.id) + '" style="width:100%;padding:9px;' +
+            'margin-top:8px;font-size:12px;color:var(--miss)">Take it back</button></div>';
+        });
+      } else {
+        h += '<div class="measured" style="margin-bottom:8px">Know a coach who is on here? ' +
+          'Use the email address they signed up with.</div>' +
+          '<div class="row" style="gap:7px;flex-wrap:nowrap">' +
+          '<input id="rpAskEmail" class="rp-inp" type="email" placeholder="them@example.com" ' +
+          'autocapitalize="off" spellcheck="false" style="flex:1">' +
+          '<button class="btn primary" id="rpAskGo" style="padding:11px 15px">Ask</button></div>' +
+          '<textarea id="rpAskNote" class="rp-inp" rows="2" style="margin-top:8px" ' +
+          'placeholder="Anything you want them to know (optional)"></textarea>' +
+          '<div id="rpAskMsg" class="measured" style="margin-top:8px"></div>';
+      }
+
+      h += '<div class="measured" style="margin-top:14px">No coach? Everything below is yours anyway — the ' +
         'app coaches you itself.</div>';
       h += '</div>';
       return h;
@@ -533,6 +564,18 @@
     wireWeek(host, function () { if (RP.rerender) RP.rerender(); });
     on($('rpCodeGo'), 'click', joinByCode);
     on($('rpCode'), 'keydown', function (e) { if (e.key === 'Enter') joinByCode(); });
+    on($('rpAskGo'), 'click', askCoach);
+    on($('rpAskEmail'), 'keydown', function (e) { if (e.key === 'Enter') askCoach(); });
+    each(host, '[data-unask]', function (b) {
+      on(b, 'click', function () {
+        b.disabled = true;
+        RP.sb.from('coach_requests').delete().eq('id', b.dataset.unask).then(function (r) {
+          if (r.error) { b.disabled = false; return fail(r.error); }
+          RP.toast('Taken back.');
+          RP.refresh();
+        });
+      });
+    });
     on($('rpMsgGo'), 'click', function () {
       var i = $('rpMsgIn');
       var body = (i.value || '').trim();
@@ -542,6 +585,29 @@
         .then(function (r) { r.error ? fail(r.error) : RP.refresh(); });
     });
     on($('rpMsgIn'), 'keydown', function (e) { if (e.key === 'Enter') $('rpMsgGo').click(); });
+  }
+
+  function askCoach() {
+    var i = $('rpAskEmail'), m = $('rpAskMsg'), b = $('rpAskGo');
+    var email = (i.value || '').trim();
+    var note = (($('rpAskNote') || {}).value || '').trim();
+    if (!email || email.indexOf('@') < 0) {
+      m.textContent = 'That does not look like an email address.';
+      m.style.color = 'var(--miss)';
+      return;
+    }
+    b.disabled = true;
+    m.textContent = 'Asking\u2026'; m.style.color = 'var(--ink-dim)';
+    RP.sb.rpc('request_coach_by_email', { p_email: email, p_note: note }).then(function (r) {
+      b.disabled = false;
+      if (r.error) {
+        m.textContent = r.error.message;
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      RP.toast('Asked ' + r.data + '. It is on their phone now.');
+      RP.refresh();
+    });
   }
 
   function joinByCode() {
@@ -615,7 +681,25 @@
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px">' +
       '<b style="font-size:14px">Your students</b>' +
       '<button class="btn primary" id="rpAddStu" style="padding:8px 13px;font-size:12.5px">Add student</button></div>';
-    if (!RP.students.length) {
+    var pend = (RP.requests || []).filter(function (r) { return r.status === 'pending'; });
+    if (pend.length) {
+      h += '<div class="rp-lab" style="margin-top:14px">ASKING TO BE TAUGHT</div>';
+      pend.forEach(function (r) {
+        h += '<div class="rp-card hot" style="padding:12px;margin-top:7px">' +
+          '<div class="rp-ttl">' + esc(nameOf(r.student_id)) +
+          '<span class="rp-tag">' + ago(r.created_at) + '</span></div>' +
+          (r.note ? '<div class="rp-sub">\u201c' + esc(r.note) + '\u201d</div>' : '') +
+          '<div class="row" style="gap:7px;margin-top:9px;flex-wrap:nowrap">' +
+          '<button class="btn" data-req-no="' + esc(r.id) + '" style="flex:1;padding:9px;font-size:12px">No thanks</button>' +
+          '<button class="btn primary" data-req-yes="' + esc(r.id) + '" style="flex:1;padding:9px;font-size:12px">Take them on</button>' +
+          '</div></div>';
+      });
+    }
+
+    /* This has to come BEFORE the "nobody yet" note, or a coach on his very
+       first day — the one most likely to have somebody waiting — would never
+       see the person asking. */
+    if (!RP.students.length && !pend.length) {
       h += '<div class="rp-empty">Nobody yet. ' +
         ((RP.profile || {}).coach_code
           ? 'Read a student your code — <b style="letter-spacing:2px;color:var(--gold)">' +
@@ -640,6 +724,21 @@
       on(c, 'click', function () { openStudent = c.dataset.stu; renderTeacher(); });
     });
     on($('rpAddStu'), 'click', addStudentSheet);
+    function answer(id, yes, btn) {
+      btn.disabled = true;
+      btn.textContent = yes ? 'Adding\u2026' : 'Declining\u2026';
+      RP.sb.rpc('answer_request', { p_id: id, p_yes: yes }).then(function (r) {
+        if (r.error) { btn.disabled = false; return fail(r.error); }
+        RP.toast(yes ? r.data + ' is now your student.' : 'Declined.');
+        RP.refresh();
+      });
+    }
+    each(host, '[data-req-yes]', function (b) {
+      on(b, 'click', function () { answer(b.dataset.reqYes, true, b); });
+    });
+    each(host, '[data-req-no]', function (b) {
+      on(b, 'click', function () { answer(b.dataset.reqNo, false, b); });
+    });
   }
 
   /* Adding a student used to mean scrolling a list of EVERYONE who had ever
