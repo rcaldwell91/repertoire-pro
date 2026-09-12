@@ -216,8 +216,12 @@
         '<div class="measured" style="margin-top:8px">So the app pitches itself at the right level. ' +
         'There is no wrong answer and you can change both later.</div>' +
         '<div class="rp-lab" style="margin-top:20px">WHERE WOULD YOU PUT YOURSELF?</div>' +
-        opt('exp', 1, 'New', 'Never been taught any of this.') +
-        opt('exp', 1, 'Beginner', 'You sing, but you have never trained.') +
+        /* There were FOUR options here and only three levels behind them:
+           "New" and "Beginner" both recorded 1, so one of the two choices
+           changed nothing at all. Offering a choice that does nothing is the
+           same kind of lie as a made-up number, so the two that meant the
+           same thing are now one that says both. */
+        opt('exp', 1, 'New to it', 'Never been taught \u2014 or you sing, but you have never trained.') +
         opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
         opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.'));
       wire('exp', function (v) { ME.experience = v; step = 1; ask(); });

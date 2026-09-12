@@ -34,6 +34,40 @@ body.rp-brand-inflow .kbdkey.white.down{background:#f0dcb4;}
 body.rp-brand-inflow .kbdkey.white.lit{background:linear-gradient(180deg,#e8b34a,#c1521d);}
 body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d,#6b3f1d);}
 
+/* ----------------------------------------------------------------------
+   A SECOND COACH'S COLOURS.
+
+   Until now every coach who switched teaching on got In Flow's brown and
+   gold — Ja Ronn's brand, on somebody else's students' phones. The class is
+   keyed to profiles.theme, so a coach picking "Deep" gets this instead and
+   Ja Ronn keeps his.
+
+   Blue-green and copper: far enough from In Flow that the two do not read as
+   the same app, and dark enough that the pitch line still shows against it.
+   In tune and out of tune are NOT rebranded here either. They mean something
+   while you are singing.
+   ---------------------------------------------------------------------- */
+body.rp-brand-deep{
+  --bg:#070d10; --bg2:#0b141a; --panel:#0d1920; --panel2:#12242e; --line:#1d3a47;
+  --ink:#e8f4f7; --ink-dim:#89a8b4; --ink-faint:#5f7f8c;
+  --gold:#4ec9c1; --gold-deep:#2a9d95;
+  --accent:#c9703a; --accent2:#4ec9c1; --pink:#a85430;
+  --grad:linear-gradient(135deg,#123a42 0%,#2a9d95 55%,#c9703a 100%);
+  --glow:0 0 22px rgba(78,201,193,.36);
+  --stage:#050a0d; --stage-line:rgba(210,240,246,.06);
+}
+body.rp-brand-deep.light{
+  --bg:#eef5f7; --bg2:#e0ebef; --panel:#ffffff; --panel2:#e7f1f4; --line:#c3d8df;
+  --ink:#0d1c23; --ink-dim:#456069; --ink-faint:#6d8a94;
+  --gold:#177a73; --gold-deep:#0f5b56; 
+  --accent:#a8551f; --accent2:#177a73; --pink:#8c4419;
+  --glow:0 4px 16px rgba(23,122,115,.22);
+  --stage:#ffffff; --stage-line:rgba(13,28,35,.06);
+}
+body.rp-brand-deep .kbdkey.white.down{background:#cfe9e7;}
+body.rp-brand-deep .kbdkey.white.lit{background:linear-gradient(180deg,#4ec9c1,#2a9d95);}
+body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#123a42);}
+
 /* The microphone dialog used to cover the screen including the bottom bar,
    so a first-timer who did not understand it had nowhere to go. It now stops
    above the tabs, and closes on a tap outside or the escape key. */

@@ -146,6 +146,7 @@
     return o.firstChild;
   }
   function closeSheet() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function sheetEl() { return $('rpSheet'); }
   RP.closeSheet = closeSheet;
 
   var authTab = 'up';
@@ -184,6 +185,10 @@
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
       (up ? 'Create my account' : 'Sign in') + '</button>';
+    if (!up) {
+      h += '<button class="btn" id="rpForgot" style="width:100%;padding:11px;margin-top:8px;' +
+        'font-size:12.5px">I have forgotten my password</button>';
+    }
     h += '<div style="text-align:center;margin:12px 0 8px;color:var(--ink-faint);font-size:12px">or</div>';
     h += '<button class="btn" id="rpLink" style="width:100%;padding:12px">Email me a sign-in link</button>';
     h += '<div id="rpMsg" class="measured" style="margin-top:12px"></div>';
@@ -195,6 +200,7 @@
     on($('rpX'), 'click', closeSheet);
     on($('rpGo'), 'click', function () { authTab === 'up' ? doSignUp() : doSignIn(); });
     on($('rpLink'), 'click', doMagicLink);
+    on($('rpForgot'), 'click', doForgot);
     box.querySelectorAll('input').forEach(function (i) {
       on(i, 'keydown', function (e) { if (e.key === 'Enter') $('rpGo').click(); });
     });
@@ -248,6 +254,73 @@
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
+  /* Until now there was no way back from a forgotten password — not a bad
+     screen, NO screen. Anyone who forgot theirs was locked out of their own
+     account for good, and the only fix was deleting the account. Supabase has
+     always been able to send the email; nothing ever asked it to. */
+  function doForgot() {
+    var email = ($('rpEmail').value || '').trim();
+    if (!email) {
+      msg('Put your email address in above first, then tap this again.', true);
+      try { $('rpEmail').focus(); } catch (e) {}
+      return;
+    }
+    msg('Sending\u2026');
+    RP.sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.href.split('#')[0]
+    }).then(function (r) {
+      if (r.error) {
+        var m = String(r.error.message || '');
+        if (/invalid/i.test(m) && /email/i.test(m)) {
+          return msg('That address was refused as undeliverable. Check it for a typo.', true);
+        }
+        return msg(m, true);
+      }
+      /* Deliberately does not say whether that address has an account: that
+         would tell a stranger who is signed up here. */
+      msg('If there is an account for ' + email + ', a reset link is on its way. ' +
+          'Open it on this phone and you can choose a new password.');
+    }).catch(function (e) { msg(String(e.message || e), true); });
+  }
+
+  /* Coming back from that email. Supabase puts the session in the URL and
+     fires PASSWORD_RECOVERY; at that point the person is signed in but has to
+     be given somewhere to type the new one, or they just land on the app with
+     no idea anything happened. */
+  function newPasswordSheet() {
+    var h = '<b style="font-size:16px">Choose a new password</b>' +
+      '<div class="measured" style="margin-top:6px">You are signed in from the link. ' +
+      'Set a password you will remember and this is done.</div>' +
+      '<label class="lab" style="margin-top:14px;display:block">NEW PASSWORD</label>' +
+      '<input id="rpNewPw" class="inp" type="password" autocomplete="new-password" ' +
+      'placeholder="At least 6 characters" style="width:100%;margin-bottom:10px">' +
+      '<label class="lab">AND AGAIN</label>' +
+      '<input id="rpNewPw2" class="inp" type="password" autocomplete="new-password" ' +
+      'style="width:100%;margin-bottom:12px">' +
+      '<button class="btn primary" id="rpPwGo" style="width:100%;padding:13px">Save it</button>' +
+      '<div id="rpPwMsg" class="measured" style="margin-top:10px"></div>' +
+      '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:8px">Not now</button>';
+    sheet(h);
+    on($('rpX'), 'click', closeSheet);
+    function save() {
+      var a = $('rpNewPw').value || '', b = $('rpNewPw2').value || '', m = $('rpPwMsg');
+      function bad(t) { m.textContent = t; m.style.color = 'var(--miss)'; }
+      if (a.length < 6) return bad('Six characters or more, please.');
+      if (a !== b) return bad('Those two do not match.');
+      $('rpPwGo').disabled = true;
+      m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ password: a }).then(function (r) {
+        $('rpPwGo').disabled = false;
+        if (r.error) return bad(r.error.message);
+        closeSheet();
+        toast('New password saved. You are signed in.');
+      });
+    }
+    on($('rpPwGo'), 'click', save);
+    on($('rpNewPw2'), 'keydown', function (e) { if (e.key === 'Enter') save(); });
+  }
+  RP.newPasswordSheet = newPasswordSheet;
+
   function doMagicLink() {
     var email = ($('rpEmail').value || '').trim();
     if (!email) return msg('Put your email in first, then tap this.', true);
@@ -289,6 +362,22 @@
         'have as a singer — coaches practise too.</div>';
     }
     if (p.is_coach) {
+      var mine = p.theme == null || p.theme === '' ? 'inflow' : p.theme;
+      h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
+        '<div class="rp-lab">YOUR COLOURS</div>' +
+        '<div class="measured" style="margin:5px 0 9px">What you see, and what the students you ' +
+        'sign up see if they ask for your look.</div>';
+      RP.THEMES.forEach(function (x) {
+        var on = (x.id || 'repertoire') === (mine || 'repertoire');
+        h += '<button class="btn' + (on ? ' primary' : '') + '" data-theme="' + esc(x.id) +
+          '" style="width:100%;padding:10px;margin-bottom:6px;text-align:left">' +
+          '<b>' + esc(x.name) + '</b> \u00b7 <span style="font-weight:600;opacity:.8">' +
+          esc(x.note) + '</span></button>';
+      });
+      h += '</div>';
+    }
+
+    if (p.is_coach) {
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
@@ -307,6 +396,17 @@
     sheet(h);
     on($('rpX'), 'click', closeSheet);
     on($('rpNameGo'), 'click', saveName);
+    (sheetEl() || document).querySelectorAll('[data-theme]').forEach(function (b) {
+      on(b, 'click', function () {
+        var t = b.dataset.theme;
+        RP.sb.from('profiles').update({ theme: t }).eq('id', RP.user.id).then(function (r) {
+          if (r.error) return toast(r.error.message);
+          RP.profile.theme = t;
+          brand();
+          RP.refresh().then(function () { openAccount(); });
+        });
+      });
+    });
     on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
@@ -652,13 +752,22 @@
      Signed out is always Repertoire. */
   try { RP.useCoachColours = localStorage.getItem('rp_coachcolours') === '1'; } catch (e) {}
 
+  /* A coach's colours belong to the coach. Until now there was only one set,
+     so every coach who switched teaching on got In Flow's brown and gold —
+     Ja Ronn's brand, on another coach's students' phones. */
+  RP.THEMES = [
+    { id: 'inflow', name: 'In Flow', note: 'Brown, gold and burnt orange.' },
+    { id: 'deep',   name: 'Deep',    note: 'Blue-green and copper.' },
+    { id: '',       name: 'Repertoire', note: 'The app\u2019s own colours. No branding.' }
+  ];
+
   function brand() {
     var t = 'repertoire';
     if (RP.profile && RP.profile.is_coach) t = RP.profile.theme || 'inflow';
     else if (RP.coach && RP.useCoachColours) t = RP.coach.theme || 'inflow';
     var b = document.body;
-    ['inflow'].forEach(function (name) {
-      b.classList.toggle('rp-brand-' + name, t === name);
+    RP.THEMES.forEach(function (x) {
+      if (x.id) b.classList.toggle('rp-brand-' + x.id, t === x.id);
     });
   }
   RP.brand = brand;
@@ -697,6 +806,13 @@
       RP.ready = true;
       RP.sb.auth.onAuthStateChange(function (ev, session) {
         RP.user = session ? session.user : null;
+        if (ev === 'PASSWORD_RECOVERY') {
+          /* after the data has loaded, or the sheet opens over a blank app */
+          loadAll().then(function () {
+            subscribe(); rerender(); newPasswordSheet();
+          });
+          return;
+        }
         if (!RP.user) {
           RP.profile = null; RP.coach = null; RP.students = [];
           RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];

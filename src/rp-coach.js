@@ -642,44 +642,58 @@
     on($('rpAddStu'), 'click', addStudentSheet);
   }
 
+  /* Adding a student used to mean scrolling a list of EVERYONE who had ever
+     signed up — every name and every email in the database, to anybody with an
+     account. That was fine for three people at a pitch and indefensible for
+     strangers, so the profiles table is shut now and this asks for the exact
+     address instead. The coach code is still the better way: he reads out six
+     characters and they join themselves. This is for when they are not in the
+     room. */
   function addStudentSheet() {
-    var h = '<b style="font-size:16px">Add a student</b>' +
-      '<div class="measured" style="margin-top:6px">' +
-      ((RP.profile || {}).coach_code
-        ? 'Or just read them your code — <b style="letter-spacing:2px">' +
-          esc(RP.profile.coach_code) + '</b> — and they join themselves. '
-        : '') +
-      'Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
+    var code = (RP.profile || {}).coach_code;
+    var h = '<b style="font-size:16px">Add a student</b>';
+    if (code) {
+      h += '<div class="rp-card hot" style="margin-top:12px"><div class="rp-lab">EASIEST WAY</div>' +
+        '<div style="font-size:29px;font-weight:900;letter-spacing:3px">' + esc(code) + '</div>' +
+        '<div class="rp-sub">Read them your code. They put it in on their Coach tab and you are paired ' +
+        '— you do not need their email at all.</div></div>';
+    }
+    h += '<div class="rp-lab" style="margin-top:16px">OR BY EMAIL</div>' +
+      '<div class="measured" style="margin-bottom:8px">The address they signed up with, exactly. ' +
+      'You cannot browse other people\u2019s accounts.</div>' +
+      '<div class="row" style="gap:7px;flex-wrap:nowrap">' +
+      '<input id="rpAddEmail" class="rp-inp" type="email" placeholder="them@example.com" ' +
+      'autocapitalize="off" spellcheck="false" style="flex:1">' +
+      '<button class="btn primary" id="rpAddGo" style="padding:11px 15px">Add</button></div>' +
+      '<div id="rpAddMsg" class="measured" style="margin-top:8px"></div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:10px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
-    RP.sb.from('profiles').select('*').order('created_at')
-      .then(function (r) {
-        var have = RP.students.map(function (s) { return s.id; });
-        var list = (r.data || []).filter(function (p) { return have.indexOf(p.id) < 0 && p.id !== RP.user.id; });
-        var el = $('rpStuList');
-        if (!el) return;
-        if (!list.length) {
-          el.innerHTML = 'Nobody new. Everyone who has signed up is already on your list.';
+
+    function go() {
+      var i = $('rpAddEmail'), m = $('rpAddMsg'), b = $('rpAddGo');
+      var email = (i.value || '').trim();
+      if (!email || email.indexOf('@') < 0) {
+        m.textContent = 'That does not look like an email address.';
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      b.disabled = true;
+      m.textContent = 'Looking\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.rpc('add_student_by_email', { p_email: email }).then(function (r) {
+        b.disabled = false;
+        if (r.error) {
+          m.textContent = r.error.message;
+          m.style.color = 'var(--miss)';
           return;
         }
-        el.className = '';
-        el.innerHTML = list.map(function (p) {
-          return '<div class="rp-card" data-add="' + esc(p.id) + '" style="cursor:pointer">' +
-            '<div class="rp-ttl">' + esc(p.display_name) + '</div>' +
-            '<div class="rp-sub">' + esc(p.email) + '</div></div>';
-        }).join('');
-        each(el, '[data-add]', function (c) {
-          on(c, 'click', function () {
-            c.style.opacity = '.5';
-            RP.sb.from('coach_students').insert({ coach_id: RP.user.id, student_id: c.dataset.add })
-              .then(function (r2) {
-                if (r2.error) { c.style.opacity = ''; return fail(r2.error); }
-                RP.closeSheet(); RP.toast('Added'); RP.refresh();
-              });
-          });
-        });
+        RP.closeSheet();
+        RP.toast(r.data + ' is now your student.');
+        RP.refresh();
       });
+    }
+    on($('rpAddGo'), 'click', go);
+    on($('rpAddEmail'), 'keydown', function (e) { if (e.key === 'Enter') go(); });
   }
 
   function studentDetail() {

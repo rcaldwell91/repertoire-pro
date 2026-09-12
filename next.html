@@ -10837,6 +10837,40 @@ body.rp-brand-inflow .kbdkey.white.down{background:#f0dcb4;}
 body.rp-brand-inflow .kbdkey.white.lit{background:linear-gradient(180deg,#e8b34a,#c1521d);}
 body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d,#6b3f1d);}
 
+/* ----------------------------------------------------------------------
+   A SECOND COACH'S COLOURS.
+
+   Until now every coach who switched teaching on got In Flow's brown and
+   gold — Ja Ronn's brand, on somebody else's students' phones. The class is
+   keyed to profiles.theme, so a coach picking "Deep" gets this instead and
+   Ja Ronn keeps his.
+
+   Blue-green and copper: far enough from In Flow that the two do not read as
+   the same app, and dark enough that the pitch line still shows against it.
+   In tune and out of tune are NOT rebranded here either. They mean something
+   while you are singing.
+   ---------------------------------------------------------------------- */
+body.rp-brand-deep{
+  --bg:#070d10; --bg2:#0b141a; --panel:#0d1920; --panel2:#12242e; --line:#1d3a47;
+  --ink:#e8f4f7; --ink-dim:#89a8b4; --ink-faint:#5f7f8c;
+  --gold:#4ec9c1; --gold-deep:#2a9d95;
+  --accent:#c9703a; --accent2:#4ec9c1; --pink:#a85430;
+  --grad:linear-gradient(135deg,#123a42 0%,#2a9d95 55%,#c9703a 100%);
+  --glow:0 0 22px rgba(78,201,193,.36);
+  --stage:#050a0d; --stage-line:rgba(210,240,246,.06);
+}
+body.rp-brand-deep.light{
+  --bg:#eef5f7; --bg2:#e0ebef; --panel:#ffffff; --panel2:#e7f1f4; --line:#c3d8df;
+  --ink:#0d1c23; --ink-dim:#456069; --ink-faint:#6d8a94;
+  --gold:#177a73; --gold-deep:#0f5b56; 
+  --accent:#a8551f; --accent2:#177a73; --pink:#8c4419;
+  --glow:0 4px 16px rgba(23,122,115,.22);
+  --stage:#ffffff; --stage-line:rgba(13,28,35,.06);
+}
+body.rp-brand-deep .kbdkey.white.down{background:#cfe9e7;}
+body.rp-brand-deep .kbdkey.white.lit{background:linear-gradient(180deg,#4ec9c1,#2a9d95);}
+body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#123a42);}
+
 /* The microphone dialog used to cover the screen including the bottom bar,
    so a first-timer who did not understand it had nowhere to go. It now stops
    above the tabs, and closes on a tap outside or the escape key. */
@@ -10993,6 +11027,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     return o.firstChild;
   }
   function closeSheet() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function sheetEl() { return $('rpSheet'); }
   RP.closeSheet = closeSheet;
 
   var authTab = 'up';
@@ -11031,6 +11066,10 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
       (up ? 'Create my account' : 'Sign in') + '</button>';
+    if (!up) {
+      h += '<button class="btn" id="rpForgot" style="width:100%;padding:11px;margin-top:8px;' +
+        'font-size:12.5px">I have forgotten my password</button>';
+    }
     h += '<div style="text-align:center;margin:12px 0 8px;color:var(--ink-faint);font-size:12px">or</div>';
     h += '<button class="btn" id="rpLink" style="width:100%;padding:12px">Email me a sign-in link</button>';
     h += '<div id="rpMsg" class="measured" style="margin-top:12px"></div>';
@@ -11042,6 +11081,7 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     on($('rpX'), 'click', closeSheet);
     on($('rpGo'), 'click', function () { authTab === 'up' ? doSignUp() : doSignIn(); });
     on($('rpLink'), 'click', doMagicLink);
+    on($('rpForgot'), 'click', doForgot);
     box.querySelectorAll('input').forEach(function (i) {
       on(i, 'keydown', function (e) { if (e.key === 'Enter') $('rpGo').click(); });
     });
@@ -11095,6 +11135,73 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
+  /* Until now there was no way back from a forgotten password — not a bad
+     screen, NO screen. Anyone who forgot theirs was locked out of their own
+     account for good, and the only fix was deleting the account. Supabase has
+     always been able to send the email; nothing ever asked it to. */
+  function doForgot() {
+    var email = ($('rpEmail').value || '').trim();
+    if (!email) {
+      msg('Put your email address in above first, then tap this again.', true);
+      try { $('rpEmail').focus(); } catch (e) {}
+      return;
+    }
+    msg('Sending\u2026');
+    RP.sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.href.split('#')[0]
+    }).then(function (r) {
+      if (r.error) {
+        var m = String(r.error.message || '');
+        if (/invalid/i.test(m) && /email/i.test(m)) {
+          return msg('That address was refused as undeliverable. Check it for a typo.', true);
+        }
+        return msg(m, true);
+      }
+      /* Deliberately does not say whether that address has an account: that
+         would tell a stranger who is signed up here. */
+      msg('If there is an account for ' + email + ', a reset link is on its way. ' +
+          'Open it on this phone and you can choose a new password.');
+    }).catch(function (e) { msg(String(e.message || e), true); });
+  }
+
+  /* Coming back from that email. Supabase puts the session in the URL and
+     fires PASSWORD_RECOVERY; at that point the person is signed in but has to
+     be given somewhere to type the new one, or they just land on the app with
+     no idea anything happened. */
+  function newPasswordSheet() {
+    var h = '<b style="font-size:16px">Choose a new password</b>' +
+      '<div class="measured" style="margin-top:6px">You are signed in from the link. ' +
+      'Set a password you will remember and this is done.</div>' +
+      '<label class="lab" style="margin-top:14px;display:block">NEW PASSWORD</label>' +
+      '<input id="rpNewPw" class="inp" type="password" autocomplete="new-password" ' +
+      'placeholder="At least 6 characters" style="width:100%;margin-bottom:10px">' +
+      '<label class="lab">AND AGAIN</label>' +
+      '<input id="rpNewPw2" class="inp" type="password" autocomplete="new-password" ' +
+      'style="width:100%;margin-bottom:12px">' +
+      '<button class="btn primary" id="rpPwGo" style="width:100%;padding:13px">Save it</button>' +
+      '<div id="rpPwMsg" class="measured" style="margin-top:10px"></div>' +
+      '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:8px">Not now</button>';
+    sheet(h);
+    on($('rpX'), 'click', closeSheet);
+    function save() {
+      var a = $('rpNewPw').value || '', b = $('rpNewPw2').value || '', m = $('rpPwMsg');
+      function bad(t) { m.textContent = t; m.style.color = 'var(--miss)'; }
+      if (a.length < 6) return bad('Six characters or more, please.');
+      if (a !== b) return bad('Those two do not match.');
+      $('rpPwGo').disabled = true;
+      m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ password: a }).then(function (r) {
+        $('rpPwGo').disabled = false;
+        if (r.error) return bad(r.error.message);
+        closeSheet();
+        toast('New password saved. You are signed in.');
+      });
+    }
+    on($('rpPwGo'), 'click', save);
+    on($('rpNewPw2'), 'keydown', function (e) { if (e.key === 'Enter') save(); });
+  }
+  RP.newPasswordSheet = newPasswordSheet;
+
   function doMagicLink() {
     var email = ($('rpEmail').value || '').trim();
     if (!email) return msg('Put your email in first, then tap this.', true);
@@ -11136,6 +11243,22 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
         'have as a singer — coaches practise too.</div>';
     }
     if (p.is_coach) {
+      var mine = p.theme == null || p.theme === '' ? 'inflow' : p.theme;
+      h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
+        '<div class="rp-lab">YOUR COLOURS</div>' +
+        '<div class="measured" style="margin:5px 0 9px">What you see, and what the students you ' +
+        'sign up see if they ask for your look.</div>';
+      RP.THEMES.forEach(function (x) {
+        var on = (x.id || 'repertoire') === (mine || 'repertoire');
+        h += '<button class="btn' + (on ? ' primary' : '') + '" data-theme="' + esc(x.id) +
+          '" style="width:100%;padding:10px;margin-bottom:6px;text-align:left">' +
+          '<b>' + esc(x.name) + '</b> \u00b7 <span style="font-weight:600;opacity:.8">' +
+          esc(x.note) + '</span></button>';
+      });
+      h += '</div>';
+    }
+
+    if (p.is_coach) {
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
@@ -11154,6 +11277,17 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     sheet(h);
     on($('rpX'), 'click', closeSheet);
     on($('rpNameGo'), 'click', saveName);
+    (sheetEl() || document).querySelectorAll('[data-theme]').forEach(function (b) {
+      on(b, 'click', function () {
+        var t = b.dataset.theme;
+        RP.sb.from('profiles').update({ theme: t }).eq('id', RP.user.id).then(function (r) {
+          if (r.error) return toast(r.error.message);
+          RP.profile.theme = t;
+          brand();
+          RP.refresh().then(function () { openAccount(); });
+        });
+      });
+    });
     on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
@@ -11499,13 +11633,22 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
      Signed out is always Repertoire. */
   try { RP.useCoachColours = localStorage.getItem('rp_coachcolours') === '1'; } catch (e) {}
 
+  /* A coach's colours belong to the coach. Until now there was only one set,
+     so every coach who switched teaching on got In Flow's brown and gold —
+     Ja Ronn's brand, on another coach's students' phones. */
+  RP.THEMES = [
+    { id: 'inflow', name: 'In Flow', note: 'Brown, gold and burnt orange.' },
+    { id: 'deep',   name: 'Deep',    note: 'Blue-green and copper.' },
+    { id: '',       name: 'Repertoire', note: 'The app\u2019s own colours. No branding.' }
+  ];
+
   function brand() {
     var t = 'repertoire';
     if (RP.profile && RP.profile.is_coach) t = RP.profile.theme || 'inflow';
     else if (RP.coach && RP.useCoachColours) t = RP.coach.theme || 'inflow';
     var b = document.body;
-    ['inflow'].forEach(function (name) {
-      b.classList.toggle('rp-brand-' + name, t === name);
+    RP.THEMES.forEach(function (x) {
+      if (x.id) b.classList.toggle('rp-brand-' + x.id, t === x.id);
     });
   }
   RP.brand = brand;
@@ -11544,6 +11687,13 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
       RP.ready = true;
       RP.sb.auth.onAuthStateChange(function (ev, session) {
         RP.user = session ? session.user : null;
+        if (ev === 'PASSWORD_RECOVERY') {
+          /* after the data has loaded, or the sheet opens over a blank app */
+          loadAll().then(function () {
+            subscribe(); rerender(); newPasswordSheet();
+          });
+          return;
+        }
         if (!RP.user) {
           RP.profile = null; RP.coach = null; RP.students = [];
           RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];
@@ -12218,44 +12368,58 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
     on($('rpAddStu'), 'click', addStudentSheet);
   }
 
+  /* Adding a student used to mean scrolling a list of EVERYONE who had ever
+     signed up — every name and every email in the database, to anybody with an
+     account. That was fine for three people at a pitch and indefensible for
+     strangers, so the profiles table is shut now and this asks for the exact
+     address instead. The coach code is still the better way: he reads out six
+     characters and they join themselves. This is for when they are not in the
+     room. */
   function addStudentSheet() {
-    var h = '<b style="font-size:16px">Add a student</b>' +
-      '<div class="measured" style="margin-top:6px">' +
-      ((RP.profile || {}).coach_code
-        ? 'Or just read them your code — <b style="letter-spacing:2px">' +
-          esc(RP.profile.coach_code) + '</b> — and they join themselves. '
-        : '') +
-      'Everyone who has signed up:</div><div id="rpStuList" class="rp-empty">Loading…</div>' +
+    var code = (RP.profile || {}).coach_code;
+    var h = '<b style="font-size:16px">Add a student</b>';
+    if (code) {
+      h += '<div class="rp-card hot" style="margin-top:12px"><div class="rp-lab">EASIEST WAY</div>' +
+        '<div style="font-size:29px;font-weight:900;letter-spacing:3px">' + esc(code) + '</div>' +
+        '<div class="rp-sub">Read them your code. They put it in on their Coach tab and you are paired ' +
+        '— you do not need their email at all.</div></div>';
+    }
+    h += '<div class="rp-lab" style="margin-top:16px">OR BY EMAIL</div>' +
+      '<div class="measured" style="margin-bottom:8px">The address they signed up with, exactly. ' +
+      'You cannot browse other people\u2019s accounts.</div>' +
+      '<div class="row" style="gap:7px;flex-wrap:nowrap">' +
+      '<input id="rpAddEmail" class="rp-inp" type="email" placeholder="them@example.com" ' +
+      'autocapitalize="off" spellcheck="false" style="flex:1">' +
+      '<button class="btn primary" id="rpAddGo" style="padding:11px 15px">Add</button></div>' +
+      '<div id="rpAddMsg" class="measured" style="margin-top:8px"></div>' +
       '<button class="btn" id="rpX" style="width:100%;padding:11px;margin-top:10px">Close</button>';
     var box = sheet(h);
     closeBtn(box);
-    RP.sb.from('profiles').select('*').order('created_at')
-      .then(function (r) {
-        var have = RP.students.map(function (s) { return s.id; });
-        var list = (r.data || []).filter(function (p) { return have.indexOf(p.id) < 0 && p.id !== RP.user.id; });
-        var el = $('rpStuList');
-        if (!el) return;
-        if (!list.length) {
-          el.innerHTML = 'Nobody new. Everyone who has signed up is already on your list.';
+
+    function go() {
+      var i = $('rpAddEmail'), m = $('rpAddMsg'), b = $('rpAddGo');
+      var email = (i.value || '').trim();
+      if (!email || email.indexOf('@') < 0) {
+        m.textContent = 'That does not look like an email address.';
+        m.style.color = 'var(--miss)';
+        return;
+      }
+      b.disabled = true;
+      m.textContent = 'Looking\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.rpc('add_student_by_email', { p_email: email }).then(function (r) {
+        b.disabled = false;
+        if (r.error) {
+          m.textContent = r.error.message;
+          m.style.color = 'var(--miss)';
           return;
         }
-        el.className = '';
-        el.innerHTML = list.map(function (p) {
-          return '<div class="rp-card" data-add="' + esc(p.id) + '" style="cursor:pointer">' +
-            '<div class="rp-ttl">' + esc(p.display_name) + '</div>' +
-            '<div class="rp-sub">' + esc(p.email) + '</div></div>';
-        }).join('');
-        each(el, '[data-add]', function (c) {
-          on(c, 'click', function () {
-            c.style.opacity = '.5';
-            RP.sb.from('coach_students').insert({ coach_id: RP.user.id, student_id: c.dataset.add })
-              .then(function (r2) {
-                if (r2.error) { c.style.opacity = ''; return fail(r2.error); }
-                RP.closeSheet(); RP.toast('Added'); RP.refresh();
-              });
-          });
-        });
+        RP.closeSheet();
+        RP.toast(r.data + ' is now your student.');
+        RP.refresh();
       });
+    }
+    on($('rpAddGo'), 'click', go);
+    on($('rpAddEmail'), 'keydown', function (e) { if (e.key === 'Enter') go(); });
   }
 
   function studentDetail() {
@@ -13124,8 +13288,12 @@ body.rp-brand-inflow .kbdkey.black.lit{background:linear-gradient(180deg,#c1521d
         '<div class="measured" style="margin-top:8px">So the app pitches itself at the right level. ' +
         'There is no wrong answer and you can change both later.</div>' +
         '<div class="rp-lab" style="margin-top:20px">WHERE WOULD YOU PUT YOURSELF?</div>' +
-        opt('exp', 1, 'New', 'Never been taught any of this.') +
-        opt('exp', 1, 'Beginner', 'You sing, but you have never trained.') +
+        /* There were FOUR options here and only three levels behind them:
+           "New" and "Beginner" both recorded 1, so one of the two choices
+           changed nothing at all. Offering a choice that does nothing is the
+           same kind of lie as a made-up number, so the two that meant the
+           same thing are now one that says both. */
+        opt('exp', 1, 'New to it', 'Never been taught \u2014 or you sing, but you have never trained.') +
         opt('exp', 2, 'Intermediate', 'Lessons, a choir or a band at some point.') +
         opt('exp', 3, 'Experienced', 'Trained, and you have been at it a while.'));
       wire('exp', function (v) { ME.experience = v; step = 1; ask(); });
