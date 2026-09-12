@@ -591,7 +591,8 @@
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
       sb.from('takes').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(50),
       sb.from('results').select('*').eq('student_id', uid).order('created_at', { ascending: false }).limit(300),
-      sb.from('coach_requests').select('*').eq('student_id', uid).order('created_at', { ascending: false })
+      sb.from('coach_requests').select('*').eq('student_id', uid).order('created_at', { ascending: false }),
+      sb.from('coach_students').select('*').eq('student_id', uid)
     ]).then(function (r) {
       RP.assignments = rows(r[1], RP.assignments);
       RP.messages    = rows(r[2], RP.messages);
@@ -599,11 +600,20 @@
       RP.results     = rows(r[4], RP.results);
       RP.myRequests  = rows(r[5], RP.myRequests);
       learnNames((RP.myRequests || []).map(function (x) { return x.coach_id; }));
+      RP.myPairing = ((r[6] && r[6].data) || [])[0] || RP.myPairing || null;
       if (r[0] && r[0].error) { loadOk = false; return; }   // keep the coach we had
       var link = (r[0].data || [])[0];
       if (!link) { RP.coach = null; return; }
       return sb.from('profiles').select('*').eq('id', link.coach_id).maybeSingle()
-        .then(function (c) { RP.coach = c.data || null; });
+        .then(function (c) {
+          RP.coach = c.data || null;
+          if (!RP.coach) return;
+          /* his ladder, so the student can see the rung above the one they
+             are on rather than just a bare name with no context */
+          return sb.from('coach_levels').select('*').eq('coach_id', RP.coach.id)
+            .order('sort').order('created_at')
+            .then(function (l) { RP.coachLevels = rows(l, RP.coachLevels); });
+        });
     });
   }
 
@@ -615,9 +625,13 @@
       sb.from('assignments').select('*').eq('coach_id', uid).order('created_at', { ascending: false }),
       sb.from('takes').select('*').eq('coach_id', uid).order('created_at', { ascending: false }).limit(50),
       sb.from('messages').select('*').or('to_id.eq.' + uid + ',from_id.eq.' + uid).order('created_at', { ascending: false }).limit(50),
-      sb.from('coach_requests').select('*').eq('coach_id', uid).eq('status', 'pending').order('created_at')
+      sb.from('coach_requests').select('*').eq('coach_id', uid).eq('status', 'pending').order('created_at'),
+      sb.from('coach_levels').select('*').eq('coach_id', uid).order('sort').order('created_at'),
+      sb.from('coach_students').select('*').eq('coach_id', uid)
     ]).then(function (r) {
       RP.requests  = rows(r[5], RP.requests);
+      RP.levels    = rows(r[6], RP.levels);
+      RP.pairings  = rows(r[7], RP.pairings);
       learnNames((RP.requests || []).map(function (x) { return x.student_id; }));
       RP.exercises = rows(r[1], RP.exercises);
       // keep the singer's own rows loaded a moment ago, and add the ones we set
@@ -705,6 +719,8 @@
          ask, the same as everything else here */
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_requests', filter: 'coach_id=eq.' + uid },
         function (p) { bump('request', p); });
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'coach_levels', filter: 'coach_id=eq.' + uid },
+        function () { refresh(); });
       ch.on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: 'coach_id=eq.' + uid },
         function () { refresh(); });
       ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'results' },
@@ -908,7 +924,7 @@
           return;
         }
         if (!RP.user) {
-          RP.profile = null; RP.coach = null; RP.students = []; RP.requests = []; RP.myRequests = [];
+          RP.profile = null; RP.coach = null; RP.students = []; RP.requests = []; RP.myRequests = []; RP.levels = []; RP.coachLevels = []; RP.pairings = []; RP.myPairing = null;
           RP.assignments = []; RP.exercises = []; RP.takes = []; RP.messages = []; RP.results = [];
           unsubscribe(); syncHeaderButton(); rerender();
           return;

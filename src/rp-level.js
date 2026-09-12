@@ -127,6 +127,11 @@
     };
   };
 
+  /* A coach looking at a student wants this too — it is the one number that
+     tells "cannot do it" apart from "has not been doing it". Same arithmetic,
+     pointed at somebody else's results. */
+  RP.levelFor = function (studentId) { return L.count(studentId); };
+
   /* ------------------------------------------------------------------ */
   /* the quiet part: notice a level change, say it once                  */
   /* ------------------------------------------------------------------ */

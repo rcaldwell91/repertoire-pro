@@ -197,6 +197,29 @@
       '<span class="rp-sub" style="margin:0">' + (open.length ? open.length + ' to do' : 'all done') +
       '</span></div>';
 
+    /* Where his coach has put him, in his coach's words — shown as a
+       judgement, above the week, because it is the thing a student most
+       wants to know and the app cannot work it out. */
+    var myPair = RP.myPairing;
+    var myLvlId = myPair && myPair.level_id;
+    if (myLvlId) {
+      var ladder = RP.coachLevels || [];
+      var idx = ladder.findIndex(function (x) { return x.id === myLvlId; });
+      var lv = idx >= 0 ? ladder[idx] : null;
+      var nextUp = idx >= 0 && ladder[idx + 1] ? ladder[idx + 1] : null;
+      if (lv) {
+        h += '<div class="rp-card hot" style="margin-top:12px;padding:12px">' +
+          '<div class="rp-lab">' + esc(coach.display_name.toUpperCase()) + ' HAS YOU AT</div>' +
+          '<div style="font-size:17px;font-weight:900;margin-top:2px">' + esc(lv.name) + '</div>' +
+          (lv.blurb ? '<div class="rp-sub">' + esc(lv.blurb) + '</div>' : '') +
+          (nextUp ? '<div class="rp-sub" style="margin-top:6px">Next: <b>' + esc(nextUp.name) + '</b>' +
+            (nextUp.blurb ? ' \u2014 ' + esc(nextUp.blurb) : '') + '</div>' : '') +
+          '<div class="measured" style="margin-top:8px;font-size:11.5px">This is ' +
+          esc(coach.display_name) + '\u2019s judgement, not something the app measured. ' +
+          'He moves it when he thinks you are ready.</div></div>';
+      }
+    }
+
     h += weekStrip(RP.user.id);
 
     if (pickedDay) {
@@ -655,7 +678,7 @@
       (RP.takes.length ? '<span class="rp-tag">' + RP.takes.length + '</span>' : '') + '</button></div>';
 
     if (tab === 'students') h += openStudent ? studentDetail() : studentList();
-    else if (tab === 'exercises') h += exerciseList();
+    else if (tab === 'exercises') h += exerciseList() + levelsSection();
     else h += inbox();
 
     host.innerHTML = h;
@@ -672,7 +695,7 @@
     });
 
     if (tab === 'students') openStudent ? wireStudentDetail(host) : wireStudentList(host);
-    else if (tab === 'exercises') wireExercises(host);
+    else if (tab === 'exercises') { wireExercises(host); wireLevelsSection(host); }
     else wireInbox(host);
   }
 
@@ -795,6 +818,145 @@
     on($('rpAddEmail'), 'keydown', function (e) { if (e.key === 'Enter') go(); });
   }
 
+  /* ================================================================ */
+  /* THE COACH'S OWN LEVELS                                            */
+  /*                                                                   */
+  /* Robert, in the September to-do: "what describes his levels" — a   */
+  /* coach may want to define the levels for his own students, rather  */
+  /* than the app defining them for everyone.                          */
+  /*                                                                   */
+  /* So the app now has THREE kinds of level and never confuses them:  */
+  /*                                                                   */
+  /*   the app's level  — how much you have DONE. Counted.             */
+  /*   the test         — how good you are. Measured, in cents and %.  */
+  /*   the coach's      — where your coach says you are. His judgement,*/
+  /*                      in his words, shown as his.                  */
+  /*                                                                   */
+  /* The app cannot measure "ready for the next stage". A coach can.   */
+  /* This stores his opinion AS his opinion.                           */
+  /* ================================================================ */
+  function levelName(id) {
+    var l = (RP.levels || []).find(function (x) { return x.id === id; });
+    return l ? l.name : null;
+  }
+
+  function pairingFor(studentId) {
+    return (RP.pairings || []).find(function (x) { return x.student_id === studentId; }) || null;
+  }
+
+  function coachLevelCard(s) {
+    var ladder = RP.levels || [];
+    var pair = pairingFor(s.id);
+    var on = pair && pair.level_id ? levelName(pair.level_id) : null;
+
+    var h = '<div class="rp-card" style="margin-top:9px;padding:11px">' +
+      '<div class="rp-lab">WHERE YOU HAVE PUT THEM</div>';
+    if (!ladder.length) {
+      h += '<div class="rp-sub" style="margin-top:4px">You have not written your levels yet. ' +
+        'They are yours — your words, your stages. Set them up under <b>Exercises</b>.</div>';
+    } else {
+      h += '<div class="rp-ttl" style="font-weight:700;font-size:13px">' +
+        (on ? esc(on) : 'Not placed yet') + '</div>' +
+        '<div class="rp-sub">Your call, in your words. The app shows it to them as yours.</div>' +
+        '<div style="margin-top:9px">';
+      ladder.forEach(function (l) {
+        var here = pair && pair.level_id === l.id;
+        h += '<button class="btn' + (here ? ' primary' : '') + '" data-setlvl="' + esc(l.id) +
+          '" data-stu="' + esc(s.id) + '" style="width:100%;padding:9px;margin-bottom:6px;' +
+          'font-size:12.5px;text-align:left">' + esc(l.name) +
+          (l.blurb ? ' <span style="font-weight:600;opacity:.75">\u00b7 ' + esc(l.blurb) + '</span>' : '') +
+          '</button>';
+      });
+      if (on) {
+        h += '<button class="btn" data-setlvl="" data-stu="' + esc(s.id) +
+          '" style="width:100%;padding:8px;font-size:12px;color:var(--miss)">Take them off a level</button>';
+      }
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+
+  function wireCoachLevels(host) {
+    each(host, '[data-setlvl]', function (b) {
+      on(b, 'click', function () {
+        var id = b.dataset.setlvl || null;
+        b.disabled = true;
+        RP.sb.from('coach_students')
+          .update({ level_id: id, level_set_at: id ? new Date().toISOString() : null })
+          .eq('coach_id', RP.user.id).eq('student_id', b.dataset.stu)
+          .then(function (r) {
+            b.disabled = false;
+            if (r.error) return fail(r.error);
+            RP.toast(id ? 'Moved them to ' + levelName(id) + '.' : 'Taken off a level.');
+            RP.refresh();
+          });
+      });
+    });
+  }
+
+  /* the ladder itself, written by him, under Exercises */
+  function levelsSection() {
+    var ladder = RP.levels || [];
+    var h = '<div class="rp-lab" style="margin-top:22px">YOUR LEVELS</div>' +
+      '<div class="measured" style="margin:5px 0 9px">Your own stages, in your own words. The app ' +
+      'has its own level — that one just counts how much somebody has done. This one is your ' +
+      'judgement about where they are, and it is shown to them as yours.</div>';
+    if (!ladder.length) {
+      h += '<div class="rp-empty" style="padding:6px 2px">None yet. Most coaches have three or ' +
+        'four \u2014 whatever you already say out loud.</div>';
+    }
+    ladder.forEach(function (l, i) {
+      h += '<div class="rp-card" style="padding:10px;margin-bottom:6px">' +
+        '<div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">' +
+        '<div style="flex:1;min-width:0"><div class="rp-ttl">' + (i + 1) + '. ' + esc(l.name) + '</div>' +
+        (l.blurb ? '<div class="rp-sub">' + esc(l.blurb) + '</div>' : '') + '</div>' +
+        '<button class="btn" data-dellvl="' + esc(l.id) + '" style="padding:6px 10px;font-size:11.5px;' +
+        'color:var(--miss)">Remove</button></div></div>';
+    });
+    h += '<div class="row" style="gap:7px;flex-wrap:nowrap;margin-top:8px">' +
+      '<input id="rpLvName" class="rp-inp" placeholder="Name it \u2014 e.g. Foundations" style="flex:1">' +
+      '<button class="btn primary" id="rpLvAdd" style="padding:11px 15px">Add</button></div>' +
+      '<input id="rpLvBlurb" class="rp-inp" style="margin-top:7px" ' +
+      'placeholder="What it means, in one line (optional)">' +
+      '<div id="rpLvMsg" class="measured" style="margin-top:7px"></div>';
+    return h;
+  }
+
+  function wireLevelsSection(host) {
+    function add() {
+      var n = $('rpLvName'), b = $('rpLvBlurb'), m = $('rpLvMsg');
+      var name = (n.value || '').trim();
+      if (!name) { m.textContent = 'Give it a name first.'; m.style.color = 'var(--miss)'; return; }
+      $('rpLvAdd').disabled = true;
+      m.textContent = 'Adding\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.from('coach_levels').insert({
+        coach_id: RP.user.id, name: name, blurb: (b.value || '').trim(),
+        sort: (RP.levels || []).length
+      }).select().then(function (r) {
+        $('rpLvAdd').disabled = false;
+        if (r.error || !r.data || !r.data.length) {
+          m.textContent = 'It did not save: ' + ((r.error && r.error.message) || 'nothing came back');
+          m.style.color = 'var(--miss)';
+          return;
+        }
+        RP.levels = (RP.levels || []).concat(r.data);
+        n.value = ''; b.value = '';
+        RP.refresh();
+      });
+    }
+    on($('rpLvAdd'), 'click', add);
+    on($('rpLvName'), 'keydown', function (e) { if (e.key === 'Enter') add(); });
+    each(host, '[data-dellvl]', function (btn) {
+      on(btn, 'click', function () {
+        btn.disabled = true;
+        RP.sb.from('coach_levels').delete().eq('id', btn.dataset.dellvl).then(function (r) {
+          if (r.error) { btn.disabled = false; return fail(r.error); }
+          RP.refresh();
+        });
+      });
+    });
+  }
+
   function studentDetail() {
     var s = RP.students.find(function (x) { return x.id === openStudent; });
     if (!s) { openStudent = null; return studentList(); }
@@ -814,12 +976,46 @@
               technical: 'Comfortable with the proper terms.' };
     var E = { 1: 'New to singing', 2: 'Has sung a bit', 3: 'Has sung a lot' };
     if (s.words || s.experience) {
+      /* Where the placement came from matters to a teacher more than the
+         placement does. "They told us" and "we watched them do it" are very
+         different pieces of information, and until now the coach saw neither —
+         he saw a word with no provenance at all. */
+      var pl = s.placement || {};
+      var meas = pl.measured || null;
       h += '<div class="rp-card hot" style="margin-top:12px;padding:11px">' +
         '<div class="rp-lab">HOW TO TALK TO THEM</div>' +
         '<div class="rp-ttl" style="font-weight:700;font-size:13px">' +
         esc(E[s.experience] || '') + '. ' + esc(W[s.words] || '') + '</div>' +
-        '<div class="rp-sub">Their own answer when they opened the app.</div></div>';
+        '<div class="rp-sub">' +
+        (meas ? 'Measured by the app, not just asked.' :
+         pl.answers ? 'Their own answer when they opened the app.' :
+                      'The app\u2019s default \u2014 they have not answered or been measured.') +
+        '</div>';
+      if (meas && meas.why && meas.why.length) {
+        h += '<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">' +
+          '<div class="rp-lab">WHAT THE TEST ACTUALLY SAW</div>';
+        meas.why.forEach(function (w) {
+          h += '<div style="font-size:12.5px;line-height:1.5">\u00b7 ' + esc(w) + '</div>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
     }
+
+    /* How much work they have put in — the app's own level, which counts and
+       does not judge. Useful to a coach for exactly one thing: telling apart
+       "cannot do it" from "has not been doing it". */
+    if (RP.levelFor) {
+      var wk = RP.levelFor(s.id);
+      h += '<div class="rp-card" style="margin-top:9px;padding:11px">' +
+        '<div class="rp-lab">HOW MUCH THEY HAVE DONE</div>' +
+        '<div class="rp-ttl" style="font-weight:700;font-size:13px">Level ' + wk.level +
+        ' \u00b7 ' + esc(wk.name) + '</div>' +
+        '<div class="rp-sub">' + wk.points + ' points, counted from things they actually did. ' +
+        'This is effort, not ability.</div></div>';
+    }
+
+    h += coachLevelCard(s);
 
     h += '<div class="rp-lab" style="margin-top:16px">THIS WEEK</div>';
     if (!mine.length) h += '<div class="rp-empty" style="padding:6px 2px">Nothing set yet.</div>';
@@ -865,6 +1061,7 @@
   }
 
   function wireStudentDetail(host) {
+    wireCoachLevels(host);
     wireTakeAudio(host);
     on($('rpBack'), 'click', function () { openStudent = null; renderTeacher(); });
     on($('rpAssign'), 'click', function () { assignSheet(openStudent); });

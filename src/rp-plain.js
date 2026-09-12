@@ -38,6 +38,7 @@
     ME.experience = +(localStorage.getItem('rp_exp') || 2);
     ME.taught = +(localStorage.getItem('rp_taught') || 2);
     ME.answers = JSON.parse(localStorage.getItem('rp_answers') || 'null');
+    ME.measured = JSON.parse(localStorage.getItem('rp_measured') || 'null');
   } catch (e) {}
 
   /* ------------------------------------------------------------------ */
@@ -93,6 +94,7 @@
       localStorage.setItem('rp_exp', String(ME.experience));
       localStorage.setItem('rp_taught', String(ME.taught));
       if (ME.answers) localStorage.setItem('rp_answers', JSON.stringify(ME.answers));
+      if (ME.measured) localStorage.setItem('rp_measured', JSON.stringify(ME.measured));
       localStorage.setItem('rp_asked', '1');
     } catch (e) {}
     var RP = window.RP;
@@ -101,7 +103,15 @@
       /* the raw answers travel too, so a later change to the questions or the
          mapping can re-place everybody instead of stranding them on whatever
          rule happened to be running the day they signed up */
-      if (ME.answers) row.placement = { answers: ME.answers, at: new Date().toISOString() };
+      /* The MEASURED placement used to live only on the phone that measured it,
+         so a coach looking at a student could not tell whether "intermediate"
+         was something they said or something the app watched them do. Those
+         are very different pieces of information for a teacher, so both travel. */
+      if (ME.answers || ME.measured) {
+        row.placement = { at: new Date().toISOString() };
+        if (ME.answers) row.placement.answers = ME.answers;
+        if (ME.measured) row.placement.measured = ME.measured;
+      }
       RP.sb.from('profiles').update(row).eq('id', RP.user.id).then(function () {
         RP.profile.words = ME.words;
         RP.profile.experience = ME.experience;
