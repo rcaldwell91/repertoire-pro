@@ -160,7 +160,7 @@
         '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>';
 
       /* Robert, 13 Sep: "make it so students can request a coach for coaching."
-         The code is the coach's move — he reads it out. This is the student's:
+         The code is the coach's move — they read it out. This is the student's:
          they ask, and the coach says yes or no. Nobody ends up teaching someone
          they never agreed to. */
       var asked = (RP.myRequests || []).filter(function (r) { return r.status === 'pending'; });
@@ -222,7 +222,7 @@
             (nextUp.blurb ? ' \u2014 ' + esc(nextUp.blurb) : '') + '</div>' : '') +
           '<div class="measured" style="margin-top:8px;font-size:11.5px">This is ' +
           esc(coach.display_name) + '\u2019s judgement, not something the app measured. ' +
-          'He moves it when he thinks you are ready.</div></div>';
+          'They move it when they think you are ready.</div></div>';
       }
     }
 
@@ -246,7 +246,7 @@
     } else {
       if (!open.length && !done.length) {
         h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
-          ' sets something on his phone it lands here — you will not need to refresh.</div>';
+          ' sets something on their phone it lands here — you will not need to refresh.</div>';
       }
       open.forEach(function (a) { h += assignmentCard(a, null); });
       if (done.length) {

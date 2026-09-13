@@ -634,6 +634,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
             <option value="45,69">Baritone (A2–A4)</option>
             <option value="48,72">Tenor (C3–C5)</option>
             <option value="53,77">Alto (F3–F5)</option>
+            <option value="57,81">Mezzo-soprano (A3–A5)</option>
             <option value="60,84">Soprano (C4–C6)</option>
           </select>
         </div>
@@ -2610,13 +2611,16 @@ function drawGame(){
   if(G.trail.length>1){
     cx2.beginPath();
     let started=false;
+    let prevM=null;
     for(const pt of G.trail){
-      if(pt.m===null){ started=false; continue; }
+      if(pt.m===null){ started=false; prevM=null; continue; }
       const x = nowX + (pt.b-beat)*ppb;
       if(x<-20) continue;
       const disp = state.octaveEquiv? foldToRange(pt.m, lo, hi) : pt.m;
       const y = yOf(disp);
-      if(!started){ cx2.moveTo(x,y); started=true; } else cx2.lineTo(x,y);
+      const leap = prevM!==null && Math.abs(disp-prevM) > 6;
+      if(!started || leap){ cx2.moveTo(x,y); started=true; } else cx2.lineTo(x,y);
+      prevM = disp;
     }
     if(isLight()){
       cx2.strokeStyle='rgba(255,255,255,.9)'; cx2.lineWidth=6; cx2.stroke();
@@ -3057,7 +3061,7 @@ function gameFrame(){
   if(state.mode==='yt'){ ytFrame(dt); return; }
   if(state.mode==='lib'){ libFrame(dt); return; }
   if(SONGLIB.active){ libRunFrame(); return; }
-  if(state.mode==='train' && TRAIN.kind!=='ladder'){ trainFrame(dt); return; }
+  if((state.mode==='train' && TRAIN.kind!=='ladder') || RT.phase){ trainFrame(dt); return; }
   if(!G.running){ return; }
 
   const s = currentSong();
@@ -3255,6 +3259,7 @@ function drawPitchLane(c2, cnv, trail, now, key){
     c2.stroke();
   }
   c2.shadowBlur=0; c2.lineWidth=1;
+  if(window.__rpOverlay){ try{ window.__rpOverlay(c2, W, H, now, pps, yOf); }catch(e){} }
   const lastLive = trail.length && trail[trail.length-1].m!==null && now-trail[trail.length-1].t < 0.6
     ? trail[trail.length-1].m : null;
   drawKeyRail(c2, H, lo, hi, yOf, lastLive);
@@ -3610,6 +3615,7 @@ function matchEnd(){
   journeyMark('train');
   trainView('grid');
   const pct = Math.round(100*MATCH.score/MATCH.total);
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Ear · Note Match', score: MATCH.score, out_of: MATCH.total }); } catch (e) {}
   const msg = pct>=90?'Incredible ear.':pct>=70?'Strong — keep drilling.':pct>=40?'Coming along — get your reps in daily.':'Everyone starts here. Run it again.';
   setTimeout(()=>alert('Note Match: '+MATCH.score+'/'+MATCH.total+' ('+pct+'%)\n'+msg), 50);
 }
@@ -8112,15 +8118,15 @@ renderJourney();
       game: 'inkey',
       d: 'What it tells you to actually do.',
       unlocks: '"This is in D minor."',
-      body: `<p>Your coach is not describing the song. He is telling you <b>which seven notes are on
+      body: `<p>Your coach is not describing the song. They are telling you <b>which seven notes are on
       the table</b>, and <b>which one is home</b>. Those two things:</p>
       <p class="say"><b>D minor is:  D  E  F  G  A  B♭  C</b><br>
       Home is <b>D</b>. Everything leans back toward it.</p>
-      <p><b>So what do you do with that?</b> Three things, and they are the reason he said it:</p>
+      <p><b>So what do you do with that?</b> Three things, and they are the reason they said it:</p>
       <p><b>1. B♭, not B.</b> That is the one black note in the set, and it is the commonest wrong
       note in the key. If something you sing suddenly sounds wrong and sour, that is usually it.</p>
       <p><b>2. "The 5" means A.</b> Count up from home: D is 1, E is 2, F is 3, G is 4, <b>A is 5</b>.
-      Now when he says "you're flat on the 5", you know which note he means without asking.</p>
+      Now when they say "you're flat on the 5", you know which note they mean without asking.</p>
       <p><b>3. F is what makes it sad.</b> Raise that one note to F♯ and the same seven notes become
       D <i>major</i>. One note is the entire difference between the two moods. That is what people
       mean when they say the third does all the work.</p>
@@ -8206,11 +8212,11 @@ renderJourney();
       body: `<p>This phrase is genuinely ambiguous, and that ambiguity is doing the confusing — not you.
       It has three meanings:</p>
       <p><b>(a) The third of the chord.</b> The note that makes the current chord major or minor. Clue:
-      he is at the piano playing a chord when he says it.</p>
-      <p><b>(b) Scale degree 3 of the key.</b> The "mi" of the key you are in. Clue: he is talking about
+      they are at the piano playing a chord when they say it.</p>
+      <p><b>(b) Scale degree 3 of the key.</b> The "mi" of the key you are in. Clue: they are talking about
       the key or the scale.</p>
       <p><b>(c) A harmony line a third above the melody.</b> Sing the tune, but a third higher, all the
-      way through. Clue: he is teaching you a backing part — and in practice, <b>this is the most
+      way through. Clue: they are teaching you a backing part — and in practice, <b>this is the most
       common one</b>.</p>
       <p class="say">If you are not sure, ask: "third of the chord, or a third above the melody?" It is
       a musician's question, and it is the right one.</p>`
@@ -8324,7 +8330,7 @@ renderJourney();
       <p class="say"><b>On "mix":</b> coaches teach it as a gear you find; voice scientists say there
       are only two mechanisms and no third one in between. Both are useful. It is a real coordination
       to learn and not a separate gear to discover — and if your coach is CVT-trained, note that "modes"
-      means something completely different to him than it does in a theory book.</p>`
+      means something completely different to them than it does in a theory book.</p>`
     },
     { u: 'Your voice', n: 41, tier: 2, t: 'Transposition', voc: true,
       d: 'Moving every note by the same distance.',
@@ -8379,7 +8385,7 @@ renderJourney();
       is just natural minor.</p>
       <p class="say"><b>Naming collision, worth knowing:</b> in Complete Vocal Technique, "modes" means
       Neutral, Curbing, Overdrive and Edge — vocal gears, nothing to do with scales. If your coach uses
-      that word, check which one he means.</p>`
+      that word, check which one they mean.</p>`
     },
     { u: 'Advanced', n: 46, tier: 3, t: 'Modulation',
       d: 'How songs change key.',
@@ -8790,6 +8796,10 @@ renderJourney();
     const eng = e.engine || {};
     const secs = eng.kind === 'timed' ? 0 : (eng.mins ? eng.mins * 60 : 60);
     GUIDE.on = true; GUIDE.ex = e; GUIDE.t0 = Date.now(); GUIDE.mode = eng.kind;
+    GUIDE.heard = false; GUIDE.heardAt = 0; GUIDE.quietSince = 0; GUIDE.askedMic = false; GUIDE.finished = false;
+    if (eng.kind === 'timed' && typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') {
+      GUIDE.askedMic = true; try { enableMic(); } catch (err) {}
+    }
     GUIDE.target = eng.target || 0; GUIDE.counts = eng.counts || null;
 
     panel.innerHTML =
@@ -8839,7 +8849,27 @@ renderJourney();
                          'Breathe out — ribs come in last'][phase];
       return;
     }
-    el.textContent = s.toFixed(1) + 's';
+    if (GUIDE.finished) return;   /* the result stays on screen until the panel closes */
+    const canHear = GUIDE.mode === 'timed' && typeof MIC !== 'undefined' && MIC.on;
+    if (canHear) {
+      const loud = MIC.level > 0.005;
+      if (loud) { if (!GUIDE.heard) { GUIDE.heard = true; GUIDE.heardAt = s; } GUIDE.quietSince = 0; }
+      else if (GUIDE.heard) { GUIDE.quietSince = (GUIDE.quietSince || 0) + 0.1; }
+      if (GUIDE.heard && GUIDE.quietSince >= 1.0) {
+        const held = Math.max(0, s - GUIDE.quietSince - GUIDE.heardAt);
+        el.textContent = held.toFixed(1) + 's';
+        sub.textContent = 'Stopped when you did — ' + held.toFixed(1) + ' seconds' +
+          (GUIDE.target ? (held >= GUIDE.target ? ', past the ' + GUIDE.target + ' you were aiming for.' : ' of the ' + GUIDE.target + ' you were aiming for.') : '.');
+        try { if (window.RP && RP.logResult) RP.logResult({ kind: 'practice', label: GUIDE.ex ? GUIDE.ex.name : 'Timed', score: Math.round(held), out_of: GUIDE.target || null }); } catch (e) {}
+        GUIDE.heard = false; GUIDE.quietSince = 0; GUIDE.finished = true;
+        setTimeout(endGuided, 1400);
+        return;
+      }
+      if (!GUIDE.heard) { el.textContent = '0.0s'; sub.textContent = 'Start when you are ready — it times itself from the first sound.'; return; }
+      el.textContent = (s - GUIDE.heardAt).toFixed(1) + 's';
+    } else {
+      el.textContent = s.toFixed(1) + 's';
+    }
     if (GUIDE.mode === 'timed' && GUIDE.target) {
       sub.textContent = s >= GUIDE.target
         ? 'Past ' + GUIDE.target + ' seconds. Stop when it stops being even.'
@@ -11055,7 +11085,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<input id="rpName" class="inp" placeholder="First name is fine" autocomplete="name" ' +
         'style="width:100%;margin-bottom:4px">' +
         '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
-        'sees, so use the name he knows you by.</div>';
+        'sees, so use the name they know you by.</div>';
     }
     h += '<label class="lab">EMAIL</label>' +
       '<input id="rpEmail" class="inp" type="email" autocomplete="email" inputmode="email" ' +
@@ -11103,7 +11133,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
     /* It used to fall back to the email prefix, which is how Robert ended up
-       called "lyonxdewitt" on his coach's phone. A name his coach recognises
+       called "lyonxdewitt" on their coach's phone. A name their coach recognises
        is worth one more required box. */
     if (!name) {
       msg('Your name, please — it is what your coach will see.', true);
@@ -11331,7 +11361,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     /* Requiring a name at sign-up only helps people who have not signed up
        yet. Robert's own account was made before that and is still called
-       "lyonxdewitt" on his coach's phone, and deleting the account to fix a
+       "lyonxdewitt" on their coach's phone, and deleting the account to fix a
        name is not a thing anyone should have to do. */
     h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
       '<label class="rp-lab">THE NAME YOUR COACH SEES</label>' +
@@ -11790,7 +11820,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   });
 
   /* Whose colours am I looking at?
-       · A coach sees his own brand. It is his app as much as anyone's.
+       · A coach sees their own brand. It is their app as much as anyone's.
        · A student keeps REPERTOIRE unless they ask for their coach's look.
          Robert: "I like our colours the way they are, I don't want them to
          change." So this is off until someone turns it on, per person, per
@@ -12051,7 +12081,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>';
 
       /* Robert, 13 Sep: "make it so students can request a coach for coaching."
-         The code is the coach's move — he reads it out. This is the student's:
+         The code is the coach's move — they read it out. This is the student's:
          they ask, and the coach says yes or no. Nobody ends up teaching someone
          they never agreed to. */
       var asked = (RP.myRequests || []).filter(function (r) { return r.status === 'pending'; });
@@ -12113,7 +12143,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
             (nextUp.blurb ? ' \u2014 ' + esc(nextUp.blurb) : '') + '</div>' : '') +
           '<div class="measured" style="margin-top:8px;font-size:11.5px">This is ' +
           esc(coach.display_name) + '\u2019s judgement, not something the app measured. ' +
-          'He moves it when he thinks you are ready.</div></div>';
+          'They move it when they think you are ready.</div></div>';
       }
     }
 
@@ -12137,7 +12167,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     } else {
       if (!open.length && !done.length) {
         h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
-          ' sets something on his phone it lands here — you will not need to refresh.</div>';
+          ' sets something on their phone it lands here — you will not need to refresh.</div>';
       }
       open.forEach(function (a) { h += assignmentCard(a, null); });
       if (done.length) {
@@ -14798,9 +14828,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* An SVG the width of its box. The horizontal rules are semitones, named
      down the left, so "am I on the note" is a question you can answer by
      looking — which is the whole point of drawing it. */
+  var LINES = {};   /* id -> notes, so playback can put them on the big map */
   ST.lineHtml = function (notes, id) {
     var b = lineBounds(notes);
     if (!b) return '';
+    LINES[id || ''] = notes;
     var W = 300, H = LINE_H, PAD = 26;
     var y = function (m) { return H - ((m - b.lo) / (b.hi - b.lo)) * H; };
     var x = function (t) { return PAD + (t / b.dur) * (W - PAD); };
@@ -14849,6 +14881,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var dur = +svg.getAttribute('data-dur') || 0;
     var W = 300, PAD = 26;
     follow = { svg: svg, audio: audio, raf: 0 };
+    ST.overlay = { notes: LINES[svg.getAttribute('data-pl') || ''] || null, audio: audio };
     ph.setAttribute('opacity', '1');
     (function step() {
       if (!follow || follow.svg !== svg) return;
@@ -14866,6 +14899,53 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   ST.unfollow = function () {
     if (follow && follow.raf) cancelAnimationFrame(follow.raf);
     follow = null;
+    ST.overlay = null;
+  };
+
+  /* Robert, 13 Sep: "on the playback on the pitch tracker, show the notes
+     on the main key map so they can sing over it — a different colour for
+     the playback notes, keep the live vocals blue, so they can see where
+     they are hitting in comparison."
+
+     The tracker's own draw calls this after it has drawn the live line,
+     handing over its scale, so the take is drawn to the very same pixels:
+     now is the right edge, the past scrolls left. The take's own clock is
+     the audio, so its line sits exactly where it was at that moment of the
+     recording and yours sits where you are — the same x is the same
+     instant. Gold for the take, blue for you. A dot at the edge marks the
+     take's note right now, which is the one to aim at. */
+  window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
+    var o = ST.overlay;
+    if (!o || !o.notes || !o.audio || o.audio.ended) return;
+    var t0 = o.audio.currentTime || 0;
+    var notes = o.notes;
+    c2.save();
+    c2.beginPath();
+    var pen = false, prev = null, cur = null;
+    for (var i = 0; i < notes.length; i++) {
+      var n = notes[i];
+      if (n.m == null) { pen = false; prev = null; continue; }
+      var x = W - (t0 - n.t) * pps;
+      if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+      var y = yOf(n.m);
+      var leap = prev && Math.abs(n.m - prev.m) > 6;
+      if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+      pen = true; prev = n;
+      if (n.t <= t0) cur = n;
+    }
+    c2.strokeStyle = 'rgba(232,179,74,.95)';
+    c2.lineWidth = 2.5;
+    c2.shadowColor = 'rgba(232,179,74,.7)';
+    c2.shadowBlur = 8;
+    c2.stroke();
+    c2.shadowBlur = 0;
+    if (cur && !o.audio.paused) {
+      c2.beginPath();
+      c2.arc(W - 5, yOf(cur.m), 5, 0, Math.PI * 2);
+      c2.fillStyle = 'rgba(232,179,74,1)';
+      c2.fill();
+    }
+    c2.restore();
   };
 
   /* ---------------------------------------------------------------- */
@@ -14995,7 +15075,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.style.cssText = 'margin-top:10px;padding:12px';
     d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
       '<div class="notice" style="margin:8px 0 9px">Sing over one, keep it on your phone, or send it ' +
-      'to your coach — the notes go with it, so he sees where you were as well as hears it.</div>' +
+      'to your coach — the notes go with it, so they see where you were as well as hear it.</div>' +
       '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
     fillTakes();
@@ -17519,8 +17599,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     function draw() {
       var h = '<b style="font-size:18px">What you teach</b>' +
         '<div class="measured" style="margin-top:8px">Your words, not the app’s. Nothing here is ' +
-        'worked out from your students or what you have assigned — a coach saying what he teaches ' +
-        'is a claim he gets to make himself.</div>';
+        'worked out from your students or what you have assigned — a coach saying what they teach ' +
+        'is a claim they get to make themselves.</div>';
 
       h += '<div class="rp-lab" style="margin-top:16px">MUSIC</div><div style="margin-top:7px">';
       GENRES.forEach(function (x) {
@@ -18638,14 +18718,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   /* hide the top while something is actually running, so the exercise is
      the first thing on the screen */
+  /* Only what is actually on the screen counts. The first version also
+     asked the routine whether it was "on" — and a routine you walk out of
+     half-way stays on forever, so the Train tab came back black until a
+     refresh. Briar found that one. */
   function running() {
     var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel'];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
-      if (el && el.style.display && el.style.display !== 'none') return true;
-      if (el && !el.style.display && ids[i] === 'v10Guided') return false;
+      if (el && el.offsetParent !== null) return true;
     }
-    try { if (V10.routineState && V10.routineState.on) return true; } catch (e) {}
     return false;
   }
   function watch() {
@@ -18782,7 +18864,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
                      tag: nd ? nd + ' of ' + list.length : '' });
       });
       top.innerHTML = '<h1 style="margin:0 0 2px">Learn</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when he says it. Pick a subject.</div>' +
+        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when they say it. Pick a subject.</div>' +
         RPPage.tiles(tiles);
       top.style.display = '';
       unit.style.display = 'none';
@@ -19584,6 +19666,104 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 </script>
 <script>
 /* ======================================================================
+   Repertoire Pro — keys under the Sustain Hold.
+
+   Robert, 13 Sep: "on the sustain hold exercise I want to see keys like
+   the piano exercise. I think a visual will help."
+
+   A strip of keys an octave wide, centred on the note to hold. The key to
+   hold is lit; a dot rides along the strip where your voice actually is,
+   green inside the window the exercise scores, gold outside it. It reads
+   the same numbers the exercise itself uses — SUS.target and the smoothed
+   pitch — so it can never disagree with the "% steady" you are given.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var raf = null;
+  var NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function black(m) { return [1, 3, 6, 8, 10].indexOf(((m % 12) + 12) % 12) >= 0; }
+  function name(m) { try { return midiName(m); } catch (e) { return NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1); } }
+
+  function ensure() {
+    var panel = $('susPanel');
+    if (!panel) return null;
+    var c = $('rpSusKeys');
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.id = 'rpSusKeys';
+    c.style.cssText = 'display:block;width:100%;height:96px;margin:10px auto 2px;max-width:420px;border-radius:10px';
+    var live = $('susLive');
+    if (live && live.parentElement) live.parentElement.insertBefore(c, live);
+    else panel.appendChild(c);
+    return c;
+  }
+
+  function frame() {
+    var panel = $('susPanel');
+    if (!panel || panel.offsetParent === null) { raf = null; return; }
+    var cv = ensure();
+    if (!cv) { raf = null; return; }
+    var W = cv.clientWidth || 360, H = 96;
+    if (cv.width !== W * 2 || cv.height !== H * 2) { cv.width = W * 2; cv.height = H * 2; }
+    var g = cv.getContext('2d');
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, W, H);
+
+    var target = null, live = null;
+    try { target = (typeof SUS !== 'undefined' && SUS.target != null) ? Math.round(SUS.target) : null; } catch (e) {}
+    try { live = (typeof MIC !== 'undefined' && MIC.on && typeof smoothedMidi === 'function') ? smoothedMidi() : null; } catch (e) {}
+    if (target == null) { raf = requestAnimationFrame(frame); return; }
+
+    var lo = target - 6, hi = target + 6;          /* thirteen keys, the target in the middle */
+    var n = hi - lo + 1, kw = W / n;
+    var pad = 6;
+    for (var m = lo; m <= hi; m++) {
+      var x = (m - lo) * kw;
+      var isT = m === target, isB = black(m);
+      g.fillStyle = isT ? 'rgba(232,179,74,.95)' : (isB ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.22)');
+      g.beginPath();
+      g.roundRect ? g.roundRect(x + 1.5, pad, kw - 3, H - pad * 2 - 16, 5) : g.rect(x + 1.5, pad, kw - 3, H - pad * 2 - 16);
+      g.fill();
+      if (isT || !isB) {
+        g.fillStyle = isT ? '#1a1408' : 'rgba(255,255,255,.7)';
+        g.font = (isT ? '800 ' : '600 ') + '10.5px system-ui, sans-serif';
+        g.textAlign = 'center';
+        g.fillText(name(m), x + kw / 2, H - 22);
+      }
+    }
+    g.fillStyle = 'rgba(255,255,255,.55)';
+    g.font = '700 10px system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.fillText(live == null ? 'sing, and your note appears here' : 'you: ' + name(Math.round(live)), W / 2, H - 6);
+
+    if (live != null) {
+      /* fold to the strip so an octave slip still shows where it lands */
+      var d = live - target;
+      d = ((d % 12) + 18) % 12 - 6;
+      var shown = target + d;
+      var x2 = (shown - lo + 0.5) * kw;
+      var cents = Math.abs(d * 100);
+      var ok = cents <= 35;
+      g.beginPath();
+      g.arc(x2, (H - 16) / 2, 7, 0, Math.PI * 2);
+      g.fillStyle = ok ? 'rgba(74,222,128,.95)' : 'rgba(232,179,74,.95)';
+      g.shadowColor = g.fillStyle; g.shadowBlur = 12;
+      g.fill();
+      g.shadowBlur = 0;
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  setInterval(function () {
+    var panel = $('susPanel');
+    if (panel && panel.offsetParent !== null && !raf) raf = requestAnimationFrame(frame);
+  }, 400);
+})();
+
+</script>
+<script>
+/* ======================================================================
    Repertoire Pro — the walkthrough.
 
    Robert, 13 Sep: "I should not have to sit next to Briar or Ja Ronn and
@@ -19649,6 +19829,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
       text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
+    /* Robert, 13 Sep: "need a card to teach about the live microphone
+       feedback." It lives on Free Sing, so the tour goes there for it. */
+    { mode: 'voice', find: function () { return $('rpVMon'); },
+      text: 'Hear yourself: with headphones in, this plays your own voice back to you live, as you sing.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
@@ -19739,7 +19923,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   function end(kind) {
-    if (run) markDone(run.kind);
+    if (run && KEY[run.kind]) markDone(run.kind);   /* tips mark themselves when first shown */
     run = null;
     teardown();
   }
@@ -19820,8 +20004,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try {
       var want = st.mode;
       var active = document.querySelector('.mode.active');
+      if (!want) throw 0;   /* a tip stays on the screen it is on */
       var map = { home: 'modeHome', train: 'modeTrain', learn: 'modeLearn', singhub: 'modeSing',
-                  coach: 'modeCoach', lib: 'modeLib', you: 'modeYou' };
+                  coach: 'modeCoach', lib: 'modeLib', you: 'modeYou', voice: 'modeVoice' };
       if (want && (!active || active.id !== map[want])) window.switchMode(want);
     } catch (e) {}
     setTimeout(function () {
@@ -19872,6 +20057,78 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       if (m && m.classList.contains('active') && $('rpAddStu')) T.start('coach');
     }
   }, 700);
+
+  /* ================================================================== */
+  /* TIPS — a short tour on one screen.                                  */
+  /* Robert, 13 Sep: "small tutorials on the individual pages for some    */
+  /* features like the pitch tracker, to let people know what they can   */
+  /* do with it." Same ring and card as the big tour, two or three steps, */
+  /* shown the first time the screen opens and again from a ? button.    */
+  /* ================================================================== */
+  var TIPS = {
+    tracker: { host: 'modeFree', anchor: 'rpStudio', steps: [
+      { find: function () { return $('freeCanvas'); },
+        text: 'Sing. The blue line is your voice; the gold lines are the notes. Hold a note and keep the line flat on one.' },
+      { find: function () { return $('rpStRec'); },
+        text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
+      { find: function () { return $('rpTakeList') || $('rpTakes'); },
+        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' }
+    ] },
+    voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
+      { find: function () { return $('rpVis'); },
+        text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
+      { find: function () { return $('rpVMon'); },
+        text: 'Hear yourself, live, through your headphones. Speaker off, or it squeals.' },
+      { find: function () { return $('rpVRec'); },
+        text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
+    ] },
+    sustain: { host: 'susPanel', anchor: 'btnSusStart', steps: [
+      { find: function () { return $('rpSusKeys'); },
+        text: 'The lit key is the note to hold. Your voice is the dot — green when it is on the note.' },
+      { find: function () { return $('btnSusStart'); },
+        text: 'Start hold, then keep the note dead steady for five seconds. New note picks another.' }
+    ] },
+    range: { host: 'rangePanel', anchor: 'btnRangeTest', steps: [
+      { find: function () { return $('btnRangeTest'); },
+        text: 'Sing your lowest comfortable note on “oooh” and hold it, then your highest. About a minute.' }
+    ] }
+  };
+  function tipDone(k) { try { return localStorage.getItem('rp_tip_' + k) === 'done'; } catch (e) { return false; } }
+  function tipMark(k) { try { localStorage.setItem('rp_tip_' + k, 'done'); } catch (e) {} }
+
+  T.tip = function (key) {
+    var tp = TIPS[key];
+    if (!tp) return;
+    if (run) teardown();
+    run = { kind: 'tip:' + key, steps: tp.steps.map(function (st) { return { mode: null, find: st.find, text: st.text }; }), i: 0 };
+    ensure();
+    window.addEventListener('resize', relayout);
+    window.addEventListener('scroll', relayout, true);
+    document.addEventListener('click', onAnyClick, true);
+    document.addEventListener('keydown', onKey);
+    show();
+  };
+
+  /* a ? on each of those screens, and the first-time showing */
+  function tipButtons() {
+    Object.keys(TIPS).forEach(function (k) {
+      var tp = TIPS[k];
+      var host = $(tp.host), anchor = $(tp.anchor);
+      if (!host || !anchor || host.offsetParent === null) return;
+      if (!$('rpTipBtn_' + k)) {
+        var b = document.createElement('button');
+        b.id = 'rpTipBtn_' + k;
+        b.className = 'btn';
+        b.title = 'What can I do here?';
+        b.textContent = '?';
+        b.style.cssText = 'padding:6px 11px;font-size:13px;font-weight:900;margin-left:8px;flex:none';
+        on(b, 'click', function (ev) { ev.stopPropagation(); T.tip(k); });
+        try { anchor.parentElement.insertBefore(b, anchor.nextSibling); } catch (e) {}
+      }
+      if (!tipDone(k) && !run && !sheetUp()) { tipMark(k); setTimeout(function () { T.tip(k); }, 500); }
+    });
+  }
+  setInterval(tipButtons, 900);
 
   /* ================================================================== */
   /* THE GUIDE — "How to use Repertoire"                                  */

@@ -98,8 +98,8 @@
     function draw() {
       var h = '<b style="font-size:18px">What you teach</b>' +
         '<div class="measured" style="margin-top:8px">Your words, not the app’s. Nothing here is ' +
-        'worked out from your students or what you have assigned — a coach saying what he teaches ' +
-        'is a claim he gets to make himself.</div>';
+        'worked out from your students or what you have assigned — a coach saying what they teach ' +
+        'is a claim they get to make themselves.</div>';
 
       h += '<div class="rp-lab" style="margin-top:16px">MUSIC</div><div style="margin-top:7px">';
       GENRES.forEach(function (x) {

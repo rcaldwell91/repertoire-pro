@@ -112,7 +112,7 @@
                      tag: nd ? nd + ' of ' + list.length : '' });
       });
       top.innerHTML = '<h1 style="margin:0 0 2px">Learn</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when he says it. Pick a subject.</div>' +
+        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when they say it. Pick a subject.</div>' +
         RPPage.tiles(tiles);
       top.style.display = '';
       unit.style.display = 'none';

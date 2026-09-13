@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-tour.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -156,6 +156,113 @@ PATCHES = [
     ("  V10.renderCoach = renderCoach;",
      "  V10.renderCoach = renderCoach;\n  V10.planFor = planFor;"),
 
+    # 14. THE RANGE TEST ON A PROFILE PAGE. The pitch loop only fed the test
+    #     while the Train tab was showing; the test now lives in Profile →
+    #     Your voice, so on Briar's phone the bar never filled. Feed it
+    #     wherever it is, as long as it is running.
+    ("  if(state.mode==='train' && TRAIN.kind!=='ladder'){ trainFrame(dt); return; }",
+     "  if((state.mode==='train' && TRAIN.kind!=='ladder') || RT.phase){ trainFrame(dt); return; }"),
+
+    # 15. STEADY HISS STOPS WHEN YOU DO. A timed exercise counted up until
+    #     Done was pressed — Briar stopped blowing and the clock kept going.
+    #     A guided exercise never asked for the microphone, so it asks now;
+    #     once air has been heard, a second of silence ends it and the time
+    #     it actually lasted is the result. If the phone will not give up
+    #     the microphone, it counts up the old way rather than sitting at 0.
+    ("    GUIDE.on = true; GUIDE.ex = e; GUIDE.t0 = Date.now(); GUIDE.mode = eng.kind;",
+     "    GUIDE.on = true; GUIDE.ex = e; GUIDE.t0 = Date.now(); GUIDE.mode = eng.kind;\n" +
+     "    GUIDE.heard = false; GUIDE.heardAt = 0; GUIDE.quietSince = 0; GUIDE.askedMic = false; GUIDE.finished = false;\n" +
+     "    if (eng.kind === 'timed' && typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') {\n" +
+     "      GUIDE.askedMic = true; try { enableMic(); } catch (err) {}\n" +
+     "    }"),
+    ("""    el.textContent = s.toFixed(1) + 's';
+    if (GUIDE.mode === 'timed' && GUIDE.target) {""",
+     """    if (GUIDE.finished) return;   /* the result stays on screen until the panel closes */
+    const canHear = GUIDE.mode === 'timed' && typeof MIC !== 'undefined' && MIC.on;
+    if (canHear) {
+      const loud = MIC.level > 0.005;
+      if (loud) { if (!GUIDE.heard) { GUIDE.heard = true; GUIDE.heardAt = s; } GUIDE.quietSince = 0; }
+      else if (GUIDE.heard) { GUIDE.quietSince = (GUIDE.quietSince || 0) + 0.1; }
+      if (GUIDE.heard && GUIDE.quietSince >= 1.0) {
+        const held = Math.max(0, s - GUIDE.quietSince - GUIDE.heardAt);
+        el.textContent = held.toFixed(1) + 's';
+        sub.textContent = 'Stopped when you did — ' + held.toFixed(1) + ' seconds' +
+          (GUIDE.target ? (held >= GUIDE.target ? ', past the ' + GUIDE.target + ' you were aiming for.' : ' of the ' + GUIDE.target + ' you were aiming for.') : '.');
+        try { if (window.RP && RP.logResult) RP.logResult({ kind: 'practice', label: GUIDE.ex ? GUIDE.ex.name : 'Timed', score: Math.round(held), out_of: GUIDE.target || null }); } catch (e) {}
+        GUIDE.heard = false; GUIDE.quietSince = 0; GUIDE.finished = true;
+        setTimeout(endGuided, 1400);
+        return;
+      }
+      if (!GUIDE.heard) { el.textContent = '0.0s'; sub.textContent = 'Start when you are ready — it times itself from the first sound.'; return; }
+      el.textContent = (s - GUIDE.heardAt).toFixed(1) + 's';
+    } else {
+      el.textContent = s.toFixed(1) + 's';
+    }
+    if (GUIDE.mode === 'timed' && GUIDE.target) {"""),
+
+    # 16. THE LADDER'S VERTICAL LINE. The same octave-slip that was fixed on
+    #     the Pitch Tracker (patch 4) was still drawn on the exercise chart —
+    #     Briar's lip trill showed the line dropping from the top to meet her.
+    #     Lift the pen across a jump no voice makes.
+    ("""    for(const pt of G.trail){
+      if(pt.m===null){ started=false; continue; }
+      const x = nowX + (pt.b-beat)*ppb;
+      if(x<-20) continue;
+      const disp = state.octaveEquiv? foldToRange(pt.m, lo, hi) : pt.m;
+      const y = yOf(disp);
+      if(!started){ cx2.moveTo(x,y); started=true; } else cx2.lineTo(x,y);
+    }""",
+     """    let prevM=null;
+    for(const pt of G.trail){
+      if(pt.m===null){ started=false; prevM=null; continue; }
+      const x = nowX + (pt.b-beat)*ppb;
+      if(x<-20) continue;
+      const disp = state.octaveEquiv? foldToRange(pt.m, lo, hi) : pt.m;
+      const y = yOf(disp);
+      const leap = prevM!==null && Math.abs(disp-prevM) > 6;
+      if(!started || leap){ cx2.moveTo(x,y); started=true; } else cx2.lineTo(x,y);
+      prevM = disp;
+    }"""),
+
+    # 17. NOTE MATCH COUNTS. It ended in an alert and wrote nothing down, so it
+    #     earned no points and never reached the coach's scorecard. Same
+    #     shape as the ear drills: score out of rounds.
+    ("""  const pct = Math.round(100*MATCH.score/MATCH.total);
+  const msg = pct>=90?'Incredible ear.':pct>=70?'Strong — keep drilling.':pct>=40?'Coming along — get your reps in daily.':'Everyone starts here. Run it again.';""",
+     """  const pct = Math.round(100*MATCH.score/MATCH.total);
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Ear · Note Match', score: MATCH.score, out_of: MATCH.total }); } catch (e) {}
+  const msg = pct>=90?'Incredible ear.':pct>=70?'Strong — keep drilling.':pct>=40?'Coming along — get your reps in daily.':'Everyone starts here. Run it again.';"""),
+
+    # 18. A MEZZO PRESET. The list jumped from Alto to Soprano; most voices in
+    #     between had no row.
+    ("""            <option value="53,77">Alto (F3–F5)</option>
+            <option value="60,84">Soprano (C4–C6)</option>""",
+     """            <option value="53,77">Alto (F3–F5)</option>
+            <option value="57,81">Mezzo-soprano (A3–A5)</option>
+            <option value="60,84">Soprano (C4–C6)</option>"""),
+
+    # 19. YOUR COACH IS NOT A "HE". Robert, 13 Sep: "that's not ok in today's
+    #     times." Every lesson that said he/him about the coach now says they.
+    ("Your coach is not describing the song. He is telling you", "Your coach is not describing the song. They are telling you"),
+    ("Three things, and they are the reason he said it:", "Three things, and they are the reason they said it:"),
+    ("""Now when he says "you're flat on the 5", you know which note he means without asking.""",
+     """Now when they say "you're flat on the 5", you know which note they mean without asking."""),
+    ("he is at the piano playing a chord when he says it.", "they are at the piano playing a chord when they say it."),
+    ("Clue: he is talking about", "Clue: they are talking about"),
+    ("Clue: he is teaching you a backing part", "Clue: they are teaching you a backing part"),
+    ("means something completely different to him than it does in a theory book.", "means something completely different to them than it does in a theory book."),
+    ("that word, check which one he means.", "that word, check which one they mean."),
+
+    # 20. A HOOK AFTER THE LIVE LINE. Robert, 13 Sep: on playback, show the
+    #     take's notes on the main key map in a different colour and keep the
+    #     live voice blue. The tracker's scale (pps, yOf) is local to its draw,
+    #     so it is handed out here; rp-studio.js draws the take with it.
+    ("""  c2.shadowBlur=0; c2.lineWidth=1;
+  const lastLive = trail.length && trail[trail.length-1].m!==null && now-trail[trail.length-1].t < 0.6""",
+     """  c2.shadowBlur=0; c2.lineWidth=1;
+  if(window.__rpOverlay){ try{ window.__rpOverlay(c2, W, H, now, pps, yOf); }catch(e){} }
+  const lastLive = trail.length && trail[trail.length-1].m!==null && now-trail[trail.length-1].t < 0.6"""),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the
@@ -205,7 +312,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-tour.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

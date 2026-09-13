@@ -59,8 +59,8 @@ function ok(cond, what) { console.log((cond ? '  ✓ ' : '  ✗ ') + what); if (
   ok(await p.evaluate(() => RPTour.running()), 'the Help row starts the real tour, on the real screens');
   ok(!(await p.evaluate(() => { const o = document.getElementById('rpSheet'); return !!(o && o.style.display !== 'none' && o.innerHTML); })), 'no picture sheet in the way');
   let n = 0;
-  while (await p.evaluate(() => RPTour.running()) && n++ < 16) { await p.evaluate(() => document.getElementById('rpTourNext').click()); await p.waitForTimeout(650); }
-  ok(!(await p.evaluate(() => RPTour.running())) && n === 11, 'Next walks all 11 steps and Done closes it (' + n + ' presses)');
+  while (await p.evaluate(() => RPTour.running()) && n++ < 18) { await p.evaluate(() => document.getElementById('rpTourNext').click()); await p.waitForTimeout(650); }
+  ok(!(await p.evaluate(() => RPTour.running())) && n === 12, 'Next walks all 12 steps and Done closes it (' + n + ' presses)');
 
   console.log('the picture guide is still there, second');
   await p.evaluate(() => window.switchMode('you')); await p.waitForTimeout(1600);

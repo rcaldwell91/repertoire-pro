@@ -284,14 +284,16 @@
 
   /* hide the top while something is actually running, so the exercise is
      the first thing on the screen */
+  /* Only what is actually on the screen counts. The first version also
+     asked the routine whether it was "on" — and a routine you walk out of
+     half-way stays on forever, so the Train tab came back black until a
+     refresh. Briar found that one. */
   function running() {
     var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel'];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
-      if (el && el.style.display && el.style.display !== 'none') return true;
-      if (el && !el.style.display && ids[i] === 'v10Guided') return false;
+      if (el && el.offsetParent !== null) return true;
     }
-    try { if (V10.routineState && V10.routineState.on) return true; } catch (e) {}
     return false;
   }
   function watch() {

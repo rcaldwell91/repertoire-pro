@@ -173,7 +173,7 @@
         '<input id="rpName" class="inp" placeholder="First name is fine" autocomplete="name" ' +
         'style="width:100%;margin-bottom:4px">' +
         '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
-        'sees, so use the name he knows you by.</div>';
+        'sees, so use the name they know you by.</div>';
     }
     h += '<label class="lab">EMAIL</label>' +
       '<input id="rpEmail" class="inp" type="email" autocomplete="email" inputmode="email" ' +
@@ -221,7 +221,7 @@
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
     /* It used to fall back to the email prefix, which is how Robert ended up
-       called "lyonxdewitt" on his coach's phone. A name his coach recognises
+       called "lyonxdewitt" on their coach's phone. A name their coach recognises
        is worth one more required box. */
     if (!name) {
       msg('Your name, please — it is what your coach will see.', true);
@@ -449,7 +449,7 @@
 
     /* Requiring a name at sign-up only helps people who have not signed up
        yet. Robert's own account was made before that and is still called
-       "lyonxdewitt" on his coach's phone, and deleting the account to fix a
+       "lyonxdewitt" on their coach's phone, and deleting the account to fix a
        name is not a thing anyone should have to do. */
     h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
       '<label class="rp-lab">THE NAME YOUR COACH SEES</label>' +
@@ -908,7 +908,7 @@
   });
 
   /* Whose colours am I looking at?
-       · A coach sees his own brand. It is his app as much as anyone's.
+       · A coach sees their own brand. It is their app as much as anyone's.
        · A student keeps REPERTOIRE unless they ask for their coach's look.
          Robert: "I like our colours the way they are, I don't want them to
          change." So this is off until someone turns it on, per person, per

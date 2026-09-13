@@ -64,6 +64,10 @@
       text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
       text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
+    /* Robert, 13 Sep: "need a card to teach about the live microphone
+       feedback." It lives on Free Sing, so the tour goes there for it. */
+    { mode: 'voice', find: function () { return $('rpVMon'); },
+      text: 'Hear yourself: with headphones in, this plays your own voice back to you live, as you sing.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
@@ -154,7 +158,7 @@
   }
 
   function end(kind) {
-    if (run) markDone(run.kind);
+    if (run && KEY[run.kind]) markDone(run.kind);   /* tips mark themselves when first shown */
     run = null;
     teardown();
   }
@@ -235,8 +239,9 @@
     try {
       var want = st.mode;
       var active = document.querySelector('.mode.active');
+      if (!want) throw 0;   /* a tip stays on the screen it is on */
       var map = { home: 'modeHome', train: 'modeTrain', learn: 'modeLearn', singhub: 'modeSing',
-                  coach: 'modeCoach', lib: 'modeLib', you: 'modeYou' };
+                  coach: 'modeCoach', lib: 'modeLib', you: 'modeYou', voice: 'modeVoice' };
       if (want && (!active || active.id !== map[want])) window.switchMode(want);
     } catch (e) {}
     setTimeout(function () {
@@ -287,6 +292,78 @@
       if (m && m.classList.contains('active') && $('rpAddStu')) T.start('coach');
     }
   }, 700);
+
+  /* ================================================================== */
+  /* TIPS — a short tour on one screen.                                  */
+  /* Robert, 13 Sep: "small tutorials on the individual pages for some    */
+  /* features like the pitch tracker, to let people know what they can   */
+  /* do with it." Same ring and card as the big tour, two or three steps, */
+  /* shown the first time the screen opens and again from a ? button.    */
+  /* ================================================================== */
+  var TIPS = {
+    tracker: { host: 'modeFree', anchor: 'rpStudio', steps: [
+      { find: function () { return $('freeCanvas'); },
+        text: 'Sing. The blue line is your voice; the gold lines are the notes. Hold a note and keep the line flat on one.' },
+      { find: function () { return $('rpStRec'); },
+        text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
+      { find: function () { return $('rpTakeList') || $('rpTakes'); },
+        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' }
+    ] },
+    voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
+      { find: function () { return $('rpVis'); },
+        text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
+      { find: function () { return $('rpVMon'); },
+        text: 'Hear yourself, live, through your headphones. Speaker off, or it squeals.' },
+      { find: function () { return $('rpVRec'); },
+        text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
+    ] },
+    sustain: { host: 'susPanel', anchor: 'btnSusStart', steps: [
+      { find: function () { return $('rpSusKeys'); },
+        text: 'The lit key is the note to hold. Your voice is the dot — green when it is on the note.' },
+      { find: function () { return $('btnSusStart'); },
+        text: 'Start hold, then keep the note dead steady for five seconds. New note picks another.' }
+    ] },
+    range: { host: 'rangePanel', anchor: 'btnRangeTest', steps: [
+      { find: function () { return $('btnRangeTest'); },
+        text: 'Sing your lowest comfortable note on “oooh” and hold it, then your highest. About a minute.' }
+    ] }
+  };
+  function tipDone(k) { try { return localStorage.getItem('rp_tip_' + k) === 'done'; } catch (e) { return false; } }
+  function tipMark(k) { try { localStorage.setItem('rp_tip_' + k, 'done'); } catch (e) {} }
+
+  T.tip = function (key) {
+    var tp = TIPS[key];
+    if (!tp) return;
+    if (run) teardown();
+    run = { kind: 'tip:' + key, steps: tp.steps.map(function (st) { return { mode: null, find: st.find, text: st.text }; }), i: 0 };
+    ensure();
+    window.addEventListener('resize', relayout);
+    window.addEventListener('scroll', relayout, true);
+    document.addEventListener('click', onAnyClick, true);
+    document.addEventListener('keydown', onKey);
+    show();
+  };
+
+  /* a ? on each of those screens, and the first-time showing */
+  function tipButtons() {
+    Object.keys(TIPS).forEach(function (k) {
+      var tp = TIPS[k];
+      var host = $(tp.host), anchor = $(tp.anchor);
+      if (!host || !anchor || host.offsetParent === null) return;
+      if (!$('rpTipBtn_' + k)) {
+        var b = document.createElement('button');
+        b.id = 'rpTipBtn_' + k;
+        b.className = 'btn';
+        b.title = 'What can I do here?';
+        b.textContent = '?';
+        b.style.cssText = 'padding:6px 11px;font-size:13px;font-weight:900;margin-left:8px;flex:none';
+        on(b, 'click', function (ev) { ev.stopPropagation(); T.tip(k); });
+        try { anchor.parentElement.insertBefore(b, anchor.nextSibling); } catch (e) {}
+      }
+      if (!tipDone(k) && !run && !sheetUp()) { tipMark(k); setTimeout(function () { T.tip(k); }, 500); }
+    });
+  }
+  setInterval(tipButtons, 900);
 
   /* ================================================================== */
   /* THE GUIDE — "How to use Repertoire"                                  */

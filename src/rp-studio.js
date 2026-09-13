@@ -257,9 +257,11 @@
   /* An SVG the width of its box. The horizontal rules are semitones, named
      down the left, so "am I on the note" is a question you can answer by
      looking — which is the whole point of drawing it. */
+  var LINES = {};   /* id -> notes, so playback can put them on the big map */
   ST.lineHtml = function (notes, id) {
     var b = lineBounds(notes);
     if (!b) return '';
+    LINES[id || ''] = notes;
     var W = 300, H = LINE_H, PAD = 26;
     var y = function (m) { return H - ((m - b.lo) / (b.hi - b.lo)) * H; };
     var x = function (t) { return PAD + (t / b.dur) * (W - PAD); };
@@ -308,6 +310,7 @@
     var dur = +svg.getAttribute('data-dur') || 0;
     var W = 300, PAD = 26;
     follow = { svg: svg, audio: audio, raf: 0 };
+    ST.overlay = { notes: LINES[svg.getAttribute('data-pl') || ''] || null, audio: audio };
     ph.setAttribute('opacity', '1');
     (function step() {
       if (!follow || follow.svg !== svg) return;
@@ -325,6 +328,53 @@
   ST.unfollow = function () {
     if (follow && follow.raf) cancelAnimationFrame(follow.raf);
     follow = null;
+    ST.overlay = null;
+  };
+
+  /* Robert, 13 Sep: "on the playback on the pitch tracker, show the notes
+     on the main key map so they can sing over it — a different colour for
+     the playback notes, keep the live vocals blue, so they can see where
+     they are hitting in comparison."
+
+     The tracker's own draw calls this after it has drawn the live line,
+     handing over its scale, so the take is drawn to the very same pixels:
+     now is the right edge, the past scrolls left. The take's own clock is
+     the audio, so its line sits exactly where it was at that moment of the
+     recording and yours sits where you are — the same x is the same
+     instant. Gold for the take, blue for you. A dot at the edge marks the
+     take's note right now, which is the one to aim at. */
+  window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
+    var o = ST.overlay;
+    if (!o || !o.notes || !o.audio || o.audio.ended) return;
+    var t0 = o.audio.currentTime || 0;
+    var notes = o.notes;
+    c2.save();
+    c2.beginPath();
+    var pen = false, prev = null, cur = null;
+    for (var i = 0; i < notes.length; i++) {
+      var n = notes[i];
+      if (n.m == null) { pen = false; prev = null; continue; }
+      var x = W - (t0 - n.t) * pps;
+      if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+      var y = yOf(n.m);
+      var leap = prev && Math.abs(n.m - prev.m) > 6;
+      if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+      pen = true; prev = n;
+      if (n.t <= t0) cur = n;
+    }
+    c2.strokeStyle = 'rgba(232,179,74,.95)';
+    c2.lineWidth = 2.5;
+    c2.shadowColor = 'rgba(232,179,74,.7)';
+    c2.shadowBlur = 8;
+    c2.stroke();
+    c2.shadowBlur = 0;
+    if (cur && !o.audio.paused) {
+      c2.beginPath();
+      c2.arc(W - 5, yOf(cur.m), 5, 0, Math.PI * 2);
+      c2.fillStyle = 'rgba(232,179,74,1)';
+      c2.fill();
+    }
+    c2.restore();
   };
 
   /* ---------------------------------------------------------------- */
@@ -454,7 +504,7 @@
     d.style.cssText = 'margin-top:10px;padding:12px';
     d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
       '<div class="notice" style="margin:8px 0 9px">Sing over one, keep it on your phone, or send it ' +
-      'to your coach — the notes go with it, so he sees where you were as well as hears it.</div>' +
+      'to your coach — the notes go with it, so they see where you were as well as hear it.</div>' +
       '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
     fillTakes();
