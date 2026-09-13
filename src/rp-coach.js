@@ -336,6 +336,10 @@
     });
   }
 
+  /* Home's "Today" reads the same list, so the two screens cannot disagree
+     about what is due. */
+  RP.dueOn = dueOn;
+
   /* One source of truth for "how much of this week is done", so the week
      strip and the scorecard cannot disagree with each other on the same
      screen — which they did: the strip said 2 of 2 and the card said 1 of 2,

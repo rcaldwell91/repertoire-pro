@@ -244,6 +244,11 @@
       }
       closeSheet();
       toast('Signed in as ' + (name || email));
+      /* The six questions live here now — with making an account, not with
+         opening the app. Offered, not forced; there is a "Not now". */
+      setTimeout(function () {
+        try { if (window.RPPlain && !RPPlain.asked()) RPPlain.ask(0); } catch (e) {}
+      }, 1100);
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 

@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-tour.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -141,6 +141,21 @@ PATCHES = [
     ('<button class="pill backpill" id="bsFree">\u2190 Sing menu</button>',
      '<button class="pill backpill" id="bsFree">\u2190 Train</button>'),
 
+    # 12. TWO THINGS CALLED COACH ON ONE SCREEN. Robert, 13 Sep: the app's own
+    #     coach is "From Repertoire" — named after what it is. The human coach's
+    #     box above it already says "From Ja Ronn". Parallel, and no jargon.
+    ("""    let h = '<h1 style="margin:0 0 4px">Coach</h1>';
+    h += '<div class="notice" style="margin-bottom:12px">A plan that changes as you do. It reads what ' +
+      'the app has actually measured — nothing else.</div>';""",
+     """    let h = '<h1 style="margin:0 0 4px">From Repertoire</h1>';
+    h += '<div class="notice" style="margin-bottom:12px">The app’s own plan, built from what it has ' +
+      'actually measured — nothing else. It changes as you do.</div>';"""),
+
+    # 13. Home's "Today" shows the same plan, read from the same function, so
+    #     the two screens can never disagree.
+    ("  V10.renderCoach = renderCoach;",
+     "  V10.renderCoach = renderCoach;\n  V10.planFor = planFor;"),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the
@@ -190,7 +205,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-tour.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

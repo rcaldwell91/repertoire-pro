@@ -690,7 +690,10 @@
     apply();
     var host = $('modeYou');
     setInterval(mountProfileRow, 1500);
-    if (!asked()) setTimeout(function () { ME.ask(0); }, 900);
+    /* Robert, 13 Sep: the six questions belong to making an account, not
+       to opening the app — a person should be able to look round first.
+       They are offered right after sign-up (rp-cloud.js) and from Profile.
+       The first open gets the tour instead. */
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else setTimeout(boot, 300);
