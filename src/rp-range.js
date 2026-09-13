@@ -16,13 +16,9 @@
    and measured on the 13th" and "picked off a list" are not the same
    claim and the app should not blur them.
 
-   The song half of idea bank #1 is NOT built, and the panel here says so.
-   Recommending songs needs a catalogue of songs with their ranges in it.
-   There is no openly licensed one — the apps that do this hold their own
-   private databases — and the standing rule is permanent: never scrape or
-   source lyrics or audio. So what is here answers the same question for
-   the songs the app actually HAS the notes to, and stops there rather
-   than guessing at the rest.
+   The song half of idea bank #1 lives next door in rp-songs.js: there is
+   no openly licensed catalogue of songs with vocal ranges, so the app
+   builds its own and every row says who entered it. Nothing is scraped.
    ====================================================================== */
 (function () {
   'use strict';
@@ -289,51 +285,18 @@
     h += '<button class="btn primary" id="rpRgTest" style="width:100%;padding:11px;margin-top:12px;' +
       'font-size:12.5px">Sing it and measure it</button>';
 
-    /* -- the songs the app can actually answer for -- */
-    var list = R.songs();
-    h += '<div class="rp-lab" style="margin-top:20px">DOES IT FIT?</div>';
-    if (!list.length) {
-      h += '<div class="measured">No songs with note data on this phone yet.</div>';
-    } else {
-      list.forEach(function (s) {
-        var f = R.fit(s, v.lo, v.hi);
-        var line, tone;
-        if (f.impossible) {
-          line = 'Wider than you are by ' + f.short + ' semitone' + (f.short === 1 ? '' : 's') +
-                 ' — it does not fit in any key.';
-          tone = 'var(--miss)';
-        } else if (f.shift === 0) {
-          var bits = [];
-          bits.push(f.roomLow === 0 ? 'its lowest note is your lowest note'
-                                    : f.roomLow + ' spare at the bottom');
-          bits.push(f.roomHigh === 0 ? 'its highest is your highest'
-                                     : f.roomHigh + ' at the top');
-          line = 'Fits as it is — ' + bits.join(', ') + '.';
-          tone = 'var(--gold)';
-        } else {
-          line = 'Fits if you move it ' + Math.abs(f.shift) + ' semitone' +
-                 (Math.abs(f.shift) === 1 ? '' : 's') + ' ' + (f.shift > 0 ? 'up' : 'down') +
-                 ' — the app’s own transpose does that.';
-          tone = 'var(--gold)';
-        }
-        h += '<div class="rp-card" style="padding:11px;margin-top:7px;border-left:3px solid ' + tone + '">' +
-          '<div class="rp-ttl">' + esc(s.title) + '</div>' +
-          '<div class="rp-sub">' + esc(name(s.lo)) + '–' + esc(name(s.hi)) + ' · ' + s.span +
-          ' semitones</div>' +
-          '<div style="font-size:12.5px;line-height:1.5;margin-top:5px">' + esc(line) + '</div></div>';
-      });
-    }
-
-    h += '<div class="rp-card" style="margin-top:12px;padding:12px;border-left:3px solid var(--gold)">' +
-      '<div style="font-size:12.5px;line-height:1.55">That is every song this app has the actual ' +
-      'notes to — so every line above is worked out, not guessed. Telling you which <i>records</i> sit ' +
-      'in your range needs a catalogue of songs with their ranges in it. There is no openly licensed ' +
-      'one, the apps that do it keep their own private database, and this app does not take lyrics or ' +
-      'audio from anywhere. So it is not built, rather than built badly.</div></div>';
+    /* The whole list, with who said so, lives in the song book — one place
+       rather than two versions of the same truth. */
+    h += '<div class="rp-lab" style="margin-top:20px">DOES IT FIT?</div>' +
+      '<div class="measured">Every song on file, sorted by whether it sits in this range: fits as it ' +
+      'is, fits if you move it, or is wider than you are and fits in no key at all.</div>' +
+      '<button class="btn" id="rpRgSongs" style="width:100%;padding:11px;margin-top:9px;' +
+      'font-size:12.5px">Songs, and whether they fit you</button>';
 
     h += '<button class="btn" id="rpRgX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
     sheet(h);
     on($('rpRgX'), 'click', shut);
+    on($('rpRgSongs'), 'click', function () { if (window.RPSongs) RPSongs.show(); });
     on($('rpRgTest'), 'click', function () {
       shut();
       try { window.switchMode('train'); } catch (e) {}
