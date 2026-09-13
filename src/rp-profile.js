@@ -29,7 +29,7 @@
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
-      folds: ['Sound', 'Reference notes', 'Microphone'], cards: [] },
+      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
@@ -83,6 +83,7 @@
       });
       g.cards.forEach(function (id) {
         var c = $(id);
+        if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (c && c.parentElement !== box) {
           if (id === 'rpRangePanelHolder') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }

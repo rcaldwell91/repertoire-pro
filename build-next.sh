@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -263,6 +263,67 @@ PATCHES = [
   if(window.__rpOverlay){ try{ window.__rpOverlay(c2, W, H, now, pps, yOf); }catch(e){} }
   const lastLive = trail.length && trail[trail.length-1].m!==null && now-trail[trail.length-1].t < 0.6"""),
 
+    # 21. THE AUDIO CLOCK, ASKED FOR AS LIVE AS THE PHONE CAN GIVE. Briar,
+    #     13 Sep: the live mic feedback is about a second late. Part of that
+    #     is the phone and its headphones, which no app can remove; this part
+    #     is ours to ask for. The plain constructor stays as the fallback.
+    ("    ctx = new (window.AudioContext||window.webkitAudioContext)();",
+     "    try { ctx = new (window.AudioContext||window.webkitAudioContext)({ latencyHint: 'interactive' }); }\n"
+     "    catch (e) { ctx = new (window.AudioContext||window.webkitAudioContext)(); }"),
+
+    # 22. THE CHART'S CLOCK. Two things read it: the words and bars are drawn
+    #     where the sound has REACHED THE EARS (the phone's reported output
+    #     delay, window.__rpHeardS, set by rp-timing.js), so what lights up is
+    #     what is heard; and after the run, or while dragging back, the chart
+    #     is drawn at an earlier beat (window.__rpScrollB, rp-scroll.js).
+    ("  const beat = G.running? songBeat() : 0;",
+     "  const beat = (G.running ? songBeat() - (window.__rpHeardS||0)*T.bps : (G.lastBeat||0)) - (window.__rpScrollB||0);"),
+    ("  const ppb = Math.max(28, Math.min(160, (W-nowX)/Math.max(0.5, state.lookahead*bpsNow)));",
+     "  const ppb = Math.max(28, Math.min(160, (W-nowX)/Math.max(0.5, state.lookahead*bpsNow)));\n"
+     "  window.__rpPpb = ppb;"),
+    ("function renderLyrics(s, beat){",
+     "function renderLyrics(s, beat){\n"
+     "  if(beat >= 0) beat -= (window.__rpHeardS||0)*T.bps;   /* light the word when it is HEARD */"),
+
+    # 23. Where the run stopped, kept, so the chart can still be scrolled
+    #     back through afterwards. A fresh start clears it.
+    ("  stopSong();\n  G.running=false;",
+     "  try{ if(T.playing) G.lastBeat = Math.max(0, songBeat()); }catch(e){}\n  stopSong();\n  G.running=false;"),
+    ("  G.trail=[]; G.lastT=performance.now(); G.winLo=null; G.winHi=null;",
+     "  G.trail=[]; G.lastBeat=0; G.lastT=performance.now(); G.winLo=null; G.winHi=null;"),
+
+    # 24. The Pitch Tracker's clock, same idea: drag back to see what you sang.
+    ("  drawPitchLane(fcx, fcv, FREE.trail, now);",
+     "  drawPitchLane(fcx, fcv, FREE.trail, now - (window.__rpScrollS||0));"),
+
+    # 25. THE GUIDED PANEL LEADS WITH WHAT THE EXERCISE IS. Briar: "the Blah
+    #     exercise isn't intuitive — just a timer." Now: the name, what it is,
+    #     a Hear-it button (rp-example.js), then the clock, then how.
+    ("""        '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Done</button>' +
+      '</div>' +
+      '<div style="text-align:center;margin:14px 0">' +""",
+     """        '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Done</button>' +
+      '</div>' +
+      (e.what ? '<div style="font-size:14px;line-height:1.5;margin-top:8px">' + e.what + '</div>' : '') +
+      (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
+      '<div style="text-align:center;margin:14px 0">' +"""),
+
+    # 26. A VOICE, NOT A PIANO, FOR THE NOTE TO MATCH AND THE NOTE TO HOLD.
+    #     Briar: "some people find it easier to match the note of a voice."
+    #     V10.playRef is the app's own switch (voice by default, piano if the
+    #     singer flips it in Profile); these three calls had bypassed it.
+    ("  playPiano(MATCH.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);",
+     "  (window.V10 && V10.playRef ? V10.playRef : playPiano)(MATCH.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);"),
+    ("playPiano(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);",
+     "(window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);"),
+    ("  playPiano(SUS.target, ctx.currentTime+0.02, 1.2, guideGain, 0.7);",
+     "  (window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.2, guideGain, 0.7);"),
+
+    # 27. Note Match's card said "I play a piano note". It is a voice unless
+    #     Reference notes is set to piano in Profile, so say what happens.
+    ("<p>I play a piano note — you sing it back and hold it. 10 rounds. The purest pitch trainer there is.</p>",
+     "<p>You hear a note — sing it back and hold it. 10 rounds.</p>"),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the
@@ -312,7 +373,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

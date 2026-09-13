@@ -652,7 +652,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       <div class="card2"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-bar-chart"/></svg></div><h3>Full Major Scale</h3><p>Up and down the full octave scale. Great for evenness between notes once you're warm.</p><button class="btn primary" data-ladder="scale">Start</button></div>
       <div class="card2"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-layers"/></svg></div><h3>Arpeggio 1-3-5-8</h3><p>Skipping between chord tones — trains accuracy on jumps, not just steps.</p><button class="btn primary" data-ladder="arp">Start</button></div>
       <div class="card2"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-chevrons-up"/></svg></div><h3>Octave Leaps</h3><p>Low note, jump the octave, land back down. Builds range and confidence at the top.</p><button class="btn primary" data-ladder="oct">Start</button></div>
-      <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-target"/></svg></div><h3>Note Match</h3><p>I play a piano note — you sing it back and hold it. 10 rounds. The purest pitch trainer there is.</p><button class="btn primary" id="btnMatch">Play</button></div>
+      <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-target"/></svg></div><h3>Note Match</h3><p>You hear a note — sing it back and hold it. 10 rounds.</p><button class="btn primary" id="btnMatch">Play</button></div>
       <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-music"/></svg></div><h3>Keyboard</h3><p>A playable keyboard. Press a note, hear it, sing it back &mdash; and watch exactly where you landed. Note Match, except you pick the note.</p><button class="btn primary" id="btnKbd">Open</button></div>
       <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-wind"/></svg></div><h3>Sustain Hold</h3><p>Hold one note dead steady for 5 seconds. Trains breath support and stops the wobble.</p><button class="btn primary" id="btnSustain">Play</button></div>
       <div class="card2" style="grid-column:1/-1;display:flex;flex-direction:row;align-items:center;gap:14px">
@@ -980,7 +980,8 @@ let comp = null, outGain = null, limiter = null;
 
 function ensureCtx(){
   if(!ctx){
-    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    try { ctx = new (window.AudioContext||window.webkitAudioContext)({ latencyHint: 'interactive' }); }
+    catch (e) { ctx = new (window.AudioContext||window.webkitAudioContext)(); }
     window.__ctxMade = (window.__ctxMade||0) + 1;
     masterGain = ctx.createGain(); masterGain.gain.value = 0.9;
     /* v9.8 — MEASURED on v9.7 with the guide slider at maximum:
@@ -2115,7 +2116,7 @@ function startRun(){
   const s = currentSong();
   G.running=true; G.finished=false;
   G.score=0; G.combo=0; G.bestCombo=0; G.notesHit=0;
-  G.trail=[]; G.lastT=performance.now(); G.winLo=null; G.winHi=null;
+  G.trail=[]; G.lastBeat=0; G.lastT=performance.now(); G.winLo=null; G.winHi=null;
   G.stats = s.notes.map(()=>({hit:0,total:0,done:false}));
   $('results').style.display='none';
   $('startOverlay').style.display='none'; // never block the stage once they start
@@ -2138,6 +2139,7 @@ function stopRun(showResults){
     showResults = false;
   }
   if(G.packAudio){ G.packAudio.pause(); }
+  try{ if(T.playing) G.lastBeat = Math.max(0, songBeat()); }catch(e){}
   stopSong();
   G.running=false;
   $('btnPlay').disabled=false;
@@ -2291,6 +2293,7 @@ function getPhrases(s){
   return phraseCache.phrases;
 }
 function renderLyrics(s, beat){
+  if(beat >= 0) beat -= (window.__rpHeardS||0)*T.bps;   /* light the word when it is HEARD */
   const phrases = getPhrases(s);
   let curP = -1;
   for(let pi=0; pi<phrases.length; pi++){
@@ -2481,7 +2484,7 @@ function drawGame(){
   const W = cv.clientWidth, H = parseFloat(cv.style.height)||300;
   cx2.clearRect(0,0,W,H);
   const tr = state.transpose;
-  const beat = G.running? songBeat() : 0;
+  const beat = (G.running ? songBeat() - (window.__rpHeardS||0)*T.bps : (G.lastBeat||0)) - (window.__rpScrollB||0);
   let lo=127, hi=0;
   if(s.windowY){
     // One fixed window for the whole song. The grid never moves and a semitone
@@ -2509,6 +2512,7 @@ function drawGame(){
   // so a slow ballad and a fast warmup drill both read comfortably.
   const bpsNow = (s.bpm*state.tempo)/60;
   const ppb = Math.max(28, Math.min(160, (W-nowX)/Math.max(0.5, state.lookahead*bpsNow)));
+  window.__rpPpb = ppb;
 
   // lane lines
   cx2.font = '10px sans-serif';
@@ -3193,7 +3197,7 @@ function freeFrame(dt){
       : !audioRunning() ? 'sound paused'
       : MIC.level > 0.004 ? 'hearing you' : 'no signal';
   }
-  drawPitchLane(fcx, fcv, FREE.trail, now);
+  drawPitchLane(fcx, fcv, FREE.trail, now - (window.__rpScrollS||0));
 }
 
 /* shared scrolling pitch-lane renderer (Free Sing + YouTube modes) */
@@ -3595,7 +3599,7 @@ function sizeMatch(){
 }
 function matchPlayTarget(){
   ensureCtx();
-  playPiano(MATCH.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);
+  (window.V10 && V10.playRef ? V10.playRef : playPiano)(MATCH.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);
 }
 function matchNext(){
   MATCH.round++;
@@ -3713,11 +3717,11 @@ $('btnSustain').addEventListener('click', async ()=>{
   susPickNote();
 });
 $('btnSusNote').addEventListener('click', susPickNote);
-$('btnSusHear').addEventListener('click', ()=>{ ensureCtx(); playPiano(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7); });
+$('btnSusHear').addEventListener('click', ()=>{ ensureCtx(); (window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7); });
 $('btnSusQuit').addEventListener('click', ()=>{ SUS.running=false; TRAIN.kind=null; trainView('grid'); });
 $('btnSusStart').addEventListener('click', ()=>{
   ensureCtx();
-  playPiano(SUS.target, ctx.currentTime+0.02, 1.2, guideGain, 0.7);
+  (window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.2, guideGain, 0.7);
   SUS.running=true; SUS.t=-1.2; SUS.within=0; // negative = lead-in
   $('susResult').textContent='';
 });
@@ -8807,6 +8811,8 @@ renderJourney();
         '<h3 style="margin:0">' + esc(e.name) + '</h3>' +
         '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Done</button>' +
       '</div>' +
+      (e.what ? '<div style="font-size:14px;line-height:1.5;margin-top:8px">' + e.what + '</div>' : '') +
+      (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
       '<div style="text-align:center;margin:14px 0">' +
         '<div id="gBig" style="font-size:46px;font-weight:900;color:var(--gold)">0.0s</div>' +
         '<div id="gSub" style="font-size:13.5px;font-weight:700;color:var(--ink-dim);min-height:22px"></div>' +
@@ -15367,10 +15373,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   function wireMonitor() {
     var n = live();
-    if (!n || typeof MIC === 'undefined' || !MIC.src) return;
-    try { MIC.src.connect(n.input); } catch (e) {}
+    if (!n) return;
+    if (typeof MIC !== 'undefined' && MIC.src) { try { MIC.src.connect(n.input); } catch (e) {} }
     try { n.out.disconnect(); } catch (e) {}
-    if (V.monitor) { try { n.out.connect(ctx.destination); } catch (e) {} }
+    /* Briar, 13 Sep: tapping an effect while a take was playing cut the
+       sound, and playing again did not carry the new effect. The output
+       was being unplugged to re-plug it for the monitor; the playback
+       runs through the same chain, so it went silent. Keep it plugged in
+       while anything is playing — the effects apply live. */
+    if (V.monitor || V.playing) { try { n.out.connect(ctx.destination); } catch (e) {} }
   }
 
   /* ---------------------------------------------------------------- */
@@ -15387,8 +15398,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return d;
   }
 
-  function seg(group, map, cur) {
-    var h = '<div class="rp-fxrow">';
+  var ABOUT = {
+    comp: 'Compressor: evens out your loud and quiet bits so a whisper and a belt sit closer together. Radio voices are compressed.',
+    eq:   'EQ: turns parts of the sound up or down. Warm adds body, Bright adds air, Telephone strips both.',
+    echo: 'Echo: repeats of your voice, fading. Slap is one quick repeat; Long is the canyon.',
+    verb: 'Reverb: the room. Off is a cupboard, Hall is a church. It hides small wobbles — which is why singers like it and why it is off on the Pitch Tracker.'
+  };
+  function seg(group, map, cur, label) {
+    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'COMPRESSOR' ? ';margin-top:12px' : '') + '">' +
+      '<div class="rp-lab" style="margin:0">' + label + '</div>' +
+      '<span class="rp-info" data-about="' + group + '" title="What is this?">i</span></div>' +
+      '<div class="rp-about measured" id="rpAbout_' + group + '" style="display:none;margin:2px 0 8px">' + esc(ABOUT[group] || '') + '</div>' +
+      '<div class="rp-fxrow">';
     Object.keys(map).forEach(function (k) {
       h += '<button class="rp-fxbtn' + (cur === k ? ' on' : '') + '" data-fx="' + group + '" data-val="' + k + '">' +
         esc(map[k].label) + '</button>';
@@ -15416,14 +15437,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<b style="font-size:13px">Hear yourself</b>' +
       '<button class="btn' + (V.monitor ? ' primary' : '') + '" id="rpVMon" style="padding:8px 13px;font-size:12.5px">' +
       (V.monitor ? 'On' : 'Off') + '</button></div>' +
-      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal. ' +
-      'There is a small delay on a phone; that is the phone, not you.</div></div>';
+      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal.</div>' +
+      '<div class="measured" style="margin-top:6px">There is a delay between your mouth and your ears on every phone — ' +
+      'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      '<div class="rp-lab">COMPRESSOR</div>' + seg('comp', COMP, V.fx.comp) +
-      '<div class="rp-lab" style="margin-top:12px">EQ</div>' + seg('eq', EQ, V.fx.eq) +
-      '<div class="rp-lab" style="margin-top:12px">ECHO</div>' + seg('echo', ECHO, V.fx.echo) +
-      '<div class="rp-lab" style="margin-top:12px">REVERB</div>' + seg('verb', VERB, V.fx.verb) +
+      seg('comp', COMP, V.fx.comp, 'COMPRESSOR') +
+      seg('eq', EQ, V.fx.eq, 'EQ') +
+      seg('echo', ECHO, V.fx.echo, 'ECHO') +
+      seg('verb', VERB, V.fx.verb, 'REVERB') +
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
@@ -15436,6 +15458,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
     on($('rpVMon'), 'click', toggleMonitor);
     visStart();
+    host.querySelectorAll('[data-about]').forEach(function (b) {
+      on(b, 'click', function () {
+        var a = $('rpAbout_' + b.dataset.about);
+        if (!a) return;
+        var show = a.style.display === 'none';
+        a.style.display = show ? '' : 'none';
+        b.classList.toggle('on', show);
+      });
+    });
     host.querySelectorAll('[data-fx]').forEach(function (b) {
       on(b, 'click', function () {
         V.fx[b.dataset.fx] = b.dataset.val;
@@ -18511,6 +18542,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '</div></div>';
   }
   function wireEx(root, backTo) {
+    if (window.RPExample) { try { RPExample.wire(root); } catch (e) {} }
     root.querySelectorAll('[data-exstart]').forEach(function (b) {
       on(b, 'click', function (ev) { ev.stopPropagation(); TR.start(b.dataset.exstart); });
     });
@@ -18554,6 +18586,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="width:100%;padding:13px;font-size:14px">Start</button>' +
       '<div class="rp-card" style="margin-top:14px;padding:13px;font-size:13.5px;line-height:1.55">' +
       '<div class="rp-lab">WHAT</div><div>' + strip(e.what) + '</div>' +
+      (window.RPExample ? '<div style="margin-top:10px">' + RPExample.button(e.id) + '</div>' : '') +
       (e.how ? '<div class="rp-lab" style="margin-top:12px">HOW</div><div>' + e.how + '</div>' : '') +
       (e.miss ? '<div class="rp-lab" style="margin-top:12px">WATCH FOR</div><div>' + e.miss + '</div>' : '') +
       (e.why ? '<div class="rp-lab" style="margin-top:12px">WHY IT WORKS</div><div>' + e.why + '</div>' : '') +
@@ -18663,6 +18696,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(one.name) + '</div>' +
           '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
           '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
+          (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(one.id, true) + '</div>' : '') +
           '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See more ' +
           esc(c.name.toLowerCase()) + '</button></div>';
       }
@@ -18968,7 +19002,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
-      folds: ['Sound', 'Reference notes', 'Microphone'], cards: [] },
+      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
@@ -19022,6 +19056,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       });
       g.cards.forEach(function (id) {
         var c = $(id);
+        if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (c && c.parentElement !== box) {
           if (id === 'rpRangePanelHolder') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
@@ -20072,7 +20107,29 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       { find: function () { return $('rpStRec'); },
         text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
       { find: function () { return $('rpTakeList') || $('rpTakes'); },
-        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' }
+        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' },
+      { find: function () { return $('freeCanvas'); },
+        text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
+    ] },
+    guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
+      { find: function () { return document.querySelector('#v10Guided [data-hear]'); },
+        text: 'Tap Hear it for the sound you are after. It is a made voice, not a singer, so copy the shape of it, not the tone.' },
+      { find: function () { return $('gBig'); },
+        text: 'The clock runs while you do it. Press Done when you have finished.' }
+    ] },
+    ladder: { host: 'trainLadderBar', anchor: 'ladderTitle', steps: [
+      { find: function () { return $('gameCanvas'); },
+        text: 'The gold bars are the notes to sing. Your voice is the blue line. Fill a bar to score it.' },
+      { find: function () { return $('btnExPause'); },
+        text: 'Pause to think, Restart to take it from the top, Record to keep the run.' },
+      { find: function () { return $('gameCanvas'); },
+        text: 'Paused or finished, drag the chart to the right to see what you sang.' }
+    ] },
+    match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
+      { find: function () { return $('matchTarget'); },
+        text: 'This is the note, sung by a voice. Replay plays it again.' },
+      { find: function () { return $('matchHold'); },
+        text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
     ] },
     voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
       { find: function () { return $('rpVis'); },
@@ -20251,6 +20308,495 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
   setInterval(row, 1500);
   setTimeout(row, 900);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — "Hear it": an example of each exercise.
+
+   Robert, 13 Sep: "add audio examples for the exercises to teach people
+   what they are supposed to sound like — a voice performing the right
+   sound, so we don't have to guess if it's ooo or uuuu."
+
+   What this is, and what it is not. It is the app's own voice-like tone —
+   the one Note Match already uses — shaped into the vowel the exercise
+   asks for, singing the exercise's actual pattern in the singer's own
+   range. It is a synthesised voice, and every button says so. It is NOT a
+   recording of a singer: the app does not take audio from anywhere, and
+   a real human example is something a coach records. That is the next
+   step, and it is built to plug in here: a coach's recording for an
+   exercise, when there is one, plays instead of this.
+
+   Vowels are made the way the reference voice is made — a buzz through
+   two or three band-pass filters sitting on the vowel's formants. The
+   numbers are the standard ones (Peterson & Barney): oo 300/870, ah
+   730/1090, ee 270/2290, uh 640/1190, ay 530/1840, and a hum is a buzz
+   with the mouth closed (a low-pass, no formants).
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var X = window.RPExample = {};
+  var VOWELS = {
+    oo: [[300, 3.5, 1.0], [870, 6, 0.35], [2240, 8, 0.10]],
+    ah: [[730, 3.2, 1.0], [1090, 5, 0.55], [2440, 7, 0.22]],
+    ee: [[270, 4, 1.0], [2290, 8, 0.45], [3010, 9, 0.18]],
+    uh: [[640, 3.2, 1.0], [1190, 5, 0.5], [2390, 7, 0.2]],
+    ay: [[530, 3.5, 1.0], [1840, 6, 0.5], [2480, 7, 0.2]],
+    oh: [[570, 3.2, 1.0], [840, 5, 0.5], [2410, 7, 0.18]]
+  };
+  /* what each exercise's syllable is, in vowel terms; a hum is 'm' */
+  function vowelOf(e) {
+    var s = String((e && e.syl) || '').toLowerCase();
+    if (/^(mmm|hum|m,|m$|nnn|ng)/.test(s) || /^m\b/.test(s)) return 'm';
+    if (/oo|through a straw|noo|loo/.test(s)) return 'oo';
+    if (/ee|mee|gee|kee/.test(s)) return 'ee';
+    if (/ay|nay|bay|bae/.test(s)) return 'ay';
+    if (/oh|ol\b|knoll/.test(s)) return 'oh';
+    if (/uh|mum|buh/.test(s)) return 'uh';
+    if (/brrr|lip/.test(s)) return 'lip';
+    if (/sss|silent|hiss/.test(s)) return 'sss';
+    return 'ah';
+  }
+
+  function f0(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  /* one voiced note, in one vowel */
+  function voice(ac, midi, when, dur, vowel, dest, vol) {
+    var out = ac.createGain();
+    out.gain.setValueAtTime(0.0001, when);
+    out.gain.linearRampToValueAtTime(vol, when + 0.06);
+    out.gain.setValueAtTime(vol, when + Math.max(0.08, dur - 0.08));
+    out.gain.linearRampToValueAtTime(0.0001, when + dur);
+    out.connect(dest);
+    var osc = ac.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0(midi), when);
+    /* a little vibrato, late, like a voice */
+    var lfo = ac.createOscillator(), lg = ac.createGain();
+    lfo.frequency.value = 5.5; lg.gain.setValueAtTime(0, when);
+    lg.gain.linearRampToValueAtTime(f0(midi) * 0.012, when + Math.min(0.6, dur));
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var pre = ac.createGain(); pre.gain.value = 0.35;
+    osc.connect(pre);
+    if (vowel === 'm') {
+      var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; lp.Q.value = 0.7;
+      pre.connect(lp); lp.connect(out);
+    } else if (vowel === 'lip') {
+      /* a lip trill is a voice chopped ~28 times a second by the lips */
+      var chop = ac.createGain(); chop.gain.value = 0.5;
+      var trill = ac.createOscillator(); trill.type = 'square'; trill.frequency.value = 28;
+      var tg = ac.createGain(); tg.gain.value = 0.5;
+      trill.connect(tg); tg.connect(chop.gain);
+      var lp2 = ac.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 900;
+      pre.connect(lp2); lp2.connect(chop); chop.connect(out);
+      trill.start(when); trill.stop(when + dur + 0.05);
+    } else {
+      var form = VOWELS[vowel] || VOWELS.ah;
+      form.forEach(function (f) {
+        var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f[0]; bp.Q.value = f[1];
+        var g = ac.createGain(); g.gain.value = f[2];
+        pre.connect(bp); bp.connect(g); g.connect(out);
+      });
+    }
+    osc.start(when); osc.stop(when + dur + 0.05);
+    lfo.start(when); lfo.stop(when + dur + 0.05);
+    return when + dur;
+  }
+  /* unvoiced: a hiss is band-passed noise */
+  function hiss(ac, when, dur, dest, vol) {
+    var len = Math.ceil(ac.sampleRate * dur), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    var src = ac.createBufferSource(); src.buffer = buf;
+    var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5500; bp.Q.value = 0.8;
+    var out = ac.createGain();
+    out.gain.setValueAtTime(0.0001, when);
+    out.gain.linearRampToValueAtTime(vol * 0.5, when + 0.15);
+    out.gain.setValueAtTime(vol * 0.5, when + dur - 0.3);
+    out.gain.linearRampToValueAtTime(0.0001, when + dur);
+    src.connect(bp); bp.connect(out); out.connect(dest);
+    src.start(when); src.stop(when + dur);
+    return when + dur;
+  }
+
+  var stopAt = 0;
+  X.playing = function () { return (typeof ctx !== 'undefined' && ctx) ? ctx.currentTime < stopAt : false; };
+
+  /* the pattern the exercise actually uses, in the singer's own range */
+  X.play = function (exId) {
+    var e = null; try { e = V10.exById(exId); } catch (err) {}
+    if (!e) return false;
+    try { ensureCtx(); } catch (err) {}
+    if (typeof ctx === 'undefined' || !ctx) return false;
+    var dest = (typeof guideGain !== 'undefined' && guideGain) ? guideGain : ctx.destination;
+    var lo = 48, hi = 72;
+    try { lo = RANGE.lo; hi = RANGE.hi; } catch (err) {}
+    var mid = Math.round((lo + hi) / 2);
+    var t = ctx.currentTime + 0.08;
+    var vw = vowelOf(e);
+    var eng = e.engine || {};
+    var end = t;
+    if (vw === 'sss' || eng.kind === 'timed' || eng.kind === 'cycle') {
+      end = hiss(ctx, t, 3.0, dest, 0.6);
+    } else if (eng.kind === 'glide') {
+      /* a siren: one long note sliding up an octave and back */
+      var o = ctx.createGain(); o.gain.setValueAtTime(0.0001, t); o.gain.linearRampToValueAtTime(0.45, t + 0.15);
+      o.gain.setValueAtTime(0.45, t + 3.6); o.gain.linearRampToValueAtTime(0.0001, t + 4); o.connect(dest);
+      var osc = ctx.createOscillator(); osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(f0(mid - 5), t);
+      osc.frequency.exponentialRampToValueAtTime(f0(mid + 7), t + 2);
+      osc.frequency.exponentialRampToValueAtTime(f0(mid - 5), t + 4);
+      var pre = ctx.createGain(); pre.gain.value = 0.35; osc.connect(pre);
+      (VOWELS.oo).forEach(function (f) { var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f[0]; bp.Q.value = f[1]; var g = ctx.createGain(); g.gain.value = f[2]; pre.connect(bp); bp.connect(g); g.connect(o); });
+      osc.start(t); osc.stop(t + 4.1); end = t + 4;
+    } else if (eng.kind === 'ladder' && eng.pattern && window.V10 && V10.PATTERNS && V10.PATTERNS[eng.pattern]) {
+      var p = V10.PATTERNS[eng.pattern], bpm = eng.bpm || 120, spb = 60 / bpm;
+      var root = mid - Math.floor((p.span || 7) / 2);
+      var at = t;
+      for (var i = 0; i < p.deg.length; i++) {
+        var d = (p.dur && p.dur[i]) || 1;
+        voice(ctx, root + p.deg[i], at, d * spb * 0.95, vw === 'lip' ? 'lip' : vw, dest, 0.55);
+        at += d * spb;
+      }
+      end = at;
+    } else {
+      /* hold, guided: one comfortable note, in the vowel, for three seconds */
+      end = voice(ctx, mid, t, 3.0, vw === 'lip' ? 'lip' : vw, dest, 0.55);
+    }
+    stopAt = end;
+    return true;
+  };
+
+  /* a Hear-it button, wired: says what it is */
+  X.button = function (exId, small) {
+    return '<button class="btn" data-hear="' + exId + '" style="padding:' + (small ? '7px 11px;font-size:12px' : '9px 14px;font-size:12.5px') +
+      '" title="A synthesised voice, not a singer">▶ Hear it</button>';
+  };
+  X.wire = function (root) {
+    (root || document).querySelectorAll('[data-hear]').forEach(function (b) {
+      if (b.dataset.wired) return;
+      b.dataset.wired = '1';
+      on(b, 'click', function (ev) {
+        ev.stopPropagation();
+        var ok = X.play(b.dataset.hear);
+        var was = b.textContent;
+        b.textContent = ok ? 'Playing… (a synthesised voice, not a singer)' : 'No sound yet — tap once more';
+        setTimeout(function () { b.textContent = was; }, ok ? 3200 : 1500);
+      });
+    });
+  };
+  setInterval(function () { X.wire(document); }, 800);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — timing.
+
+   Briar, 13 Sep: the words light up out of step with the note bars, a
+   held note seems to run into the next word, and the live mic feedback
+   is late. Two delays are behind all of that, and the app had a fixed
+   guess (100 ms) for one and nothing for the other:
+
+   1. The phone plays sound LATER than the app schedules it. The browser
+      reports how much (outputLatency). The chart and the words are now
+      drawn where the sound has reached the ears — window.__rpHeardS,
+      read by the base's chart (patch 22).
+   2. The singer's voice reaches the app later still, through the mic.
+      That is state.latencyMs, which scores and draws the voice earlier
+      to make up for it. It now starts from the reported output delay
+      plus 100 ms for the mic, instead of a flat 100, and the singer can
+      set it by hand in Profile → Sound and microphone. A hand-set value
+      is kept and wins over the automatic one.
+
+   Nothing here can remove the delay you HEAR through headphones — that
+   is the phone's own; Bluetooth adds the most.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'rp_timing';
+  var TM = window.RPTiming = {};
+  var saved = null;
+  try { var v = localStorage.getItem(KEY); if (v != null && v !== '' && isFinite(+v)) saved = +v; } catch (e) {}
+  var autoMs = 100;
+  window.__rpHeardS = 0;
+
+  function outLat() {
+    try {
+      if (typeof ctx === 'undefined' || !ctx) return 0;
+      var o = ctx.outputLatency;
+      if (!(o > 0)) o = ctx.baseLatency;
+      return (o > 0 && o < 1) ? o : 0;
+    } catch (e) { return 0; }
+  }
+  function apply(ms) {
+    try { state.latencyMs = ms; } catch (e) {}
+    var r = $('rLat'), o = $('oLat');
+    if (r && +r.value !== ms) r.value = ms;
+    if (o) o.textContent = ms + ' ms';
+    var m = $('rpTimingRange'), mo = $('rpTimingOut');
+    if (m && +m.value !== ms) m.value = ms;
+    if (mo) mo.textContent = ms + ' ms' + (saved == null ? ' · automatic' : '');
+  }
+  TM.auto = function () { return autoMs; };
+  TM.get = function () { return saved != null ? saved : autoMs; };
+  TM.set = function (ms) {
+    ms = Math.max(0, Math.min(400, Math.round(ms / 10) * 10));
+    saved = ms;
+    try { localStorage.setItem(KEY, String(ms)); } catch (e) {}
+    apply(ms);
+  };
+  TM.reset = function () {
+    saved = null;
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    apply(autoMs);
+  };
+
+  function tick() {
+    var out = outLat();
+    window.__rpHeardS = out;
+    var a = Math.round((out * 1000 + 100) / 10) * 10;
+    if (a !== autoMs) { autoMs = a; if (saved == null) apply(autoMs); }
+  }
+
+  /* the base's own slider (in the Sing settings) keeps working; a move
+     there is a hand-set value too */
+  function wire() {
+    var r = $('rLat');
+    if (r && !r.dataset.rpTiming) {
+      r.dataset.rpTiming = '1';
+      r.addEventListener('input', function (e) { TM.set(+e.target.value); });
+    }
+  }
+
+  /* the Profile row: one slider, one line of what it is for, one reset */
+  TM.row = function () {
+    var d = $('rpTimingRow');
+    if (d) return d;
+    d = document.createElement('div');
+    d.id = 'rpTimingRow';
+    d.className = 'rp-card';
+    d.style.padding = '13px';
+    d.innerHTML =
+      '<div class="rp-ttl">Timing</div>' +
+      '<div class="rp-sub" style="margin-bottom:8px">If your voice shows up late on the note map, move this right. Early, move it left.</div>' +
+      '<label style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--ink-faint)">' +
+        '<span>Mic delay</span><output id="rpTimingOut">100 ms</output></label>' +
+      '<input type="range" id="rpTimingRange" min="0" max="400" value="100" step="10" style="width:100%">' +
+      '<button class="btn ghost" id="rpTimingAuto" style="margin-top:8px;padding:8px 12px;font-size:12.5px">Back to automatic</button>';
+    d.querySelector('#rpTimingRange').addEventListener('input', function (e) {
+      TM.set(+e.target.value);
+      var r = $('rLat'); if (r) { r.value = e.target.value; }
+    });
+    d.querySelector('#rpTimingAuto').addEventListener('click', TM.reset);
+    return d;
+  };
+
+  function boot() {
+    wire();
+    apply(saved != null ? saved : autoMs);
+    tick();
+    setInterval(function () { tick(); wire(); }, 1000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — scroll the chart back.
+
+   Robert, 13 Sep: "when you're doing an exercise and you pause it, or
+   after you've completed it, you should be able to scroll back and see
+   the notes you've hit."
+
+   Drag the chart to the right and it shows what came before; a pill says
+   how far back you are and puts you back to now. Both charts get it —
+   the exercise chart (beats) and the Pitch Tracker (seconds). The charts
+   themselves read one number each, window.__rpScrollB / __rpScrollS,
+   and subtract it from their clock; that is the whole of the patch to
+   the base app. A new start clears it.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  window.__rpScrollB = 0;   /* beats, the exercise chart */
+  window.__rpScrollS = 0;   /* seconds, the Pitch Tracker */
+
+  function pill(id, text, reset) {
+    var d = $(id);
+    if (!text) { if (d) d.style.display = 'none'; return; }
+    if (!d) {
+      d = document.createElement('button');
+      d.id = id;
+      d.className = 'btn primary';
+      d.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:8px;padding:6px 12px;font-size:12px;z-index:5;white-space:nowrap';
+      d.addEventListener('click', function (e) { e.stopPropagation(); reset(); });
+    }
+    d.textContent = text;
+    d.style.display = '';
+    return d;
+  }
+
+  function attach(canvasId, opts) {
+    var cv = $(canvasId);
+    if (!cv || cv.dataset.rpScroll) return;
+    cv.dataset.rpScroll = '1';
+    var wrap = cv.parentElement;
+    if (wrap && getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+    var down = null, moved = false;
+    cv.style.touchAction = 'pan-y';
+    cv.addEventListener('pointerdown', function (e) {
+      if (opts.live()) return;                 /* not while it is running */
+      down = { x: e.clientX, v: opts.get() }; moved = false;
+      try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - down.x;
+      if (Math.abs(dx) > 4) moved = true;
+      var v = Math.max(0, Math.min(opts.max(), down.v + dx / opts.pxPer()));
+      opts.set(v);
+      opts.redraw();
+      var p = pill(canvasId + 'Back', v > 0.01 ? '← ' + opts.label(v) + ' back · tap for now' : '', function () { opts.set(0); opts.redraw(); pill(canvasId + 'Back', ''); });
+      if (p && !p.parentElement && wrap) wrap.appendChild(p);
+    });
+    var up = function () { down = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    /* a running chart means now — clear any old scroll and the pill */
+    setInterval(function () {
+      if (opts.live() && opts.get() !== 0) { opts.set(0); pill(canvasId + 'Back', ''); }
+    }, 300);
+  }
+
+  var n = 0;
+  var iv = setInterval(function () {
+    if (!$('gameCanvas') || !$('freeCanvas')) { if (++n > 80) clearInterval(iv); return; }
+    clearInterval(iv);
+    /* the exercise chart: beats; ppb is what the chart last drew with */
+    attach('gameCanvas', {
+      live: function () { try { return !!(G.running && !T.paused); } catch (e) { return false; } },
+      get: function () { return window.__rpScrollB; },
+      set: function (v) { window.__rpScrollB = v; },
+      max: function () { try { return Math.max(0, (G.lastBeat || 0) + 4); } catch (e) { return 64; } },
+      pxPer: function () { return window.__rpPpb || 60; },
+      label: function (v) { return Math.round(v) + ' beats'; },
+      redraw: function () { try { drawGame(); } catch (e) {} }
+    });
+    /* the Pitch Tracker: seconds; W/7 pixels per second, always */
+    attach('freeCanvas', {
+      live: function () { try { return typeof MIC !== 'undefined' && MIC.on && !window.__rpFreeHeld; } catch (e) { return true; } },
+      get: function () { return window.__rpScrollS; },
+      set: function (v) { window.__rpScrollS = v; },
+      max: function () { try { return Math.max(0, FREE.trail.length ? (FREE.trail[FREE.trail.length - 1].t - FREE.trail[0].t) : 0); } catch (e) { return 60; } },
+      pxPer: function () { var c = $('freeCanvas'); return (c ? c.clientWidth : 360) / 7; },
+      label: function (v) { return Math.round(v) + ' seconds'; },
+      redraw: function () {}
+    });
+  }, 250);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the phone's back button.
+
+   Briar, 13 Sep: pressing back on any page took her all the way out to
+   Google, and she had to click her way back to where she was. The app
+   never put anything in the browser's history, so "back" meant "leave".
+
+   Every screen change now leaves a footprint in the history. Back walks
+   the footprints: a page goes back to the tab it came from, a running
+   exercise is left the way its own Done button leaves it, a tab goes
+   back to the tab before it — and the very first screen stays put, so
+   back never leaves the app by accident. Forward is left alone.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var stack = [];          /* ['home', 'train', 'page:cat:breath', ...] */
+  var applying = false;    /* true while we are the ones navigating */
+  var seeded = false;
+  window.RPBack = { stack: function () { return stack.slice(); } };
+
+  function current() {
+    try {
+      if (window.RPPage && RPPage.isOpen()) return 'page';
+      if (typeof state !== 'undefined' && state.mode) return state.mode;
+    } catch (e) {}
+    return 'home';
+  }
+  function push(key) {
+    if (applying) return;
+    /* a tab change stands any open page down, so its footprint goes too */
+    if (key !== 'page') while (stack.length && stack[stack.length - 1] === 'page') stack.pop();
+    if (stack.length && stack[stack.length - 1] === key) return;
+    stack.push(key);
+    if (stack.length > 40) stack.shift();
+    try { history.pushState({ rp: key, n: stack.length }, ''); } catch (e) {}
+  }
+
+  /* something is running on the Train tab — leave it the way its own
+     button would, and stay on the tab */
+  function leaveRunning() {
+    var ids = ['gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit', 'btnKbdBack'];
+    for (var i = 0; i < ids.length; i++) {
+      var b = $(ids[i]);
+      if (b && b.offsetParent !== null) { b.click(); return true; }
+    }
+    return false;
+  }
+
+  function goBack() {
+    applying = true;
+    try {
+      /* a sheet on top closes first */
+      var o = $('rpSheet');
+      if (o && o.style.display !== 'none' && o.innerHTML) { o.style.display = 'none'; o.innerHTML = ''; return; }
+      /* the tour or a tip */
+      if (window.RPTour && RPTour.running()) { RPTour.stop(); return; }
+      if (window.RPPage && RPPage.isOpen()) { RPPage.back(); stack.pop(); return; }
+      if (leaveRunning()) return;   /* still on the same tab: its footprint stays */
+      stack.pop();
+      var prev = stack.length ? stack[stack.length - 1] : 'home';
+      if (prev === 'page') prev = 'home';
+      try { window.switchMode(prev); } catch (e) {}
+    } finally {
+      setTimeout(function () { applying = false; }, 60);
+    }
+  }
+
+  window.addEventListener('popstate', function () {
+    /* the browser has already stepped back one entry; put one back so the
+       next press is ours again, then do our own going-back */
+    if (!seeded) return;
+    try { history.pushState({ rp: 'hold' }, ''); } catch (e) {}
+    goBack();
+  });
+
+  /* seed one entry so the first press never leaves the site */
+  var n = 0;
+  var iv = setInterval(function () {
+    if (typeof window.switchMode !== 'function') { if (++n > 50) clearInterval(iv); return; }
+    clearInterval(iv);
+    try { history.replaceState({ rp: 'root' }, ''); history.pushState({ rp: 'home' }, ''); } catch (e) {}
+    stack = ['home'];
+    seeded = true;
+    var prev = window.switchMode;
+    window.switchMode = function (m) {
+      var r = prev.apply(this, arguments);
+      push(m === 'page' ? 'page' : m);
+      return r;
+    };
+    if (window.RPPage) {
+      var open = RPPage.open;
+      RPPage.open = function (o) { var r = open.apply(this, arguments); push('page'); return r; };
+    }
+  }, 200);
 })();
 
 </script>

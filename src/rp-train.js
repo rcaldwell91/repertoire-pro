@@ -77,6 +77,7 @@
       '</div></div>';
   }
   function wireEx(root, backTo) {
+    if (window.RPExample) { try { RPExample.wire(root); } catch (e) {} }
     root.querySelectorAll('[data-exstart]').forEach(function (b) {
       on(b, 'click', function (ev) { ev.stopPropagation(); TR.start(b.dataset.exstart); });
     });
@@ -120,6 +121,7 @@
       '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="width:100%;padding:13px;font-size:14px">Start</button>' +
       '<div class="rp-card" style="margin-top:14px;padding:13px;font-size:13.5px;line-height:1.55">' +
       '<div class="rp-lab">WHAT</div><div>' + strip(e.what) + '</div>' +
+      (window.RPExample ? '<div style="margin-top:10px">' + RPExample.button(e.id) + '</div>' : '') +
       (e.how ? '<div class="rp-lab" style="margin-top:12px">HOW</div><div>' + e.how + '</div>' : '') +
       (e.miss ? '<div class="rp-lab" style="margin-top:12px">WATCH FOR</div><div>' + e.miss + '</div>' : '') +
       (e.why ? '<div class="rp-lab" style="margin-top:12px">WHY IT WORKS</div><div>' + e.why + '</div>' : '') +
@@ -229,6 +231,7 @@
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(one.name) + '</div>' +
           '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
           '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
+          (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(one.id, true) + '</div>' : '') +
           '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See more ' +
           esc(c.name.toLowerCase()) + '</button></div>';
       }

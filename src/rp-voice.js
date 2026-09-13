@@ -149,10 +149,15 @@
 
   function wireMonitor() {
     var n = live();
-    if (!n || typeof MIC === 'undefined' || !MIC.src) return;
-    try { MIC.src.connect(n.input); } catch (e) {}
+    if (!n) return;
+    if (typeof MIC !== 'undefined' && MIC.src) { try { MIC.src.connect(n.input); } catch (e) {} }
     try { n.out.disconnect(); } catch (e) {}
-    if (V.monitor) { try { n.out.connect(ctx.destination); } catch (e) {} }
+    /* Briar, 13 Sep: tapping an effect while a take was playing cut the
+       sound, and playing again did not carry the new effect. The output
+       was being unplugged to re-plug it for the monitor; the playback
+       runs through the same chain, so it went silent. Keep it plugged in
+       while anything is playing — the effects apply live. */
+    if (V.monitor || V.playing) { try { n.out.connect(ctx.destination); } catch (e) {} }
   }
 
   /* ---------------------------------------------------------------- */
@@ -169,8 +174,18 @@
     return d;
   }
 
-  function seg(group, map, cur) {
-    var h = '<div class="rp-fxrow">';
+  var ABOUT = {
+    comp: 'Compressor: evens out your loud and quiet bits so a whisper and a belt sit closer together. Radio voices are compressed.',
+    eq:   'EQ: turns parts of the sound up or down. Warm adds body, Bright adds air, Telephone strips both.',
+    echo: 'Echo: repeats of your voice, fading. Slap is one quick repeat; Long is the canyon.',
+    verb: 'Reverb: the room. Off is a cupboard, Hall is a church. It hides small wobbles — which is why singers like it and why it is off on the Pitch Tracker.'
+  };
+  function seg(group, map, cur, label) {
+    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'COMPRESSOR' ? ';margin-top:12px' : '') + '">' +
+      '<div class="rp-lab" style="margin:0">' + label + '</div>' +
+      '<span class="rp-info" data-about="' + group + '" title="What is this?">i</span></div>' +
+      '<div class="rp-about measured" id="rpAbout_' + group + '" style="display:none;margin:2px 0 8px">' + esc(ABOUT[group] || '') + '</div>' +
+      '<div class="rp-fxrow">';
     Object.keys(map).forEach(function (k) {
       h += '<button class="rp-fxbtn' + (cur === k ? ' on' : '') + '" data-fx="' + group + '" data-val="' + k + '">' +
         esc(map[k].label) + '</button>';
@@ -198,14 +213,15 @@
       '<b style="font-size:13px">Hear yourself</b>' +
       '<button class="btn' + (V.monitor ? ' primary' : '') + '" id="rpVMon" style="padding:8px 13px;font-size:12.5px">' +
       (V.monitor ? 'On' : 'Off') + '</button></div>' +
-      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal. ' +
-      'There is a small delay on a phone; that is the phone, not you.</div></div>';
+      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal.</div>' +
+      '<div class="measured" style="margin-top:6px">There is a delay between your mouth and your ears on every phone — ' +
+      'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      '<div class="rp-lab">COMPRESSOR</div>' + seg('comp', COMP, V.fx.comp) +
-      '<div class="rp-lab" style="margin-top:12px">EQ</div>' + seg('eq', EQ, V.fx.eq) +
-      '<div class="rp-lab" style="margin-top:12px">ECHO</div>' + seg('echo', ECHO, V.fx.echo) +
-      '<div class="rp-lab" style="margin-top:12px">REVERB</div>' + seg('verb', VERB, V.fx.verb) +
+      seg('comp', COMP, V.fx.comp, 'COMPRESSOR') +
+      seg('eq', EQ, V.fx.eq, 'EQ') +
+      seg('echo', ECHO, V.fx.echo, 'ECHO') +
+      seg('verb', VERB, V.fx.verb, 'REVERB') +
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
@@ -218,6 +234,15 @@
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
     on($('rpVMon'), 'click', toggleMonitor);
     visStart();
+    host.querySelectorAll('[data-about]').forEach(function (b) {
+      on(b, 'click', function () {
+        var a = $('rpAbout_' + b.dataset.about);
+        if (!a) return;
+        var show = a.style.display === 'none';
+        a.style.display = show ? '' : 'none';
+        b.classList.toggle('on', show);
+      });
+    });
     host.querySelectorAll('[data-fx]').forEach(function (b) {
       on(b, 'click', function () {
         V.fx[b.dataset.fx] = b.dataset.val;

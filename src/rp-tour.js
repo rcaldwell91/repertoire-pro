@@ -307,7 +307,29 @@
       { find: function () { return $('rpStRec'); },
         text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
       { find: function () { return $('rpTakeList') || $('rpTakes'); },
-        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' }
+        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' },
+      { find: function () { return $('freeCanvas'); },
+        text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
+    ] },
+    guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
+      { find: function () { return document.querySelector('#v10Guided [data-hear]'); },
+        text: 'Tap Hear it for the sound you are after. It is a made voice, not a singer, so copy the shape of it, not the tone.' },
+      { find: function () { return $('gBig'); },
+        text: 'The clock runs while you do it. Press Done when you have finished.' }
+    ] },
+    ladder: { host: 'trainLadderBar', anchor: 'ladderTitle', steps: [
+      { find: function () { return $('gameCanvas'); },
+        text: 'The gold bars are the notes to sing. Your voice is the blue line. Fill a bar to score it.' },
+      { find: function () { return $('btnExPause'); },
+        text: 'Pause to think, Restart to take it from the top, Record to keep the run.' },
+      { find: function () { return $('gameCanvas'); },
+        text: 'Paused or finished, drag the chart to the right to see what you sang.' }
+    ] },
+    match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
+      { find: function () { return $('matchTarget'); },
+        text: 'This is the note, sung by a voice. Replay plays it again.' },
+      { find: function () { return $('matchHold'); },
+        text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
     ] },
     voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
       { find: function () { return $('rpVis'); },
