@@ -17602,6 +17602,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var live = theRange();
     if (!live) return false;
     applying = true;
+    seen = { lo: lo, hi: hi };
     try {
       live.lo = lo; live.hi = hi;
       if (typeof updateRangeDisp === 'function') updateRangeDisp();
@@ -17611,11 +17612,20 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
   R.apply = apply;
 
+  /* The app calls updateRangeDisp() every time the Train tab opens, with
+     whatever RANGE holds — on a fresh phone that is its built-in A2–A4.
+     The first version saved that as "sung and measured", which was a lie
+     on screen for anyone who had never sung a note. So: remember what the
+     range was when we last looked, and only write when it actually moves. */
+  var seen = null;
   function save(by) {
     var live = theRange();
     if (!live) return;
     var lo = Math.round(live.lo), hi = Math.round(live.hi);
     if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return;
+    if (!seen) { seen = { lo: lo, hi: hi }; if (!readLocal()) return; }
+    if (seen.lo === lo && seen.hi === hi) return;            /* nothing moved */
+    seen = { lo: lo, hi: hi };
     var prev = readLocal();
     if (prev && prev.lo === lo && prev.hi === hi) return;   /* nothing changed */
     var v = { lo: lo, hi: hi, at: nowIso(), by: by || (looksPicked(lo, hi) ? 'preset' : 'test') };
