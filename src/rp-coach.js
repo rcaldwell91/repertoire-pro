@@ -978,6 +978,10 @@
     h += '<h2 style="margin:12px 0 2px;font-size:19px">' + esc(s.display_name) + '</h2>';
     h += '<div class="rp-sub" style="margin:0 0 4px">' + esc(s.email) + '</div>';
 
+    /* He assigns exercises that ladder through their range. Until now he
+       could not see what that range was. */
+    if (window.RPRange) h += RPRange.lineFor(s);
+
     // How they answered on first open. This is the most useful thing on the
     // screen before he has met them: it tells him how to talk to them.
     var W = { plain: 'Music words lose them — keep it plain.',
