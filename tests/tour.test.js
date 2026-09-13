@@ -52,13 +52,21 @@ function ok(cond, what) { console.log((cond ? '  ✓ ' : '  ✗ ') + what); if (
   await p.evaluate(() => document.querySelector('#rpProfileTop [data-pg="help"]').click()); await p.waitForTimeout(900);
   ok(await p.evaluate(() => RPPage.isOpen('profile:help')), 'Help page opens as a page');
   ok(!!(await p.$('#rpHelpRow')) && await p.evaluate(() => document.getElementById('rpHelpRow').offsetParent !== null), 'Help row is on that page');
-  await p.evaluate(() => document.getElementById('rpHelpRow').click()); await p.waitForTimeout(800);
-  ok(await p.evaluate(() => /How to use Repertoire/.test(document.getElementById('rpSheet').innerText)), 'Help page opens');
-  await p.evaluate(() => document.getElementById('rpHelpTour').click()); await p.waitForTimeout(1200);
-  ok(await p.evaluate(() => RPTour.running()), 'tour restarts from Help');
+  ok(!!(await p.$('#rpGuideRow')), 'the picture guide has its own row');
+  /* Robert asked for this: the tutorial from Profile walks the real screens,
+     it does not open a page of pictures. */
+  await p.evaluate(() => document.getElementById('rpHelpRow').click()); await p.waitForTimeout(1300);
+  ok(await p.evaluate(() => RPTour.running()), 'the Help row starts the real tour, on the real screens');
+  ok(!(await p.evaluate(() => { const o = document.getElementById('rpSheet'); return !!(o && o.style.display !== 'none' && o.innerHTML); })), 'no picture sheet in the way');
   let n = 0;
   while (await p.evaluate(() => RPTour.running()) && n++ < 16) { await p.evaluate(() => document.getElementById('rpTourNext').click()); await p.waitForTimeout(650); }
   ok(!(await p.evaluate(() => RPTour.running())) && n === 11, 'Next walks all 11 steps and Done closes it (' + n + ' presses)');
+
+  console.log('the picture guide is still there, second');
+  await p.evaluate(() => window.switchMode('you')); await p.waitForTimeout(1600);
+  await p.evaluate(() => document.querySelector('#rpProfileTop [data-pg="help"]').click()); await p.waitForTimeout(900);
+  await p.evaluate(() => document.getElementById('rpGuideRow').click()); await p.waitForTimeout(900);
+  ok(await p.evaluate(() => /How to use Repertoire/.test(document.getElementById('rpSheet').innerText)), 'the guide with pictures opens from its own row');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs[0] : ''));
   await browser.close();

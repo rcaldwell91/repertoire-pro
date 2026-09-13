@@ -33,7 +33,7 @@
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
-      folds: ['About'], cards: ['rpHelpRow'] }
+      folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow'] }
   ];
 
   function foldNamed(name) {

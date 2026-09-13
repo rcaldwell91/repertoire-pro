@@ -318,7 +318,7 @@
       '<button class="btn" id="rpHelpX" style="padding:7px 12px;font-size:12px">Close</button></div>' +
       '<div class="measured" style="margin-top:6px">Real pictures of the app, with the thing to press marked.</div>' +
       '<div class="row" style="gap:7px;margin-top:12px;flex-wrap:nowrap">' +
-      '<button class="btn primary" id="rpHelpTour" style="flex:1;padding:11px;font-size:12.5px">Show me round</button>' +
+      '<button class="btn primary" id="rpHelpTour" style="flex:1;padding:11px;font-size:12.5px">Walk me through it instead</button>' +
       (coach ? '<button class="btn" id="rpHelpTourC" style="flex:1;padding:11px;font-size:12.5px">The coach tour</button>' : '') +
       '</div>';
 
@@ -380,21 +380,32 @@
   };
 
   /* ---- the way in, from Profile ------------------------------------- */
-  function row() {
+  /* Robert, 13 Sep: "when you try to see the tutorial again in the profile
+     section I'd like it to take you through the actual screens like it does
+     the first time and not just show pictures." So the first row IS the
+     tour — the real one, on the real screens. The pictures are second, for
+     when you want to read rather than be walked. */
+  function card(id, title, sub, fn) {
     var host = $('modeYou');
-    if (!host) return;
-    var d = $('rpHelpRow');
-    if (d) return;
-    d = document.createElement('div');
-    d.id = 'rpHelpRow';
+    if (!host || $(id)) return;
+    var d = document.createElement('div');
+    d.id = id;
     d.className = 'rp-card';
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">Help — how to use Repertoire</div>' +
-      '<div class="rp-sub">Show me round again, and a guide with pictures</div></div>' +
+      '<div><div class="rp-ttl">' + esc(title) + '</div>' +
+      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
-    on(d, 'click', T.help);
+    on(d, 'click', fn);
     host.appendChild(d);   /* rp-profile moves it into the Help page */
+  }
+  function row() {
+    card('rpHelpRow', 'Show me round the app',
+      'The same walk-through as the first time, on the real screens.',
+      function () { T.start(isCoach() ? 'coach' : 'student'); });
+    card('rpGuideRow', 'The guide, with pictures',
+      'Every screen, with the thing to press marked. Read it at your own pace.',
+      T.help);
   }
   setInterval(row, 1500);
   setTimeout(row, 900);
