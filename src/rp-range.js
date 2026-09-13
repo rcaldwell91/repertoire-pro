@@ -16,9 +16,9 @@
    and measured on the 13th" and "picked off a list" are not the same
    claim and the app should not blur them.
 
-   The song half of idea bank #1 lives next door in rp-songs.js: there is
-   no openly licensed catalogue of songs with vocal ranges, so the app
-   builds its own and every row says who entered it. Nothing is scraped.
+   Song suggestions and recommendations are PARKED, at Robert's word on
+   13 Sep. Nothing here suggests anything. This file keeps one number that
+   the app had been throwing away, and shows it.
    ====================================================================== */
 (function () {
   'use strict';
@@ -188,51 +188,6 @@
   setInterval(pull, 1500);
 
   /* ================================================================== */
-  /* DOES IT FIT? — only for songs the app has the actual notes to.      */
-  /* ================================================================== */
-  function songSpan(s) {
-    if (!s || !s.notes || !s.notes.length) return null;
-    var lo = Infinity, hi = -Infinity;
-    for (var i = 0; i < s.notes.length; i++) {
-      var m = s.notes[i].m;
-      if (!isFinite(m)) continue;
-      if (m < lo) lo = m;
-      if (m > hi) hi = m;
-    }
-    if (!isFinite(lo) || !isFinite(hi)) return null;
-    var t = s.transposeDefault || 0;
-    return { lo: lo + t, hi: hi + t };
-  }
-
-  R.songs = function () {
-    var out = [];
-    try {
-      if (typeof SONGS === 'undefined') return out;
-      SONGS.forEach(function (s) {
-        if (/^Exercise:/i.test(s.title || '')) return;   /* those are drills, not songs */
-        var sp = songSpan(s);
-        if (sp) out.push({ title: s.title, lo: sp.lo, hi: sp.hi, span: sp.hi - sp.lo });
-      });
-    } catch (e) {}
-    return out;
-  };
-
-  /* How far the song has to move, in semitones, to sit inside your range.
-     Returns null when it simply will not: the song is wider than you are. */
-  R.fit = function (song, lo, hi) {
-    if (song.span > (hi - lo)) return { impossible: true, short: song.span - (hi - lo) };
-    var shift = 0;
-    if (song.lo < lo) shift = lo - song.lo;
-    else if (song.hi > hi) shift = hi - song.hi;
-    return {
-      impossible: false,
-      shift: shift,
-      roomLow: (song.lo + shift) - lo,
-      roomHigh: hi - (song.hi + shift)
-    };
-  };
-
-  /* ================================================================== */
   function sheet(html) {
     var o = $('rpSheet');
     if (!o) {
@@ -285,18 +240,9 @@
     h += '<button class="btn primary" id="rpRgTest" style="width:100%;padding:11px;margin-top:12px;' +
       'font-size:12.5px">Sing it and measure it</button>';
 
-    /* The whole list, with who said so, lives in the song book — one place
-       rather than two versions of the same truth. */
-    h += '<div class="rp-lab" style="margin-top:20px">DOES IT FIT?</div>' +
-      '<div class="measured">Every song on file, sorted by whether it sits in this range: fits as it ' +
-      'is, fits if you move it, or is wider than you are and fits in no key at all.</div>' +
-      '<button class="btn" id="rpRgSongs" style="width:100%;padding:11px;margin-top:9px;' +
-      'font-size:12.5px">Songs, and whether they fit you</button>';
-
     h += '<button class="btn" id="rpRgX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
     sheet(h);
     on($('rpRgX'), 'click', shut);
-    on($('rpRgSongs'), 'click', function () { if (window.RPSongs) RPSongs.show(); });
     on($('rpRgTest'), 'click', function () {
       shut();
       try { window.switchMode('train'); } catch (e) {}
@@ -307,30 +253,56 @@
     });
   };
 
-  /* ---- the row in Profile ------------------------------------------ */
+  /* ------------------------------------------------------------------ */
+  /* Profile already HAS a "Your voice" row. Two rows about one range is
+     one too many, and the one that was there was wrong: buildProfile()
+     runs once ever (it bails on host.dataset.v10) and reads the range off
+     the screen at that moment — which is before anything has been
+     restored. So it sat there saying A2–A4 while the Train tab said
+     C3–C5. Keep the row people already look at, and keep it true.        */
+  /* ------------------------------------------------------------------ */
+  function voiceFold() {
+    var host = $('youSlots');
+    if (!host) return null;
+    var all = host.querySelectorAll('details.pfold');
+    for (var i = 0; i < all.length; i++) {
+      var s0 = all[i].querySelector('summary span');
+      if (s0 && /^Your voice/i.test((s0.textContent || '').trim())) return all[i];
+    }
+    return null;
+  }
+
   function row() {
-    var host = $('modeYou');
-    if (!host) return;
+    var d = voiceFold();
+    if (!d) return;
     var v = R.get();
     if (!v) return;
-    var d = $('rpRangeRow');
-    var fresh = !d;
-    if (fresh) {
-      d = document.createElement('div');
-      d.id = 'rpRangeRow';
-      d.className = 'rp-card';
-      d.style.cursor = 'pointer';
+    var txt = name(v.lo) + ' \u2013 ' + name(v.hi);
+
+    var sub = d.querySelector('summary .psub');
+    if (sub && sub.textContent !== txt) sub.textContent = txt;
+    var pv = d.querySelector('.prow .pv');
+    if (pv && pv.textContent !== txt) pv.textContent = txt;
+
+    var line = d.querySelector('#rpRangeLine');
+    if (!line) {
+      line = document.createElement('div');
+      line.id = 'rpRangeLine';
+      line.className = 'rp-card';
+      line.style.cssText = 'padding:11px;margin-top:10px;cursor:pointer';
+      var body = d.querySelector('.pfoldin');
+      if (!body) return;
+      body.appendChild(line);
+      on(line, 'click', R.open);
     }
-    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">Your range</div>' +
-      '<div class="rp-sub">' + esc(name(v.lo)) + '–' + esc(name(v.hi)) + ' · ' + (v.hi - v.lo) +
-      ' semitones' + (v.by === 'preset' ? ' · picked, not measured'
-                     : (v.at ? ' · measured ' + esc(when(v.at)) : '')) + '</div></div>' +
-      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
-    if (fresh) {
-      on(d, 'click', R.open);
-      try { host.appendChild(d); } catch (e) {}
-    }
+    /* the notes themselves are already on the two lines above this one, so
+       this row carries the thing they do not: where the number came from */
+    var head = v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured');
+    line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">' + esc(head) + '</div>' +
+      '<div class="rp-sub">' + (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your ' +
+      'account</div></div><div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
   setInterval(row, 1500);
   setTimeout(row, 1150);
