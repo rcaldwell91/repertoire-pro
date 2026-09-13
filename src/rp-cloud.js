@@ -392,6 +392,55 @@
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
+  /* ------------------------------------------------------------------ */
+  /* PROFILE'S "ACCOUNT" ROW.                                            */
+  /* v10.1 had one before accounts existed: a name you typed that stayed  */
+  /* on the phone, under a sentence saying "there is no account, no      */
+  /* server and no sign-in". Both are now false, and a signed-in person   */
+  /* saw two accounts on one screen — the real one at the top right and   */
+  /* a fake one in Profile saying "Not set". That name was read by        */
+  /* nothing else in the app, so the row now shows the real account and   */
+  /* opens it. base.html is not modified; this rewrites the row it built. */
+  /* ------------------------------------------------------------------ */
+  var acctSig = '';
+  function accountRow() {
+    var host = $('youSlots');
+    if (!host) return;
+    var fold = null;
+    var all = host.querySelectorAll('details.pfold');
+    for (var i = 0; i < all.length; i++) {
+      var sp = all[i].querySelector('summary span');
+      if (sp && /^Account/i.test((sp.textContent || '').trim())) { fold = all[i]; break; }
+    }
+    if (!fold) return;
+    var me = RP.user && RP.profile ? RP.profile : null;
+    var sig = me ? 'in:' + (me.display_name || '') + ':' + (me.email || '') + ':' + (me.is_coach ? 'c' : 's') : 'out';
+    if (sig === acctSig && fold.dataset.rp) return;
+    acctSig = sig;
+    fold.dataset.rp = '1';
+    var sub = fold.querySelector('summary .psub');
+    if (sub) sub.textContent = me ? (me.display_name || me.email || 'Signed in') : 'Not signed in';
+    var body = fold.querySelector('.pfoldin');
+    if (!body) return;
+    if (me) {
+      body.innerHTML = '<div class="prow" style="border-top:0"><span class="pk">Name</span><span class="pv">' +
+          esc(me.display_name || '\u2014') + '</span></div>' +
+        '<div class="prow"><span class="pk">Email</span><span class="pv">' + esc(me.email || '') + '</span></div>' +
+        (me.is_coach ? '<div class="prow"><span class="pk">Teaching</span><span class="pv">on \u00b7 code ' +
+          esc(me.coach_code || '') + '</span></div>' : '') +
+        '<div class="measured" style="margin-top:8px">Your name is what your coach sees. Change it, switch teaching on, ' +
+          'or sign out from here.</div>' +
+        '<button class="btn" id="rpAcctOpen" style="width:100%;padding:11px;margin-top:10px;font-size:12.5px">Open my account</button>';
+    } else {
+      body.innerHTML = '<div class="measured">Not signed in. A coach can only find you if you have an account, and ' +
+          'your range and your takes only follow you to a new phone with one. Everything else works without.</div>' +
+        '<button class="btn primary" id="rpAcctOpen" style="width:100%;padding:11px;margin-top:10px;font-size:12.5px">Sign in or make an account</button>';
+    }
+    on($('rpAcctOpen'), 'click', function () { (RP.user && RP.profile) ? openAccount() : openAuth(); });
+  }
+  setInterval(accountRow, 1500);
+  setTimeout(accountRow, 1300);
+
   function openAccount() {
     var p = RP.profile || {};
     var h = '<b style="font-size:16px">' + esc(p.display_name || 'Account') + '</b>' +
