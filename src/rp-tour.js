@@ -42,6 +42,11 @@
   /* one sentence. `mode` is the tab it lives on.                        */
   /* ------------------------------------------------------------------ */
   var STUDENT = [
+    /* Robert, 13 Sep: "walk me through what this app is for, what I get
+       out of it, how to use it." The first and last cards answer the first
+       two; everything between is the third. */
+    { mode: 'home', find: null,
+      text: 'Repertoire is a singing coach in your pocket: fifteen minutes a day, and your real coach\u2019s work when you have one.' },
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
@@ -51,14 +56,14 @@
         return signedIn() ? 'Your account — your name, and where you sign out.'
                           : 'Make an account here so a coach can find you.';
       } },
-    { mode: 'train', find: function () { return $('btnRangeTest'); },
-      text: 'Sing your lowest note, then your highest — every exercise is built on this.' },
     { mode: 'home', find: function () { return $('rpTodayGo') || $('btnJourney'); },
       text: 'Every day, press this — fifteen minutes, from whoever is coaching you.' },
-    { mode: 'train', find: function () { return first('#trainGrid [data-start], #v10TrainHost [data-start], #modeTrain [data-start]'); },
-      text: 'Or pick one exercise and press Start.' },
+    { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
+      text: 'Want one thing? Pick what to work on up top, then Start.' },
+    { mode: 'train', find: function () { return $('rpTileTracker'); },
+      text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
-      text: 'Sing anything and watch the line — record it if you like.' },
+      text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
@@ -66,8 +71,12 @@
         if (hasCoach()) return 'What your coach sets you lands here — tap it, record, send the take you like.';
         return 'Got a coach? Their code goes in here, and what they set you shows up here.';
       } },
-    { mode: 'you', find: function () { return $('rpHelpRow'); },
-      text: 'Lost? The tour and a guide with pictures live here.' }
+    { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="voice"]'); },
+      text: 'Your range lives here. Sing it once and every exercise fits your voice.' },
+    { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="help"]'); },
+      text: 'Lost? This tour and a guide with pictures live here.' },
+    { mode: 'home', find: null,
+      text: 'What you get: do the fifteen minutes most days and the app keeps count — of the days, and of what you can do now that you could not.' }
   ];
 
   var COACH = [
@@ -318,23 +327,26 @@
       'Wired ones if you have them. Through the speaker the app hears itself and squeals. ' +
       'Then make an account with the button at the top right — a coach can only find you if you have one.');
     h += sec('2. Find your range', '02-range.jpg',
-      'Train tab, <b>Test my range</b>. Sing your lowest comfortable note, then your highest. ' +
-      'Every exercise from then on is built around what you sang.');
+      'Profile, <b>Your voice</b>, <b>Test my range</b>. Sing your lowest comfortable note, then your highest. ' +
+      'Every exercise from then on is built around what you sang. It is offered when you sign up.');
 
     h += '<div class="rp-lab" style="margin-top:22px">EVERY DAY</div>';
     h += sec('3. Today', '03-today.jpg',
       'Home. One button, about fifteen minutes. It says who set it — your coach, or Repertoire itself when nobody has.');
     h += sec('4. One exercise', '04-exercise.jpg',
-      'Train tab. Pick one and press <b>Start</b>. It plays the notes, you sing them, it shows how close you were.');
-    h += sec('5. Sing something', '05-sing.jpg',
-      'Sing tab, <b>Free Sing</b>. Sing anything and watch the line. Nothing is scored, nothing is sent.');
+      'Train tab. Pick what to work on and your level at the top, then <b>Start</b> on the one it gives you. ' +
+      'Or tap a category for the whole list.');
+    h += sec('5. See your notes', '13-tracker.jpg',
+      'Train tab, <b>Pitch Tracker</b>. It draws every note you sing as you sing it, and can record a take with the notes kept.');
+    h += sec('6. Sing something', '05-sing.jpg',
+      'Sing tab, <b>Free Sing</b>. A bit of echo, something to watch. Nothing is scored, nothing is sent.');
 
     h += '<div class="rp-lab" style="margin-top:22px">WITH A COACH</div>';
-    h += sec('6. Join your coach', '06-coach.jpg',
+    h += sec('7. Join your coach', '06-coach.jpg',
       'Coach tab. They read you a six-character code; you type it in and press <b>Join</b>. Or find them by what they teach.');
-    h += sec('7. What they set you', '07-assignment.jpg',
+    h += sec('8. What they set you', '07-assignment.jpg',
       'It appears here the moment they set it. Tap it and the exercise opens, already set up.');
-    h += sec('8. Record, then send the one you like', '08-record.jpg',
+    h += sec('9. Record, then send the one you like', '08-record.jpg',
       '<b>Save</b> keeps a take on your phone. <b>Submit</b> sends it to your coach and ticks the work off. Nothing leaves your phone until you press Submit.');
 
     h += '<div class="rp-lab" style="margin-top:22px">GET THE MOST OUT OF IT</div>' +
@@ -382,9 +394,7 @@
       '<div class="rp-sub">Show me round again, and a guide with pictures</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', T.help);
-    /* first among the added cards, because being lost is the reason you are here */
-    var firstCard = host.querySelector('#rpTestRow') || null;
-    try { host.insertBefore(d, firstCard); } catch (e) { host.appendChild(d); }
+    host.appendChild(d);   /* rp-profile moves it into the Help page */
   }
   setInterval(row, 1500);
   setTimeout(row, 900);

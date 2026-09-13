@@ -495,11 +495,39 @@
       '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Start</button>' +
       '<button class="btn" id="rpTestNow" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px">' +
       'Test me instead \u2014 measure it</button>');
-    on($('rpOK'), 'click', function () { shut(); apply(); });
+    on($('rpOK'), 'click', function () { shut(); apply(); offerRange(); });
     on($('rpTestNow'), 'click', function () {
       shut(); apply();
       try { if (window.RPTest) RPTest.open(); } catch (e) {}
     });
+  }
+
+  /* Robert, 13 Sep: the range test is not something you do often, so it
+     comes off the Train tab and is offered here, once, while you are
+     already going through the rounds. It lives in Profile → Your voice. */
+  function offerRange() {
+    var known = null;
+    try { known = window.RPRange ? RPRange.get() : null; } catch (e) {}
+    if (known && known.by) return;          /* already sung or picked — do not nag */
+    setTimeout(function () {
+      sheet('<b style="font-size:18px">One more: your range.</b>' +
+        '<div class="measured" style="margin-top:8px">Sing your lowest comfortable note, then your highest. ' +
+        'About a minute. Every exercise is then built around what you sang instead of a guess.</div>' +
+        '<button class="btn primary" id="rpRgNow" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Sing it now</button>' +
+        '<button class="btn" id="rpRgLater" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">Later \u2014 it is in Profile</button>');
+      on($('rpRgLater'), 'click', shut);
+      on($('rpRgNow'), 'click', function () {
+        shut();
+        try { window.switchMode('you'); } catch (e) {}
+        setTimeout(function () {
+          try { if (window.RPProfile) RPProfile.open('voice'); } catch (e) {}
+          setTimeout(function () {
+            var b = $('btnRangeTest');
+            if (b) { try { b.scrollIntoView({ block: 'center' }); } catch (e) {} b.click(); }
+          }, 350);
+        }, 200);
+      });
+    }, 500);
   }
 
   ME.ask = function (from) { step = from || 0; answers = {}; ask(); };

@@ -142,7 +142,11 @@
   B.items = ITEMS;
 
   /* ------------------------------------------------------------------ */
+  /* Robert, 13 Sep: not a pop-up. A page, with a back button. */
   function sheet(html) {
+    if (window.RPPage) {
+      return RPPage.open({ key: 'body', backLabel: 'Train', html: html });
+    }
     var o = $('rpSheet');
     if (!o) {
       o = document.createElement('div');
@@ -157,7 +161,10 @@
     o.style.display = 'flex';
     return o.firstChild;
   }
-  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function shut() {
+    if (window.RPPage && RPPage.isOpen()) return RPPage.back();
+    var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; }
+  }
 
   function mins() {
     var t = ITEMS.reduce(function (a, x) { return a + x.secs; }, 0);

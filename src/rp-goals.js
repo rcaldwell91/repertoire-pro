@@ -1,5 +1,5 @@
 /* ======================================================================
-   Repertoire Pro — "I just want to be able to…"
+   Repertoire Pro — "I want to be able to…"
 
    The idea bank, item 7, and it is the point underneath most of the others.
    Robert:
@@ -172,7 +172,11 @@
   }
 
   /* ------------------------------------------------------------------ */
+  /* Robert, 13 Sep: not a pop-up. A page, with a back button. */
   function sheet(html) {
+    if (window.RPPage) {
+      return RPPage.open({ key: 'goals', backLabel: 'Train', html: html });
+    }
     var o = $('rpSheet');
     if (!o) {
       o = document.createElement('div');
@@ -187,7 +191,10 @@
     o.style.display = 'flex';
     return o.firstChild;
   }
-  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function shut() {
+    if (window.RPPage && RPPage.isOpen()) return RPPage.back();
+    var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; }
+  }
 
   G.open = function (id) {
     if (id) return one(id);
@@ -273,7 +280,7 @@
     d.className = 'exrow';
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="exhead">' +
-      '<div class="exname">I just want to be able to…</div>' +
+      '<div class="exname">I want to be able to…</div>' +
       '<button class="btn primary" id="rpGoalGo" style="padding:7px 12px;font-size:12px">Open</button>' +
       '</div>' +
       '<div class="exsyl" style="margin-top:6px;font-weight:600">Higher notes · runs · vibrato · ' +

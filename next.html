@@ -14045,11 +14045,39 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Start</button>' +
       '<button class="btn" id="rpTestNow" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px">' +
       'Test me instead \u2014 measure it</button>');
-    on($('rpOK'), 'click', function () { shut(); apply(); });
+    on($('rpOK'), 'click', function () { shut(); apply(); offerRange(); });
     on($('rpTestNow'), 'click', function () {
       shut(); apply();
       try { if (window.RPTest) RPTest.open(); } catch (e) {}
     });
+  }
+
+  /* Robert, 13 Sep: the range test is not something you do often, so it
+     comes off the Train tab and is offered here, once, while you are
+     already going through the rounds. It lives in Profile → Your voice. */
+  function offerRange() {
+    var known = null;
+    try { known = window.RPRange ? RPRange.get() : null; } catch (e) {}
+    if (known && known.by) return;          /* already sung or picked — do not nag */
+    setTimeout(function () {
+      sheet('<b style="font-size:18px">One more: your range.</b>' +
+        '<div class="measured" style="margin-top:8px">Sing your lowest comfortable note, then your highest. ' +
+        'About a minute. Every exercise is then built around what you sang instead of a guess.</div>' +
+        '<button class="btn primary" id="rpRgNow" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Sing it now</button>' +
+        '<button class="btn" id="rpRgLater" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">Later \u2014 it is in Profile</button>');
+      on($('rpRgLater'), 'click', shut);
+      on($('rpRgNow'), 'click', function () {
+        shut();
+        try { window.switchMode('you'); } catch (e) {}
+        setTimeout(function () {
+          try { if (window.RPProfile) RPProfile.open('voice'); } catch (e) {}
+          setTimeout(function () {
+            var b = $('btnRangeTest');
+            if (b) { try { b.scrollIntoView({ block: 'center' }); } catch (e) {} b.click(); }
+          }, 350);
+        }, 200);
+      });
+    }, 500);
   }
 
   ME.ask = function (from) { step = from || 0; answers = {}; ask(); };
@@ -15295,6 +15323,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     h += '<h1 style="margin:0 0 2px">Free Sing</h1>';
     h += '<div class="rp-sub" style="margin:0 0 12px">Just sing. Nothing here is measured, scored, or ' +
       'sent anywhere. Put some colour on your voice and enjoy it.</div>';
+    /* Robert, 13 Sep: "it needs some type of visual that interacts as you
+       sing." Not the keyboard map — that is the Pitch Tracker's job — just
+       something to watch. Loudness is the size, the shape of the sound is
+       the colour. It measures nothing you are told about. */
+    h += '<div class="panel" style="padding:0;overflow:hidden;position:relative">' +
+      '<canvas id="rpVis" style="display:block;width:100%;height:220px"></canvas>' +
+      '<div id="rpVisNote" class="measured" style="position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11.5px"></div></div>';
 
     h += '<div class="panel" style="padding:12px">' +
       '<div class="row" style="justify-content:space-between;align-items:center">' +
@@ -15320,6 +15355,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     host.innerHTML = h;
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
     on($('rpVMon'), 'click', toggleMonitor);
+    visStart();
     host.querySelectorAll('[data-fx]').forEach(function (b) {
       on(b, 'click', function () {
         V.fx[b.dataset.fx] = b.dataset.val;
@@ -15526,6 +15562,91 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* ---------------------------------------------------------------- */
   /* its own mode, alongside the app's                                 */
   /* ---------------------------------------------------------------- */
+  /* THE VISUAL. An analyser tapped off the microphone; a ring of bars
+     that grow with the sound and a core that swells with loudness. The
+     colour drifts with where the energy sits — bright and high, or dark
+     and low — so a held note looks steady and a slide looks like a
+     slide. Nothing here is reported to you as a number, on purpose.   */
+  /* ---------------------------------------------------------------- */
+  var VIS = { raf: null, an: null, freq: null, time: null, src: null, hue: 265, size: 0 };
+  function visTap() {
+    if (typeof ctx === 'undefined' || !ctx || typeof MIC === 'undefined' || !MIC.src) return false;
+    if (VIS.src === MIC.src && VIS.an) return true;
+    try {
+      VIS.an = ctx.createAnalyser();
+      VIS.an.fftSize = 1024;
+      VIS.an.smoothingTimeConstant = 0.8;
+      MIC.src.connect(VIS.an);
+      VIS.src = MIC.src;
+      VIS.freq = new Uint8Array(VIS.an.frequencyBinCount);
+      VIS.time = new Float32Array(VIS.an.fftSize);
+      return true;
+    } catch (e) { return false; }
+  }
+  function visFrame() {
+    var cv = $('rpVis');
+    if (!cv) { VIS.raf = null; return; }
+    var W = cv.clientWidth || 360, H = 220;
+    if (cv.width !== W * 2 || cv.height !== H * 2) { cv.width = W * 2; cv.height = H * 2; }
+    var g = cv.getContext('2d');
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, W, H);
+    var cx = W / 2, cy = H / 2;
+    var live = visTap();
+    var rms = 0, centroid = 0;
+    if (live) {
+      VIS.an.getFloatTimeDomainData(VIS.time);
+      var sum = 0; for (var i = 0; i < VIS.time.length; i++) sum += VIS.time[i] * VIS.time[i];
+      rms = Math.sqrt(sum / VIS.time.length);
+      VIS.an.getByteFrequencyData(VIS.freq);
+      var num = 0, den = 0;
+      for (var k = 2; k < 200; k++) { num += k * VIS.freq[k]; den += VIS.freq[k]; }
+      centroid = den ? num / den : 0;
+    }
+    var loud = Math.min(1, rms * 6);
+    VIS.size += (loud - VIS.size) * 0.25;
+    var targetHue = 265 - Math.min(1, centroid / 80) * 200;   /* deep violet when low, warm gold when bright */
+    VIS.hue += (targetHue - VIS.hue) * 0.08;
+
+    /* the ring of bars */
+    var N = 64, base = 46;
+    for (var b = 0; b < N; b++) {
+      var bin = 2 + Math.floor(b * 3);
+      var v = live ? (VIS.freq[bin] || 0) / 255 : 0;
+      var len = 6 + v * 60;
+      var a = (b / N) * Math.PI * 2 - Math.PI / 2;
+      var r0 = base + VIS.size * 22;
+      g.strokeStyle = 'hsla(' + VIS.hue + ',85%,' + (55 + v * 25) + '%,' + (0.35 + v * 0.65) + ')';
+      g.lineWidth = 3;
+      g.lineCap = 'round';
+      g.beginPath();
+      g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      g.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len));
+      g.stroke();
+    }
+    /* the core */
+    var R = base - 6 + VIS.size * 22;
+    var grad = g.createRadialGradient(cx, cy, 2, cx, cy, R);
+    grad.addColorStop(0, 'hsla(' + VIS.hue + ',90%,75%,.95)');
+    grad.addColorStop(1, 'hsla(' + (VIS.hue + 30) + ',85%,55%,.25)');
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+
+    var note = $('rpVisNote');
+    if (note) note.textContent = live ? (loud > 0.05 ? '' : 'Sing.') : 'Waiting for the microphone — tap Hear yourself or Record.';
+    VIS.raf = requestAnimationFrame(visFrame);
+  }
+  function visStart() {
+    if (VIS.raf) return;
+    try { if (typeof MIC !== 'undefined' && !MIC.on && typeof startMic === 'function') startMic(); } catch (e) {}
+    VIS.raf = requestAnimationFrame(visFrame);
+  }
+  function visStop() {
+    if (VIS.raf) cancelAnimationFrame(VIS.raf);
+    VIS.raf = null;
+  }
+
+  /* ---------------------------------------------------------------- */
   function install() {
     if (window.__rpVoiceMode) return;
     if (typeof window.switchMode !== 'function') return;
@@ -15551,6 +15672,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
          before handing over. */
       var mine = $('modeVoice');
       if (mine) mine.classList.remove('active');
+      visStop();
       if (V.monitor) { V.monitor = false; wireMonitor(); }
       stopPlay();
       return prev.apply(this, arguments);
@@ -16887,7 +17009,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   B.items = ITEMS;
 
   /* ------------------------------------------------------------------ */
+  /* Robert, 13 Sep: not a pop-up. A page, with a back button. */
   function sheet(html) {
+    if (window.RPPage) {
+      return RPPage.open({ key: 'body', backLabel: 'Train', html: html });
+    }
     var o = $('rpSheet');
     if (!o) {
       o = document.createElement('div');
@@ -16902,7 +17028,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     o.style.display = 'flex';
     return o.firstChild;
   }
-  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function shut() {
+    if (window.RPPage && RPPage.isOpen()) return RPPage.back();
+    var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; }
+  }
 
   function mins() {
     var t = ITEMS.reduce(function (a, x) { return a + x.secs; }, 0);
@@ -16992,7 +17121,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 </script>
 <script>
 /* ======================================================================
-   Repertoire Pro — "I just want to be able to…"
+   Repertoire Pro — "I want to be able to…"
 
    The idea bank, item 7, and it is the point underneath most of the others.
    Robert:
@@ -17165,7 +17294,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   /* ------------------------------------------------------------------ */
+  /* Robert, 13 Sep: not a pop-up. A page, with a back button. */
   function sheet(html) {
+    if (window.RPPage) {
+      return RPPage.open({ key: 'goals', backLabel: 'Train', html: html });
+    }
     var o = $('rpSheet');
     if (!o) {
       o = document.createElement('div');
@@ -17180,7 +17313,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     o.style.display = 'flex';
     return o.firstChild;
   }
-  function shut() { var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; } }
+  function shut() {
+    if (window.RPPage && RPPage.isOpen()) return RPPage.back();
+    var o = $('rpSheet'); if (o) { o.style.display = 'none'; o.innerHTML = ''; }
+  }
 
   G.open = function (id) {
     if (id) return one(id);
@@ -17266,7 +17402,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.className = 'exrow';
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="exhead">' +
-      '<div class="exname">I just want to be able to…</div>' +
+      '<div class="exname">I want to be able to…</div>' +
       '<button class="btn primary" id="rpGoalGo" style="padding:7px 12px;font-size:12px">Open</button>' +
       '</div>' +
       '<div class="exsyl" style="margin-top:6px;font-weight:600">Higher notes · runs · vibrato · ' +
@@ -18071,6 +18207,811 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 </script>
 <script>
 /* ======================================================================
+   Repertoire Pro — pages, and the tile that opens one.
+
+   Robert, 13 Sep: the pop-up sheets for "Before the voice" and "I want to
+   be able to…" are wrong — "sliding up and down while you're trying to
+   look through it, it's not great". And the Sing tab is the one screen
+   that feels right: an icon in a gradient box, a title, one line, a
+   chevron, and tapping it takes you somewhere. "I want the whole app to
+   be redone like that."
+
+   So: a PAGE is a whole screen with a back button, and a TILE is the Sing
+   tab's card. Everything else in this pass is built out of those two.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var PG = window.RPPage = {};
+  var from = 'home';
+  var cur = null;          /* { key, title, holder } while a page is open */
+  var hueN = 0;
+
+  function ensure() {
+    var d = $('modePage');
+    if (d) return d;
+    var home = $('modeHome');
+    if (!home || !home.parentElement) return null;
+    d = document.createElement('div');
+    d.id = 'modePage';
+    d.className = 'mode';
+    home.parentElement.insertBefore(d, home.nextSibling);
+    return d;
+  }
+
+  /* ---- a tile, the Sing-tab way ------------------------------------ */
+  PG.tile = function (o) {
+    hueN = (hueN % 5) + 1;
+    var hue = o.hue || ('hue' + hueN);
+    return '<div class="mcard ' + hue + '" ' + (o.id ? 'id="' + esc(o.id) + '" ' : '') +
+      (o.data ? o.data + ' ' : '') + '>' +
+      '<div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#' + esc(o.icon || 'i-play') + '"/></svg></div>' +
+      '<div style="min-width:0"><h4>' + esc(o.title) + (o.tag ? ' <span class="extag" style="color:var(--accent)">' + esc(o.tag) + '</span>' : '') + '</h4>' +
+      (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
+      '<div class="chev">›</div></div>';
+  };
+  PG.tiles = function (list) {
+    hueN = 0;
+    return '<div class="homegrid">' + list.map(PG.tile).join('') + '</div>';
+  };
+
+  /* ---- open / back --------------------------------------------------- */
+  function modeName() {
+    /* `state` is a top-level const in the base app — reachable by name, not via window */
+    try { return (typeof state !== 'undefined' && state.mode) || 'home'; } catch (e) { return 'home'; }
+  }
+
+  /* open({ key, title, sub, html, node, wire, back }) — `html` is rendered;
+     `node` (an existing element) is MOVED in and given back on close.  */
+  PG.open = function (o) {
+    var d = ensure();
+    if (!d) return null;
+    if (!cur) { var m = modeName(); if (m !== 'page') from = m; }
+    if (cur && cur.node && cur.home) { try { cur.home.appendChild(cur.node); } catch (e) {} }
+    cur = { key: o.key || '', title: o.title || '', node: o.node || null, home: o.node ? o.node.parentElement : null, back: o.back || null };
+
+    d.innerHTML = '<button class="pill backpill" id="rpPageBack">← ' + esc(o.backLabel || 'Back') + '</button>' +
+      (o.title ? '<h1 style="margin:0 0 2px">' + esc(o.title) + '</h1>' : '') +
+      (o.sub ? '<div class="rp-sub" style="margin:0 0 12px">' + esc(o.sub) + '</div>' : '') +
+      '<div id="rpPageBody">' + (o.html || '') + '</div>';
+    if (o.node) { $('rpPageBody').appendChild(o.node); o.node.style.display = ''; }
+
+    document.querySelectorAll('.mode').forEach(function (el) { el.classList.remove('active'); });
+    d.classList.add('active');
+    try { state.mode = 'page'; } catch (e) {}
+    window.scrollTo(0, 0);
+    on($('rpPageBack'), 'click', PG.back);
+    if (o.wire) { try { o.wire($('rpPageBody')); } catch (e) {} }
+    return $('rpPageBody');
+  };
+
+  PG.body = function () { return $('rpPageBody'); };
+  PG.isOpen = function (key) { return !!cur && (!key || cur.key === key); };
+
+  PG.back = function () {
+    var was = cur;
+    cur = null;
+    if (was && was.node && was.home) { try { was.node.style.display = 'none'; was.home.appendChild(was.node); } catch (e) {} }
+    if (was && was.back) { try { was.back(); return; } catch (e) {} }
+    try { window.switchMode(from === 'page' ? 'home' : from); } catch (e) {}
+  };
+
+  /* leaving by the bottom nav must stand the page down, like every other
+     screen the base app does not know about */
+  (function install() {
+    var n = 0;
+    var iv = setInterval(function () {
+      if (typeof window.switchMode !== 'function') { if (++n > 50) clearInterval(iv); return; }
+      clearInterval(iv);
+      var prev = window.switchMode;
+      window.switchMode = function (m) {
+        var d = $('modePage');
+        if (m !== 'page') {
+          if (d) d.classList.remove('active');
+          if (cur) {
+            var was = cur; cur = null;
+            if (was.node && was.home) { try { was.node.style.display = 'none'; was.home.appendChild(was.node); } catch (e) {} }
+          }
+        }
+        return prev.apply(this, arguments);
+      };
+    }, 200);
+  })();
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the tab order.
+   Robert, 13 Sep: Home, Train, Sing, Coach, Learn, Library, Profile.
+   The base app builds the bar once from its own list; the buttons are
+   real nodes with their own click handlers, so they are simply put in
+   his order.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var ORDER = ['navHome', 'navTrain', 'navSing', 'navCoach', 'navLearn', 'navLib', 'navYou'];
+  var n = 0;
+  var iv = setInterval(function () {
+    var nav = document.querySelector('.bottomnav');
+    if (!nav || !document.getElementById('navCoach')) { if (++n > 60) clearInterval(iv); return; }
+    clearInterval(iv);
+    ORDER.forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) nav.appendChild(b);
+    });
+  }, 250);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the Train tab, the Sing-tab way.
+
+   Robert, 13 Sep: "It's still too much information. Less is more."
+   At the top, the categories and the level, side-scrolling. Under that,
+   ONE exercise that matches, with Start and a See more. Then a tile per
+   category — icon, title, one line, chevron — each opening a page with
+   that category's exercises. Everything, all at once, hidden behind one
+   button at the bottom. Your range is not on this tab any more; it lives
+   in Profile and is offered when you sign up.
+
+   The base app's own Train renderer still runs — its running-exercise
+   screens (ladder, guided, note match, sustain) are what Start opens
+   into — but its list is hidden and this sits in front of it.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+  function strip(h) { return String(h || '').replace(/<[^>]+>/g, ''); }
+
+  var TR = window.RPTrain = {};
+  var CATS = [
+    { id: 'warmup',  name: 'Warm-up',  icon: 'i-zap',         sub: 'Gentle ways to start making sound.' },
+    { id: 'breath',  name: 'Breath',   icon: 'i-wind',        sub: 'Letting air out slowly and steadily.' },
+    { id: 'tone',    name: 'Tone',     icon: 'i-volume',      sub: 'The colour of the sound, and the gear change.' },
+    { id: 'agility', name: 'Agility',  icon: 'i-shuffle',     sub: 'Moving quickly and cleanly between notes.' },
+    { id: 'range',   name: 'Range',    icon: 'i-chevrons-up', sub: 'More usable notes, top and bottom.' },
+    { id: 'pitch',   name: 'Pitch',    icon: 'i-target',      sub: 'Hitting the note you meant, and holding it.' },
+    { id: 'ear',     name: 'Ear',      icon: 'i-headphones',  sub: 'Hearing it before you sing it.' }
+  ];
+  var LEVELS = [[0, 'Any level'], [1, 'Beginner'], [2, 'Intermediate'], [3, 'Advanced']];
+  var TOOLS = [
+    ['btnMatch',   'Note Match',   'A note plays, you sing it back and hold it. Ten rounds.'],
+    ['btnKbd',     'Keyboard',     'Press a note, hear it, sing it back, see where you landed.'],
+    ['btnSustain', 'Sustain Hold', 'Hold one note dead steady for five seconds.']
+  ];
+  var DRILLS = [
+    ['tonic',   'Find home',       'A phrase plays. Sing the note it wants to rest on.'],
+    ['degree',  'Name the degree', 'A key is set, then one note plays. Which one is it, 1 to 7?'],
+    ['singdeg', 'Sing the degree', 'A key is set. Then sing the one it asks for.'],
+    ['hilo',    'Higher or lower', 'Two notes. Which was higher? Listening only.']
+  ];
+
+  var sel = { cat: 'warmup', level: 0 };
+  try { sel.cat = localStorage.getItem('rp_tr_cat') || 'warmup'; sel.level = +(localStorage.getItem('rp_tr_lvl') || 0); } catch (e) {}
+  if (!CATS.some(function (c) { return c.id === sel.cat; })) sel.cat = 'warmup';
+
+  function EX() { try { return (window.V10 && V10.EX) || []; } catch (e) { return []; } }
+  function listFor(cat, level) {
+    var all = EX();
+    var list;
+    if (cat === 'pitch') list = all.filter(function (e) { return e.score === 'pitch'; });
+    else if (cat === 'ear') list = [];
+    else list = all.filter(function (e) { return e.pillar === cat; });
+    if (level) list = list.filter(function (e) { return e.level === level; });
+    return list.slice().sort(function (a, b) { return a.level - b.level; });
+  }
+  function catOf(id) { return CATS.filter(function (c) { return c.id === id; })[0]; }
+  function lvlName(l) { return ['', 'Beginner', 'Intermediate', 'Advanced'][l] || ''; }
+
+  /* ---- one exercise, as a card -------------------------------------- */
+  function exCard(e, big) {
+    return '<div class="rp-card" data-exopen="' + esc(e.id) + '" style="padding:12px;cursor:pointer;margin-top:8px">' +
+      '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(e.name) +
+      (e.quiet ? '<span class="rp-tag">quiet ok</span>' : '') + '</div>' +
+      '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
+      (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
+      '</div>' +
+      '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="padding:9px 14px;font-size:12.5px">Start</button>' +
+      '</div></div>';
+  }
+  function wireEx(root, backTo) {
+    root.querySelectorAll('[data-exstart]').forEach(function (b) {
+      on(b, 'click', function (ev) { ev.stopPropagation(); TR.start(b.dataset.exstart); });
+    });
+    root.querySelectorAll('[data-exopen]').forEach(function (c) {
+      on(c, 'click', function (ev) { if (ev.target.closest('[data-exstart]')) return; TR.detail(c.dataset.exopen, backTo); });
+    });
+    root.querySelectorAll('[data-tool]').forEach(function (b) {
+      on(b, 'click', function () { TR.tool(b.dataset.tool); });
+    });
+    root.querySelectorAll('[data-drill]').forEach(function (b) {
+      on(b, 'click', function () { TR.drill(b.dataset.drill); });
+    });
+  }
+
+  /* everything that runs, runs on the Train tab — so go there first */
+  TR.start = function (id) {
+    try { window.switchMode('train'); } catch (e) {}
+    setTimeout(function () { try { V10.startEx(id); } catch (e) {} }, 90);
+  };
+  TR.tool = function (btnId) {
+    try { window.switchMode('train'); } catch (e) {}
+    setTimeout(function () { var b = $(btnId); if (b) b.click(); }, 90);
+  };
+  TR.drill = function (kind) {
+    try { window.switchMode('train'); } catch (e) {}
+    setTimeout(function () { try { V10.startDrill(kind); } catch (e) {} }, 90);
+  };
+  TR.routine = function (key) {
+    try { window.switchMode('train'); } catch (e) {}
+    setTimeout(function () {
+      try { V10.startRoutine(key === 'cool' ? V10.COOLDOWN : V10.ROUTINES[key]); } catch (e) {}
+    }, 90);
+  };
+
+  /* ---- an exercise's own page --------------------------------------- */
+  TR.detail = function (id, backTo) {
+    var e = null; try { e = V10.exById(id); } catch (err) {}
+    if (!e || !window.RPPage) return;
+    var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(lvlName(e.level)) +
+      (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + (e.quiet ? ' · quiet ok' : '') + '</div>' +
+      '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="width:100%;padding:13px;font-size:14px">Start</button>' +
+      '<div class="rp-card" style="margin-top:14px;padding:13px;font-size:13.5px;line-height:1.55">' +
+      '<div class="rp-lab">WHAT</div><div>' + strip(e.what) + '</div>' +
+      (e.how ? '<div class="rp-lab" style="margin-top:12px">HOW</div><div>' + e.how + '</div>' : '') +
+      (e.miss ? '<div class="rp-lab" style="margin-top:12px">WATCH FOR</div><div>' + e.miss + '</div>' : '') +
+      (e.why ? '<div class="rp-lab" style="margin-top:12px">WHY IT WORKS</div><div>' + e.why + '</div>' : '') +
+      '</div>';
+    RPPage.open({ key: 'ex:' + id, title: e.name, html: h, backLabel: backTo ? backTo.label : 'Train',
+      back: backTo ? backTo.go : null, wire: function (root) { wireEx(root, null); } });
+  };
+
+  /* ---- a category's page -------------------------------------------- */
+  TR.category = function (cat, level) {
+    var c = catOf(cat);
+    if (!c || !window.RPPage) return;
+    if (level == null) level = sel.level;
+    var h = '<div class="segrow" style="margin-bottom:4px">';
+    LEVELS.forEach(function (l) {
+      h += '<button class="seg' + (level === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
+    });
+    h += '</div>';
+    if (cat === 'pitch') {
+      h += '<div class="rp-lab" style="margin-top:12px">GAMES</div>';
+      TOOLS.forEach(function (t) {
+        h += '<div class="rp-card" style="padding:12px;margin-top:8px"><div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+          '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(t[1]) + '</div><div class="rp-sub">' + esc(t[2]) + '</div></div>' +
+          '<button class="btn primary" data-tool="' + t[0] + '" style="padding:9px 14px;font-size:12.5px">Play</button></div></div>';
+      });
+    }
+    if (cat === 'ear') {
+      DRILLS.forEach(function (t) {
+        h += '<div class="rp-card" style="padding:12px;margin-top:8px"><div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+          '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(t[1]) + '</div><div class="rp-sub">' + esc(t[2]) + '</div></div>' +
+          '<button class="btn primary" data-drill="' + t[0] + '" style="padding:9px 14px;font-size:12.5px">Play</button></div></div>';
+      });
+      h += '<div class="measured" style="margin-top:10px">These ask you to sing back, not just tap an answer — hearing a note and producing it are different skills, and only one of them makes you sing better.</div>';
+    }
+    var list = listFor(cat, level);
+    if (list.length) {
+      h += '<div class="rp-lab" style="margin-top:12px">' + (cat === 'pitch' ? 'EXERCISES' : (list.length + ' EXERCISE' + (list.length === 1 ? '' : 'S'))) + '</div>';
+      list.forEach(function (e) { h += exCard(e, false); });
+    } else if (cat !== 'ear') {
+      h += '<div class="measured" style="margin-top:12px">Nothing at that level here. Try Any level.</div>';
+    }
+    RPPage.open({ key: 'cat:' + cat, title: c.name, sub: c.sub, html: h, backLabel: 'Train',
+      wire: function (root) {
+        wireEx(root, { label: c.name, go: function () { TR.category(cat, sel.level); } });
+        root.querySelectorAll('[data-lv]').forEach(function (b) {
+          on(b, 'click', function () { sel.level = +b.dataset.lv; try { localStorage.setItem('rp_tr_lvl', sel.level); } catch (e) {} TR.category(cat, sel.level); });
+        });
+      } });
+  };
+
+  TR.all = function () {
+    if (!window.RPPage) return;
+    var h = '';
+    CATS.forEach(function (c) {
+      var list = listFor(c.id, 0);
+      if (!list.length) return;
+      h += '<div class="rp-lab" style="margin-top:14px">' + esc(c.name.toUpperCase()) + '</div>';
+      list.forEach(function (e) { h += exCard(e, false); });
+    });
+    RPPage.open({ key: 'all', title: 'Every exercise', sub: EX().length + ' of them. Tap a name to read about it.', html: h, backLabel: 'Train',
+      wire: function (root) { wireEx(root, { label: 'Every exercise', go: TR.all }); } });
+  };
+
+  /* ---- the tab itself ----------------------------------------------- */
+  function pickOne(cat, level) {
+    var list = listFor(cat, level);
+    if (!list.length) list = listFor(cat, 0);
+    if (!list.length) return null;
+    var d = new Date();
+    var n = d.getFullYear() * 400 + d.getMonth() * 31 + d.getDate();   /* same one all day, different tomorrow */
+    return list[n % list.length];
+  }
+
+  function draw() {
+    var mode = $('modeTrain');
+    if (!mode) return;
+    var top = $('rpTrainTop');
+    if (!top) {
+      top = document.createElement('div');
+      top.id = 'rpTrainTop';
+      mode.insertBefore(top, mode.firstChild);
+    }
+    var h = '<div class="segrow" style="margin-top:2px">';
+    CATS.forEach(function (c) {
+      h += '<button class="seg' + (sel.cat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' + esc(c.name) + '</button>';
+    });
+    h += '</div><div class="segrow">';
+    LEVELS.forEach(function (l) {
+      h += '<button class="seg' + (sel.level === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
+    });
+    h += '</div>';
+
+    var c = catOf(sel.cat);
+    if (sel.cat === 'ear') {
+      var dr = DRILLS[new Date().getDate() % DRILLS.length];
+      h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · EAR</div>' +
+        '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
+        '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(dr[1]) + '</div><div class="rp-sub">' + esc(dr[2]) + '</div></div>' +
+        '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
+        '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See all ear drills</button></div>';
+    } else {
+      var one = pickOne(sel.cat, sel.level);
+      if (one) {
+        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
+          (sel.level ? ' · ' + esc(lvlName(sel.level).toUpperCase()) : '') + '</div>' +
+          '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
+          '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(one.name) + '</div>' +
+          '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
+          '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
+          '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See more ' +
+          esc(c.name.toLowerCase()) + '</button></div>';
+      }
+    }
+
+    h += '<div class="row" style="gap:8px;margin-top:10px">' +
+      '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
+      '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>';
+
+    h += '<h3 style="margin:18px 4px 2px">Work on</h3>';
+    h += RPPage.tiles(CATS.map(function (c) {
+      var n = c.id === 'ear' ? DRILLS.length : (c.id === 'pitch' ? listFor('pitch', 0).length + TOOLS.length : listFor(c.id, 0).length);
+      return { icon: c.icon, title: c.name, sub: c.sub, data: 'data-more="' + c.id + '"' };
+    }));
+
+    h += '<h3 style="margin:18px 4px 2px">Also</h3>';
+    h += RPPage.tiles([
+      { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, drawn live. Record a take.', id: 'rpTileTracker' },
+      { icon: 'i-layers',   title: 'I want to be able to…', sub: 'Say what you want. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-user',     title: 'Before the voice', sub: 'Posture, jaw, tongue, shoulders. No sound.', id: 'rpTileBody' }
+    ]);
+    h += '<button class="btn" id="rpTrainAll" style="width:100%;padding:11px;margin-top:14px;font-size:12.5px">Every exercise, all at once</button>';
+
+    top.innerHTML = h;
+    wireEx(top);
+    top.querySelectorAll('[data-cat]').forEach(function (b) {
+      on(b, 'click', function () { sel.cat = b.dataset.cat; try { localStorage.setItem('rp_tr_cat', sel.cat); } catch (e) {} draw(); });
+    });
+    top.querySelectorAll('[data-lv]').forEach(function (b) {
+      on(b, 'click', function () { sel.level = +b.dataset.lv; try { localStorage.setItem('rp_tr_lvl', sel.level); } catch (e) {} draw(); });
+    });
+    top.querySelectorAll('[data-more]').forEach(function (b) {
+      on(b, 'click', function () { TR.category(b.dataset.more, sel.level); });
+    });
+    top.querySelectorAll('[data-routine]').forEach(function (b) {
+      on(b, 'click', function () { TR.routine(b.dataset.routine); });
+    });
+    on($('rpTrainAll'), 'click', TR.all);
+    on($('rpTileTracker'), 'click', function () { var g = $('rpTrainPitchGo'); if (g) g.click(); });
+    on($('rpTileGoals'), 'click', function () { if (window.RPGoals) RPGoals.open(); });
+    on($('rpTileBody'), 'click', function () { if (window.RPBody) RPBody.open(); });
+  }
+
+  /* the base's own list, and the rows other modules put at the top, stay
+     in the DOM (their buttons are what our tiles click) but out of sight */
+  function tidy() {
+    ['v10TrainHost', 'rpGoalRow', 'rpBodyRow', 'rpTrainPitch'].forEach(function (id) {
+      var el = $(id); if (el && el.style.display !== 'none') el.style.display = 'none';
+    });
+    var rp = $('rangePanel');
+    if (rp && rp.parentElement && rp.parentElement.id === 'modeTrain' && window.RPProfile && RPProfile.takeRange) RPProfile.takeRange(rp);
+  }
+
+  /* hide the top while something is actually running, so the exercise is
+     the first thing on the screen */
+  function running() {
+    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = $(ids[i]);
+      if (el && el.style.display && el.style.display !== 'none') return true;
+      if (el && !el.style.display && ids[i] === 'v10Guided') return false;
+    }
+    try { if (V10.routineState && V10.routineState.on) return true; } catch (e) {}
+    return false;
+  }
+  function watch() {
+    var top = $('rpTrainTop');
+    if (!top) return;
+    var r = running();
+    var want = r ? 'none' : '';
+    if (top.style.display !== want) top.style.display = want;
+  }
+
+  var ticks = 0;
+  var iv = setInterval(function () {
+    ticks++;
+    if (!window.V10 || !V10.EX || !$('modeTrain') || !window.RPPage) { if (ticks > 80) clearInterval(iv); return; }
+    tidy();
+    if (!$('rpTrainTop')) draw();
+    watch();
+  }, 400);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the Learn tab, the Sing-tab way.
+
+   Robert, 13 Sep: "I go on the Learn tab and immediately I'm turned off.
+   It's too many words. I don't know what to read first." So: one tile per
+   subject, tap it, and only that subject's lessons show. The paragraphs
+   about what lessons can and cannot do are gone from the front; the
+   descriptions sit behind an (i) on each row.
+
+   The base app still renders every lesson and game into this tab — its
+   rows and buttons are what open a lesson and start a game — so this
+   sorts what it drew rather than drawing again. It re-sorts after every
+   render, because the base redraws the whole tab on every tap.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var LN = window.RPLearn = {};
+  var open = null;    /* unit name, or 'games', or null for the tiles */
+  var ICON = { 'Play it': 'i-play', 'Sound and pitch': 'i-target', 'Time': 'i-repeat',
+               'The major scale and key': 'i-bar-chart', 'Minor and the third': 'i-trending-up',
+               'Intervals': 'i-layers', 'Chords and harmony': 'i-music', 'Song form': 'i-file',
+               'Your voice': 'i-mic', 'Advanced': 'i-package' };
+  var SUB = { 'Play it': 'Games. Every answer plays, so your ear learns it too.',
+              'Sound and pitch': 'What a note is, and what "in tune" means.',
+              'Time': 'Beats, bars, and counting in.',
+              'The major scale and key': 'Do-re-mi, and what a key is.',
+              'Minor and the third': 'The sad one, and the note that makes it sad.',
+              'Intervals': 'The distance between two notes.',
+              'Chords and harmony': 'Notes that sound together.',
+              'Song form': 'Verse, chorus, bridge — the shape of a song.',
+              'Your voice': 'Range, registers, and the right key for you.',
+              'Advanced': 'For when the rest is easy.' };
+
+  function css() {
+    if ($('rpLearnCSS')) return;
+    var s = document.createElement('style');
+    s.id = 'rpLearnCSS';
+    s.textContent = '.rp-info{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;' +
+      'border-radius:50%;border:1px solid var(--line);color:var(--ink-faint);font-size:12px;font-weight:800;margin-left:8px;' +
+      'cursor:pointer;flex:none}.rp-info.on{color:var(--gold);border-color:var(--gold)}' +
+      '#modeLearn .lsn .ld,#modeLearn .grow .gd,#modeLearn .grow .measured{display:none}' +
+      '#modeLearn .lsn.rp-open .ld,#modeLearn .grow.rp-open .gd,#modeLearn .grow.rp-open .measured{display:block}' +
+      '#modeLearn .lsn .lsnbody .ld{display:block}';
+    document.head.appendChild(s);
+  }
+
+  /* split what the base drew into { games: [...nodes], units: {name: [nodes]} } */
+  function harvest(host) {
+    var out = { games: [], units: {}, order: [], chrome: [] };
+    var cur = null;
+    Array.prototype.slice.call(host.children).forEach(function (el) {
+      if (el.id === 'rpLearnTop' || el.id === 'rpLearnUnit' || el.id === 'rpTriviaRow') return;
+      if (el.tagName === 'H3') {
+        var t = (el.textContent || '').trim();
+        cur = (t === 'Play it') ? 'games' : t;
+        if (cur !== 'games') { out.units[cur] = out.units[cur] || []; if (out.order.indexOf(cur) < 0) out.order.push(cur); }
+        out.chrome.push(el);
+        return;
+      }
+      if (cur === 'games' && el.classList.contains('grow')) { out.games.push(el); return; }
+      if (cur && cur !== 'games' && el.classList.contains('lsn')) { out.units[cur].push(el); return; }
+      if (cur === 'games' && el.classList.contains('notice')) { out.chrome.push(el); return; }
+      out.chrome.push(el);    /* h1, pill, notices, tier buttons — not shown up front */
+    });
+    return out;
+  }
+
+  function infoButton(row) {
+    if (row.querySelector('.rp-info')) return;
+    var b = document.createElement('span');
+    b.className = 'rp-info';
+    b.textContent = 'i';
+    b.title = 'What this one is about';
+    var head = row.querySelector('.lt, .gt') || row.firstElementChild;
+    if (head) head.appendChild(b);
+    on(b, 'click', function (ev) {
+      ev.stopPropagation();
+      row.classList.toggle('rp-open');
+      b.classList.toggle('on', row.classList.contains('rp-open'));
+    });
+  }
+
+  function layout() {
+    var host = $('modeLearn');
+    if (!host) return;
+    css();
+    var h = harvest(host);
+    h.chrome.forEach(function (el) { el.style.display = 'none'; });
+
+    var done = {};
+    try { done = (V10.P && V10.P.lessonsDone) || {}; } catch (e) {}
+
+    var top = $('rpLearnTop');
+    if (!top) { top = document.createElement('div'); top.id = 'rpLearnTop'; host.insertBefore(top, host.firstChild); }
+    var unit = $('rpLearnUnit');
+    if (!unit) { unit = document.createElement('div'); unit.id = 'rpLearnUnit'; host.appendChild(unit); }
+
+    if (!open) {
+      var tiles = [{ icon: ICON['Play it'], title: 'Play it', sub: SUB['Play it'], data: 'data-unit="games"' }];
+      h.order.forEach(function (u) {
+        var list = h.units[u] || [];
+        var nd = list.filter(function (el) { return el.classList.contains('done'); }).length;
+        tiles.push({ icon: ICON[u] || 'i-book', title: u, sub: SUB[u] || '', data: 'data-unit="' + esc(u) + '"',
+                     tag: nd ? nd + ' of ' + list.length : '' });
+      });
+      top.innerHTML = '<h1 style="margin:0 0 2px">Learn</h1>' +
+        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when he says it. Pick a subject.</div>' +
+        RPPage.tiles(tiles);
+      top.style.display = '';
+      unit.style.display = 'none';
+      /* park every row out of sight, in its holder */
+      h.games.forEach(function (el) { el.style.display = 'none'; });
+      h.order.forEach(function (u) { h.units[u].forEach(function (el) { el.style.display = 'none'; }); });
+      top.querySelectorAll('[data-unit]').forEach(function (t) {
+        on(t, 'click', function () { open = t.dataset.unit; layout(); window.scrollTo(0, 0); });
+      });
+      /* the word of the day sits under the tiles, small */
+      var tv = $('rpTriviaRow'); if (tv) host.appendChild(tv);
+    } else {
+      top.style.display = 'none';
+      var rows = open === 'games' ? h.games : (h.units[open] || []);
+      unit.innerHTML = '<button class="pill backpill" id="rpLearnBack">← Learn</button>' +
+        '<h1 style="margin:0 0 2px">' + esc(open === 'games' ? 'Play it' : open) + '</h1>' +
+        '<div class="rp-sub" style="margin:0 0 10px">' + esc(SUB[open === 'games' ? 'Play it' : open] || '') +
+        ' Tap ⓘ for what a row is about.</div>';
+      var box = document.createElement('div');
+      unit.appendChild(box);
+      rows.forEach(function (el) { el.style.display = ''; box.appendChild(el); infoButton(el); });
+      /* the rows the base drew that are not this subject stay parked */
+      h.games.forEach(function (el) { if (rows.indexOf(el) < 0) el.style.display = 'none'; });
+      h.order.forEach(function (u) { h.units[u].forEach(function (el) { if (rows.indexOf(el) < 0) el.style.display = 'none'; }); });
+      unit.style.display = '';
+      on($('rpLearnBack'), 'click', function () { open = null; layout(); window.scrollTo(0, 0); });
+      var tv2 = $('rpTriviaRow'); if (tv2) tv2.style.display = 'none';
+    }
+    var tv3 = $('rpTriviaRow'); if (tv3 && !open) tv3.style.display = '';
+  }
+
+  LN.open = function (u) { open = u || null; layout(); };
+
+  /* re-sort after every base render */
+  (function install() {
+    var n = 0;
+    var iv = setInterval(function () {
+      if (!window.V10 || !V10.renderLearn || V10.renderLearn.__rp) { if (++n > 80) clearInterval(iv); return; }
+      clearInterval(iv);
+      var prev = V10.renderLearn;
+      var wrapped = function () {
+        var r = prev.apply(this, arguments);
+        try { layout(); } catch (e) {}
+        return r;
+      };
+      wrapped.__rp = 1;
+      V10.renderLearn = wrapped;
+      if ($('modeLearn') && $('modeLearn').children.length) { try { layout(); } catch (e) {} }
+      /* The base's own tap handlers call its renderLearn closure directly,
+         not V10.renderLearn, so the wrapper never sees those redraws. Watch
+         the tab instead: when our containers are gone, the base has redrawn
+         and it is time to sort again. */
+      var host = $('modeLearn');
+      if (host && window.MutationObserver) {
+        var busy = false;
+        new MutationObserver(function () {
+          if (busy) return;
+          if ($('rpLearnTop') && $('rpLearnUnit') && $('rpLearnTop').parentElement === host) {
+            /* still ours — unless the word of the day just landed on top */
+            var tv = $('rpTriviaRow');
+            if (!(tv && !open && tv !== host.lastElementChild)) return;
+          }
+          busy = true;
+          setTimeout(function () { try { layout(); } catch (e) {} busy = false; }, 30);
+        }).observe(host, { childList: true });
+      }
+    }, 200);
+  })();
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the Profile tab, the Sing-tab way.
+
+   Robert, 13 Sep: "too many options on one page. These need to be put
+   into categories." Six tiles. Each opens a page holding the real rows
+   the app already built — the base's own settings panels and the cards
+   the cloud layer adds — moved in and moved back, wiring intact.
+
+   Your vocal range moves here from the Train tab. "I'm not gonna be
+   testing my vocal range often." It is offered when you sign up.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var PR = window.RPProfile = {};
+
+  var GROUPS = [
+    { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Who you are signed in as.',
+      folds: ['Account'], cards: [] },
+    { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and where you are.',
+      folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
+    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
+      folds: ['Practice'], cards: ['rpLevelRow'] },
+    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
+      folds: ['Sound', 'Reference notes', 'Microphone'], cards: [] },
+    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
+      folds: ['Appearance'], cards: ['rpDoseRow'] },
+    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
+      folds: ['About'], cards: ['rpHelpRow'] }
+  ];
+
+  function foldNamed(name) {
+    var all = document.querySelectorAll('#youSlots details.pfold, #rpProfileHolders details.pfold');
+    for (var i = 0; i < all.length; i++) {
+      var sp = all[i].querySelector('summary span');
+      if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) return all[i];
+    }
+    return null;
+  }
+
+  /* the range panel comes from the Train tab — rp-train hands it over */
+  PR.takeRange = function (panel) {
+    var hold = holder('rpRangePanelHolder');
+    if (!hold) return;
+    hold.appendChild(panel);
+    panel.style.display = 'block';
+    panel.style.marginTop = '10px';
+  };
+
+  function holders() {
+    var h = $('rpProfileHolders');
+    if (!h) {
+      h = document.createElement('div');
+      h.id = 'rpProfileHolders';
+      h.style.display = 'none';
+      var mode = $('modeYou'); if (!mode) return null;
+      mode.appendChild(h);
+    }
+    return h;
+  }
+  function holder(id) {
+    var hs = holders(); if (!hs) return null;
+    var d = $(id);
+    if (!d) { d = document.createElement('div'); d.id = id; hs.appendChild(d); }
+    return d;
+  }
+
+  /* pull every row into its group's holder (folds and cards alike) */
+  function gather() {
+    GROUPS.forEach(function (g) {
+      var box = holder('rpPG_' + g.key);
+      if (!box) return;
+      g.folds.forEach(function (name) {
+        var f = foldNamed(name);
+        if (f && f.parentElement !== box) box.appendChild(f);
+      });
+      g.cards.forEach(function (id) {
+        var c = $(id);
+        if (c && c.parentElement !== box) {
+          if (id === 'rpRangePanelHolder') box.insertBefore(c, box.firstChild); else box.appendChild(c);
+        }
+      });
+    });
+  }
+
+  PR.open = function (key) {
+    var g = GROUPS.filter(function (x) { return x.key === key; })[0];
+    if (!g || !window.RPPage) return;
+    gather();
+    var box = holder('rpPG_' + key);
+    if (!box) return;
+    /* folds open by default on a page — the page is the fold now */
+    box.querySelectorAll('details.pfold').forEach(function (d) { d.open = true; });
+    var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
+    if (key === 'voice') {
+      /* the base's own "Your voice" fold repeats the range the panel above
+         it already shows, and tells you to test it on the Train tab — which
+         is no longer where it is */
+      var f = foldNamed('Your voice');
+      if (f) {
+        var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
+        var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
+        var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
+      }
+    }
+    RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
+  };
+
+  function draw() {
+    var mode = $('modeYou');
+    if (!mode || $('rpProfileTop')) return;
+    var top = document.createElement('div');
+    top.id = 'rpProfileTop';
+    var h1 = mode.querySelector('h1');
+    var intro = h1 ? h1.nextElementSibling : null;
+    top.innerHTML = RPPage.tiles(GROUPS.map(function (g) {
+      return { icon: g.icon, title: g.title, sub: g.sub, data: 'data-pg="' + g.key + '"' };
+    }));
+    var slots = $('youSlots');
+    mode.insertBefore(top, slots || null);
+    top.querySelectorAll('[data-pg]').forEach(function (t) {
+      on(t, 'click', function () { PR.open(t.dataset.pg); });
+    });
+  }
+
+  /* the summary lines on the tiles should say something true and current */
+  function refresh() {
+    var top = $('rpProfileTop'); if (!top) return;
+    var me = null; try { me = window.RP && RP.user && RP.profile ? RP.profile : null; } catch (e) {}
+    var t = top.querySelector('[data-pg="account"] p'); if (t) t.textContent = me ? (me.display_name || me.email) : 'Not signed in — tap to sign in.';
+    var rg = null; try { rg = window.RPRange ? RPRange.get() : null; } catch (e) {}
+    var v = top.querySelector('[data-pg="voice"] p');
+    if (v && rg) { try { v.textContent = midiName(rg.lo) + '–' + midiName(rg.hi) + (rg.by === 'preset' ? ' · picked, not sung' : rg.at ? ' · sung and measured' : ''); } catch (e) {} }
+    var lv = $('rpLevelRow'); var p = top.querySelector('[data-pg="progress"] p');
+    if (lv && p) { var tt = lv.querySelector('.rp-ttl'); if (tt) p.textContent = tt.textContent; }
+  }
+
+  var ticks = 0;
+  var iv = setInterval(function () {
+    ticks++;
+    if (!$('modeYou') || !$('youSlots') || !window.RPPage) { if (ticks > 80) clearInterval(iv); return; }
+    draw();
+    gather();
+    refresh();
+  }, 600);
+})();
+
+</script>
+<script>
+/* ======================================================================
    Repertoire Pro — the walkthrough.
 
    Robert, 13 Sep: "I should not have to sit next to Briar or Ja Ronn and
@@ -18114,6 +19055,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* one sentence. `mode` is the tab it lives on.                        */
   /* ------------------------------------------------------------------ */
   var STUDENT = [
+    /* Robert, 13 Sep: "walk me through what this app is for, what I get
+       out of it, how to use it." The first and last cards answer the first
+       two; everything between is the third. */
+    { mode: 'home', find: null,
+      text: 'Repertoire is a singing coach in your pocket: fifteen minutes a day, and your real coach\u2019s work when you have one.' },
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
@@ -18123,14 +19069,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         return signedIn() ? 'Your account — your name, and where you sign out.'
                           : 'Make an account here so a coach can find you.';
       } },
-    { mode: 'train', find: function () { return $('btnRangeTest'); },
-      text: 'Sing your lowest note, then your highest — every exercise is built on this.' },
     { mode: 'home', find: function () { return $('rpTodayGo') || $('btnJourney'); },
       text: 'Every day, press this — fifteen minutes, from whoever is coaching you.' },
-    { mode: 'train', find: function () { return first('#trainGrid [data-start], #v10TrainHost [data-start], #modeTrain [data-start]'); },
-      text: 'Or pick one exercise and press Start.' },
+    { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
+      text: 'Want one thing? Pick what to work on up top, then Start.' },
+    { mode: 'train', find: function () { return $('rpTileTracker'); },
+      text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
-      text: 'Sing anything and watch the line — record it if you like.' },
+      text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
@@ -18138,8 +19084,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         if (hasCoach()) return 'What your coach sets you lands here — tap it, record, send the take you like.';
         return 'Got a coach? Their code goes in here, and what they set you shows up here.';
       } },
-    { mode: 'you', find: function () { return $('rpHelpRow'); },
-      text: 'Lost? The tour and a guide with pictures live here.' }
+    { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="voice"]'); },
+      text: 'Your range lives here. Sing it once and every exercise fits your voice.' },
+    { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="help"]'); },
+      text: 'Lost? This tour and a guide with pictures live here.' },
+    { mode: 'home', find: null,
+      text: 'What you get: do the fifteen minutes most days and the app keeps count — of the days, and of what you can do now that you could not.' }
   ];
 
   var COACH = [
@@ -18390,23 +19340,26 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       'Wired ones if you have them. Through the speaker the app hears itself and squeals. ' +
       'Then make an account with the button at the top right — a coach can only find you if you have one.');
     h += sec('2. Find your range', '02-range.jpg',
-      'Train tab, <b>Test my range</b>. Sing your lowest comfortable note, then your highest. ' +
-      'Every exercise from then on is built around what you sang.');
+      'Profile, <b>Your voice</b>, <b>Test my range</b>. Sing your lowest comfortable note, then your highest. ' +
+      'Every exercise from then on is built around what you sang. It is offered when you sign up.');
 
     h += '<div class="rp-lab" style="margin-top:22px">EVERY DAY</div>';
     h += sec('3. Today', '03-today.jpg',
       'Home. One button, about fifteen minutes. It says who set it — your coach, or Repertoire itself when nobody has.');
     h += sec('4. One exercise', '04-exercise.jpg',
-      'Train tab. Pick one and press <b>Start</b>. It plays the notes, you sing them, it shows how close you were.');
-    h += sec('5. Sing something', '05-sing.jpg',
-      'Sing tab, <b>Free Sing</b>. Sing anything and watch the line. Nothing is scored, nothing is sent.');
+      'Train tab. Pick what to work on and your level at the top, then <b>Start</b> on the one it gives you. ' +
+      'Or tap a category for the whole list.');
+    h += sec('5. See your notes', '13-tracker.jpg',
+      'Train tab, <b>Pitch Tracker</b>. It draws every note you sing as you sing it, and can record a take with the notes kept.');
+    h += sec('6. Sing something', '05-sing.jpg',
+      'Sing tab, <b>Free Sing</b>. A bit of echo, something to watch. Nothing is scored, nothing is sent.');
 
     h += '<div class="rp-lab" style="margin-top:22px">WITH A COACH</div>';
-    h += sec('6. Join your coach', '06-coach.jpg',
+    h += sec('7. Join your coach', '06-coach.jpg',
       'Coach tab. They read you a six-character code; you type it in and press <b>Join</b>. Or find them by what they teach.');
-    h += sec('7. What they set you', '07-assignment.jpg',
+    h += sec('8. What they set you', '07-assignment.jpg',
       'It appears here the moment they set it. Tap it and the exercise opens, already set up.');
-    h += sec('8. Record, then send the one you like', '08-record.jpg',
+    h += sec('9. Record, then send the one you like', '08-record.jpg',
       '<b>Save</b> keeps a take on your phone. <b>Submit</b> sends it to your coach and ticks the work off. Nothing leaves your phone until you press Submit.');
 
     h += '<div class="rp-lab" style="margin-top:22px">GET THE MOST OUT OF IT</div>' +
@@ -18454,9 +19407,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<div class="rp-sub">Show me round again, and a guide with pictures</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', T.help);
-    /* first among the added cards, because being lost is the reason you are here */
-    var firstCard = host.querySelector('#rpTestRow') || null;
-    try { host.insertBefore(d, firstCard); } catch (e) { host.appendChild(d); }
+    host.appendChild(d);   /* rp-profile moves it into the Help page */
   }
   setInterval(row, 1500);
   setTimeout(row, 900);

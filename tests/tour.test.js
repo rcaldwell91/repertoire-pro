@@ -48,14 +48,17 @@ function ok(cond, what) { console.log((cond ? '  ✓ ' : '  ✗ ') + what); if (
 
   console.log('restart from Profile');
   await p.evaluate(() => window.switchMode('you')); await p.waitForTimeout(2000);
-  ok(!!(await p.$('#rpHelpRow')), 'Help row is in Profile');
+  ok(!!(await p.$('#rpProfileTop [data-pg="help"]')), 'Help tile is in Profile');
+  await p.evaluate(() => document.querySelector('#rpProfileTop [data-pg="help"]').click()); await p.waitForTimeout(900);
+  ok(await p.evaluate(() => RPPage.isOpen('profile:help')), 'Help page opens as a page');
+  ok(!!(await p.$('#rpHelpRow')) && await p.evaluate(() => document.getElementById('rpHelpRow').offsetParent !== null), 'Help row is on that page');
   await p.evaluate(() => document.getElementById('rpHelpRow').click()); await p.waitForTimeout(800);
   ok(await p.evaluate(() => /How to use Repertoire/.test(document.getElementById('rpSheet').innerText)), 'Help page opens');
   await p.evaluate(() => document.getElementById('rpHelpTour').click()); await p.waitForTimeout(1200);
   ok(await p.evaluate(() => RPTour.running()), 'tour restarts from Help');
   let n = 0;
-  while (await p.evaluate(() => RPTour.running()) && n++ < 12) { await p.evaluate(() => document.getElementById('rpTourNext').click()); await p.waitForTimeout(650); }
-  ok(!(await p.evaluate(() => RPTour.running())) && n === 8, 'Next walks all 8 steps and Done closes it (' + n + ' presses)');
+  while (await p.evaluate(() => RPTour.running()) && n++ < 16) { await p.evaluate(() => document.getElementById('rpTourNext').click()); await p.waitForTimeout(650); }
+  ok(!(await p.evaluate(() => RPTour.running())) && n === 11, 'Next walks all 11 steps and Done closes it (' + n + ' presses)');
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs[0] : ''));
   await browser.close();

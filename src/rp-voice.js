@@ -185,6 +185,13 @@
     h += '<h1 style="margin:0 0 2px">Free Sing</h1>';
     h += '<div class="rp-sub" style="margin:0 0 12px">Just sing. Nothing here is measured, scored, or ' +
       'sent anywhere. Put some colour on your voice and enjoy it.</div>';
+    /* Robert, 13 Sep: "it needs some type of visual that interacts as you
+       sing." Not the keyboard map — that is the Pitch Tracker's job — just
+       something to watch. Loudness is the size, the shape of the sound is
+       the colour. It measures nothing you are told about. */
+    h += '<div class="panel" style="padding:0;overflow:hidden;position:relative">' +
+      '<canvas id="rpVis" style="display:block;width:100%;height:220px"></canvas>' +
+      '<div id="rpVisNote" class="measured" style="position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:11.5px"></div></div>';
 
     h += '<div class="panel" style="padding:12px">' +
       '<div class="row" style="justify-content:space-between;align-items:center">' +
@@ -210,6 +217,7 @@
     host.innerHTML = h;
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
     on($('rpVMon'), 'click', toggleMonitor);
+    visStart();
     host.querySelectorAll('[data-fx]').forEach(function (b) {
       on(b, 'click', function () {
         V.fx[b.dataset.fx] = b.dataset.val;
@@ -416,6 +424,91 @@
   /* ---------------------------------------------------------------- */
   /* its own mode, alongside the app's                                 */
   /* ---------------------------------------------------------------- */
+  /* THE VISUAL. An analyser tapped off the microphone; a ring of bars
+     that grow with the sound and a core that swells with loudness. The
+     colour drifts with where the energy sits — bright and high, or dark
+     and low — so a held note looks steady and a slide looks like a
+     slide. Nothing here is reported to you as a number, on purpose.   */
+  /* ---------------------------------------------------------------- */
+  var VIS = { raf: null, an: null, freq: null, time: null, src: null, hue: 265, size: 0 };
+  function visTap() {
+    if (typeof ctx === 'undefined' || !ctx || typeof MIC === 'undefined' || !MIC.src) return false;
+    if (VIS.src === MIC.src && VIS.an) return true;
+    try {
+      VIS.an = ctx.createAnalyser();
+      VIS.an.fftSize = 1024;
+      VIS.an.smoothingTimeConstant = 0.8;
+      MIC.src.connect(VIS.an);
+      VIS.src = MIC.src;
+      VIS.freq = new Uint8Array(VIS.an.frequencyBinCount);
+      VIS.time = new Float32Array(VIS.an.fftSize);
+      return true;
+    } catch (e) { return false; }
+  }
+  function visFrame() {
+    var cv = $('rpVis');
+    if (!cv) { VIS.raf = null; return; }
+    var W = cv.clientWidth || 360, H = 220;
+    if (cv.width !== W * 2 || cv.height !== H * 2) { cv.width = W * 2; cv.height = H * 2; }
+    var g = cv.getContext('2d');
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, W, H);
+    var cx = W / 2, cy = H / 2;
+    var live = visTap();
+    var rms = 0, centroid = 0;
+    if (live) {
+      VIS.an.getFloatTimeDomainData(VIS.time);
+      var sum = 0; for (var i = 0; i < VIS.time.length; i++) sum += VIS.time[i] * VIS.time[i];
+      rms = Math.sqrt(sum / VIS.time.length);
+      VIS.an.getByteFrequencyData(VIS.freq);
+      var num = 0, den = 0;
+      for (var k = 2; k < 200; k++) { num += k * VIS.freq[k]; den += VIS.freq[k]; }
+      centroid = den ? num / den : 0;
+    }
+    var loud = Math.min(1, rms * 6);
+    VIS.size += (loud - VIS.size) * 0.25;
+    var targetHue = 265 - Math.min(1, centroid / 80) * 200;   /* deep violet when low, warm gold when bright */
+    VIS.hue += (targetHue - VIS.hue) * 0.08;
+
+    /* the ring of bars */
+    var N = 64, base = 46;
+    for (var b = 0; b < N; b++) {
+      var bin = 2 + Math.floor(b * 3);
+      var v = live ? (VIS.freq[bin] || 0) / 255 : 0;
+      var len = 6 + v * 60;
+      var a = (b / N) * Math.PI * 2 - Math.PI / 2;
+      var r0 = base + VIS.size * 22;
+      g.strokeStyle = 'hsla(' + VIS.hue + ',85%,' + (55 + v * 25) + '%,' + (0.35 + v * 0.65) + ')';
+      g.lineWidth = 3;
+      g.lineCap = 'round';
+      g.beginPath();
+      g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      g.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len));
+      g.stroke();
+    }
+    /* the core */
+    var R = base - 6 + VIS.size * 22;
+    var grad = g.createRadialGradient(cx, cy, 2, cx, cy, R);
+    grad.addColorStop(0, 'hsla(' + VIS.hue + ',90%,75%,.95)');
+    grad.addColorStop(1, 'hsla(' + (VIS.hue + 30) + ',85%,55%,.25)');
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+
+    var note = $('rpVisNote');
+    if (note) note.textContent = live ? (loud > 0.05 ? '' : 'Sing.') : 'Waiting for the microphone — tap Hear yourself or Record.';
+    VIS.raf = requestAnimationFrame(visFrame);
+  }
+  function visStart() {
+    if (VIS.raf) return;
+    try { if (typeof MIC !== 'undefined' && !MIC.on && typeof startMic === 'function') startMic(); } catch (e) {}
+    VIS.raf = requestAnimationFrame(visFrame);
+  }
+  function visStop() {
+    if (VIS.raf) cancelAnimationFrame(VIS.raf);
+    VIS.raf = null;
+  }
+
+  /* ---------------------------------------------------------------- */
   function install() {
     if (window.__rpVoiceMode) return;
     if (typeof window.switchMode !== 'function') return;
@@ -441,6 +534,7 @@
          before handing over. */
       var mine = $('modeVoice');
       if (mine) mine.classList.remove('active');
+      visStop();
       if (V.monitor) { V.monitor = false; wireMonitor(); }
       stopPlay();
       return prev.apply(this, arguments);
