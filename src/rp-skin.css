@@ -73,3 +73,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
    above the tabs, and closes on a tap outside or the escape key. */
 .michelp{bottom:68px !important; align-items:flex-end !important;}
 .michelp-box{margin-bottom:10px;}
+
+/* the ⓘ badge, everywhere — exercise names, Learn rows, the effects */
+.rp-info{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+  border:1px solid var(--gold);color:var(--gold);font-size:11px;font-weight:800;margin-left:7px;cursor:pointer;flex:none;
+  vertical-align:middle;font-style:normal;}
+.rp-info.on{background:rgba(232,179,74,.18);}

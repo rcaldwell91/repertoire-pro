@@ -37,11 +37,11 @@
   var LEVELS = [[0, 'Any level'], [1, 'Beginner'], [2, 'Intermediate'], [3, 'Advanced']];
   var TOOLS = [
     ['btnMatch',   'Note Match',   'A note plays, you sing it back and hold it. Ten rounds.'],
-    ['btnKbd',     'Keyboard',     'Press a note, hear it, sing it back, see where you landed.'],
+    ['btnKbd',     'Keyboard',     'Free play: press a note, sing it back. Not scored — Note Match and Sustain Hold are.'],
     ['btnSustain', 'Sustain Hold', 'Hold one note dead steady for five seconds.']
   ];
   var DRILLS = [
-    ['tonic',   'Find home',       'A phrase plays. Sing the note it wants to rest on.'],
+    ['tonic',   'Sing the home note', 'A short tune plays. Sing the note it sounds finished on.'],
     ['degree',  'Name the degree', 'A key is set, then one note plays. Which one is it, 1 to 7?'],
     ['singdeg', 'Sing the degree', 'A key is set. Then sing the one it asks for.'],
     ['hilo',    'Higher or lower', 'Two notes. Which was higher? Listening only.']
@@ -69,6 +69,7 @@
     return '<div class="rp-card" data-exopen="' + esc(e.id) + '" style="padding:12px;cursor:pointer;margin-top:8px">' +
       '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
       '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(e.name) +
+      '<span class="rp-info" title="What is this?">i</span>' +
       (e.quiet ? '<span class="rp-tag">quiet ok</span>' : '') + '</div>' +
       '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
       (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
@@ -228,7 +229,8 @@
         h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
           (sel.level ? ' · ' + esc(lvlName(sel.level).toUpperCase()) : '') + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
-          '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(one.name) + '</div>' +
+          '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
+          '<span class="rp-info" title="What is this?">i</span></div>' +
           '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
           '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
           (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(one.id, true) + '</div>' : '') +
@@ -291,8 +293,30 @@
      asked the routine whether it was "on" — and a routine you walk out of
      half-way stays on forever, so the Train tab came back black until a
      refresh. Briar found that one. */
+  /* Profile → Help: every exercise, what it is and how to do it */
+  function helpRow() {
+    var d = $('rpExRow');
+    if (d) return;
+    d = document.createElement('div');
+    d.id = 'rpExRow';
+    d.className = 'rp-card';
+    d.style.cursor = 'pointer';
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">Every exercise, explained</div>' +
+      '<div class="rp-sub">What each one is, how to do it, and a Hear it button.</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    on(d, 'click', function () {
+      try { window.switchMode('train'); } catch (e) {}
+      setTimeout(TR.all, 120);
+    });
+    var host = $('modeYou') || document.body;
+    host.appendChild(d);
+  }
+  setInterval(helpRow, 1500);
+  setTimeout(helpRow, 800);
+
   function running() {
-    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel'];
+    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox'];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
       if (el && el.offsetParent !== null) return true;

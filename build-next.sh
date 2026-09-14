@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -324,6 +324,142 @@ PATCHES = [
     ("<p>I play a piano note — you sing it back and hold it. 10 rounds. The purest pitch trainer there is.</p>",
      "<p>You hear a note — sing it back and hold it. 10 rounds.</p>"),
 
+    # 28. THE RANGE TEST TOOK THE FIRST NOTE IT HEARD. Briar: "it just cuts
+    #     out at the first note it hears — give people a few seconds and use
+    #     the highest / lowest note it tracked." About four seconds of voice
+    #     now, and the extremes of what was sung, trimmed of glitches.
+    ("  const need = 80; // ~1.5s of voiced audio",
+     "  const need = 240; // ~4s of voiced audio — the first note is not the lowest note"),
+    ("      RANGE.lo = Math.round(percentile(RT.samples, 0.15));",
+     "      RANGE.lo = Math.round(percentile(RT.samples, 0.05));"),
+    ("      RANGE.hi = Math.round(percentile(RT.samples, 0.85));",
+     "      RANGE.hi = Math.round(percentile(RT.samples, 0.95));"),
+    ("  $('rtPrompt').innerHTML = 'Sing your <span style=\"color:var(--accent2)\">LOWEST</span> comfortable note on “oooh” and hold it…';",
+     "  $('rtPrompt').innerHTML = 'Sing your <span style=\"color:var(--accent2)\">LOWEST</span> comfortable note on “oooh” and keep going until the bar fills — slide lower if you can…';"),
+    ("      $('rtPrompt').innerHTML = 'Got it! Now your <span style=\"color:var(--gold)\">HIGHEST</span> comfortable note — “oooh”, no straining…';",
+     "      $('rtPrompt').innerHTML = 'Got it! Now your <span style=\"color:var(--gold)\">HIGHEST</span> comfortable note — “oooh”, keep going until the bar fills, no straining…';"),
+
+    # 29. THE KEYBOARD, SIDEWAYS. Briar: "when people turn the phone sideways
+    #     it should expand to show more keys." The base already re-draws on
+    #     resize; the width of the window is now the width of the phone.
+    ("  const host = document.getElementById('kbdKeys');\n  if(!host) return;\n  host.innerHTML = '';",
+     "  const host = document.getElementById('kbdKeys');\n  if(!host) return;\n"
+     "  KBD.span = window.innerWidth > window.innerHeight ? 29 : 17;   /* sideways: nearly two octaves */\n"
+     "  if(KBD.lo + KBD.span > 100) KBD.lo = kbdWhiteBelow(100 - KBD.span);\n"
+     "  host.innerHTML = '';"),
+
+    # 30. A HELD KEY GOES QUIET SO THE MIC CAN HEAR YOU. Briar: holding a key
+    #     down, the app tracked her voice badly; letting go, it tracked her
+    #     perfectly. The key was the loudest sound the app makes, and the
+    #     phone's mic hears it as well as her. It still rings; after a second
+    #     it drops to a hum under the voice.
+    ("  g.gain.linearRampToValueAtTime(0.92, t + 0.015);",
+     "  g.gain.linearRampToValueAtTime(0.92, t + 0.015);\n"
+     "  g.gain.setValueAtTime(0.92, t + 1.0);\n"
+     "  g.gain.exponentialRampToValueAtTime(0.12, t + 1.6);   /* the mic hears the key too */"),
+    ("'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key and it rings like a piano; hold it and it stays' +\n"
+     "      ' until you let go. The arrows slide the keyboard one key at a time &mdash; they never jump an octave.</div>'",
+     "'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing it. A held key goes quiet after a second so the mic hears you, not the key.' +\n"
+     "      ' Turn the phone sideways for more keys. This is free play &mdash; Note Match and Sustain Hold are the scored versions.</div>'"),
+
+    # 31. "FIND HOME" MEANT NOTHING TO BRIAR. Said the way it would be said.
+    ("      ['tonic', 'Find home', 'A phrase plays. Sing the note it wants to rest on.',",
+     "      ['tonic', 'Sing the home note', 'A short tune plays. Sing the note it sounds finished on.',"),
+    ("    const titles = { tonic: 'Find home', degree: 'Name the degree', singdeg: 'Sing the degree', hilo: 'Higher or lower' };",
+     "    const titles = { tonic: 'Sing the home note', degree: 'Name the degree', singdeg: 'Sing the degree', hilo: 'Higher or lower' };"),
+    ("      h += '<div style=\"font-size:15px;font-weight:800;color:var(--ink-dim)\">Sing the note it wants to rest on</div>' +",
+     "      h += '<div style=\"font-size:15px;font-weight:800;color:var(--ink-dim)\">Sing the note the tune sounds finished on</div>' +"),
+
+    # 32. NAME THE INTERVAL, BY EAR. Robert: showing the two notes on the keys
+    #     made it counting, not hearing. It plays them and shows no keys. Two
+    #     new games for advanced ears keep the keys: play the note you hear,
+    #     play the interval you hear.
+    ("      return { kind: 'choice', lo: root, n: 13, root, highlight: [root, root + s],\n"
+     "        prompt: 'How far apart are these two notes?',",
+     "      return { kind: 'choice', lo: root, n: 13, root, highlight: [], ear: true,\n"
+     "        prompt: 'Listen. How far apart are the two notes?',"),
+    ("    if (id === 'interval') {\n      const sizes = G.hard > 2",
+     "    if (id === 'playnote' || id === 'playint') {\n"
+     "      const sizes = G.hard > 2 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] : [2, 4, 5, 7, 9, 12];\n"
+     "      const s = sizes[Math.floor(Math.random() * sizes.length)];\n"
+     "      return { kind: 'pick', lo: root, n: 13, root, ref: root,\n"
+     "        target: id === 'playnote' ? [root + s] : [root, root + s],\n"
+     "        prompt: id === 'playnote' ? 'The lit key plays, then another note. Play that other note.'\n"
+     "                                  : 'Two notes play; the first is lit. Play both, in order.',\n"
+     "        after: 'The second note was a ' + ['unison','2nd','2nd','3rd','3rd','4th','tritone','5th','6th','6th','7th','7th','octave'][s] + ' up from the first.' };\n"
+     "    }\n"
+     "    if (id === 'interval') {\n      const sizes = G.hard > 2"),
+    ("    { id: 'interval', name: 'Name the interval', level: 3, need: 2,\n"
+     "      teaches: 'Distance between two notes, counted inclusively.',\n"
+     "      why: 'The inclusive count is the number one beginner stumble: two steps is called a third.' }\n"
+     "  ];",
+     "    { id: 'interval', name: 'Name the interval', level: 3, need: 2,\n"
+     "      teaches: 'Two notes play. How far apart are they?',\n"
+     "      why: 'By ear, with no keys to count. A third and a fifth sound different long before you can name them.' },\n"
+     "    { id: 'playnote', name: 'Play the note you hear', level: 3, need: 2,\n"
+     "      teaches: 'A note plays after a lit one. Find it on the keys.',\n"
+     "      why: 'Hearing a note and finding it is the ear and the hand working together.' },\n"
+     "    { id: 'playint', name: 'Play the interval you hear', level: 3, need: 2,\n"
+     "      teaches: 'Two notes play. Play them both.',\n"
+     "      why: 'The same skill, one step harder: the distance has to be right, not just the note.' }\n"
+     "  ];"),
+    ("    } else {\n      h += kbd(q.lo, q.n, {\n        label: labeller(q),\n        state: m => (q.highlight || q.show || []).indexOf(m) >= 0 ? 'lit' : ''\n      });",
+     "    } else {\n      if (!q.ear) h += kbd(q.lo, q.n, {\n        label: labeller(q),\n        state: m => (q.highlight || q.show || []).indexOf(m) >= 0 ? 'lit' : ''\n      });"),
+    ("        state: m => {\n          if (feedback && q.target.indexOf(m) >= 0) return 'ok';",
+     "        state: m => {\n          if (q.ref === m && q.target.indexOf(m) < 0 && done.indexOf(m) < 0) return 'lit';\n          if (feedback && q.target.indexOf(m) >= 0) return 'ok';"),
+    ("      playRun(q.target || [q.root]);\n      return;\n    }\n    playRun(q.show || [q.root]);",
+     "      playRun(q.ref != null && q.target.indexOf(q.ref) < 0 ? [q.ref].concat(q.target) : (q.target || [q.root]));\n      return;\n    }\n    playRun(q.show || [q.root]);"),
+    ("    play(m, 0, 0.5, 0.5);\n    const i = G.picked.length;",
+     "    play(m, 0, 0.5, 0.5);\n    if (q.ref === m && q.target.indexOf(m) < 0) return;   /* the reference key is not an answer */\n    const i = G.picked.length;"),
+
+    # 33. TWO LEARN CARDS, SAID PLAINLY. Briar: chords and harmony, and triads,
+    #     "just plainly confusing."
+    ("""      body: `<p>Two or more notes at once. As a singer you almost never build one — but you are singing
+      <i>over</i> one at every moment, and which note of it you land on is most of what makes a melody
+      sound right or wrong.</p>`""",
+     """      body: `<p>A <b>chord</b> is two or more notes played at the same time. A guitar strum is a chord.
+      Three piano keys pressed together is a chord.</p>
+      <p>Singers hardly ever sing chords. You sing one note while the band plays the chord underneath
+      you. Which note of that chord you land on is most of what makes a tune sound right.</p>`"""),
+    ("""      body: `<p>The standard chord is three notes: <b>1, 3 and 5</b> of a scale starting on the chord's
+      own note. In C: <b>C, E, G</b>.</p>
+      <p>The bottom note is the <b>root</b> and gives the chord its name. The <b>third</b> decides
+      major or minor. The <b>fifth</b> mostly just fills it out.</p>`""",
+     """      body: `<p>The usual chord has three notes. Start on any note. Skip a note, take the next. Skip a
+      note, take the next. Starting on C that gives <b>C, E and G</b>.</p>
+      <p>The bottom note is the <b>root</b>, and it names the chord: this one is called C. The middle
+      note is the <b>third</b>, and it decides whether the chord sounds bright (major) or sad (minor).
+      The top note is the <b>fifth</b>, and it fills the sound out.</p>`"""),
+
+    # 34. COPY THAT TALKED TO ROBERT. Robert: "so much of this app text is
+    #     written like you are talking to me specifically." Said to the
+    #     singer holding the phone.
+    ("      note: 'Robert — this is my best identification of the exercise you described as <b>\"bhay\"</b>. ' +\n"
+     "            'If yours was a bratty belting sound, this is it. If yours was a loose floppy-tongue ' +\n"
+     "            'release, you want <b>Blah</b> in the Articulation group instead. I could not be certain ' +\n"
+     "            'from the spelling, so both are here.'",
+     "      note: 'Coaches spell this one differently. If yours means a bratty belting sound, this is it. ' +\n"
+     "            'If yours means a loose, floppy-tongue release, use <b>Blah</b> in the Articulation group instead.'"),
+    ("      note: '<b>Honest label:</b> both halves of this are well documented on their own, but I could not ' +\n"
+     "            'find a source that names the combination as a standard exercise. It is a coherent, safe ' +\n"
+     "            'thing a coach would plausibly assign — I am describing it as a combination rather than ' +\n"
+     "            'dressing it up as a classic.'",
+     "      note: 'Both halves of this are standard exercises. Putting them together is a safe combination, ' +\n"
+     "            'not a classic with a name of its own.'"),
+    ("      note: 'The family this belongs to is well attested; this exact syllable is not documented as a ' +\n"
+     "            'named exercise anywhere I could find. Here in case it is the \"blah\" you were taught.'",
+     "      note: 'A tongue-release exercise. Coaches use different syllables for it; this is the loose one.'"),
+    ("blurb: 'The colour of the sound, and where your voice changes gear. Robert: this is the one I could not practise around.' },",
+     "blurb: 'The colour of the sound, and where your voice changes gear.' },"),
+    ("'piano.<br><br>Being straight with you: what you get here is a <b>synthesised voice-like tone</b>, '",
+     "'piano.<br><br>What you get here is a <b>synthesised voice-like tone</b>, '"),
+    ("'far closer to a sung note than a piano is — but the study measured real voices and I am not ' +\n"
+     "      'claiming this recovers the whole difference. A real recorded voice would be better, and you '",
+     "'far closer to a sung note than a piano is — but the study measured real voices, and this does not ' +\n"
+     "      'claim to recover the whole difference. A real recorded voice would be better, and you '"),
+    ("      '<div class=\"ctl\"><label>What should I call you?</label>' +",
+     "      '<div class=\"ctl\"><label>Your name</label>' +"),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the
@@ -373,7 +509,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

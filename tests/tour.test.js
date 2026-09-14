@@ -60,7 +60,7 @@ function ok(cond, what) { console.log((cond ? '  ✓ ' : '  ✗ ') + what); if (
   ok(!(await p.evaluate(() => { const o = document.getElementById('rpSheet'); return !!(o && o.style.display !== 'none' && o.innerHTML); })), 'no picture sheet in the way');
   let n = 0;
   while (await p.evaluate(() => RPTour.running()) && n++ < 18) { await p.evaluate(() => document.getElementById('rpTourNext').click()); await p.waitForTimeout(650); }
-  ok(!(await p.evaluate(() => RPTour.running())) && n === 12, 'Next walks all 12 steps and Done closes it (' + n + ' presses)');
+  ok(!(await p.evaluate(() => RPTour.running())) && n === 13, 'Next walks all 13 steps and Done closes it (' + n + ' presses)');
 
   console.log('the picture guide is still there, second');
   await p.evaluate(() => window.switchMode('you')); await p.waitForTimeout(1600);

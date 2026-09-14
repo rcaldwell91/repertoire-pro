@@ -73,6 +73,60 @@
     return out;
   }
 
+  /* Robert, 14 Sep: "maybe we can have an example to show/hear on the
+     cards to help people visualise and understand." Each is a few notes
+     played with the app's own reference sound: (midi, seconds from now,
+     length). Same offset = together. */
+  function P(m, at, dur, vol) { try { V10._play(m, at, dur == null ? 0.7 : dur, vol == null ? 0.5 : vol); } catch (e) {} }
+  function run(list, gap, dur) { list.forEach(function (m, i) { P(m, i * (gap || 0.45), dur || 0.42); }); return list.length * (gap || 0.45); }
+  function chord(list, at, dur) { list.forEach(function (m) { P(m, at || 0, dur || 1.2, 0.36); }); }
+  var EX = {
+    1:  { say: 'One note, held', go: function () { P(60, 0, 1.4); } },
+    2:  { say: 'A to G, then A again', go: function () { run([57, 59, 60, 62, 64, 65, 67, 69]); } },
+    3:  { say: 'A half step, then a whole step', go: function () { run([60, 61]); run([60, 62]).valueOf(); P(60, 1.2, 0.42); P(62, 1.65, 0.42); } },
+    4:  { say: 'C, C sharp, D', go: function () { run([60, 61, 62], 0.55); } },
+    5:  { say: 'C, then the C an octave up', go: function () { P(60, 0, 0.8); P(72, 0.9, 0.8); chord([60, 72], 2.0, 1.2); } },
+    7:  { say: 'Four beats', go: function () { run([67, 67, 67, 67], 0.6, 0.15); } },
+    14: { say: 'A scale, bottom to top', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.38); } },
+    15: { say: 'The major scale from C', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.38); } },
+    16: { say: 'Up the scale, then home', go: function () { var t = run([60, 62, 64, 65, 67, 69, 71], 0.36); P(72, t, 0.5); P(60, t + 0.9, 1.3); } },
+    17: { say: 'Degrees 1 to 7, then 1 again', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.4); } },
+    20: { say: 'Major, then minor: only the middle note moves', go: function () { chord([60, 64, 67], 0, 1.1); chord([60, 63, 67], 1.4, 1.3); } },
+    21: { say: 'The natural minor scale from A', go: function () { run([57, 59, 60, 62, 64, 65, 67, 69], 0.38); } },
+    25: { say: 'A third, then a fifth', go: function () { P(60, 0, 0.5); P(64, 0.55, 0.6); P(60, 1.5, 0.5); P(67, 2.05, 0.7); } },
+    28: { say: 'Three notes at once: a chord', go: function () { chord([60, 64, 67], 0, 1.6); } },
+    29: { say: 'Root, third, fifth — then together', go: function () { run([60, 64, 67], 0.5, 0.45); chord([60, 64, 67], 1.7, 1.4); } },
+    30: { say: 'The chord, then its third on its own', go: function () { chord([60, 64, 67], 0, 1.2); P(64, 1.5, 1.2); } },
+    31: { say: 'Four chords that all belong to C', go: function () { chord([60, 64, 67], 0, 0.7); chord([65, 69, 72], 0.8, 0.7); chord([67, 71, 74], 1.6, 0.7); chord([60, 64, 67], 2.4, 1.2); } },
+    33: { say: 'Home, away, tension, home', go: function () { chord([60, 64, 67], 0, 0.7); chord([65, 69, 72], 0.8, 0.7); chord([67, 71, 74], 1.6, 0.7); chord([60, 64, 67], 2.4, 1.2); } },
+    34: { say: 'A cadence: the tension chord, then home', go: function () { chord([67, 71, 74], 0, 0.9); chord([60, 64, 67], 1.0, 1.5); } },
+    35: { say: 'A plain chord, then the same with a seventh', go: function () { chord([60, 64, 67], 0, 1.1); chord([60, 64, 67, 70], 1.4, 1.4); } },
+    43: { say: 'A tune, then the same tune a third higher', go: function () { run([60, 62, 64, 62, 60], 0.36); run([64, 65, 67, 65, 64].map(function (m) { return m; }), 0.36).valueOf(); } },
+    45: { say: 'Major, then the same notes started on D', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.3); [62, 64, 65, 67, 69, 71, 72, 74].forEach(function (m, i) { P(m, 2.7 + i * 0.3, 0.32); }); } },
+    47: { say: 'The pentatonic: five notes', go: function () { run([60, 62, 64, 67, 69, 72], 0.38); } }
+  };
+  /* two runs one after the other, for the rows above that play two things */
+  EX[3].go = function () { P(60, 0, 0.42); P(61, 0.45, 0.42); P(60, 1.3, 0.42); P(62, 1.75, 0.42); };
+  EX[43].go = function () { run([60, 62, 64, 62, 60], 0.36); [64, 65, 67, 65, 64].forEach(function (m, i) { P(m, 2.1 + i * 0.36, 0.34); }); };
+  function hearButton(row) {
+    var body = row.querySelector('.lsnbody');
+    if (!body || body.querySelector('[data-lhear]')) return;
+    var n = +row.dataset.lsn;
+    var ex = EX[n];
+    if (!ex) return;
+    var b = document.createElement('button');
+    b.className = 'btn';
+    b.setAttribute('data-lhear', n);
+    b.style.cssText = 'padding:8px 12px;font-size:12.5px;margin:2px 0 10px';
+    b.textContent = '▶ Hear it — ' + ex.say;
+    on(b, 'click', function (ev) {
+      ev.stopPropagation();
+      try { if (typeof ensureCtx === 'function') ensureCtx(); } catch (e) {}
+      ex.go();
+    });
+    body.insertBefore(b, body.firstChild);
+  }
+
   function infoButton(row) {
     if (row.querySelector('.rp-info')) return;
     var b = document.createElement('span');
@@ -133,7 +187,7 @@
         ' Tap ⓘ for what a row is about.</div>';
       var box = document.createElement('div');
       unit.appendChild(box);
-      rows.forEach(function (el) { el.style.display = ''; box.appendChild(el); infoButton(el); });
+      rows.forEach(function (el) { el.style.display = ''; box.appendChild(el); infoButton(el); hearButton(el); });
       /* the rows the base drew that are not this subject stay parked */
       h.games.forEach(function (el) { if (rows.indexOf(el) < 0) el.style.display = 'none'; });
       h.order.forEach(function (u) { h.units[u].forEach(function (el) { if (rows.indexOf(el) < 0) el.style.display = 'none'; }); });

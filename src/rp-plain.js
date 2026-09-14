@@ -194,7 +194,8 @@
   /* ---------------------------------------------------------------- */
   /* marking the words up, without touching anything interactive      */
   /* ---------------------------------------------------------------- */
-  var SKIP = /^(SCRIPT|STYLE|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|LABEL|SVG|CANVAS|CODE)$/;
+  var SKIP = /^(SCRIPT|STYLE|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|LABEL|SVG|CANVAS|CODE|H1|H2|H3|H4|SUMMARY)$/;
+  var SKIPCLS = /(^|\s)(rp-ttl|rp-lab|pill|lt|gt|kbdlbl|seg)(\s|$)/;   /* titles and labels: the word is the name, not a term */
   function markUp(root, cap) {
     if (!root) return;
     var left = cap || 40, seen = {};
@@ -204,6 +205,7 @@
         var p = n.parentNode;
         while (p && p !== root) {
           if (SKIP.test(p.nodeName) || p.classList && p.classList.contains('rp-gl')) return NodeFilter.FILTER_REJECT;
+          if (SKIPCLS.test(p.className || '')) return NodeFilter.FILTER_REJECT;
           p = p.parentNode;
         }
         return RX.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
@@ -310,7 +312,7 @@
     return '<button class="btn" data-skip="1" style="width:100%;padding:11px;margin-top:14px;' +
       'font-size:12.5px;color:var(--ink-dim)">Skip this \u2014 just let me in</button>' +
       '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
-      'Nothing is lost. It all lives in <b>Profile</b> under <b>Where I have got you</b>, ' +
+      'Nothing is lost. It all lives in <b>Profile</b> under <b>Where you are</b>, ' +
       'and you can set them whenever you want.</div>';
   }
 
@@ -424,7 +426,7 @@
   function ask() {
     /* step 0 is the OFFER. Nothing has been asked yet and nothing has to be. */
     if (step === 0) {
-      sheet('<b style="font-size:18px">Want me to work out where to start you?</b>' +
+      sheet('<b style="font-size:18px">Work out where to start?</b>' +
         '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which ' +
         'warm-ups you are given first and how the app words things \u2014 and you can change any of it later, ' +
         'or ignore all of it and just have a look round.</div>' +
@@ -483,23 +485,26 @@
       ? 'Normal words, and anything unusual is one tap from a plain sentence.'
       : 'The proper terms, used properly, with no slowing down.';
 
-    sheet('<b style="font-size:18px">Right \u2014 here is where I am putting you.</b>' +
+    sheet('<b style="font-size:18px">Here is where you start.</b>' +
       '<div class="rp-card" style="margin-top:14px;padding:12px">' +
       '<div class="rp-lab">YOUR SINGING</div>' +
       '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(singLine) + '</div></div>' +
       '<div class="rp-card" style="margin-top:9px;padding:12px">' +
       '<div class="rp-lab">WORDS AND MUSIC</div>' +
       '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(wordLine) + '</div></div>' +
-      '<div class="measured" style="margin-top:12px">This is what you <b>told</b> me \u2014 it is not measured. ' +
-      'If it is wrong, change it in <b>Profile</b>, or take the test, which measures instead of asking.</div>' +
-      '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Start</button>' +
-      '<button class="btn" id="rpTestNow" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px">' +
-      'Test me instead \u2014 measure it</button>');
-    on($('rpOK'), 'click', function () { shut(); apply(); offerRange(); });
-    on($('rpTestNow'), 'click', function () {
+      '<div class="measured" style="margin-top:12px">This is what you <b>said</b>. It is not measured. ' +
+      'If it is wrong, change it in <b>Profile</b>. Next come five short tests that measure it.</div>' +
+      '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Measure it</button>' +
+      '<button class="btn" id="rpTestLater" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px;color:var(--ink-dim)">' +
+      'Later \u2014 it is in Profile</button>');
+    /* Robert, 14 Sep: "after the questions, give the test exercises so they
+       match your level and confirm where you are with more data." */
+    on($('rpOK'), 'click', function () {
       shut(); apply();
-      try { if (window.RPTest) RPTest.open(); } catch (e) {}
+      if (window.RPTest) { try { RPTest.open(); return; } catch (e) {} }
+      offerRange();
     });
+    on($('rpTestLater'), 'click', function () { shut(); apply(); });
   }
 
   /* Robert, 13 Sep: the range test is not something you do often, so it
@@ -648,7 +653,7 @@
     var wrd  = ME.taught === 1 ? 'plain English'
              : ME.taught === 2 ? 'normal words, tap to explain' : 'proper terms';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">Where I have got you</div>' +
+      '<div><div class="rp-ttl">Where you are</div>' +
       '<div class="rp-sub">Singing: ' + sing + ' \u00b7 Words: ' + wrd + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
     if (fresh) {
@@ -663,8 +668,11 @@
     var s = document.createElement('style');
     s.id = 'rpPlainCSS';
     s.textContent =
-      '.rp-gl{border-bottom:1px dashed var(--gold);cursor:pointer;}' +
-      '.rp-gl:active{background:rgba(232,179,74,.16);}' +
+      '.rp-gl{cursor:pointer;white-space:nowrap;}' +
+      '.rp-gl::after{content:"i";display:inline-block;width:14px;height:14px;line-height:13px;margin-left:3px;' +
+      'border-radius:50%;border:1px solid var(--gold);color:var(--gold);font-size:10px;font-weight:800;' +
+      'font-style:normal;text-align:center;vertical-align:1px;}' +
+      '.rp-gl:active::after{background:rgba(232,179,74,.25);}' +
       '.rp-whatis{font-size:12.5px;color:var(--ink-dim);line-height:1.5;margin-top:6px;' +
       'padding-left:9px;border-left:2px solid var(--line);}';
     document.head.appendChild(s);

@@ -273,11 +273,6 @@
         '<div class="rp-sub">' + esc(d.sub) + '</div></div>';
     });
     h += '</div>' +
-      '<div class="rp-card" style="margin-top:6px;padding:12px;border-left:3px solid var(--gold)">' +
-      '<div style="font-size:12.5px;line-height:1.55">What you will <i>not</i> see yet is trivia about ' +
-      'songs and artists — the Grammy year, the thing the singer did in 1974. That needs a catalogue of ' +
-      'songs, and this app does not take lyrics or audio from anywhere. Until there is a source we are ' +
-      'allowed to use, saying nothing beats making something up.</div></div>' +
       '<button class="btn" id="rpDoseX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
     var box = sheet(h);
     on($('rpDoseX'), 'click', shut);

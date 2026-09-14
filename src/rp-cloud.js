@@ -459,6 +459,21 @@
       '<button class="btn primary" id="rpNameGo" style="padding:11px 15px">Save</button></div>' +
       '<div id="rpNameMsg" class="measured" style="margin-top:7px"></div></div>';
 
+    /* Robert, 14 Sep: "she should be able to change her email address,
+       password and the normal stuff." */
+    h += '<div class="rp-card" style="margin-top:10px;padding:11px">' +
+      '<label class="rp-lab">EMAIL</label>' +
+      '<div class="row" style="gap:7px;margin-top:6px;flex-wrap:nowrap">' +
+      '<input id="rpNewEmail" class="rp-inp" type="email" style="flex:1" autocomplete="email" value="' + esc(p.email || '') + '">' +
+      '<button class="btn primary" id="rpEmailGo" style="padding:11px 15px">Save</button></div>' +
+      '<div id="rpEmailMsg" class="measured" style="margin-top:7px"></div></div>';
+    h += '<div class="rp-card" style="margin-top:10px;padding:11px">' +
+      '<label class="rp-lab">NEW PASSWORD</label>' +
+      '<div class="row" style="gap:7px;margin-top:6px;flex-wrap:nowrap">' +
+      '<input id="rpNewPass" class="rp-inp" type="password" style="flex:1" autocomplete="new-password" placeholder="At least 6 characters">' +
+      '<button class="btn primary" id="rpPassGo" style="padding:11px 15px">Save</button></div>' +
+      '<div id="rpPassMsg" class="measured" style="margin-top:7px"></div></div>';
+
     if (p.is_coach) {
       h += '<div class="rp-card hot" style="margin-top:14px"><div class="rp-lab">YOUR COACH CODE</div>' +
         '<div style="font-size:31px;font-weight:900;letter-spacing:3px">' + esc(p.coach_code || '') + '</div>' +
@@ -488,7 +503,7 @@
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
-        '<div class="measured" style="margin-top:8px">Coaches are learners too — the student view gives you the AI coach for your own practice.</div>';
+        '<div class="measured" style="margin-top:8px">Coaches are learners too — the student view is your own practice, set by Repertoire.</div>';
     }
     if (RP.coach) {
       h += '<div class="rp-card" style="margin-top:14px">' +
@@ -515,6 +530,31 @@
       });
     });
     on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
+    on($('rpEmailGo'), 'click', function () {
+      var i = $('rpNewEmail'), m = $('rpEmailMsg'), b = $('rpEmailGo');
+      var email = (i.value || '').trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { m.textContent = 'That does not look like an email address.'; m.style.color = 'var(--miss)'; return; }
+      if (email === (RP.profile && RP.profile.email)) { m.textContent = 'That is already your email.'; m.style.color = 'var(--ink-dim)'; return; }
+      b.disabled = true; m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ email: email }).then(function (r) {
+        b.disabled = false;
+        if (r.error) { m.textContent = r.error.message; m.style.color = 'var(--miss)'; return; }
+        m.textContent = 'A link has gone to ' + email + '. Tap it and the change is done.';
+        m.style.color = 'var(--hit)';
+      });
+    });
+    on($('rpPassGo'), 'click', function () {
+      var i = $('rpNewPass'), m = $('rpPassMsg'), b = $('rpPassGo');
+      var pw = i.value || '';
+      if (pw.length < 6) { m.textContent = 'Six characters or more, please.'; m.style.color = 'var(--miss)'; return; }
+      b.disabled = true; m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ password: pw }).then(function (r) {
+        b.disabled = false;
+        if (r.error) { m.textContent = r.error.message; m.style.color = 'var(--miss)'; return; }
+        i.value = '';
+        m.textContent = 'Password changed.'; m.style.color = 'var(--hit)';
+      });
+    });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
     on($('rpCoachCol'), 'click', function () {
@@ -833,9 +873,30 @@
      the scorecard's "days practised" counted it under an invalid day, and the
      placement test could not see it at all. Keep what the database actually
      stored, not what we asked it to store. */
+  /* Briar, 14 Sep: her tests "did not count". She was not signed in, and a
+     result with nowhere to go was thrown away. Now it is kept on the phone,
+     so the test and the points see it; it is not sent anywhere. */
+  var LOCAL_KEY = 'rp_results_local';
+  function localResults() { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]') || []; } catch (e) { return []; } }
+  function keepLocal(r) {
+    try {
+      var all = localResults(); all.unshift(r); all = all.slice(0, 200);
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+  if (!RP.results) RP.results = [];
+  if (!RP.results.length) RP.results = localResults();
   RP.logResult = function (row) {
     try {
-      if (!RP.user || !RP.sb || !RP.profile) return;
+      if (!RP.user || !RP.sb || !RP.profile) {
+        var loc = { student_id: null, coach_id: null, created_at: new Date().toISOString(), local: true };
+        Object.keys(row || {}).forEach(function (k) { if (row[k] != null) loc[k] = row[k]; });
+        if (!RP.results) RP.results = [];
+        RP.results.unshift(loc);
+        keepLocal(loc);
+        try { rerender(); } catch (e) {}
+        return Promise.resolve(loc);
+      }
       var r = { student_id: RP.user.id, coach_id: RP.coach ? RP.coach.id : null };
       Object.keys(row || {}).forEach(function (k) { if (row[k] != null) r[k] = row[k]; });
       return RP.sb.from('results').insert(r).select().then(function (x) {

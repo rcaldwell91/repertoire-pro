@@ -60,6 +60,10 @@
       text: 'Every day, press this — fifteen minutes, from whoever is coaching you.' },
     { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
       text: 'Want one thing? Pick what to work on up top, then Start.' },
+    /* Briar, 14 Sep: did not know what a lip trill was, and did not know
+       the card would tell her. */
+    { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
+      text: 'Tap any exercise to read what it is and hear it, and tap any word with an ⓘ for what it means.' },
     { mode: 'train', find: function () { return $('rpTileTracker'); },
       text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
@@ -345,9 +349,19 @@
       { find: function () { return $('btnSusStart'); },
         text: 'Start hold, then keep the note dead steady for five seconds. New note picks another.' }
     ] },
+    keys: { host: 'kbdPanel', anchor: 'kbdUp', steps: [
+      { find: function () { return $('kbdKeys'); },
+        text: 'Tap a key, then sing it. The key you are singing lights up.' },
+      { find: function () { return $('kbdMsg'); },
+        text: 'A held key goes quiet after a second so the mic hears you, not the key. Sideways gives more keys.' }
+    ] },
+    ear: { host: 'v10Ear', anchor: 'earQuit', steps: [
+      { find: function () { return $('earReplay'); },
+        text: 'Listen, then answer or sing. Play again plays it once more.' }
+    ] },
     range: { host: 'rangePanel', anchor: 'btnRangeTest', steps: [
       { find: function () { return $('btnRangeTest'); },
-        text: 'Sing your lowest comfortable note on “oooh” and hold it, then your highest. About a minute.' }
+        text: 'Sing your lowest comfortable note on “oooh” and keep going until the bar fills, then your highest. About a minute.' }
     ] }
   };
   function tipDone(k) { try { return localStorage.getItem('rp_tip_' + k) === 'done'; } catch (e) { return false; } }

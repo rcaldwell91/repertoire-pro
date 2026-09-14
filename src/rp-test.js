@@ -50,6 +50,16 @@
   try { startedAt = +(localStorage.getItem('rp_test_at') || 0); } catch (e) {}
 
   var STEPS = [
+    { key: 'range', name: 'Sing your range',
+      what: 'Your lowest comfortable note, then your highest. About a minute. Every exercise is then built around it.',
+      measures: 'your range', mode: 'you',
+      go: function () {
+        try { if (window.RPProfile) RPProfile.open('voice'); } catch (e) {}
+        setTimeout(function () {
+          var b = $('btnRangeTest');
+          if (b) { try { b.scrollIntoView({ block: 'center' }); } catch (e) {} b.click(); }
+        }, 350);
+      } },
     { key: 'sustain', name: 'Hold one note steady',
       what: 'Five seconds on one note. It measures how much of the hold stayed on the note.',
       measures: 'breath and steadiness', mode: 'train',
@@ -59,9 +69,9 @@
       measures: 'your ear', mode: 'train',
       go: function () { try { V10.startDrill('hilo'); } catch (e) {} } },
     { key: 'sing', name: 'Sing the note back',
-      what: 'It plays a note, you sing it. Measured the same way — distance from the note.',
+      what: 'A note plays, you sing it and hold it. Ten rounds. It counts how many you matched.',
       measures: 'pitch, with your own voice', mode: 'train',
-      go: function () { try { V10.startDrill('tonic'); } catch (e) {} } },
+      go: function () { var b = $('btnMatch'); if (b) b.click(); } },
     { key: 'theory', name: 'Name the interval',
       what: 'Is that a third, a fifth, an octave? Three stars if you have it.',
       /* The theory games render into modeLearn, not modeTrain. Sending
@@ -83,14 +93,28 @@
     });
   }
 
+  function isMatch(r) { return /note match/i.test(r.label || ''); }
   function resultFor(key) {
     var rs = mine();
+    if (key === 'range') {
+      var rg = null;
+      try { rg = window.RPRange ? RPRange.get() : null; } catch (e) {}
+      if (!rg || rg.by !== 'test' || !rg.at) return null;
+      if (new Date(rg.at).getTime() < startedAt) return null;
+      return { lo: rg.lo, hi: rg.hi };
+    }
+    if (key === 'sing') {
+      var mm = rs.filter(function (r) { return r.kind === 'ear' && isMatch(r) && r.out_of; });
+      if (!mm.length) return null;
+      var best = mm.slice().sort(function (a, b) { return b.score / b.out_of - a.score / a.out_of; })[0];
+      return { score: best.score, outOf: best.out_of };
+    }
     if (key === 'sustain') {
       var s = rs.filter(function (r) { return r.kind === 'sustain' && r.pct != null; });
       return s.length ? { pct: Math.max.apply(null, s.map(function (r) { return r.pct; })) } : null;
     }
-    if (key === 'ear' || key === 'sing') {
-      var e = rs.filter(function (r) { return r.kind === 'ear' && r.cents != null; });
+    if (key === 'ear') {
+      var e = rs.filter(function (r) { return r.kind === 'ear' && r.cents != null && !isMatch(r); });
       if (!e.length) return null;
       return { cents: Math.min.apply(null, e.map(function (r) { return r.cents; })),
                runs: e.length };
@@ -109,8 +133,10 @@
      measurements — two runs of the same measure is what it is. */
   function said(key, r) {
     if (!r) return '';
+    if (key === 'range') { try { return midiName(r.lo) + ' to ' + midiName(r.hi); } catch (e) { return r.lo + ' to ' + r.hi; } }
     if (key === 'sustain') return r.pct + '% of the hold stayed on the note';
-    if (key === 'ear' || key === 'sing') return 'closest was ' + r.cents + ' cents off';
+    if (key === 'ear') return 'closest was ' + r.cents + ' cents off';
+    if (key === 'sing') return r.score + ' of ' + r.outOf + ' notes matched';
     if (key === 'theory') return r.stars + ' of ' + r.outOf + ' stars';
     return '';
   }
@@ -128,16 +154,19 @@
   /* has to take the verdict's word for it.                              */
   /* ------------------------------------------------------------------ */
   T.place = function () {
-    var sus = resultFor('sustain'), ear = resultFor('ear'), th = resultFor('theory');
+    var sus = resultFor('sustain'), ear = resultFor('ear'), th = resultFor('theory'), mt = resultFor('sing'), rg = resultFor('range');
     var sing = null, taught = null, why = [];
 
-    if (sus || ear) {
+    if (rg) why.push('sang from ' + said('range', rg));
+    if (sus || ear || mt) {
       var n = 0, tot = 0;
       if (sus) { tot += sus.pct >= 75 ? 3 : sus.pct >= 45 ? 2 : 1; n++; }
       if (ear) { tot += ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1; n++; }
+      if (mt) { var f = mt.score / mt.outOf; tot += f >= 0.8 ? 3 : f >= 0.5 ? 2 : 1; n++; }
       sing = Math.round(tot / n);
       if (sus) why.push('held a note ' + sus.pct + '% steady');
       if (ear) why.push('got within ' + ear.cents + ' cents of the note');
+      if (mt) why.push('matched ' + mt.score + ' of ' + mt.outOf + ' notes');
     }
     if (th) {
       taught = th.stars >= 3 ? 3 : th.stars >= 2 ? 2 : 1;
@@ -179,7 +208,7 @@
   function draw() {
     var p = T.place();
     var h = '<b style="font-size:18px">Where am I actually at?</b>' +
-      '<div class="measured" style="margin-top:8px">Four short things. Nothing here is a guess — ' +
+      '<div class="measured" style="margin-top:8px">Five short things. Nothing here is a guess — ' +
       'each one measures something and shows you the number. Do them in any order, stop whenever ' +
       'you like, come back to it later.</div>';
 
@@ -236,7 +265,7 @@
         /* Leave no other exercise open behind this one. Starting the ear drill
            straight after the steady note otherwise landed you on Train with
            both panels stacked up the screen. */
-        ['susPanel', 'v10Ear', 'v10Game', 'v10Guided'].forEach(function (id) {
+        ['susPanel', 'v10Ear', 'v10Game', 'v10Guided', 'matchPanel'].forEach(function (id) {
           var el = $(id);
           if (el) el.style.display = 'none';
         });
@@ -283,7 +312,7 @@
       '<div style="flex:1;min-width:0"><div class="rp-ttl">Test me — where am I actually at?</div>' +
       '<div class="rp-sub">' + (p.done
         ? p.done + ' of ' + p.total + ' done. Measured, not guessed.'
-        : 'Four short things that measure instead of asking.') + '</div></div>' +
+        : 'Five short things that measure instead of asking.') + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     if (fresh) {
       on(d, 'click', function () { T.open(); });
