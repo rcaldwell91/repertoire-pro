@@ -212,10 +212,8 @@
 
   function draw() {
     var p = T.place();
-    var h = '<b style="font-size:18px">Where am I actually at?</b>' +
-      '<div class="measured" style="margin-top:8px">Five short things. Nothing here is a guess — ' +
-      'each one measures something and shows you the number. Do them in any order, stop whenever ' +
-      'you like, come back to it later.</div>';
+    var h = '<b style="font-size:18px">Where are you at?</b>' +
+      '<div class="measured" style="margin-top:8px">Five short things. Each one measures something and shows you the number. Any order. Stop whenever you like.</div>';
 
     h += '<div class="rp-lab" style="margin-top:16px">' + p.done + ' OF ' + p.total + ' DONE</div>';
 
@@ -295,7 +293,7 @@
       ME.measured = { at: new Date().toISOString(), sing: q.sing, taught: q.taught, why: q.why };
       ME.save();
       shut();
-      try { if (window.RP && RP.toast) RP.toast('Done — that is measured, not guessed.'); } catch (e) {}
+      try { if (window.RP && RP.toast) RP.toast('Done. That is measured.'); } catch (e) {}
       try { if (ME.apply) ME.apply(); } catch (e) {}
     });
   }
@@ -335,10 +333,10 @@
     }
     var p = T.place();
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div style="flex:1;min-width:0"><div class="rp-ttl">Test me — where am I actually at?</div>' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Test me</div>' +
       '<div class="rp-sub">' + (p.done
-        ? p.done + ' of ' + p.total + ' done. Measured, not guessed.'
-        : 'Five short things that measure instead of asking.') + '</div></div>' +
+        ? p.done + ' of ' + p.total + ' done.'
+        : 'Five short things that measure where you are.') + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     if (fresh) {
       on(d, 'click', function () { T.open(); });

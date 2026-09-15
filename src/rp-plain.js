@@ -427,9 +427,7 @@
     /* step 0 is the OFFER. Nothing has been asked yet and nothing has to be. */
     if (step === 0) {
       sheet('<b style="font-size:18px">Work out where to start?</b>' +
-        '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which ' +
-        'warm-ups you are given first and how the app words things \u2014 and you can change any of it later, ' +
-        'or ignore all of it and just have a look round.</div>' +
+        '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which warm-ups you get first and how the app talks. Change any of it later, or skip it and look round.</div>' +
         '<button class="btn primary" id="rpGoQ" style="width:100%;padding:14px;margin-top:18px;font-size:15px">' +
         'Ask me the six questions</button>' +
         '<button class="btn" data-skip="1" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">' +
@@ -475,15 +473,15 @@
     saveMe();
 
     var singLine = d.experience === 1
-      ? 'Starting you on the beginner warm-ups \u2014 the gentlest ones, and the ones that actually teach pitch.'
+      ? 'You start on the beginner warm-ups. They are the gentle ones, and they teach pitch.'
       : d.experience === 2
-      ? 'Starting you on the beginner and intermediate warm-ups.'
+      ? 'You start on the beginner and intermediate warm-ups.'
       : 'Every exercise is open to you.';
     var wordLine = d.taught === 1
-      ? 'Plain English throughout. Any word worth knowing is explained the first time it appears, and you can tap it again later.'
+      ? 'Plain words. Anything unusual gets an ⓘ you can tap.'
       : d.taught === 2
-      ? 'Normal words, and anything unusual is one tap from a plain sentence.'
-      : 'The proper terms, used properly, with no slowing down.';
+      ? 'Normal words. Anything unusual gets an ⓘ you can tap.'
+      : 'The proper terms.';
 
     sheet('<b style="font-size:18px">Here is where you start.</b>' +
       '<div class="rp-card" style="margin-top:14px;padding:12px">' +
@@ -492,8 +490,7 @@
       '<div class="rp-card" style="margin-top:9px;padding:12px">' +
       '<div class="rp-lab">WORDS AND MUSIC</div>' +
       '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(wordLine) + '</div></div>' +
-      '<div class="measured" style="margin-top:12px">This is what you <b>said</b>. It is not measured. ' +
-      'If it is wrong, change it in <b>Profile</b>. Next come five short tests that measure it.</div>' +
+      '<div class="measured" style="margin-top:12px">That is from your answers. Next, five short tests measure it.</div>' +
       '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Measure it</button>' +
       '<button class="btn" id="rpTestLater" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px;color:var(--ink-dim)">' +
       'Later \u2014 it is in Profile</button>');

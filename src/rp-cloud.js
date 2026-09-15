@@ -183,8 +183,7 @@
       '" placeholder="At least 6 characters" style="width:100%;margin-bottom:12px">';
 
     if (up) {
-      h += '<div class="measured" style="margin-bottom:14px">That is all. If you teach, you switch ' +
-        'that on afterwards from your name at the top — you stay a singer either way.</div>';
+      h += '<div class="measured" style="margin-bottom:14px">If you teach, switch that on afterwards from your name at the top.</div>';
     }
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
@@ -404,10 +403,9 @@
   /* ------------------------------------------------------------------ */
   var acctSig = '';
   function accountRow() {
-    var host = $('youSlots');
-    if (!host) return;
     var fold = null;
-    var all = host.querySelectorAll('details.pfold');
+    /* rp-profile moves the fold into its Account page; look in both places */
+    var all = document.querySelectorAll('#youSlots details.pfold, #rpProfileHolders details.pfold');
     for (var i = 0; i < all.length; i++) {
       var sp = all[i].querySelector('summary span');
       if (sp && /^Account/i.test((sp.textContent || '').trim())) { fold = all[i]; break; }
@@ -432,8 +430,7 @@
           'or sign out from here.</div>' +
         '<button class="btn" id="rpAcctOpen" style="width:100%;padding:11px;margin-top:10px;font-size:12.5px">Open my account</button>';
     } else {
-      body.innerHTML = '<div class="measured">Not signed in. A coach can only find you if you have an account, and ' +
-          'your range and your takes only follow you to a new phone with one. Everything else works without.</div>' +
+      body.innerHTML = '<div class="measured">Not signed in. With an account a coach can find you, and your range and takes follow you to a new phone. Everything else works without one.</div>' +
         '<button class="btn primary" id="rpAcctOpen" style="width:100%;padding:11px;margin-top:10px;font-size:12.5px">Sign in or make an account</button>';
     }
     on($('rpAcctOpen'), 'click', function () { (RP.user && RP.profile) ? openAccount() : openAuth(); });

@@ -155,7 +155,7 @@
           '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(t[1]) + '</div><div class="rp-sub">' + esc(t[2]) + '</div></div>' +
           '<button class="btn primary" data-drill="' + t[0] + '" style="padding:9px 14px;font-size:12.5px">Play</button></div></div>';
       });
-      h += '<div class="measured" style="margin-top:10px">These ask you to sing back, not just tap an answer — hearing a note and producing it are different skills, and only one of them makes you sing better.</div>';
+      h += '<div class="measured" style="margin-top:10px">Most of these ask you to sing the answer, not tap it. Hearing a note and singing it are different skills.</div>';
     }
     var list = listFor(cat, level);
     if (list.length) {

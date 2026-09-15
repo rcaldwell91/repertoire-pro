@@ -174,20 +174,15 @@
   B.open = function (openId) {
     var h = '<b style="font-size:18px">Before the voice</b>' +
       '<div class="measured" style="margin-top:8px">About ' + mins() + ' minutes, and none of it ' +
-      'makes a sound. Do the lot or pick one — it is not a routine you can fail.</div>';
+      'makes a sound. Do the lot or pick one.</div>';
 
     /* The safety panel is not small print and is not at the bottom. */
     h += '<div class="rp-card" style="margin-top:14px;padding:13px;border-left:3px solid var(--miss)">' +
       '<div class="rp-lab" style="color:var(--miss)">THE ONE RULE</div>' +
       '<div style="font-size:13.5px;line-height:1.55;margin-top:5px">' +
-      '<b>Nothing here touches the front of your throat.</b> You will find videos telling singers ' +
-      'to massage their own voice box. We are not going to, and neither should you on your own: the ' +
-      'front of the neck carries the artery to your brain and a bone that breaks, and people have ' +
-      'been seriously hurt doing it to themselves.</div>' +
+      '<b>Nothing here touches the front of your throat.</b> Some videos tell singers to massage their own voice box. Do not. The front of the neck carries the artery to your brain and a bone that breaks.</div>' +
       '<div style="font-size:13px;line-height:1.55;margin-top:8px;color:var(--ink-dim)">' +
-      'That work is real and it helps — but it is a voice therapist’s hands, in a room with you. ' +
-      'If your throat feels tight and it will not settle, that is who to see. An app cannot do it ' +
-      'and should not pretend.</div></div>';
+      'If your throat feels tight and will not settle, see a voice therapist.</div></div>';
 
     ITEMS.forEach(function (x) {
       var open = x.id === openId;
@@ -210,9 +205,7 @@
       h += '</div>';
     });
 
-    h += '<div class="measured" style="margin-top:14px;font-size:11.5px">Hold anything here briefly ' +
-      'and keep moving. A long stretch before you sing takes strength out of you rather than ' +
-      'putting it in — which is the opposite of what most people have been told.</div>';
+    h += '<div class="measured" style="margin-top:14px;font-size:11.5px">Hold anything here briefly and keep moving. A long stretch before you sing takes strength out, not in.</div>';
     h += '<button class="btn" id="rpBodyX" style="width:100%;padding:12px;margin-top:14px">Close</button>';
 
     var box = sheet(h);

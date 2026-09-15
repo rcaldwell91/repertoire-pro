@@ -111,7 +111,7 @@
         '<div class="sub" style="font-size:12.5px;color:var(--ink-dim);font-weight:600">' +
         (window.RP && RP.user && !RP.coach
           ? 'Nobody has set you work, so this is Repertoire’s own plan. Join a coach on the Coach tab and theirs goes here instead.'
-          : 'Repertoire’s own plan, built from what it has measured. It changes as you do.') + '</div>';
+          : 'Repertoire’s plan for today. It changes as you do.') + '</div>';
       if (plan) {
         h += '<div style="margin:12px 0 4px">' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +

@@ -263,7 +263,7 @@
     var cur = T.dose();
     var h = '<b style="font-size:18px">How much extra?</b>' +
       '<div class="measured" style="margin-top:8px">Words, and the reason an exercise works. ' +
-      'It is meant to be a nudge, not homework — so you set how much of it you want.</div>' +
+      'You choose how much of it you want.</div>' +
       '<div style="margin-top:14px">';
     DOSES.forEach(function (d) {
       h += '<div class="rp-card' + (d.k === cur ? ' hot' : '') + '" data-dose="' + d.k + '" ' +

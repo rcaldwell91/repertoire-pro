@@ -55,8 +55,7 @@
     var t = document.createElement('div');
     t.id = 'rpPitchTitle';
     t.innerHTML = '<h1 style="margin:0 0 2px">Pitch Tracker</h1>' +
-      '<div class="rp-sub" style="margin:0 0 12px">Every note you sing, measured. Record a take and ' +
-      'the notes are kept with it.</div>';
+      '<div class="rp-sub" style="margin:0 0 12px">See the notes you sing, as you sing them. Record a take and the notes are kept with it.</div>';
     if (back && back.parentNode === host) host.insertBefore(t, back.nextSibling);
     else host.insertBefore(t, host.firstChild);
   }
@@ -503,8 +502,7 @@
     d.className = 'panel';
     d.style.cssText = 'margin-top:10px;padding:12px';
     d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Sing over one, keep it on your phone, or send it ' +
-      'to your coach — the notes go with it, so they see where you were as well as hear it.</div>' +
+      '<div class="notice" style="margin:8px 0 9px">Play one back, keep it, or send it to your coach. The notes go with it.</div>' +
       '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
     fillTakes();

@@ -199,8 +199,7 @@
   G.open = function (id) {
     if (id) return one(id);
     var h = '<b style="font-size:18px">What do you want to be able to do?</b>' +
-      '<div class="measured" style="margin-top:8px">Say it however you would say it out loud. ' +
-      'You do not need to know what any exercise is called — that is the app’s job.</div>' +
+      '<div class="measured" style="margin-top:8px">Say it the way you would say it out loud. You do not need to know what any exercise is called.</div>' +
       '<div style="margin-top:14px">';
     GOALS.forEach(function (g) {
       h += '<div class="rp-card" data-goal="' + esc(g.id) + '" style="cursor:pointer;padding:12px;' +

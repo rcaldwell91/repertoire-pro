@@ -244,8 +244,7 @@
         'name on it. Two minutes of singing gets you your own.</div></div>';
     }
 
-    h += '<div class="measured" style="margin-top:12px">Every exercise ladders through this, so it is ' +
-      'worth it being right. It is kept on this phone and on your account, and your coach can see it.</div>';
+    h += '<div class="measured" style="margin-top:12px">Every exercise is built around this, so it is worth getting right. Your coach can see it.</div>';
 
     h += '<button class="btn primary" id="rpRgTest" style="width:100%;padding:11px;margin-top:12px;' +
       'font-size:12.5px">Sing it and measure it</button>';

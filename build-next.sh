@@ -148,8 +148,8 @@ PATCHES = [
     h += '<div class="notice" style="margin-bottom:12px">A plan that changes as you do. It reads what ' +
       'the app has actually measured — nothing else.</div>';""",
      """    let h = '<h1 style="margin:0 0 4px">From Repertoire</h1>';
-    h += '<div class="notice" style="margin-bottom:12px">The app’s own plan, built from what it has ' +
-      'actually measured — nothing else. It changes as you do.</div>';"""),
+    h += '<div class="notice" style="margin-bottom:12px">The app’s plan for you, built from what it has ' +
+      'measured. It changes as you do.</div>';"""),
 
     # 13. Home's "Today" shows the same plan, read from the same function, so
     #     the two screens can never disagree.
@@ -451,12 +451,6 @@ PATCHES = [
      "      note: 'A tongue-release exercise. Coaches use different syllables for it; this is the loose one.'"),
     ("blurb: 'The colour of the sound, and where your voice changes gear. Robert: this is the one I could not practise around.' },",
      "blurb: 'The colour of the sound, and where your voice changes gear.' },"),
-    ("'piano.<br><br>Being straight with you: what you get here is a <b>synthesised voice-like tone</b>, '",
-     "'piano.<br><br>What you get here is a <b>synthesised voice-like tone</b>, '"),
-    ("'far closer to a sung note than a piano is — but the study measured real voices and I am not ' +\n"
-     "      'claiming this recovers the whole difference. A real recorded voice would be better, and you '",
-     "'far closer to a sung note than a piano is — but the study measured real voices, and this does not ' +\n"
-     "      'claim to recover the whole difference. A real recorded voice would be better, and you '"),
     ("      '<div class=\"ctl\"><label>What should I call you?</label>' +",
      "      '<div class=\"ctl\"><label>Your name</label>' +"),
 
@@ -507,6 +501,136 @@ WORDS = [
 for a, r in WORDS:
     if a in base:
         base = base.replace(a, r)
+
+
+# ---------------------------------------------------------------------
+# THE WRITING PASS (Robert, 15 Sep). Briar: "it's all written like ChatGPT,
+# nobody actually talks like that." Each entry is the sentence as a person
+# reads it on screen, and what it says now. The matcher tolerates the
+# base's line breaks and ' + ' string joins, so the anchor is the words.
+# ---------------------------------------------------------------------
+import re as _re
+def _loose(s):
+    sep = r"(?:\s|'\s*\+\s*')+"
+    return sep.join(_re.escape(w).replace("'", r"\\?'") for w in s.split())
+def rewrite(text, pairs, where):
+    for old, new in pairs:
+        text, n = _re.subn(_loose(old), lambda m: new, text)
+        assert n == 1, 'writing pass (%s): found %d, expected 1: %r' % (where, n, old[:70])
+    return text
+
+WRITING = [
+    # ---- Coach tab: From Repertoire ----
+    ("I pick the session, I say why first, and I keep it to one thing at a time. Best if you do not yet know what you need — which is most people at the start, including me about you.",
+     "Repertoire picks the session, says why, and keeps it to one thing at a time. Best if you do not yet know what you need."),
+    ("I propose a session and offer two or three alternatives. You pick the order within the block.",
+     "Repertoire suggests a session and two or three alternatives. You pick."),
+    ("You assemble the session. I show you what the numbers say and tell you what I think you are leaving out.",
+     "You build the session. Repertoire shows you the numbers and what you might be leaving out."),
+    ("Days, not minutes — deliberately. In a study of practice sessions ranging from 8 to 57 minutes, neither total time nor number of correct repetitions predicted how well people played the next day. What predicted it was how they handled mistakes. So this app will never set you a minute target, and it counts <b>4 to 6 days a week with a rest day</b> as a full week rather than punishing you for not doing seven. Missing one day does not set you back — that is measured, not encouragement.",
+     "Days, not minutes. <b>Four to six days a week with a rest day</b> counts as a full week. Missing a day does not set you back."),
+    ("<b>Worth saying plainly.</b> Most coaches would start you on pitch, because it transfers faster and it is the thing people notice. You have asked for tone. That is a legitimate route and the evidence is friendlier to it than the convention suggests — one study of registration work alone improved pitch accuracy by 157 cents against 46 for a control group, and the singers who were worst gained the most. Pitch work is folded in here at a lower dose from the start rather than removed. You can flip this any time.",
+     "Most coaches would start you on pitch, because it shows fastest. You picked tone. That works too, and you still get a little pitch work from the start. Change it any time."),
+    ("Pitch first is the conventional order and it transfers fast. One thing to know: if practising while you sound rough is what stops you practising at all, switching to tone for a few weeks is a real strategy and not a cop-out. Say so and I will reorder it.",
+     "Pitch first is the usual order, and it shows fast. If sounding rough puts you off practising, switch to tone for a few weeks. That is a real plan, not a cop-out."),
+    ("How much should I push?", "How much should the app decide?"),
+    ("This changes who chooses and how much I explain. It never changes whether there is a plan — the best teaching is high on both structure and choice, not a trade between them. I will also step back on my own as you get further in, and tell you when I do.",
+     "This only changes who chooses and how much gets explained. There is always a plan."),
+    ("Naming a time and a place is the single best-evidenced thing on this screen. In one study, people who only had the intention to exercise managed it 35% of the time; the ones who wrote down the day, time and place managed 91%.",
+     "Pick a time and a place. People who write down when and where they will practise do it far more often than people who only mean to."),
+    ("Turn this on and the Coach tab becomes your coach's channel instead of mine: they set the week's work, your practice records itself, and they review it in their own time.",
+     "Sign in and join your coach with their code, and this tab becomes their channel: they set the work, you record, they listen in their own time."),
+    ("<b>Not built yet — this is the shape, not a working link.</b> Sending takes to another person needs an account system and a server, which is Phase 2. What works today: the recordings are tagged and titled, so they can be shared by hand.",
+     "Join your coach from the top of this tab, with the code they give you."),
+    ("What I can and cannot tell you", "What the app can and cannot tell you"),
+    ("<span class=\"lab\">I CAN MEASURE</span>", "<span class=\"lab\">IT CAN MEASURE</span>"),
+    ("<span class=\"lab\">I CANNOT MEASURE</span>", "<span class=\"lab\">IT CANNOT MEASURE</span>"),
+    ("Those need equipment a phone does not have, and the ones that can be approximated from audio fall apart in an ordinary room on an ordinary phone. The best validated measure of tone quality in the research explains about two thirds of what a listener hears at its very best — and the expert listeners it was validated against only agree with themselves 39% of the time. So I will give you numbers and leave the judgement to you.",
+     "Those need equipment a phone does not have. So you get the numbers, and the judgement stays yours."),
+    # ---- Sing, Song, Tracker, Profile chrome ----
+    ("Pick your stage.", "Pick one."),
+    ("Settings for this device. Everything here is remembered.", "Your account, your voice, and how the app works."),
+    ("The horizontal lines are notes (C in gold). Hold a note and try to keep your blue line flat and centered on a note line. Steadiness scores how level you hold your pitch.",
+     "The lines are notes, with C in gold. The blue line is your voice. Keep it flat on a line and Steadiness goes up."),
+    ("<b>Sound not working? Plug your headphones in first</b> — that is when it breaks, so that is when to test it. Then press <b>1</b> and <b>2</b>, in that order. Each one prints an answer, and between them they say whether it is the app, the microphone, or the phone itself.",
+     "<b>No sound?</b> Plug your headphones in first, then press <b>1</b> and <b>2</b> in that order. Each one says what it found."),
+    ("Everything you record and every note map you build is stored on this device only. Nothing is uploaded anywhere.",
+     "Recordings stay on this phone unless you send one to your coach."),
+    ("<b>How this app talks about your voice.</b> It reports what it measured and stops there. It will tell you how many cents off a note was, because it counted; it will not tell you whether you sounded good, because it cannot hear that and neither can any software. When conditions are too noisy to measure something honestly, it says so instead of guessing.",
+     "The app tells you what it measured and stops there. It can say how far off a note was. It cannot say whether it sounded good, and it will not pretend to."),
+    ("Everything in Repertoire lives on this phone and nowhere else. There is no account, no server and no sign-in — so nothing here is sent anywhere, and clearing your browser data would clear it. Accounts and sync are a later job.",
+     "Sign in and your range, your takes and your progress follow you to a new phone."),
+    ("<b>This one is worth a minute of your time.</b> In a study where people matched pitch against five different reference sounds, the average error was 46 cents against a live voice and about 188 against a piano — four times worse. The people who were <i>worst</i> with the piano improved the most with a voice. Every reference note in this app used to be a piano.<br><br>Being straight with you: what you get here is a <b>synthesised voice-like tone</b>, not a recording of a person. It has a soft onset, vibrato and vowel-shaped resonance, so it is far closer to a sung note than a piano is — but the study measured real voices and I am not claiming this recovers the whole difference. A real recorded voice would be better, and you recording your own reference notes is the honest way to get there.",
+     "People match a voice more closely than a piano, and the ones who find a piano hardest gain the most from a voice. So every reference note here is a voice-like tone. It is made by the app, not recorded from a person. A real recorded voice would be better."),
+    # ---- exercise scoring notes ----
+    ("The app tracks your pitch on this one and can tell you how far off you were, in cents. It cannot tell you whether it sounded good — that part is still yours.",
+     "The app tracks your pitch on this one and tells you how far off you were. Whether it sounded good is your call."),
+    ("The app times this one. That is all it does — it cannot see your breathing, so it will not tell you anything about your support.",
+     "The app only times this one. It cannot see your breathing."),
+    ("The app does not score this one. There is no honest way to measure it from a phone microphone, so it guides you and stays quiet rather than inventing a number.",
+     "The app does not score this one. A phone microphone cannot measure it, so the app guides you and does not invent a number."),
+    # ---- exercises ----
+    ("The trill stalling at the top — that means the air stopped or the throat gripped, and it is information, not failure.",
+     "The trill stalling at the top. That means the air stopped or the throat gripped."),
+    ("The most precisely controllable version of the same effect as lip trills — the straw is a calibrated resistor. It has the strongest research base of anything in this library.",
+     "The same idea as lip trills, but the straw sets the resistance for you. It is the best-researched exercise in the app."),
+    ("The three errors Titze names: <b>air escaping around the straw</b>,", "<b>Air escaping around the straw</b>,"),
+    ("It is the single most prescribed warm-up there is, and the best diagnostic in the whole library — what your voice does on a siren tells you what it will do everywhere else.",
+     "It is the most common warm-up there is. What your voice does on a siren, it does everywhere else."),
+    ("If nobody tells you that, you will reasonably conclude the exercise is broken.", ""),
+    ("Here is the whole point in one sentence: <b>L uses the tip of your tongue and G uses the back of it.</b>",
+     "<b>L uses the tip of your tongue and G uses the back of it.</b>"),
+    ("note: 'Robert — this is your \"loga loga\".'", "note: ''"),
+    ("Measured, not folklore: in one study seven of eight subjects showed real widening of the throat and a lowering of the larynx. It is a first-line treatment for a voice that is working too hard.",
+     "A yawn opens the throat and lowers the larynx. It is one of the first things a voice therapist gives to a voice that is working too hard."),
+    ("Counter-intuitive and badly under-used.", "Under-used."),
+    ("A stamina test. The first top note is easy; the honest question is whether the fourth is as easy as the first.",
+     "A stamina test. The first top note is easy. The question is whether the fourth is."),
+    ("Physical therapy for your voice, and <b>the set with the strongest research base of anything in this library.</b> Dose matters far more than effort here.",
+     "Physical therapy for your voice, and very well researched. Doing it every day matters far more than doing it hard."),
+    # ---- lessons ----
+    ("This is the atomic unit. Scales, keys, chord quality and transposing are all <i>defined</i> in half steps, and it is the single most under-taught idea in music. Get this one solid and four later lessons collapse into it.",
+     "Scales, keys, chords and transposing are all built from half steps. Get this one solid and four later lessons get easy."),
+    ("In this app, one press of <b>Move the key down</b> is exactly one half step. I measured it so you would not have to wonder.",
+     "In this app, one press of <b>Move the key down</b> is exactly one half step."),
+    ("That is why this unit comes before scales — the same order Berklee uses for singers.",
+     "That is why this unit comes before scales."),
+    ("This is the single most useful ear skill in music, and it is the one almost every ear-training app skips. There is a drill for it in Train → Ear.",
+     "It is the most useful ear skill there is. There is a drill for it in Train, Ear: Sing the home note."),
+    ("<p>Here is a genuinely useful thing that most ear training gets backwards.</p>", "<p>Most ear training gets this backwards.</p>"),
+    ("<p class=\"say\"><b>Honest caveat:</b> nobody has run a head-to-head trial of the two approaches. Every curriculum I checked sequences it this way, and the perception research points the same direction — but that is agreement, not proof.</p>",
+     "<p class=\"say\">Nobody has tested the two approaches head to head. Music schools teach it this way, and the research on hearing points the same way.</p>"),
+    ("This phrase is genuinely ambiguous, and that ambiguity is doing the confusing — not you. It has three meanings:",
+     "This phrase means three different things, which is why it confuses people:"),
+    ("This is pure vocabulary and it takes five minutes, but not knowing it is the fastest way to look lost in a rehearsal.",
+     "This is just vocabulary, and it takes five minutes to learn."),
+    ("They are not the same, and the difference is the most practical idea in this whole tab.",
+     "They are not the same, and the difference matters more than anything else here."),
+    ("<p class=\"say\">There is a drill for the underlying ear skill in Train → Ear: <b>Sing the bass</b>. In one study, 88% of trained listeners said the bass line was how they identified what a chord was — more than any other strategy.</p>",
+     "<p class=\"say\">Start with the ear drills in Train, Ear. Hearing where home is comes first.</p>"),
+    ("This is the single most common place people hurt themselves in a warm-up.",
+     "This is where people hurt themselves in a warm-up."),
+    ("Getting louder and softer without the note changing is genuinely hard, because",
+     "Getting louder and softer without the note changing is hard, because"),
+    # ---- the daily plan's step notes ----
+    ("Semi-occluded work first — the gentlest way to bring the instrument online.",
+     "Lip trills, straws and hums first. The gentlest way to start."),
+    ("Pick anything from your library and use today's one thing on it. This happens every session, not in week four.",
+     "Pick any song and use today\\'s one thing on it."),
+    ("Straw or hum, then descending. Singers report it helps; the objective evidence is not there yet. It takes two minutes and is very unlikely to hurt.",
+     "Straw or hum, then a few notes coming down. Two minutes."),
+    ("The single most common thing a coach says that beginners cannot act on.",
+     "The thing coaches say most that beginners cannot act on."),
+]
+base = rewrite(base, WRITING, 'base')
+
+# the transposition note, in both places it is written
+base = rewrite(base, [
+    ("Use these if the notes feel too high or too low for your voice. It moves the whole song, not just one note.",
+     "Too high or too low? Each press moves the whole song one half step."),
+    ("note.innerHTML = 'Use these if the notes feel too high or too low for your voice. ' + 'Each press moves everything by a half step &mdash; the smallest step in music &mdash; ' +",
+     "note.innerHTML = 'Too high or too low? Each press moves everything by one half step, ' +"),
+], 'transposition')
 
 for anchor, replacement in PATCHES:
     n = base.count(anchor)
