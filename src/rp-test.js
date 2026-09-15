@@ -114,10 +114,15 @@
       return s.length ? { pct: Math.max.apply(null, s.map(function (r) { return r.pct; })) } : null;
     }
     if (key === 'ear') {
-      var e = rs.filter(function (r) { return r.kind === 'ear' && r.cents != null && !isMatch(r); });
+      /* Briar, 15 Sep: "Hear the note didn't save my progress." Higher or
+         lower is listening only, so its row has a score and no cents; this
+         only counted rows with cents. Either counts now. */
+      var e = rs.filter(function (r) { return r.kind === 'ear' && !isMatch(r) && (r.cents != null || r.out_of); });
       if (!e.length) return null;
-      return { cents: Math.min.apply(null, e.map(function (r) { return r.cents; })),
-               runs: e.length };
+      var withC = e.filter(function (r) { return r.cents != null; });
+      var best = e.slice().sort(function (a, b) { return (b.score || 0) / (b.out_of || 1) - (a.score || 0) / (a.out_of || 1); })[0];
+      return { cents: withC.length ? Math.min.apply(null, withC.map(function (r) { return r.cents; })) : null,
+               score: best.score, outOf: best.out_of, runs: e.length };
     }
     if (key === 'theory') {
       var g = rs.filter(function (r) { return r.kind === 'game' && r.score != null; });
@@ -135,7 +140,7 @@
     if (!r) return '';
     if (key === 'range') { try { return midiName(r.lo) + ' to ' + midiName(r.hi); } catch (e) { return r.lo + ' to ' + r.hi; } }
     if (key === 'sustain') return r.pct + '% of the hold stayed on the note';
-    if (key === 'ear') return 'closest was ' + r.cents + ' cents off';
+    if (key === 'ear') return r.cents != null ? 'closest was ' + r.cents + ' cents off' : r.score + ' of ' + r.outOf + ' right';
     if (key === 'sing') return r.score + ' of ' + r.outOf + ' notes matched';
     if (key === 'theory') return r.stars + ' of ' + r.outOf + ' stars';
     return '';
@@ -161,11 +166,11 @@
     if (sus || ear || mt) {
       var n = 0, tot = 0;
       if (sus) { tot += sus.pct >= 75 ? 3 : sus.pct >= 45 ? 2 : 1; n++; }
-      if (ear) { tot += ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1; n++; }
+      if (ear) { var ef = ear.cents != null ? (ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1) : ((ear.score || 0) / (ear.outOf || 1) >= 0.8 ? 3 : (ear.score || 0) / (ear.outOf || 1) >= 0.5 ? 2 : 1); tot += ef; n++; }
       if (mt) { var f = mt.score / mt.outOf; tot += f >= 0.8 ? 3 : f >= 0.5 ? 2 : 1; n++; }
       sing = Math.round(tot / n);
       if (sus) why.push('held a note ' + sus.pct + '% steady');
-      if (ear) why.push('got within ' + ear.cents + ' cents of the note');
+      if (ear) why.push(ear.cents != null ? 'got within ' + ear.cents + ' cents of the note' : 'got ' + ear.score + ' of ' + ear.outOf + ' right by ear');
       if (mt) why.push('matched ' + mt.score + ' of ' + mt.outOf + ' notes');
     }
     if (th) {
@@ -271,8 +276,10 @@
         });
         try { window.switchMode(s.mode || 'train'); } catch (e) {}
         setTimeout(function () { s.go(); }, 140);
-        /* Coming back here afterwards is the singer's move, not ours — the
-           app must not yank them out of an exercise the moment it finishes. */
+        /* Briar, 15 Sep: both drills "sent me back to the train menu". So:
+           when the step's own screen closes, the test comes back — never
+           before, so nobody is yanked out of an exercise mid-way. */
+        pending = { key: s.key, since: Date.now() };
       });
     });
     on($('rpTestX'), 'click', shut);
@@ -292,6 +299,25 @@
       try { if (ME.apply) ME.apply(); } catch (e) {}
     });
   }
+
+  /* ------------------------------------------------------------------ */
+  /* back to the test when a step's screen has closed                    */
+  /* ------------------------------------------------------------------ */
+  var pending = null;
+  var PANEL = { range: 'rtBox', sustain: 'susPanel', ear: 'v10Ear', sing: 'matchPanel', theory: 'v10Game' };
+  function visible(id) { var el = $(id); return !!(el && el.offsetParent !== null && el.style.display !== 'none'); }
+  setInterval(function () {
+    if (!pending) return;
+    var id = PANEL[pending.key];
+    /* the drill's own "Back to Train" says where it really goes */
+    var eb = $('earBack'); if (eb && eb.textContent !== 'Back to the test') eb.textContent = 'Back to the test';
+    if (Date.now() - pending.since < 1500) return;          /* give the screen time to open */
+    if (visible(id)) { pending.seen = true; return; }
+    if (!pending.seen) { if (Date.now() - pending.since > 8000) pending = null; return; }   /* never opened: let it go */
+    var key = pending.key; pending = null;
+    try { T.open(); } catch (e) {}
+    try { if (window.RP && RP.toast && resultFor(key)) RP.toast('Saved. Next one when you are ready.'); } catch (e) {}
+  }, 500);
 
   /* ------------------------------------------------------------------ */
   /* the way in, from Profile                                            */

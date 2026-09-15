@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -305,7 +305,7 @@ PATCHES = [
      """        '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Done</button>' +
       '</div>' +
       (e.what ? '<div style="font-size:14px;line-height:1.5;margin-top:8px">' + e.what + '</div>' : '') +
-      (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
+      (window.RPExample && RPExample.enabled ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
       '<div style="text-align:center;margin:14px 0">' +"""),
 
     # 26. A VOICE, NOT A PIANO, FOR THE NOTE TO MATCH AND THE NOTE TO HOLD.
@@ -460,6 +460,11 @@ PATCHES = [
     ("      '<div class=\"ctl\"><label>What should I call you?</label>' +",
      "      '<div class=\"ctl\"><label>Your name</label>' +"),
 
+    # 35. THE WHOLE RUN CAN BE SCROLLED BACK THROUGH. 600 points was ten
+    #     seconds of voice; the bars went further back than the line did.
+    ("  if(G.trail.length>600) G.trail.shift();",
+     "  if(G.trail.length>9000) G.trail.shift();"),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the
@@ -509,7 +514,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

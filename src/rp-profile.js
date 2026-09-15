@@ -29,7 +29,7 @@
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
-      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpTimingRow'] },
+      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
@@ -78,18 +78,46 @@
       var box = holder('rpPG_' + g.key);
       if (!box) return;
       g.folds.forEach(function (name) {
-        var f = foldNamed(name);
-        if (f && f.parentElement !== box) box.appendChild(f);
+        /* Briar, 15 Sep: five "Your voice" rows stacked up. The base rebuilds
+           its folds when a level button is tapped; the new one was moved in
+           beside the old ones instead of in their place. Newest wins. */
+        var fresh = null, all = document.querySelectorAll('#youSlots details.pfold');
+        for (var i = 0; i < all.length; i++) {
+          var sp = all[i].querySelector('summary span');
+          if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) { fresh = all[i]; break; }
+        }
+        if (fresh) {
+          Array.prototype.slice.call(box.querySelectorAll('details.pfold')).forEach(function (d) {
+            var sp = d.querySelector('summary span');
+            if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) d.remove();
+          });
+          box.appendChild(fresh);
+          fresh.open = true;
+          if (name === 'Your voice') tidyVoice(fresh);
+        }
       });
       g.cards.forEach(function (id) {
         var c = $(id);
         if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (c && c.parentElement !== box) {
-          if (id === 'rpRangePanelHolder') box.insertBefore(c, box.firstChild); else box.appendChild(c);
+          if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
       });
     });
   }
+
+  /* the base's own "Your voice" fold repeats the range the panel above it
+     already shows, and tells you to test it on the Train tab — which is no
+     longer where it is */
+  function tidyVoice(f) {
+    var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
+    var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
+    var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
+  }
+  /* while a Profile page is open, a rebuilt fold is picked up straight away */
+  setInterval(function () {
+    try { if (window.RPPage && RPPage.isOpen() && document.querySelector('#youSlots details.pfold')) gather(); } catch (e) {}
+  }, 600);
 
   PR.open = function (key) {
     var g = GROUPS.filter(function (x) { return x.key === key; })[0];
@@ -100,17 +128,7 @@
     /* folds open by default on a page — the page is the fold now */
     box.querySelectorAll('details.pfold').forEach(function (d) { d.open = true; });
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
-    if (key === 'voice') {
-      /* the base's own "Your voice" fold repeats the range the panel above
-         it already shows, and tells you to test it on the Train tab — which
-         is no longer where it is */
-      var f = foldNamed('Your voice');
-      if (f) {
-        var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
-        var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
-        var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
-      }
-    }
+    if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 

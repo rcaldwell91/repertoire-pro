@@ -109,6 +109,7 @@
   EX[3].go = function () { P(60, 0, 0.42); P(61, 0.45, 0.42); P(60, 1.3, 0.42); P(62, 1.75, 0.42); };
   EX[43].go = function () { run([60, 62, 64, 62, 60], 0.36); [64, 65, 67, 65, 64].forEach(function (m, i) { P(m, 2.1 + i * 0.36, 0.34); }); };
   function hearButton(row) {
+    if (!(window.RPExample && RPExample.enabled)) return;   /* off with the rest of Hear it */
     var body = row.querySelector('.lsnbody');
     if (!body || body.querySelector('[data-lhear]')) return;
     var n = +row.dataset.lsn;

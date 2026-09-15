@@ -26,6 +26,13 @@
   function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
 
   var X = window.RPExample = {};
+  /* Briar, 15 Sep: "the Hear it just sounds like a rain stick … it doesn't
+     emulate the actual sound you are supposed to make." So the button is
+     OFF everywhere until a real recording replaces the synth. Everything
+     that plays stays in place; a recording per exercise plugs into X.play
+     (look up exId in a table of audio URLs before falling back to the
+     synth) and this switch goes back on. */
+  X.enabled = false;
   var VOWELS = {
     oo: [[300, 3.5, 1.0], [870, 6, 0.35], [2240, 8, 0.10]],
     ah: [[730, 3.2, 1.0], [1090, 5, 0.55], [2440, 7, 0.22]],
@@ -158,6 +165,7 @@
 
   /* a Hear-it button, wired: says what it is */
   X.button = function (exId, small) {
+    if (!X.enabled) return '';
     return '<button class="btn" data-hear="' + exId + '" style="padding:' + (small ? '7px 11px;font-size:12px' : '9px 14px;font-size:12.5px') +
       '" title="A synthesised voice, not a singer">▶ Hear it</button>';
   };

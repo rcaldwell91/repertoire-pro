@@ -3100,7 +3100,7 @@ function gameFrame(){
   const userMidi = MIC.on? smoothedMidi() : null;
   const scoreBeat = beat - state.latencyMs/1000*T.bps;
   G.trail.push({b:scoreBeat, m:userMidi});
-  if(G.trail.length>600) G.trail.shift();
+  if(G.trail.length>9000) G.trail.shift();
 
   // scoring
   let target = null;
@@ -8813,7 +8813,7 @@ renderJourney();
         '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Done</button>' +
       '</div>' +
       (e.what ? '<div style="font-size:14px;line-height:1.5;margin-top:8px">' + e.what + '</div>' : '') +
-      (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
+      (window.RPExample && RPExample.enabled ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
       '<div style="text-align:center;margin:14px 0">' +
         '<div id="gBig" style="font-size:46px;font-weight:900;color:var(--gold)">0.0s</div>' +
         '<div id="gSub" style="font-size:13.5px;font-weight:700;color:var(--ink-dim);min-height:22px"></div>' +
@@ -16207,10 +16207,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       return s.length ? { pct: Math.max.apply(null, s.map(function (r) { return r.pct; })) } : null;
     }
     if (key === 'ear') {
-      var e = rs.filter(function (r) { return r.kind === 'ear' && r.cents != null && !isMatch(r); });
+      /* Briar, 15 Sep: "Hear the note didn't save my progress." Higher or
+         lower is listening only, so its row has a score and no cents; this
+         only counted rows with cents. Either counts now. */
+      var e = rs.filter(function (r) { return r.kind === 'ear' && !isMatch(r) && (r.cents != null || r.out_of); });
       if (!e.length) return null;
-      return { cents: Math.min.apply(null, e.map(function (r) { return r.cents; })),
-               runs: e.length };
+      var withC = e.filter(function (r) { return r.cents != null; });
+      var best = e.slice().sort(function (a, b) { return (b.score || 0) / (b.out_of || 1) - (a.score || 0) / (a.out_of || 1); })[0];
+      return { cents: withC.length ? Math.min.apply(null, withC.map(function (r) { return r.cents; })) : null,
+               score: best.score, outOf: best.out_of, runs: e.length };
     }
     if (key === 'theory') {
       var g = rs.filter(function (r) { return r.kind === 'game' && r.score != null; });
@@ -16228,7 +16233,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!r) return '';
     if (key === 'range') { try { return midiName(r.lo) + ' to ' + midiName(r.hi); } catch (e) { return r.lo + ' to ' + r.hi; } }
     if (key === 'sustain') return r.pct + '% of the hold stayed on the note';
-    if (key === 'ear') return 'closest was ' + r.cents + ' cents off';
+    if (key === 'ear') return r.cents != null ? 'closest was ' + r.cents + ' cents off' : r.score + ' of ' + r.outOf + ' right';
     if (key === 'sing') return r.score + ' of ' + r.outOf + ' notes matched';
     if (key === 'theory') return r.stars + ' of ' + r.outOf + ' stars';
     return '';
@@ -16254,11 +16259,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (sus || ear || mt) {
       var n = 0, tot = 0;
       if (sus) { tot += sus.pct >= 75 ? 3 : sus.pct >= 45 ? 2 : 1; n++; }
-      if (ear) { tot += ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1; n++; }
+      if (ear) { var ef = ear.cents != null ? (ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1) : ((ear.score || 0) / (ear.outOf || 1) >= 0.8 ? 3 : (ear.score || 0) / (ear.outOf || 1) >= 0.5 ? 2 : 1); tot += ef; n++; }
       if (mt) { var f = mt.score / mt.outOf; tot += f >= 0.8 ? 3 : f >= 0.5 ? 2 : 1; n++; }
       sing = Math.round(tot / n);
       if (sus) why.push('held a note ' + sus.pct + '% steady');
-      if (ear) why.push('got within ' + ear.cents + ' cents of the note');
+      if (ear) why.push(ear.cents != null ? 'got within ' + ear.cents + ' cents of the note' : 'got ' + ear.score + ' of ' + ear.outOf + ' right by ear');
       if (mt) why.push('matched ' + mt.score + ' of ' + mt.outOf + ' notes');
     }
     if (th) {
@@ -16364,8 +16369,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         });
         try { window.switchMode(s.mode || 'train'); } catch (e) {}
         setTimeout(function () { s.go(); }, 140);
-        /* Coming back here afterwards is the singer's move, not ours — the
-           app must not yank them out of an exercise the moment it finishes. */
+        /* Briar, 15 Sep: both drills "sent me back to the train menu". So:
+           when the step's own screen closes, the test comes back — never
+           before, so nobody is yanked out of an exercise mid-way. */
+        pending = { key: s.key, since: Date.now() };
       });
     });
     on($('rpTestX'), 'click', shut);
@@ -16385,6 +16392,25 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       try { if (ME.apply) ME.apply(); } catch (e) {}
     });
   }
+
+  /* ------------------------------------------------------------------ */
+  /* back to the test when a step's screen has closed                    */
+  /* ------------------------------------------------------------------ */
+  var pending = null;
+  var PANEL = { range: 'rtBox', sustain: 'susPanel', ear: 'v10Ear', sing: 'matchPanel', theory: 'v10Game' };
+  function visible(id) { var el = $(id); return !!(el && el.offsetParent !== null && el.style.display !== 'none'); }
+  setInterval(function () {
+    if (!pending) return;
+    var id = PANEL[pending.key];
+    /* the drill's own "Back to Train" says where it really goes */
+    var eb = $('earBack'); if (eb && eb.textContent !== 'Back to the test') eb.textContent = 'Back to the test';
+    if (Date.now() - pending.since < 1500) return;          /* give the screen time to open */
+    if (visible(id)) { pending.seen = true; return; }
+    if (!pending.seen) { if (Date.now() - pending.since > 8000) pending = null; return; }   /* never opened: let it go */
+    var key = pending.key; pending = null;
+    try { T.open(); } catch (e) {}
+    try { if (window.RP && RP.toast && resultFor(key)) RP.toast('Saved. Next one when you are ready.'); } catch (e) {}
+  }, 500);
 
   /* ------------------------------------------------------------------ */
   /* the way in, from Profile                                            */
@@ -18885,7 +18911,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">Every exercise, explained</div>' +
-      '<div class="rp-sub">What each one is, how to do it, and a Hear it button.</div></div>' +
+      '<div class="rp-sub">What each one is and how to do it.</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', function () {
       try { window.switchMode('train'); } catch (e) {}
@@ -19036,6 +19062,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   EX[3].go = function () { P(60, 0, 0.42); P(61, 0.45, 0.42); P(60, 1.3, 0.42); P(62, 1.75, 0.42); };
   EX[43].go = function () { run([60, 62, 64, 62, 60], 0.36); [64, 65, 67, 65, 64].forEach(function (m, i) { P(m, 2.1 + i * 0.36, 0.34); }); };
   function hearButton(row) {
+    if (!(window.RPExample && RPExample.enabled)) return;   /* off with the rest of Hear it */
     var body = row.querySelector('.lsnbody');
     if (!body || body.querySelector('[data-lhear]')) return;
     var n = +row.dataset.lsn;
@@ -19197,7 +19224,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
-      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpTimingRow'] },
+      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
@@ -19246,18 +19273,46 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var box = holder('rpPG_' + g.key);
       if (!box) return;
       g.folds.forEach(function (name) {
-        var f = foldNamed(name);
-        if (f && f.parentElement !== box) box.appendChild(f);
+        /* Briar, 15 Sep: five "Your voice" rows stacked up. The base rebuilds
+           its folds when a level button is tapped; the new one was moved in
+           beside the old ones instead of in their place. Newest wins. */
+        var fresh = null, all = document.querySelectorAll('#youSlots details.pfold');
+        for (var i = 0; i < all.length; i++) {
+          var sp = all[i].querySelector('summary span');
+          if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) { fresh = all[i]; break; }
+        }
+        if (fresh) {
+          Array.prototype.slice.call(box.querySelectorAll('details.pfold')).forEach(function (d) {
+            var sp = d.querySelector('summary span');
+            if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) d.remove();
+          });
+          box.appendChild(fresh);
+          fresh.open = true;
+          if (name === 'Your voice') tidyVoice(fresh);
+        }
       });
       g.cards.forEach(function (id) {
         var c = $(id);
         if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (c && c.parentElement !== box) {
-          if (id === 'rpRangePanelHolder') box.insertBefore(c, box.firstChild); else box.appendChild(c);
+          if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
       });
     });
   }
+
+  /* the base's own "Your voice" fold repeats the range the panel above it
+     already shows, and tells you to test it on the Train tab — which is no
+     longer where it is */
+  function tidyVoice(f) {
+    var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
+    var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
+    var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
+  }
+  /* while a Profile page is open, a rebuilt fold is picked up straight away */
+  setInterval(function () {
+    try { if (window.RPPage && RPPage.isOpen() && document.querySelector('#youSlots details.pfold')) gather(); } catch (e) {}
+  }, 600);
 
   PR.open = function (key) {
     var g = GROUPS.filter(function (x) { return x.key === key; })[0];
@@ -19268,17 +19323,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* folds open by default on a page — the page is the fold now */
     box.querySelectorAll('details.pfold').forEach(function (d) { d.open = true; });
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
-    if (key === 'voice') {
-      /* the base's own "Your voice" fold repeats the range the panel above
-         it already shows, and tells you to test it on the Train tab — which
-         is no longer where it is */
-      var f = foldNamed('Your voice');
-      if (f) {
-        var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
-        var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
-        var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
-      }
-    }
+    if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 
@@ -20085,7 +20130,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first — through the speaker the app squeals.' },
+      text: 'Put headphones in first — through the speaker the app squeals. Sound check is on Home if you are not sure they work.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
@@ -20098,7 +20143,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Briar, 14 Sep: did not know what a lip trill was, and did not know
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
-      text: 'Tap any exercise to read what it is and hear it, and tap any word with an ⓘ for what it means.' },
+      text: 'Tap any exercise to read what it is and how to do it, and tap any word with an ⓘ for what it means.' },
     { mode: 'train', find: function () { return $('rpTileTracker'); },
       text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
@@ -20351,8 +20396,6 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
     ] },
     guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
-      { find: function () { return document.querySelector('#v10Guided [data-hear]'); },
-        text: 'Tap Hear it for the sound you are after. It is a made voice, not a singer, so copy the shape of it, not the tone.' },
       { find: function () { return $('gBig'); },
         text: 'The clock runs while you do it. Press Done when you have finished.' }
     ] },
@@ -20589,6 +20632,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
 
   var X = window.RPExample = {};
+  /* Briar, 15 Sep: "the Hear it just sounds like a rain stick … it doesn't
+     emulate the actual sound you are supposed to make." So the button is
+     OFF everywhere until a real recording replaces the synth. Everything
+     that plays stays in place; a recording per exercise plugs into X.play
+     (look up exId in a table of audio URLs before falling back to the
+     synth) and this switch goes back on. */
+  X.enabled = false;
   var VOWELS = {
     oo: [[300, 3.5, 1.0], [870, 6, 0.35], [2240, 8, 0.10]],
     ah: [[730, 3.2, 1.0], [1090, 5, 0.55], [2440, 7, 0.22]],
@@ -20721,6 +20771,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   /* a Hear-it button, wired: says what it is */
   X.button = function (exId, small) {
+    if (!X.enabled) return '';
     return '<button class="btn" data-hear="' + exId + '" style="padding:' + (small ? '7px 11px;font-size:12px' : '9px 14px;font-size:12.5px') +
       '" title="A synthesised voice, not a singer">▶ Hear it</button>';
   };
@@ -20931,7 +20982,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       live: function () { try { return !!(G.running && !T.paused); } catch (e) { return false; } },
       get: function () { return window.__rpScrollB; },
       set: function (v) { window.__rpScrollB = v; },
-      max: function () { try { return Math.max(0, (G.lastBeat || 0) + 4); } catch (e) { return 64; } },
+      /* Briar, 15 Sep: "only 4 notes, then it locks." G.lastBeat is only set
+         when a run STOPS; paused, it was still 0, so the limit was 4 beats.
+         Paused or stopped, the limit is where the run has got to. */
+      max: function () { try { return Math.max(0, (G.running ? songBeat() : (G.lastBeat || 0)) + 1); } catch (e) { return 64; } },
       pxPer: function () { return window.__rpPpb || 60; },
       label: function (v) { return Math.round(v) + ' beats'; },
       redraw: function () { try { drawGame(); } catch (e) {} }
@@ -21069,6 +21123,69 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (last[b.id] && now - last[b.id] < IDS[b.id]) { e.stopPropagation(); e.preventDefault(); return; }
     last[b.id] = now;
   }, true);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — sound check.
+
+   Briar, 15 Sep, could not tell whether her headphones were the problem.
+   One button, one note, one question: did you hear it? It sits on Home
+   under Today, and at the top of Profile → Sound and microphone. The note
+   is the app's own reference sound, so what you hear here is what every
+   exercise plays.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var SC = window.RPSound = {};
+
+  SC.check = function () {
+    try { if (typeof ensureCtx === 'function') ensureCtx(); } catch (e) {}
+    try {
+      if (typeof ctx !== 'undefined' && ctx && ctx.state === 'suspended') ctx.resume();
+      var play = (window.V10 && V10.playRef) ? V10.playRef : window.playPiano;
+      if (play) play(60, ctx.currentTime + 0.05, 1.2, guideGain, 0.8);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  function card(id) {
+    var d = document.createElement('div');
+    d.id = id;
+    d.className = 'rp-card';
+    d.style.cssText = 'padding:12px;margin-top:10px';
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Sound check</div>' +
+      '<div class="rp-sub" data-sc-msg>Not sure your headphones work? Play a note.</div></div>' +
+      '<button class="btn primary" data-sc-go style="padding:9px 14px;font-size:12.5px;flex:none">Play a note</button></div>';
+    var msg = d.querySelector('[data-sc-msg]');
+    d.querySelector('[data-sc-go]').addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var ok = SC.check();
+      msg.textContent = ok
+        ? 'Heard a note? Your headphones are fine. Nothing? Turn the volume up, then check the plug or the Bluetooth connection.'
+        : 'The phone would not play sound. Tap once more, and check the volume.';
+      setTimeout(function () { msg.textContent = 'Not sure your headphones work? Play a note.'; }, 9000);
+    });
+    return d;
+  }
+
+  function mount() {
+    /* Home, under Today */
+    var today = $('rpToday');
+    if (today && !$('rpSoundHome')) {
+      try { today.parentElement.insertBefore(card('rpSoundHome'), today.nextSibling); } catch (e) {}
+    }
+    /* Profile → Sound and microphone: rp-profile picks this row up by id */
+    if (!$('rpSoundRow')) {
+      var host = $('modeYou');
+      if (host) host.appendChild(card('rpSoundRow'));
+    }
+  }
+  setInterval(mount, 1200);
+  setTimeout(mount, 700);
 })();
 
 </script>

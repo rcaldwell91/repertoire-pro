@@ -73,7 +73,10 @@
       live: function () { try { return !!(G.running && !T.paused); } catch (e) { return false; } },
       get: function () { return window.__rpScrollB; },
       set: function (v) { window.__rpScrollB = v; },
-      max: function () { try { return Math.max(0, (G.lastBeat || 0) + 4); } catch (e) { return 64; } },
+      /* Briar, 15 Sep: "only 4 notes, then it locks." G.lastBeat is only set
+         when a run STOPS; paused, it was still 0, so the limit was 4 beats.
+         Paused or stopped, the limit is where the run has got to. */
+      max: function () { try { return Math.max(0, (G.running ? songBeat() : (G.lastBeat || 0)) + 1); } catch (e) { return 64; } },
       pxPer: function () { return window.__rpPpb || 60; },
       label: function (v) { return Math.round(v) + ' beats'; },
       redraw: function () { try { drawGame(); } catch (e) {} }

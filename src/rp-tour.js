@@ -50,7 +50,7 @@
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first — through the speaker the app squeals.' },
+      text: 'Put headphones in first — through the speaker the app squeals. Sound check is on Home if you are not sure they work.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
@@ -63,7 +63,7 @@
     /* Briar, 14 Sep: did not know what a lip trill was, and did not know
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
-      text: 'Tap any exercise to read what it is and hear it, and tap any word with an ⓘ for what it means.' },
+      text: 'Tap any exercise to read what it is and how to do it, and tap any word with an ⓘ for what it means.' },
     { mode: 'train', find: function () { return $('rpTileTracker'); },
       text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
@@ -316,8 +316,6 @@
         text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
     ] },
     guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
-      { find: function () { return document.querySelector('#v10Guided [data-hear]'); },
-        text: 'Tap Hear it for the sound you are after. It is a made voice, not a singer, so copy the shape of it, not the tone.' },
       { find: function () { return $('gBig'); },
         text: 'The clock runs while you do it. Press Done when you have finished.' }
     ] },

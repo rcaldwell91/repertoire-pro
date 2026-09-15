@@ -303,7 +303,7 @@
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">Every exercise, explained</div>' +
-      '<div class="rp-sub">What each one is, how to do it, and a Hear it button.</div></div>' +
+      '<div class="rp-sub">What each one is and how to do it.</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', function () {
       try { window.switchMode('train'); } catch (e) {}
