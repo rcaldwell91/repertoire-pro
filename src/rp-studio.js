@@ -581,6 +581,36 @@
     playBar();
   }
 
+  ST.singOver = loadTake;
+
+  /* Robert, 16 Sep: a note map "played back as a guide". Same overlay as
+     Sing over it, but the clock is a timer rather than a recording — an
+     object that looks enough like an audio element for __rpOverlay and
+     the bar (currentTime, paused, ended, pause). Nothing is heard. */
+  function clockFor(dur) {
+    var t0 = performance.now(), c = { paused: false, ended: false, muted: true, _dur: dur || 0 };
+    Object.defineProperty(c, 'currentTime', { get: function () {
+      if (c.ended) return c._dur;
+      var t = (performance.now() - t0) / 1000;
+      if (c._dur && t > c._dur + 0.6) { c.ended = true; return c._dur; }
+      return t;
+    } });
+    c.pause = function () { c.paused = true; c.ended = true; };
+    return c;
+  }
+  ST.guide = function (notes, title, dur) {
+    if (!notes || !notes.length) return say('That map has no notes.');
+    ST.stopAll();
+    (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
+    var last = notes[notes.length - 1];
+    var clock = clockFor(dur || (last && last.t) || 0);
+    over = { audio: clock, url: null, title: title || 'the map', mode: 'guide' };
+    ST.overlay = { notes: notes, audio: clock };
+    say('Guide: ' + (title || 'the map') + '. Gold is the map; blue is you now.');
+    try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+    playBar();
+  };
+
   /* the bar under the big map: what is playing, a Stop, and the sound switch */
   function playBar() {
     var cv = $('freeCanvas');
@@ -598,8 +628,9 @@
     }
     var title = over ? over.title : 'the take';
     var mode = over && over.mode === 'over';
+    var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing over ' : 'Listening to ');
     bar.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
-        (mode ? 'Singing over ' : 'Listening to ') + '<span style="color:var(--gold)">' + esc(title) + '</span></div>' +
+        lead + '<span style="color:var(--gold)">' + esc(title) + '</span></div>' +
       (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '') +
       '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>';
     bar.style.display = '';
@@ -617,6 +648,7 @@
     var o = ST.overlay, live = o && o.audio && !o.audio.ended && !o.audio.paused;
     if (live && (!bar || bar.style.display === 'none')) playBar();
     if (!live && bar && bar.style.display !== 'none' && !(o && o.audio && !o.audio.ended)) playBar();
+    if (o && o.audio && o.audio.ended && over && over.mode === 'guide') stopOver();
   }, 400);
 
   /* ---------------------------------------------------------------- */
@@ -651,9 +683,19 @@
     on(d, 'click', function () { try { switchMode('free'); } catch (err) {} });
   }
 
+  /* Robert, 16 Sep: "Your takes" said nothing kept while the mini player
+     was playing a take. The list was drawn once, at boot, before the
+     library had loaded from the phone, and never again. Now it follows. */
+  var takesSig = '';
+  function refreshTakes() {
+    var sig = '';
+    try { sig = takes().map(function (s) { return s.id + ':' + (s.sentAt || ''); }).join(','); } catch (e) {}
+    if (sig !== takesSig) { takesSig = sig; if ($('rpTakeList')) fillTakes(); }
+  }
   function boot() {
-    setInterval(function () { mount(); mountTakes(); mountTrainEntry(); }, 1200);
+    setInterval(function () { mount(); mountTakes(); mountTrainEntry(); refreshTakes(); }, 1200);
     mount(); mountTakes(); mountTrainEntry();
+    try { if (typeof libReady !== 'undefined' && libReady && libReady.then) libReady.then(function () { setTimeout(refreshTakes, 50); }); } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else setTimeout(boot, 400);

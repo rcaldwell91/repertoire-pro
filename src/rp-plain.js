@@ -186,7 +186,10 @@
   };
   ME.glossary = G;
 
-  var TERMS = Object.keys(G).sort(function (a, b) { return b.length - a.length; });
+  /* words that are also ordinary English ("keep it flat") are not marked up
+     on sight — they stay in the glossary for a page that asks */
+  var PLAIN_WORDS = { flat: 1, sharp: 1, tone: 1, mix: 1, register: 1, sustain: 1 };
+  var TERMS = Object.keys(G).filter(function (t) { return !PLAIN_WORDS[t]; }).sort(function (a, b) { return b.length - a.length; });
   var RX = new RegExp('\\b(' + TERMS.map(function (t) {
     return t.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
   }).join('|') + ')\\b', 'i');

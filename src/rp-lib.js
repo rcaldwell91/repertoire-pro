@@ -205,7 +205,7 @@
       top.id = 'rpLibTop';
       mode.insertBefore(top, mode.firstChild);
     }
-    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Recordings'], ['playlists', 'Playlists']];
+    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Recordings'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h1 style="margin:0">Your Library</h1>' +
       '<div class="row" style="gap:4px;flex:none">' +
@@ -234,6 +234,7 @@
       if (chip === 'all') {
         body += row({ title: 'All songs', sub: 'Everything you own · ' + owned().length, icon: 'i-music', data: 'data-pin="all"' });
         body += row({ title: 'My Recordings', sub: 'Your takes · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
+        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Kept on their own · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
       }
       plists().forEach(function (p) {
         var ss = plSongs(p);
@@ -244,6 +245,9 @@
         body += '<div class="measured" style="margin-top:10px">No playlists yet. Make one with the ＋ at the top.</div>';
       }
       body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + body + '</div>';
+    }
+    if (chip === 'maps') {
+      body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + (window.RPMaps ? RPMaps.rowsHtml(row, grid) : '') + '</div>';
     }
     h += '<div id="rpLibBody">' + body + '</div>';
 
@@ -284,7 +288,10 @@
       on(b, 'click', function () { chip = b.dataset.chip; L.draw(); });
     });
     top.querySelectorAll('[data-pin]').forEach(function (b) {
-      on(b, 'click', function () { chip = b.dataset.pin === 'all' ? 'songs' : 'recordings'; L.draw(); window.scrollTo(0, 0); });
+      on(b, 'click', function () { chip = b.dataset.pin === 'all' ? 'songs' : b.dataset.pin; L.draw(); window.scrollTo(0, 0); });
+    });
+    top.querySelectorAll('[data-map]').forEach(function (b) {
+      on(b, 'click', function () { if (window.RPMaps) RPMaps.open(b.dataset.map); });
     });
     top.querySelectorAll('[data-pl]').forEach(function (b) {
       on(b, 'click', function () { L.playlist(b.dataset.pl); });
@@ -541,6 +548,18 @@
         var tray = document.createElement('div');
         tray.className = 'rp-tray';
         Array.prototype.slice.call(r.querySelectorAll('.iconbtn')).forEach(function (b) { tray.appendChild(b); });
+        /* Robert, 16 Sep: a take in the Library should be singable over in
+           the Pitch Tracker, and keepable as a note map, from here */
+        if (s.kind === 'recording' && s.notes && s.notes.length) {
+          var so = document.createElement('button');
+          so.className = 'iconbtn'; so.textContent = 'Sing over it'; so.title = 'Open the Pitch Tracker with this take as the guide';
+          so.onclick = function (ev) { ev.stopPropagation(); try { switchMode('free'); } catch (e) {} setTimeout(function () { if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s); }, 250); };
+          tray.appendChild(so);
+          var nm = document.createElement('button');
+          nm.className = 'iconbtn'; nm.textContent = 'Note map'; nm.title = 'Keep the notes on their own';
+          nm.onclick = function (ev) { ev.stopPropagation(); if (window.RPMaps) RPMaps.fromTake(s); };
+          tray.appendChild(nm);
+        }
         var dots = document.createElement('button');
         dots.className = 'rp-dots';
         dots.textContent = '⋯';

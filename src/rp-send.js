@@ -209,6 +209,7 @@
         (kind === 'pitch'
           ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
           : '') +
+        (hasNotes ? '<button class="btn" data-map="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Note map</button>' : '') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
         '<button class="btn' + (s.sentAt ? '' : ' primary') + '" data-send="' + esc(s.id) +
         '" style="flex:1;padding:9px;font-size:12px">' + (s.sentAt ? 'Send again' : 'Send to coach') + '</button>' +
@@ -244,6 +245,9 @@
         }
         S.send(s, '', b);
       });
+    });
+    root.querySelectorAll('[data-map]').forEach(function (b) {
+      on(b, 'click', function () { var s = find(b.dataset.map); if (s && window.RPMaps) RPMaps.fromTake(s); });
     });
     root.querySelectorAll('[data-load]').forEach(function (b) {
       on(b, 'click', function () { var s = find(b.dataset.load); if (s && onLoad) onLoad(s); });
