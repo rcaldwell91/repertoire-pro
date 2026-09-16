@@ -443,7 +443,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
   <div id="modeSing" class="mode">
     <div class="hero" style="padding:16px">
       <h2 style="margin:0">What are we singing?</h2>
-      <div class="sub">Pick your stage.</div>
+      <div class="sub">Pick one.</div>
     </div>
     <div class="homegrid" style="margin-top:12px">
       <div class="mcard hue2" id="shSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
@@ -634,6 +634,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
             <option value="45,69">Baritone (A2–A4)</option>
             <option value="48,72">Tenor (C3–C5)</option>
             <option value="53,77">Alto (F3–F5)</option>
+            <option value="57,81">Mezzo-soprano (A3–A5)</option>
             <option value="60,84">Soprano (C4–C6)</option>
           </select>
         </div>
@@ -651,7 +652,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       <div class="card2"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-bar-chart"/></svg></div><h3>Full Major Scale</h3><p>Up and down the full octave scale. Great for evenness between notes once you're warm.</p><button class="btn primary" data-ladder="scale">Start</button></div>
       <div class="card2"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-layers"/></svg></div><h3>Arpeggio 1-3-5-8</h3><p>Skipping between chord tones — trains accuracy on jumps, not just steps.</p><button class="btn primary" data-ladder="arp">Start</button></div>
       <div class="card2"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-chevrons-up"/></svg></div><h3>Octave Leaps</h3><p>Low note, jump the octave, land back down. Builds range and confidence at the top.</p><button class="btn primary" data-ladder="oct">Start</button></div>
-      <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-target"/></svg></div><h3>Note Match</h3><p>I play a piano note — you sing it back and hold it. 10 rounds. The purest pitch trainer there is.</p><button class="btn primary" id="btnMatch">Play</button></div>
+      <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-target"/></svg></div><h3>Note Match</h3><p>You hear a note — sing it back and hold it. 10 rounds.</p><button class="btn primary" id="btnMatch">Play</button></div>
       <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-music"/></svg></div><h3>Keyboard</h3><p>A playable keyboard. Press a note, hear it, sing it back &mdash; and watch exactly where you landed. Note Match, except you pick the note.</p><button class="btn primary" id="btnKbd">Open</button></div>
       <div class="card2 game"><div class="cardic"><svg class="ic" style="width:26px;height:26px"><use href="#i-wind"/></svg></div><h3>Sustain Hold</h3><p>Hold one note dead steady for 5 seconds. Trains breath support and stops the wobble.</p><button class="btn primary" id="btnSustain">Play</button></div>
       <div class="card2" style="grid-column:1/-1;display:flex;flex-direction:row;align-items:center;gap:14px">
@@ -854,13 +855,13 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <b>Try another mode</b> — some phones only give sound on one of them.</div>
     </div>
     <div style="margin-top:10px"><canvas id="freeCanvas"></canvas></div>
-    <div class="panel notice" style="margin-top:10px">The horizontal lines are notes (C in gold). Hold a note and try to keep your blue line flat and centered on a note line. Steadiness scores how level you hold your pitch.</div>
+    <div class="panel notice" style="margin-top:10px">The lines are notes, with C in gold. The blue line is your voice. Keep it flat on a line and Steadiness goes up.</div>
   </div>
   <!-- ============ YOU / SETTINGS ============ -->
   <div id="modeYou" class="mode">
     <div class="hero" style="padding:16px 16px 14px">
       <h1 style="margin:0">You</h1>
-      <div class="sub">Settings for this device. Everything here is remembered.</div>
+      <div class="sub">Your account, your voice, and how the app works.</div>
     </div>
     <div id="youSlots"></div>
   </div>
@@ -979,7 +980,8 @@ let comp = null, outGain = null, limiter = null;
 
 function ensureCtx(){
   if(!ctx){
-    ctx = new (window.AudioContext||window.webkitAudioContext)();
+    try { ctx = new (window.AudioContext||window.webkitAudioContext)({ latencyHint: 'interactive' }); }
+    catch (e) { ctx = new (window.AudioContext||window.webkitAudioContext)(); }
     window.__ctxMade = (window.__ctxMade||0) + 1;
     masterGain = ctx.createGain(); masterGain.gain.value = 0.9;
     /* v9.8 — MEASURED on v9.7 with the guide slider at maximum:
@@ -2114,7 +2116,7 @@ function startRun(){
   const s = currentSong();
   G.running=true; G.finished=false;
   G.score=0; G.combo=0; G.bestCombo=0; G.notesHit=0;
-  G.trail=[]; G.lastT=performance.now(); G.winLo=null; G.winHi=null;
+  G.trail=[]; G.lastBeat=0; G.lastT=performance.now(); G.winLo=null; G.winHi=null;
   G.stats = s.notes.map(()=>({hit:0,total:0,done:false}));
   $('results').style.display='none';
   $('startOverlay').style.display='none'; // never block the stage once they start
@@ -2137,6 +2139,7 @@ function stopRun(showResults){
     showResults = false;
   }
   if(G.packAudio){ G.packAudio.pause(); }
+  try{ if(T.playing) G.lastBeat = Math.max(0, songBeat()); }catch(e){}
   stopSong();
   G.running=false;
   $('btnPlay').disabled=false;
@@ -2290,6 +2293,7 @@ function getPhrases(s){
   return phraseCache.phrases;
 }
 function renderLyrics(s, beat){
+  if(beat >= 0) beat -= (window.__rpHeardS||0)*T.bps;   /* light the word when it is HEARD */
   const phrases = getPhrases(s);
   let curP = -1;
   for(let pi=0; pi<phrases.length; pi++){
@@ -2480,7 +2484,7 @@ function drawGame(){
   const W = cv.clientWidth, H = parseFloat(cv.style.height)||300;
   cx2.clearRect(0,0,W,H);
   const tr = state.transpose;
-  const beat = G.running? songBeat() : 0;
+  const beat = (G.running ? songBeat() - (window.__rpHeardS||0)*T.bps : (G.lastBeat||0)) - (window.__rpScrollB||0);
   let lo=127, hi=0;
   if(s.windowY){
     // One fixed window for the whole song. The grid never moves and a semitone
@@ -2508,6 +2512,7 @@ function drawGame(){
   // so a slow ballad and a fast warmup drill both read comfortably.
   const bpsNow = (s.bpm*state.tempo)/60;
   const ppb = Math.max(28, Math.min(160, (W-nowX)/Math.max(0.5, state.lookahead*bpsNow)));
+  window.__rpPpb = ppb;
 
   // lane lines
   cx2.font = '10px sans-serif';
@@ -2610,13 +2615,16 @@ function drawGame(){
   if(G.trail.length>1){
     cx2.beginPath();
     let started=false;
+    let prevM=null;
     for(const pt of G.trail){
-      if(pt.m===null){ started=false; continue; }
+      if(pt.m===null){ started=false; prevM=null; continue; }
       const x = nowX + (pt.b-beat)*ppb;
       if(x<-20) continue;
       const disp = state.octaveEquiv? foldToRange(pt.m, lo, hi) : pt.m;
       const y = yOf(disp);
-      if(!started){ cx2.moveTo(x,y); started=true; } else cx2.lineTo(x,y);
+      const leap = prevM!==null && Math.abs(disp-prevM) > 6;
+      if(!started || leap){ cx2.moveTo(x,y); started=true; } else cx2.lineTo(x,y);
+      prevM = disp;
     }
     if(isLight()){
       cx2.strokeStyle='rgba(255,255,255,.9)'; cx2.lineWidth=6; cx2.stroke();
@@ -3057,7 +3065,7 @@ function gameFrame(){
   if(state.mode==='yt'){ ytFrame(dt); return; }
   if(state.mode==='lib'){ libFrame(dt); return; }
   if(SONGLIB.active){ libRunFrame(); return; }
-  if(state.mode==='train' && TRAIN.kind!=='ladder'){ trainFrame(dt); return; }
+  if((state.mode==='train' && TRAIN.kind!=='ladder') || RT.phase){ trainFrame(dt); return; }
   if(!G.running){ return; }
 
   const s = currentSong();
@@ -3092,7 +3100,7 @@ function gameFrame(){
   const userMidi = MIC.on? smoothedMidi() : null;
   const scoreBeat = beat - state.latencyMs/1000*T.bps;
   G.trail.push({b:scoreBeat, m:userMidi});
-  if(G.trail.length>600) G.trail.shift();
+  if(G.trail.length>9000) G.trail.shift();
 
   // scoring
   let target = null;
@@ -3189,7 +3197,7 @@ function freeFrame(dt){
       : !audioRunning() ? 'sound paused'
       : MIC.level > 0.004 ? 'hearing you' : 'no signal';
   }
-  drawPitchLane(fcx, fcv, FREE.trail, now);
+  drawPitchLane(fcx, fcv, FREE.trail, now - (window.__rpScrollS||0));
 }
 
 /* shared scrolling pitch-lane renderer (Free Sing + YouTube modes) */
@@ -3255,6 +3263,7 @@ function drawPitchLane(c2, cnv, trail, now, key){
     c2.stroke();
   }
   c2.shadowBlur=0; c2.lineWidth=1;
+  if(window.__rpOverlay){ try{ window.__rpOverlay(c2, W, H, now, pps, yOf); }catch(e){} }
   const lastLive = trail.length && trail[trail.length-1].m!==null && now-trail[trail.length-1].t < 0.6
     ? trail[trail.length-1].m : null;
   drawKeyRail(c2, H, lo, hi, yOf, lastLive);
@@ -3546,7 +3555,7 @@ $('btnRangeTest').addEventListener('click', async ()=>{
   if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
   RT.phase='low'; RT.samples=[];
   $('rtBox').style.display='block';
-  $('rtPrompt').innerHTML = 'Sing your <span style="color:var(--accent2)">LOWEST</span> comfortable note on “oooh” and hold it…';
+  $('rtPrompt').innerHTML = 'Sing your <span style="color:var(--accent2)">LOWEST</span> comfortable note on “oooh” and keep going until the bar fills — slide lower if you can…';
 });
 $('btnRtCancel').addEventListener('click', ()=>{ RT.phase=null; $('rtBox').style.display='none'; });
 function percentile(arr,p){
@@ -3558,17 +3567,17 @@ function rtFrame(um){
     RT.samples.push(um);
     $('rtNote').textContent = midiName(um);
   }
-  const need = 80; // ~1.5s of voiced audio
+  const need = 240; // ~4s of voiced audio — the first note is not the lowest note
   $('rtProg').style.width = Math.min(100, RT.samples.length/need*100)+'%';
   if(RT.samples.length>=need){
     if(RT.phase==='low'){
-      RANGE.lo = Math.round(percentile(RT.samples, 0.15));
+      RANGE.lo = Math.round(percentile(RT.samples, 0.05));
       RT.phase='high'; RT.samples=[];
-      $('rtPrompt').innerHTML = 'Got it! Now your <span style="color:var(--gold)">HIGHEST</span> comfortable note — “oooh”, no straining…';
+      $('rtPrompt').innerHTML = 'Got it! Now your <span style="color:var(--gold)">HIGHEST</span> comfortable note — “oooh”, keep going until the bar fills, no straining…';
       $('rtNote').textContent='–';
       playDing();
     } else {
-      RANGE.hi = Math.round(percentile(RT.samples, 0.85));
+      RANGE.hi = Math.round(percentile(RT.samples, 0.95));
       if(RANGE.hi < RANGE.lo+7) RANGE.hi = RANGE.lo+12;
       RT.phase=null;
       $('rtBox').style.display='none';
@@ -3590,7 +3599,7 @@ function sizeMatch(){
 }
 function matchPlayTarget(){
   ensureCtx();
-  playPiano(MATCH.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);
+  (window.V10 && V10.playRef ? V10.playRef : playPiano)(MATCH.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7);
 }
 function matchNext(){
   MATCH.round++;
@@ -3610,6 +3619,7 @@ function matchEnd(){
   journeyMark('train');
   trainView('grid');
   const pct = Math.round(100*MATCH.score/MATCH.total);
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Ear · Note Match', score: MATCH.score, out_of: MATCH.total }); } catch (e) {}
   const msg = pct>=90?'Incredible ear.':pct>=70?'Strong — keep drilling.':pct>=40?'Coming along — get your reps in daily.':'Everyone starts here. Run it again.';
   setTimeout(()=>alert('Note Match: '+MATCH.score+'/'+MATCH.total+' ('+pct+'%)\n'+msg), 50);
 }
@@ -3707,11 +3717,11 @@ $('btnSustain').addEventListener('click', async ()=>{
   susPickNote();
 });
 $('btnSusNote').addEventListener('click', susPickNote);
-$('btnSusHear').addEventListener('click', ()=>{ ensureCtx(); playPiano(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7); });
+$('btnSusHear').addEventListener('click', ()=>{ ensureCtx(); (window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7); });
 $('btnSusQuit').addEventListener('click', ()=>{ SUS.running=false; TRAIN.kind=null; trainView('grid'); });
 $('btnSusStart').addEventListener('click', ()=>{
   ensureCtx();
-  playPiano(SUS.target, ctx.currentTime+0.02, 1.2, guideGain, 0.7);
+  (window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.2, guideGain, 0.7);
   SUS.running=true; SUS.t=-1.2; SUS.within=0; // negative = lead-in
   $('susResult').textContent='';
 });
@@ -5909,8 +5919,8 @@ function kbdBuild(){
       '<div id="kbdKeys" class="kbd"></div>' +
       '<button class="btn" id="kbdUp" style="padding:0 12px;font-size:20px;font-weight:900">&rsaquo;</button>' +
     '</div>' +
-    '<div class="notice" id="kbdMsg" style="margin-top:10px">Tap a key and it rings like a piano; hold it and it stays' +
-      ' until you let go. The arrows slide the keyboard one key at a time &mdash; they never jump an octave.</div>';
+    '<div class="notice" id="kbdMsg" style="margin-top:10px">Tap a key, then sing it. A held key goes quiet after a second so the mic hears you, not the key.' +
+      ' Turn the phone sideways for more keys. This is free play &mdash; Note Match and Sustain Hold are the scored versions.</div>';
   host.appendChild(p);
   document.getElementById('btnKbdBack').addEventListener('click', kbdExit);
   document.getElementById('kbdDown').addEventListener('click', () => kbdSlide(-1));
@@ -5929,6 +5939,8 @@ function kbdSlide(dir){
 function kbdRender(){
   const host = document.getElementById('kbdKeys');
   if(!host) return;
+  KBD.span = window.innerWidth > window.innerHeight ? 29 : 17;   /* sideways: nearly two octaves */
+  if(KBD.lo + KBD.span > 100) KBD.lo = kbdWhiteBelow(100 - KBD.span);
   host.innerHTML = '';
   KBD.els = {};
   const notes = [];
@@ -5990,6 +6002,8 @@ function kbdOn(m){
      be the LOUDEST thing the app makes, not the quietest. Normalised like
      playPiano so this number is the peak it really produces. */
   g.gain.linearRampToValueAtTime(0.92, t + 0.015);
+  g.gain.setValueAtTime(0.92, t + 1.0);
+  g.gain.exponentialRampToValueAtTime(0.12, t + 1.6);   /* the mic hears the key too */
   const lp = ctx.createBiquadFilter();
   lp.type = 'lowpass'; lp.frequency.value = 3200;
   g.connect(lp); lp.connect(guideGain);
@@ -6221,8 +6235,7 @@ function layoutSong(){
         '<button id="keyDown">&#9837; Move the song down</button>' +
         '<button id="keyUp">&#9839; Move the song up</button>' +
       '</div>' +
-      '<div class="notice" style="margin-top:8px">Use these if the notes feel too high or too low for ' +
-      'your voice. It moves the whole song, not just one note.</div>';
+      '<div class="notice" style="margin-top:8px">Too high or too low? Each press moves the whole song one half step.</div>';
     stage.appendChild(kp);
     $$('keyDown').addEventListener('click', ()=>keyNudge(-1));
     $$('keyUp').addEventListener('click', ()=>keyNudge(1));
@@ -6337,9 +6350,7 @@ function soundBox(){
        Robert asked, fairly: "am I supposed to have my headphones in or not?"
        A diagnostic nobody can follow is not a diagnostic. */
     '<div class="notice" id="soundHow" style="margin-top:6px">' +
-      '<b>Sound not working? Plug your headphones in first</b> — that is when it breaks, so that is ' +
-      'when to test it. Then press <b>1</b> and <b>2</b>, in that order. Each one prints an answer, ' +
-      'and between them they say whether it is the app, the microphone, or the phone itself.</div>' +
+      '<b>No sound?</b> Plug your headphones in first, then press <b>1</b> and <b>2</b> in that order. Each one says what it found.</div>' +
     '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">' +
       '<button class="btn" id="btnTestSound" style="padding:8px 12px;font-size:12.5px">1 &nbsp;Test sound</button>' +
       '<button class="btn" id="btnSoundNoMic" style="padding:8px 12px;font-size:12.5px">2 &nbsp;Test without mic</button>' +
@@ -6634,8 +6645,7 @@ function youBuild(){
     ab.className = 'panel'; ab.style.marginTop = '10px'; ab.id = 'youAbout';
     ab.innerHTML = '<b style="font-size:13.5px">About</b>' +
       '<div class="notice" style="margin-top:6px">Version <b id="youVer">—</b><br>' +
-      'Everything you record and every note map you build is stored on this device only. ' +
-      'Nothing is uploaded anywhere.</div>';
+      'Recordings stay on this phone unless you send one to your coach.</div>';
     host.appendChild(ab);
   }
   try{
@@ -7129,8 +7139,7 @@ renderJourney();
     if (down) down.innerHTML = song ? '&#9837; Move the song down' : '&#9837; Move the key down';
     if (up) up.innerHTML = song ? '&#9839; Move the song up' : '&#9839; Move the key up';
     if (note) {
-      note.innerHTML = 'Use these if the notes feel too high or too low for your voice. ' +
-        'Each press moves everything by a half step &mdash; the smallest step in music &mdash; ' +
+      note.innerHTML = 'Too high or too low? Each press moves everything by one half step, ' +
         (song ? 'and it moves the whole song, not just one note.'
               : 'and it moves the whole exercise, not just one note.') +
         ' Twelve presses is a full octave, which is as far as it goes.';
@@ -7448,8 +7457,7 @@ renderJourney();
       how: 'Lips loose, jaw released, blow steadily until they flap. If they will not flutter, rest ' +
            'two fingers on your cheeks beside the corners of your mouth to take the weight off. Then ' +
            'add voice. Then glide. Then run the pattern, keeping the buzz <b>even</b> through the top.',
-      miss: 'The trill stalling at the top — that means the air stopped or the throat gripped, and it ' +
-            'is information, not failure. Tensing the lips instead of relaxing them. Going so breathy ' +
+      miss: 'The trill stalling at the top. That means the air stopped or the throat gripped. Tensing the lips instead of relaxing them. Going so breathy ' +
             'there is air but no tone.',
       care: 'Very safe. Some people anatomically cannot trill — use a tongue trill, "ng", or a straw.',
       myth: 'You will hear that lip trills create negative pressure. That is backwards — the pressure ' +
@@ -7459,12 +7467,11 @@ renderJourney();
       id: 'straw', name: 'Straw phonation', syl: 'oo through a straw', pillar: 'warmup', level: 1,
       quiet: true, score: 'none', engine: { kind: 'guided', mins: 3 },
       what: 'Sing through a thin straw. Glide low to high to low, then build hills of pitch and volume.',
-      why: 'The most precisely controllable version of the same effect as lip trills — the straw is a ' +
-           'calibrated resistor. It has the strongest research base of anything in this library.',
+      why: 'The same idea as lip trills, but the straw sets the resistance for you. It is the best-researched exercise in the app.',
       how: 'Thin straw, lips sealed around it. <b>1.</b> Glide from as low as you can to as high as you ' +
            'can. <b>2.</b> Build progressively larger hills with pitch and loudness. <b>3.</b> Hum a ' +
            'song you like through it. Two to five minutes, several times a day if you want.',
-      miss: 'The three errors Titze names: <b>air escaping around the straw</b>, <b>air escaping ' +
+      miss: '<b>Air escaping around the straw</b>, <b>air escaping ' +
             'through the nose</b>, and making the accents in your throat instead of from your belly.',
       care: 'A narrow straw into water is a heavy load — build up to it. If you have a diagnosed voice ' +
             'problem, do this with a professional, not an app.'
@@ -7488,9 +7495,7 @@ renderJourney();
       quiet: true, score: 'pitch', engine: { kind: 'glide' },
       what: 'A continuous slide from low to high and back. No separate notes.',
       why: 'By removing the note <i>targets</i>, you remove the place where singers brace for the ' +
-           'break. Your voice is allowed to change gear gradually instead of jumping a cliff. It is ' +
-           'the single most prescribed warm-up there is, and the best diagnostic in the whole library ' +
-           '— what your voice does on a siren tells you what it will do everywhere else.',
+           'break. Your voice is allowed to change gear gradually instead of jumping a cliff. It is the most common warm-up there is. What your voice does on a siren, it does everywhere else.',
       how: 'Start low and comfortable, slide up through and past your break, and back down. Slow ' +
            'enough that you hear every part of the slide. Do not force — aim for a smooth, buzzy ' +
            'connection.',
@@ -7602,8 +7607,7 @@ renderJourney();
             'do the work. Forcing the nasal quality instead of letting it happen.',
       care: '<b>This is supposed to sound ugly.</b> Sharp, piercing, whiny, annoying. It is not a ' +
             'finished sound and you should not sing songs like this — it is a temporary tool to find a ' +
-            'coordination, and you drop it once you have found it. If nobody tells you that, you will ' +
-            'reasonably conclude the exercise is broken.'
+            'coordination, and you drop it once you have found it. '
     },
     {
       id: 'bay', name: 'Bratty Bay', syl: 'bay · bae', pillar: 'tone', level: 2,
@@ -7616,10 +7620,8 @@ renderJourney();
       how: 'Same brat. Octave up, top note repeated, back down. Men start around E3, women around C#4.',
       miss: 'Same as Nay: heavy instead of bright.',
       care: 'Also deliberately ugly, and also temporary.',
-      note: 'Robert — this is my best identification of the exercise you described as <b>"bhay"</b>. ' +
-            'If yours was a bratty belting sound, this is it. If yours was a loose floppy-tongue ' +
-            'release, you want <b>Blah</b> in the Articulation group instead. I could not be certain ' +
-            'from the spelling, so both are here.'
+      note: 'Coaches spell this one differently. If yours means a bratty belting sound, this is it. ' +
+            'If yours means a loose, floppy-tongue release, use <b>Blah</b> in the Articulation group instead.'
     },
     {
       id: 'wah', name: 'Wah', syl: 'wah', pillar: 'tone', level: 1,
@@ -7640,7 +7642,7 @@ renderJourney();
       why: 'Trains the coordination for a big interval, and builds confidence at the top.',
       how: 'Think of the top note <i>before</i> you leap. Light and supported.',
       miss: 'Reaching up for it.',
-      care: '<b>This is the single most common place people hurt themselves in a warm-up.</b> Never do ' +
+      care: '<b>This is where people hurt themselves in a warm-up.</b> Never do ' +
             'it first. If the top note cracks, go back to sirens rather than repeating the leap.'
     },
 
@@ -7649,8 +7651,7 @@ renderJourney();
       id: 'laga', name: 'Slack-jaw La-Ga', syl: 'la-ga la-ga', pillar: 'agility', level: 1,
       quiet: true, score: 'pitch', engine: { kind: 'ladder', pattern: 'five', bpm: 132 },
       what: 'Jaw hangs open and completely still. Only the tongue moves.',
-      why: 'Here is the whole point in one sentence: <b>L uses the tip of your tongue and G uses the ' +
-           'back of it.</b> Alternating them quickly demands that the front and back of your tongue ' +
+      why: '<b>L uses the tip of your tongue and G uses the back of it.</b> Alternating them quickly demands that the front and back of your tongue ' +
            'move independently — and if your jaw is doing the work, it physically cannot keep up. So ' +
            'hanging the jaw still forces the tongue to do its own job. That matters because your tongue ' +
            'is attached to your larynx, so every jaw-driven tongue movement is stealing from your vowel ' +
@@ -7662,7 +7663,7 @@ renderJourney();
             'being broken. Jutting the jaw forward instead of letting it drop back. Clenching it open: ' +
             'rigid is not the same as relaxed.',
       care: 'If your jaw hinge clicks or aches, use a smaller opening. Never force it wide.',
-      note: 'Robert — this is your "loga loga".'
+      note: ''
     },
     {
       id: 'tongueout', name: 'Tongue-out singing', syl: 'ah · uh', pillar: 'tone', level: 1,
@@ -7692,10 +7693,8 @@ renderJourney();
            'Watch whether the tongue pulls back in.',
       miss: 'If the tongue retracts as you get louder, you have gone past your usable dynamic today. ' +
             'Back off rather than pushing through.',
-      note: '<b>Honest label:</b> both halves of this are well documented on their own, but I could not ' +
-            'find a source that names the combination as a standard exercise. It is a coherent, safe ' +
-            'thing a coach would plausibly assign — I am describing it as a combination rather than ' +
-            'dressing it up as a classic.'
+      note: 'Both halves of this are standard exercises. Putting them together is a safe combination, ' +
+            'not a classic with a name of its own.'
     },
     {
       id: 'blah', name: 'Blah', syl: 'blah blah blah', pillar: 'agility', level: 1,
@@ -7705,16 +7704,13 @@ renderJourney();
            'the tongue or jaw gets a chance to hold.',
       how: 'Jaw hanging, tongue loose and forward, and let it be as floppy as it wants.',
       miss: 'Doing it neatly. Neat is the opposite of the point.',
-      note: 'The family this belongs to is well attested; this exact syllable is not documented as a ' +
-            'named exercise anywhere I could find. Here in case it is the "blah" you were taught.'
+      note: 'A tongue-release exercise. Coaches use different syllables for it; this is the loose one.'
     },
     {
       id: 'yawnsigh', name: 'Yawn-sigh', syl: 'ah · oo', pillar: 'tone', level: 1,
       quiet: true, score: 'none', engine: { kind: 'guided', mins: 1 },
       what: 'A real yawn, released into a sighing slide downward.',
-      why: 'Measured, not folklore: in one study seven of eight subjects showed real widening of the ' +
-           'throat and a lowering of the larynx. It is a first-line treatment for a voice that is ' +
-           'working too hard.',
+      why: 'A yawn opens the throat and lowers the larynx. It is one of the first things a voice therapist gives to a voice that is working too hard.',
       how: 'A genuine yawn, then let it fall into a sigh on "ah" or "oo", high to low. A closed-mouth ' +
            'version works if you need to be discreet.',
       miss: '<b>Over-yawning.</b> An exaggerated yawn pulls the tongue root back and pushes the larynx ' +
@@ -7727,7 +7723,7 @@ renderJourney();
       id: 'messa', name: 'Messa di voce', syl: 'ah · oh · oo', pillar: 'breath', level: 3,
       quiet: false, score: 'pitch', engine: { kind: 'hold', secs: 10 },
       what: 'One note. Quiet, growing to full, shrinking back to quiet.',
-      why: 'Getting louder and softer without the note changing is genuinely hard, because the natural ' +
+      why: 'Getting louder and softer without the note changing is hard, because the natural ' +
            'coupling is that more pressure means higher pitch and a different quality. Learning to ' +
            'uncouple them is the best single test that your breath and your larynx are cooperating ' +
            'rather than compensating for each other. <b>Only the volume should change</b> — pitch, ' +
@@ -7764,7 +7760,7 @@ renderJourney();
       id: 'descend', name: 'Descending five-tone', syl: 'oo · ol', pillar: 'range', level: 1,
       quiet: true, score: 'pitch', engine: { kind: 'ladder', pattern: 'down5', bpm: 120 },
       what: 'Top down instead of bottom up.',
-      why: 'Counter-intuitive and badly under-used. Starting high and light trains the muscle that ' +
+      why: 'Under-used. Starting high and light trains the muscle that ' +
            'stretches your folds — the one everyday speech never trains — by keeping a light quality ' +
            'while the pitch comes down. The alternative, dragging heavy chest voice upward, is what ' +
            'most people do and it is why they hit a ceiling.',
@@ -7777,8 +7773,7 @@ renderJourney();
       id: 'octrep', name: 'Octave repeat', syl: 'buh · mum · nay', pillar: 'range', level: 3,
       quiet: false, score: 'pitch', engine: { kind: 'ladder', pattern: 'octrep', bpm: 112 },
       what: 'Up the octave, hit the top note four times, come down.',
-      why: 'A stamina test. The first top note is easy; the honest question is whether the fourth is ' +
-           'as easy as the first.',
+      why: 'A stamina test. The first top note is easy. The question is whether the fourth is.',
       how: 'Breathe low. Keep repeats two, three and four exactly as easy as repeat one.',
       miss: 'Getting heavier or louder each repeat.',
       care: 'The classic overreach drill. Late in a session, and stop the half step <i>before</i> it ' +
@@ -7788,8 +7783,7 @@ renderJourney();
       id: 'vfe', name: 'Vocal Function Exercises', syl: 'ee · knoll · ol', pillar: 'breath', level: 1,
       quiet: true, score: 'time', engine: { kind: 'guided', mins: 5 },
       what: 'Four exercises, soft voice, twice each, twice a day, for about six weeks.',
-      why: 'Physical therapy for your voice, and <b>the set with the strongest research base of ' +
-           'anything in this library.</b> Dose matters far more than effort here.',
+      why: 'Physical therapy for your voice, and very well researched. Doing it every day matters far more than doing it hard.',
       how: '<b>1. Warm-up:</b> hold "eee" as long as you can, very forward, almost nasal. ' +
            '<b>2. Stretch:</b> glide upward on "knoll" from your lowest to your highest — the goal is ' +
            '<i>no breaks</i>. <b>3. Contract:</b> glide downward, highest to lowest, same goal, no ' +
@@ -7820,7 +7814,7 @@ renderJourney();
     { id: 'all',    name: 'All' },
     { id: 'warmup', name: 'Warm-up',  blurb: 'Semi-occluded work — the gentlest way to start making sound, and the backbone of any real warm-up.' },
     { id: 'breath', name: 'Breath',   blurb: 'Letting air out slowly and steadily, so the note does not wobble, run out or blast.' },
-    { id: 'tone',   name: 'Tone',     blurb: 'The colour of the sound, and where your voice changes gear. Robert: this is the one I could not practise around.' },
+    { id: 'tone',   name: 'Tone',     blurb: 'The colour of the sound, and where your voice changes gear.' },
     { id: 'agility',name: 'Agility',  blurb: 'Moving quickly and cleanly between notes, and getting your tongue out of your jaw’s way.' },
     { id: 'range',  name: 'Range',    blurb: 'More usable notes, top and bottom. Safely — the coordination is learned before the exposure.' },
     { id: 'pitch',  name: 'Pitch',    blurb: 'Hitting the note you meant to hit, and holding it there.' },
@@ -7927,13 +7921,10 @@ renderJourney();
       unlocks: '"Let\'s take it down a whole step."',
       body: `<p>A <b>half step</b> is the smallest distance between two notes in western music. On a
       piano it is one key to the very next key, black or white. A <b>whole step</b> is two of those.</p>
-      <p>This is the atomic unit. Scales, keys, chord quality and transposing are all <i>defined</i> in
-      half steps, and it is the single most under-taught idea in music. Get this one solid and four
-      later lessons collapse into it.</p>
+      <p>Scales, keys, chords and transposing are all built from half steps. Get this one solid and four later lessons get easy.</p>
       <p class="say"><b>"Let's take it down a whole step"</b> means: move every single note in the song
       down by two half steps. Nothing else changes.</p>
-      <p>In this app, one press of <b>Move the key down</b> is exactly one half step. I measured it so
-      you would not have to wonder.</p>`
+      <p>In this app, one press of <b>Move the key down</b> is exactly one half step.</p>`
     },
     { u: 'Sound and pitch', n: 4, tier: 1, t: 'Sharps and flats',
       d: 'The notes in between, and why F♯ and G♭ are the same note.',
@@ -7973,7 +7964,7 @@ renderJourney();
       being told. Everything about timing is measured against it.</p>
       <p>Speed is <b>tempo</b>, counted in beats per minute. 60 bpm is one beat a second. 120 is two.</p>
       <p class="say">A singer's most common problem in a lesson is not pitch. It is not knowing where
-      beat 1 is. That is why this unit comes before scales — the same order Berklee uses for singers.</p>`
+      beat 1 is. That is why this unit comes before scales.</p>`
     },
     { u: 'Time', n: 8, tier: 1, t: 'Bars, and 4/4',
       d: 'How beats group into fours.',
@@ -8058,8 +8049,7 @@ renderJourney();
       without a full stop. Go one more and the tension goes away.</p>
       <p>That resting note is the <b>tonic</b>, or "home". It is the note the music is organised around,
       and you can find it by ear long before you can name it.</p>
-      <p class="say">This is the single most useful ear skill in music, and it is the one almost every
-      ear-training app skips. There is a drill for it in Train → Ear.</p>`
+      <p class="say">It is the most useful ear skill there is. There is a drill for it in Train, Ear: Sing the home note.</p>`
     },
     { u: 'The major scale and key', n: 17, tier: 1, game: 'degree', t: 'Scale degrees 1 to 7',
       d: 'Numbering the notes so you can talk about them.',
@@ -8112,15 +8102,15 @@ renderJourney();
       game: 'inkey',
       d: 'What it tells you to actually do.',
       unlocks: '"This is in D minor."',
-      body: `<p>Your coach is not describing the song. He is telling you <b>which seven notes are on
+      body: `<p>Your coach is not describing the song. They are telling you <b>which seven notes are on
       the table</b>, and <b>which one is home</b>. Those two things:</p>
       <p class="say"><b>D minor is:  D  E  F  G  A  B♭  C</b><br>
       Home is <b>D</b>. Everything leans back toward it.</p>
-      <p><b>So what do you do with that?</b> Three things, and they are the reason he said it:</p>
+      <p><b>So what do you do with that?</b> Three things, and they are the reason they said it:</p>
       <p><b>1. B♭, not B.</b> That is the one black note in the set, and it is the commonest wrong
       note in the key. If something you sing suddenly sounds wrong and sour, that is usually it.</p>
       <p><b>2. "The 5" means A.</b> Count up from home: D is 1, E is 2, F is 3, G is 4, <b>A is 5</b>.
-      Now when he says "you're flat on the 5", you know which note he means without asking.</p>
+      Now when they say "you're flat on the 5", you know which note they mean without asking.</p>
       <p><b>3. F is what makes it sad.</b> Raise that one note to F♯ and the same seven notes become
       D <i>major</i>. One note is the entire difference between the two moods. That is what people
       mean when they say the third does all the work.</p>
@@ -8171,7 +8161,7 @@ renderJourney();
     { u: 'Intervals', n: 27, tier: 2, t: 'Hearing degrees, not intervals', voc: true,
       d: 'Why "that\'s the 5" beats "that\'s a perfect fifth".',
       unlocks: null,
-      body: `<p>Here is a genuinely useful thing that most ear training gets backwards.</p>
+      body: `<p>Most ear training gets this backwards.</p>
       <p>Identifying an interval in isolation turns out to be a <b>different skill</b> from hearing
       music. Add one stray note before or after and people's answers shift systematically. Graded exams
       like ABRSM never test an isolated interval at any level, grade 1 through 8 — every pitch task is
@@ -8179,38 +8169,37 @@ renderJourney();
       <p>What transfers is hearing a note's <b>role in the key</b>: that is the 5, that is the leading
       tone, that is home. So this app trains degrees first and treats intervals as vocabulary you add
       later, in context.</p>
-      <p class="say"><b>Honest caveat:</b> nobody has run a head-to-head trial of the two approaches.
-      Every curriculum I checked sequences it this way, and the perception research points the same
-      direction — but that is agreement, not proof.</p>`
+      <p class="say">Nobody has tested the two approaches head to head. Music schools teach it this way, and the research on hearing points the same way.</p>`
     },
 
     /* ============ UNIT 6 — CHORDS AND HARMONY ============ */
     { u: 'Chords and harmony', n: 28, tier: 1, t: 'What a chord is',
       d: 'Notes sounding together.',
       unlocks: null,
-      body: `<p>Two or more notes at once. As a singer you almost never build one — but you are singing
-      <i>over</i> one at every moment, and which note of it you land on is most of what makes a melody
-      sound right or wrong.</p>`
+      body: `<p>A <b>chord</b> is two or more notes played at the same time. A guitar strum is a chord.
+      Three piano keys pressed together is a chord.</p>
+      <p>Singers hardly ever sing chords. You sing one note while the band plays the chord underneath
+      you. Which note of that chord you land on is most of what makes a tune sound right.</p>`
     },
     { u: 'Chords and harmony', n: 29, tier: 1, game: 'third', t: 'Triads: root, third, fifth',
       d: 'The three-note building block.',
       unlocks: '"Land on the root."',
-      body: `<p>The standard chord is three notes: <b>1, 3 and 5</b> of a scale starting on the chord's
-      own note. In C: <b>C, E, G</b>.</p>
-      <p>The bottom note is the <b>root</b> and gives the chord its name. The <b>third</b> decides
-      major or minor. The <b>fifth</b> mostly just fills it out.</p>`
+      body: `<p>The usual chord has three notes. Start on any note. Skip a note, take the next. Skip a
+      note, take the next. Starting on C that gives <b>C, E and G</b>.</p>
+      <p>The bottom note is the <b>root</b>, and it names the chord: this one is called C. The middle
+      note is the <b>third</b>, and it decides whether the chord sounds bright (major) or sad (minor).
+      The top note is the <b>fifth</b>, and it fills the sound out.</p>`
     },
     { u: 'Chords and harmony', n: 30, tier: 1, game: 'third', t: '"Sing the third" — decoded', key: true,
       d: 'Three things your coach might mean, and how to tell.',
       unlocks: '"Sing the third."',
-      body: `<p>This phrase is genuinely ambiguous, and that ambiguity is doing the confusing — not you.
-      It has three meanings:</p>
+      body: `<p>This phrase means three different things, which is why it confuses people:</p>
       <p><b>(a) The third of the chord.</b> The note that makes the current chord major or minor. Clue:
-      he is at the piano playing a chord when he says it.</p>
-      <p><b>(b) Scale degree 3 of the key.</b> The "mi" of the key you are in. Clue: he is talking about
+      they are at the piano playing a chord when they say it.</p>
+      <p><b>(b) Scale degree 3 of the key.</b> The "mi" of the key you are in. Clue: they are talking about
       the key or the scale.</p>
       <p><b>(c) A harmony line a third above the melody.</b> Sing the tune, but a third higher, all the
-      way through. Clue: he is teaching you a backing part — and in practice, <b>this is the most
+      way through. Clue: they are teaching you a backing part — and in practice, <b>this is the most
       common one</b>.</p>
       <p class="say">If you are not sure, ask: "third of the chord, or a third above the melody?" It is
       a musician's question, and it is the right one.</p>`
@@ -8273,8 +8262,7 @@ renderJourney();
       different. <b>Pre-chorus</b> — the short ramp that lifts you into the chorus.</p>
       <p>Also: <b>intro</b>, <b>outro</b>, <b>hook</b> (the bit people remember), <b>vamp</b> (a short
       loop that repeats until someone comes in), <b>tag</b> (a repeated ending).</p>
-      <p class="say">This is pure vocabulary and it takes five minutes, but not knowing it is the
-      fastest way to look lost in a rehearsal.</p>`
+      <p class="say">This is just vocabulary, and it takes five minutes to learn.</p>`
     },
     { u: 'Song form', n: 37, tier: 2, t: 'The 12-bar blues',
       d: 'The form you will be asked to sing without a chart.',
@@ -8290,8 +8278,7 @@ renderJourney();
       d: 'Why hitting the note is not the same as living up there.',
       unlocks: '"It sits too high for you."',
       body: `<p><b>Range</b> is every note you can produce. <b>Tessitura</b> is where your voice is
-      comfortable and works well for a long stretch. They are not the same, and the difference is the
-      most practical idea in this whole tab.</p>
+      comfortable and works well for a long stretch. They are not the same, and the difference matters more than anything else here.</p>
       <p>A song does not ask you for one note. It asks you to <i>live</i> somewhere for three minutes.
       You can have the range for a song and still be unable to sing it — which is why "I can hit that
       note" is the wrong test.</p>
@@ -8324,7 +8311,7 @@ renderJourney();
       <p class="say"><b>On "mix":</b> coaches teach it as a gear you find; voice scientists say there
       are only two mechanisms and no third one in between. Both are useful. It is a real coordination
       to learn and not a separate gear to discover — and if your coach is CVT-trained, note that "modes"
-      means something completely different to him than it does in a theory book.</p>`
+      means something completely different to them than it does in a theory book.</p>`
     },
     { u: 'Your voice', n: 41, tier: 2, t: 'Transposition', voc: true,
       d: 'Moving every note by the same distance.',
@@ -8355,9 +8342,7 @@ renderJourney();
       <p>The hard part is not the interval — it is holding your line while someone else sings a
       different one right next to you. That takes practice, and it is the skill working session
       singers rate highest.</p>
-      <p class="say">There is a drill for the underlying ear skill in Train → Ear: <b>Sing the bass</b>.
-      In one study, 88% of trained listeners said the bass line was how they identified what a chord
-      was — more than any other strategy.</p>`
+      <p class="say">Start with the ear drills in Train, Ear. Hearing where home is comes first.</p>`
     },
     { u: 'Your voice', n: 44, tier: 3, t: 'Following a click', voc: true,
       d: 'Subdividing instead of chasing.',
@@ -8379,7 +8364,7 @@ renderJourney();
       is just natural minor.</p>
       <p class="say"><b>Naming collision, worth knowing:</b> in Complete Vocal Technique, "modes" means
       Neutral, Curbing, Overdrive and Edge — vocal gears, nothing to do with scales. If your coach uses
-      that word, check which one he means.</p>`
+      that word, check which one they mean.</p>`
     },
     { u: 'Advanced', n: 46, tier: 3, t: 'Modulation',
       d: 'How songs change key.',
@@ -8556,13 +8541,10 @@ renderJourney();
      number that means nothing, which is the thing we do not do. */
   function scoreNote(e) {
     if (e.score === 'pitch')
-      return 'The app tracks your pitch on this one and can tell you how far off you were, in cents. ' +
-             'It cannot tell you whether it sounded good — that part is still yours.';
+      return 'The app tracks your pitch on this one and tells you how far off you were. Whether it sounded good is your call.';
     if (e.score === 'time')
-      return 'The app times this one. That is all it does — it cannot see your breathing, so it will ' +
-             'not tell you anything about your support.';
-    return 'The app does not score this one. There is no honest way to measure it from a phone ' +
-           'microphone, so it guides you and stays quiet rather than inventing a number.';
+      return 'The app only times this one. It cannot see your breathing.';
+    return 'The app does not score this one. A phone microphone cannot measure it, so the app guides you and does not invent a number.';
   }
 
   function renderTrain() {
@@ -8706,7 +8688,7 @@ renderJourney();
          'pitches improved their recognition and left their singing exactly where it started. ' +
          'Recognising and producing are different skills.</div>';
     const D = [
-      ['tonic', 'Find home', 'A phrase plays. Sing the note it wants to rest on.',
+      ['tonic', 'Sing the home note', 'A short tune plays. Sing the note it sounds finished on.',
        'The skill almost every ear app skips, and the one everything else is built on.'],
       ['degree', 'Name the degree', 'A cadence sets the key, then one note plays. Which degree is it?',
        'Answers are 1 to 7, not interval names — that is how coaches and bands actually talk.'],
@@ -8790,6 +8772,10 @@ renderJourney();
     const eng = e.engine || {};
     const secs = eng.kind === 'timed' ? 0 : (eng.mins ? eng.mins * 60 : 60);
     GUIDE.on = true; GUIDE.ex = e; GUIDE.t0 = Date.now(); GUIDE.mode = eng.kind;
+    GUIDE.heard = false; GUIDE.heardAt = 0; GUIDE.quietSince = 0; GUIDE.askedMic = false; GUIDE.finished = false;
+    if (eng.kind === 'timed' && typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') {
+      GUIDE.askedMic = true; try { enableMic(); } catch (err) {}
+    }
     GUIDE.target = eng.target || 0; GUIDE.counts = eng.counts || null;
 
     panel.innerHTML =
@@ -8797,6 +8783,8 @@ renderJourney();
         '<h3 style="margin:0">' + esc(e.name) + '</h3>' +
         '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Done</button>' +
       '</div>' +
+      (e.what ? '<div style="font-size:14px;line-height:1.5;margin-top:8px">' + e.what + '</div>' : '') +
+      (window.RPExample && RPExample.enabled ? '<div style="margin-top:8px">' + RPExample.button(e.id) + '</div>' : '') +
       '<div style="text-align:center;margin:14px 0">' +
         '<div id="gBig" style="font-size:46px;font-weight:900;color:var(--gold)">0.0s</div>' +
         '<div id="gSub" style="font-size:13.5px;font-weight:700;color:var(--ink-dim);min-height:22px"></div>' +
@@ -8839,7 +8827,27 @@ renderJourney();
                          'Breathe out — ribs come in last'][phase];
       return;
     }
-    el.textContent = s.toFixed(1) + 's';
+    if (GUIDE.finished) return;   /* the result stays on screen until the panel closes */
+    const canHear = GUIDE.mode === 'timed' && typeof MIC !== 'undefined' && MIC.on;
+    if (canHear) {
+      const loud = MIC.level > 0.005;
+      if (loud) { if (!GUIDE.heard) { GUIDE.heard = true; GUIDE.heardAt = s; } GUIDE.quietSince = 0; }
+      else if (GUIDE.heard) { GUIDE.quietSince = (GUIDE.quietSince || 0) + 0.1; }
+      if (GUIDE.heard && GUIDE.quietSince >= 1.0) {
+        const held = Math.max(0, s - GUIDE.quietSince - GUIDE.heardAt);
+        el.textContent = held.toFixed(1) + 's';
+        sub.textContent = 'Stopped when you did — ' + held.toFixed(1) + ' seconds' +
+          (GUIDE.target ? (held >= GUIDE.target ? ', past the ' + GUIDE.target + ' you were aiming for.' : ' of the ' + GUIDE.target + ' you were aiming for.') : '.');
+        try { if (window.RP && RP.logResult) RP.logResult({ kind: 'practice', label: GUIDE.ex ? GUIDE.ex.name : 'Timed', score: Math.round(held), out_of: GUIDE.target || null }); } catch (e) {}
+        GUIDE.heard = false; GUIDE.quietSince = 0; GUIDE.finished = true;
+        setTimeout(endGuided, 1400);
+        return;
+      }
+      if (!GUIDE.heard) { el.textContent = '0.0s'; sub.textContent = 'Start when you are ready — it times itself from the first sound.'; return; }
+      el.textContent = (s - GUIDE.heardAt).toFixed(1) + 's';
+    } else {
+      el.textContent = s.toFixed(1) + 's';
+    }
     if (GUIDE.mode === 'timed' && GUIDE.target) {
       sub.textContent = s >= GUIDE.target
         ? 'Past ' + GUIDE.target + ' seconds. Stop when it stops being even.'
@@ -9011,7 +9019,7 @@ renderJourney();
 
   function earRender() {
     const p = earPanel();
-    const titles = { tonic: 'Find home', degree: 'Name the degree', singdeg: 'Sing the degree', hilo: 'Higher or lower' };
+    const titles = { tonic: 'Sing the home note', degree: 'Name the degree', singdeg: 'Sing the degree', hilo: 'Higher or lower' };
     let h = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<h3 style="margin:0">' + titles[EAR.kind] + ' — <span style="font-weight:600">Round ' +
       Math.min(EAR.round, EAR.rounds) + '/' + EAR.rounds + '</span></h3>' +
@@ -9032,7 +9040,7 @@ renderJourney();
       h += '</div><div class="row" style="justify-content:center;margin-top:10px">' +
            '<button class="btn" id="earReplay">Play again</button></div>';
     } else if (EAR.kind === 'tonic') {
-      h += '<div style="font-size:15px;font-weight:800;color:var(--ink-dim)">Sing the note it wants to rest on</div>' +
+      h += '<div style="font-size:15px;font-weight:800;color:var(--ink-dim)">Sing the note the tune sounds finished on</div>' +
            '<div id="earFb" style="font-size:17px;font-weight:800;min-height:26px;margin-top:10px;color:var(--ink-dim)">listen…</div>' +
            '<div class="micmeter" style="max-width:320px;margin:12px auto"><i id="earHold"></i></div>' +
            '<div class="row" style="justify-content:center"><button class="btn" id="earReplay">Play again</button>' +
@@ -9397,18 +9405,15 @@ renderJourney();
   const DIALS = {
     directive: {
       name: 'Tell me what to do',
-      blurb: 'I pick the session, I say why first, and I keep it to one thing at a time. Best if you ' +
-             'do not yet know what you need — which is most people at the start, including me about you.'
+      blurb: 'Repertoire picks the session, says why, and keeps it to one thing at a time. Best if you do not yet know what you need.'
     },
     collaborative: {
       name: 'Suggest, and I\'ll choose',
-      blurb: 'I propose a session and offer two or three alternatives. You pick the order within the ' +
-             'block.'
+      blurb: 'Repertoire suggests a session and two or three alternatives. You pick.'
     },
     consultative: {
       name: 'I\'ll drive',
-      blurb: 'You assemble the session. I show you what the numbers say and tell you what I think you ' +
-             'are leaving out.'
+      blurb: 'You build the session. Repertoire shows you the numbers and what you might be leaving out.'
     }
   };
 
@@ -9454,8 +9459,8 @@ renderJourney();
     const nWk = wk.filter(d => d.on).length;
 
     let h = '<h1 style="margin:0 0 4px">From Repertoire</h1>';
-    h += '<div class="notice" style="margin-bottom:12px">The app’s own plan, built from what it has ' +
-      'actually measured — nothing else. It changes as you do.</div>';
+    h += '<div class="notice" style="margin-bottom:12px">The app’s plan for you, built from what it has ' +
+      'measured. It changes as you do.</div>';
 
     /* ---- today ---- */
     h += '<div class="plan">';
@@ -9466,16 +9471,14 @@ renderJourney();
     h += '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div>' +
       '<div class="pd">Shoulders, ribs, and a couple of slow hisses. No voice yet.</div></div></div>';
     h += '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) +
-      '</div><div class="pd">Semi-occluded work first — the gentlest way to bring the instrument online.</div></div></div>';
+      '</div><div class="pd">Lip trills, straws and hums first. The gentlest way to start.</div></div></div>';
     h += '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
       ' <span class="extag" style="color:var(--accent)">TODAY\'S ONE THING</span></div>' +
       '<div class="pd">' + esc(plan.focus.what.replace(/<[^>]+>/g, '')) + '</div></div></div>';
     h += '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div>' +
-      '<div class="pd">Pick anything from your library and use today\'s one thing on it. This happens ' +
-      'every session, not in week four.</div></div></div>';
+      '<div class="pd">Pick any song and use today\'s one thing on it.</div></div></div>';
     h += '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div>' +
-      '<div class="pd">Straw or hum, then descending. Singers report it helps; the objective evidence ' +
-      'is not there yet. It takes two minutes and is very unlikely to hurt.</div></div></div>';
+      '<div class="pd">Straw or hum, then a few notes coming down. Two minutes.</div></div></div>';
     h += '</div>';
 
     /* ---- this week ---- */
@@ -9489,12 +9492,7 @@ renderJourney();
         (d.on ? 'var(--accent)' : 'var(--panel2)') + ';border:1px solid var(--line)"></div></div>';
     });
     h += '</div>';
-    h += '<div class="measured">Days, not minutes — deliberately. In a study of practice sessions ' +
-      'ranging from 8 to 57 minutes, neither total time nor number of correct repetitions predicted ' +
-      'how well people played the next day. What predicted it was how they handled mistakes. So this ' +
-      'app will never set you a minute target, and it counts <b>4 to 6 days a week with a rest day</b> ' +
-      'as a full week rather than punishing you for not doing seven. Missing one day does not set you ' +
-      'back — that is measured, not encouragement.</div>';
+    h += '<div class="measured">Days, not minutes. <b>Four to six days a week with a rest day</b> counts as a full week. Missing a day does not set you back.</div>';
     h += '</div>';
 
     /* ---- what I want ---- */
@@ -9508,40 +9506,28 @@ renderJourney();
     h += '</div>';
 
     if (P.goal === 'tone') {
-      h += '<div class="measured"><b>Worth saying plainly.</b> Most coaches would start you on pitch, ' +
-        'because it transfers faster and it is the thing people notice. You have asked for tone. ' +
-        'That is a legitimate route and the evidence is friendlier to it than the convention suggests ' +
-        '— one study of registration work alone improved pitch accuracy by 157 cents against 46 for a ' +
-        'control group, and the singers who were worst gained the most. Pitch work is folded in here ' +
-        'at a lower dose from the start rather than removed. You can flip this any time.</div>';
+      h += '<div class="measured">Most coaches would start you on pitch, because it shows fastest. You picked tone. That works too, and you still get a little pitch work from the start. Change it any time.</div>';
     } else if (P.goal === 'pitch') {
-      h += '<div class="measured">Pitch first is the conventional order and it transfers fast. One ' +
-        'thing to know: if practising while you sound rough is what stops you practising at all, ' +
-        'switching to tone for a few weeks is a real strategy and not a cop-out. Say so and I will ' +
-        'reorder it.</div>';
+      h += '<div class="measured">Pitch first is the usual order, and it shows fast. If sounding rough puts you off practising, switch to tone for a few weeks. That is a real plan, not a cop-out.</div>';
     }
     h += '</div>';
 
     /* ---- the dial ---- */
     h += '<div class="panel" style="margin-top:12px">';
-    h += '<b style="font-size:14px">How much should I push?</b>';
+    h += '<b style="font-size:14px">How much should the app decide?</b>';
     h += '<div class="dial">';
     Object.keys(DIALS).forEach(k => {
       h += '<button data-dial="' + k + '" class="' + (P.dial === k ? 'on' : '') + '">' + esc(DIALS[k].name) + '</button>';
     });
     h += '</div>';
     h += '<div class="notice" style="margin-top:8px">' + DIALS[P.dial].blurb + '</div>';
-    h += '<div class="measured">This changes who chooses and how much I explain. It never changes ' +
-      'whether there is a plan — the best teaching is high on both structure and choice, not a trade ' +
-      'between them. I will also step back on my own as you get further in, and tell you when I do.</div>';
+    h += '<div class="measured">This only changes who chooses and how much gets explained. There is always a plan.</div>';
     h += '</div>';
 
     /* ---- where and when ---- */
     h += '<div class="panel" style="margin-top:12px">';
     h += '<b style="font-size:14px">When and where</b>';
-    h += '<div class="notice" style="margin-top:6px">Naming a time and a place is the single ' +
-      'best-evidenced thing on this screen. In one study, people who only had the intention to exercise ' +
-      'managed it 35% of the time; the ones who wrote down the day, time and place managed 91%.</div>';
+    h += '<div class="notice" style="margin-top:6px">Pick a time and a place. People who write down when and where they will practise do it far more often than people who only mean to.</div>';
     h += '<div class="ctl" style="margin-top:10px"><label>I will practise</label>' +
       '<input id="cWhen" type="text" placeholder="8pm, after dinner" value="' + esc(P.when) + '" ' +
       'style="width:100%;padding:10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:14px"></div>';
@@ -9573,9 +9559,7 @@ renderJourney();
       '<b style="font-size:14px">Working with a real coach</b>' +
       '<button class="btn" id="cCoachMode" style="padding:8px 12px;font-size:12.5px">' +
       (P.coachMode ? 'On' : 'Off') + '</button></div>';
-    h += '<div class="notice" style="margin-top:6px">Turn this on and the Coach tab becomes your ' +
-      'coach\'s channel instead of mine: they set the week\'s work, your practice records itself, and ' +
-      'they review it in their own time.</div>';
+    h += '<div class="notice" style="margin-top:6px">Sign in and join your coach with their code, and this tab becomes their channel: they set the work, you record, they listen in their own time.</div>';
     if (P.coachMode) {
       h += '<div class="ctl" style="margin-top:10px"><label>Coach</label>' +
         '<input id="cCoachName" type="text" placeholder="your coach\'s name" value="' + esc(P.coachName) + '" ' +
@@ -9586,26 +9570,20 @@ renderJourney();
         '<div class="pd">No extra step. The take is the session, not a performance you have to psych up for.</div></div></div>';
       h += '<div class="planstep"><div class="pmin">3</div><div><div class="pt">They reply against the clock</div>' +
         '<div class="pd">Comments pinned to the second, so you never drill a bad habit for a week.</div></div></div>';
-      h += '<div class="measured"><b>Not built yet — this is the shape, not a working link.</b> ' +
-        'Sending takes to another person needs an account system and a server, which is Phase 2. ' +
-        'What works today: the recordings are tagged and titled, so they can be shared by hand.</div>';
+      h += '<div class="measured">Join your coach from the top of this tab, with the code they give you.</div>';
     }
     h += '</div>';
 
     /* ---- honesty ---- */
     h += '<div class="panel" style="margin-top:12px">';
-    h += '<b style="font-size:14px">What I can and cannot tell you</b>';
+    h += '<b style="font-size:14px">What the app can and cannot tell you</b>';
     h += '<div class="exbody" style="border-top:0;padding-top:6px">' +
-      '<span class="lab">I CAN MEASURE</span>How far from the note you were, in cents. How long you ' +
+      '<span class="lab">IT CAN MEASURE</span>How far from the note you were, in cents. How long you ' +
       'held it. Whether the pitch drifted, and which way. How fast you landed on it. Whether you slid ' +
       'into it, and by how much.' +
-      '<span class="lab">I CANNOT MEASURE</span>Whether it sounded good. Your breath support. Your ' +
+      '<span class="lab">IT CANNOT MEASURE</span>Whether it sounded good. Your breath support. Your ' +
       'throat tension. Which register you were in. Anything about your vocal health.' +
-      '<span class="lab">WHY NOT</span>Those need equipment a phone does not have, and the ones that ' +
-      'can be approximated from audio fall apart in an ordinary room on an ordinary phone. The best ' +
-      'validated measure of tone quality in the research explains about two thirds of what a listener ' +
-      'hears at its very best — and the expert listeners it was validated against only agree with ' +
-      'themselves 39% of the time. So I will give you numbers and leave the judgement to you.</div>';
+      '<span class="lab">WHY NOT</span>Those need equipment a phone does not have. So you get the numbers, and the judgement stays yours.</div>';
     h += '</div>';
 
     host.innerHTML = h;
@@ -9679,12 +9657,10 @@ renderJourney();
     /* --- you --- */
     const you = fold('Account', P.name || 'Not set', '', false);
     you.body.innerHTML =
-      '<div class="ctl"><label>What should I call you?</label>' +
+      '<div class="ctl"><label>Your name</label>' +
       '<input id="pName" type="text" value="' + esc(P.name) + '" placeholder="your name" ' +
       'style="width:100%;padding:10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:14px"></div>' +
-      '<div class="measured">Everything in Repertoire lives on this phone and nowhere else. There is ' +
-      'no account, no server and no sign-in — so nothing here is sent anywhere, and clearing your ' +
-      'browser data would clear it. Accounts and sync are a later job.</div>';
+      '<div class="measured">Sign in and your range, your takes and your progress follow you to a new phone.</div>';
     host.appendChild(you.el);
 
     /* --- voice --- */
@@ -9731,15 +9707,7 @@ renderJourney();
       '<button data-ref="voice" class="' + (V10.refVoice ? 'on' : '') + '">Voice-like</button>' +
       '<button data-ref="piano" class="' + (!V10.refVoice ? 'on' : '') + '">Piano</button></div>' +
       '<div class="row" style="margin-top:10px"><button class="btn" id="pRefTry" style="padding:8px 12px;font-size:12.5px">Hear the difference</button></div>' +
-      '<div class="measured"><b>This one is worth a minute of your time.</b> In a study where people ' +
-      'matched pitch against five different reference sounds, the average error was 46 cents against a ' +
-      'live voice and about 188 against a piano — four times worse. The people who were <i>worst</i> ' +
-      'with the piano improved the most with a voice. Every reference note in this app used to be a ' +
-      'piano.<br><br>Being straight with you: what you get here is a <b>synthesised voice-like tone</b>, ' +
-      'not a recording of a person. It has a soft onset, vibrato and vowel-shaped resonance, so it is ' +
-      'far closer to a sung note than a piano is — but the study measured real voices and I am not ' +
-      'claiming this recovers the whole difference. A real recorded voice would be better, and you ' +
-      'recording your own reference notes is the honest way to get there.</div>';
+      '<div class="measured">People match a voice more closely than a piano, and the ones who find a piano hardest gain the most from a voice. So every reference note here is a voice-like tone. It is made by the app, not recorded from a person. A real recorded voice would be better.</div>';
     host.appendChild(ref.el);
 
     /* --- mic --- */
@@ -9766,11 +9734,7 @@ renderJourney();
     const ab = fold('About', '', '', false);
     ab.body.innerHTML =
       (about ? about.innerHTML : '') +
-      '<div class="measured" style="margin-top:10px"><b>How this app talks about your voice.</b> ' +
-      'It reports what it measured and stops there. It will tell you how many cents off a note was, ' +
-      'because it counted; it will not tell you whether you sounded good, because it cannot hear that ' +
-      'and neither can any software. When conditions are too noisy to measure something honestly, it ' +
-      'says so instead of guessing.</div>';
+      '<div class="measured" style="margin-top:10px">The app tells you what it measured and stops there. It can say how far off a note was. It cannot say whether it sounded good, and it will not pretend to.</div>';
     host.appendChild(ab.el);
     if (about) about.remove();
 
@@ -10288,13 +10252,19 @@ renderJourney();
            'the table.' },
     { id: 'degree', name: 'Find the degree', level: 2, need: 2,
       teaches: '"You\'re on the 5." "Sing the 3."',
-      why: 'The single most common thing a coach says that beginners cannot act on.' },
+      why: 'The thing coaches say most that beginners cannot act on.' },
     { id: 'third', name: 'Spot the third', level: 3, need: 2,
       teaches: 'The note that makes a chord major or minor.',
       why: 'Your coach\'s "sing the third" — the chord kind. One note, whole colour.' },
     { id: 'interval', name: 'Name the interval', level: 3, need: 2,
-      teaches: 'Distance between two notes, counted inclusively.',
-      why: 'The inclusive count is the number one beginner stumble: two steps is called a third.' }
+      teaches: 'Two notes play. How far apart are they?',
+      why: 'By ear, with no keys to count. A third and a fifth sound different long before you can name them.' },
+    { id: 'playnote', name: 'Play the note you hear', level: 3, need: 2,
+      teaches: 'A note plays after a lit one. Find it on the keys.',
+      why: 'Hearing a note and finding it is the ear and the hand working together.' },
+    { id: 'playint', name: 'Play the interval you hear', level: 3, need: 2,
+      teaches: 'Two notes play. Play them both.',
+      why: 'The same skill, one step harder: the distance has to be right, not just the note.' }
   ];
 
   /* ---------------------------------------------------------------- */
@@ -10538,14 +10508,23 @@ renderJourney();
         after: third + '. Move it to ' + other + ' and the same chord becomes ' + kn + ' ' +
                (minor ? 'major' : 'minor') + ' — one note, whole colour.' };
     }
+    if (id === 'playnote' || id === 'playint') {
+      const sizes = G.hard > 2 ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] : [2, 4, 5, 7, 9, 12];
+      const s = sizes[Math.floor(Math.random() * sizes.length)];
+      return { kind: 'pick', lo: root, n: 13, root, ref: root,
+        target: id === 'playnote' ? [root + s] : [root, root + s],
+        prompt: id === 'playnote' ? 'The lit key plays, then another note. Play that other note.'
+                                  : 'Two notes play; the first is lit. Play both, in order.',
+        after: 'The second note was a ' + ['unison','2nd','2nd','3rd','3rd','4th','tritone','5th','6th','6th','7th','7th','octave'][s] + ' up from the first.' };
+    }
     if (id === 'interval') {
       const sizes = G.hard > 2 ? [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12] : [2, 4, 5, 7, 9, 12];
       const s = sizes[Math.floor(Math.random() * sizes.length)];
       const opts = ['2nd', '3rd', '4th', '5th', '6th', '7th', 'octave'];
       const nameOf = { 1: '2nd', 2: '2nd', 3: '3rd', 4: '3rd', 5: '4th', 7: '5th',
                        8: '6th', 9: '6th', 10: '7th', 11: '7th', 12: 'octave' };
-      return { kind: 'choice', lo: root, n: 13, root, highlight: [root, root + s],
-        prompt: 'How far apart are these two notes?',
+      return { kind: 'choice', lo: root, n: 13, root, highlight: [], ear: true,
+        prompt: 'Listen. How far apart are the two notes?',
         show: [root, root + s],
         options: opts,
         answer: opts.indexOf(nameOf[s]),
@@ -10590,6 +10569,7 @@ renderJourney();
       h += kbd(q.lo, q.n, {
         label: labeller(q),
         state: m => {
+          if (q.ref === m && q.target.indexOf(m) < 0 && done.indexOf(m) < 0) return 'lit';
           if (feedback && q.target.indexOf(m) >= 0) return 'ok';
           if (feedback && done.indexOf(m) >= 0 && q.target.indexOf(m) < 0) return 'no';
           if (done.indexOf(m) >= 0) return 'sel';
@@ -10602,7 +10582,7 @@ renderJourney();
           (i + 1) + '</span>').join('') + '</div>';
       }
     } else {
-      h += kbd(q.lo, q.n, {
+      if (!q.ear) h += kbd(q.lo, q.n, {
         label: labeller(q),
         state: m => (q.highlight || q.show || []).indexOf(m) >= 0 ? 'lit' : ''
       });
@@ -10645,7 +10625,7 @@ renderJourney();
           play(q.cadence + d + iv - 12, i * 0.4, 0.38, 0.3)));
         return;
       }
-      playRun(q.target || [q.root]);
+      playRun(q.ref != null && q.target.indexOf(q.ref) < 0 ? [q.ref].concat(q.target) : (q.target || [q.root]));
       return;
     }
     playRun(q.show || [q.root]);
@@ -10657,6 +10637,7 @@ renderJourney();
     const q = G.q;
     if (q.kind !== 'build' && q.kind !== 'pick') return;
     play(m, 0, 0.5, 0.5);
+    if (q.ref === m && q.target.indexOf(m) < 0) return;   /* the reference key is not an answer */
     const i = G.picked.length;
     G.picked.push(m);
     if (q.target[i] !== m) return finish(false);
@@ -10878,6 +10859,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 .michelp{bottom:68px !important; align-items:flex-end !important;}
 .michelp-box{margin-bottom:10px;}
 
+/* the ⓘ badge, everywhere — exercise names, Learn rows, the effects */
+.rp-info{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+  border:1px solid var(--gold);color:var(--gold);font-size:11px;font-weight:800;margin-left:7px;cursor:pointer;flex:none;
+  vertical-align:middle;font-style:normal;}
+.rp-info.on{background:rgba(232,179,74,.18);}
+
 </style>
 <script>
 /* ======================================================================
@@ -11055,7 +11042,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<input id="rpName" class="inp" placeholder="First name is fine" autocomplete="name" ' +
         'style="width:100%;margin-bottom:4px">' +
         '<div class="measured" style="margin-bottom:10px;font-size:11.5px">This is what your coach ' +
-        'sees, so use the name he knows you by.</div>';
+        'sees, so use the name they know you by.</div>';
     }
     h += '<label class="lab">EMAIL</label>' +
       '<input id="rpEmail" class="inp" type="email" autocomplete="email" inputmode="email" ' +
@@ -11065,8 +11052,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '" placeholder="At least 6 characters" style="width:100%;margin-bottom:12px">';
 
     if (up) {
-      h += '<div class="measured" style="margin-bottom:14px">That is all. If you teach, you switch ' +
-        'that on afterwards from your name at the top — you stay a singer either way.</div>';
+      h += '<div class="measured" style="margin-bottom:14px">If you teach, switch that on afterwards from your name at the top.</div>';
     }
 
     h += '<button class="btn primary" id="rpGo" style="width:100%;padding:13px;font-size:14px">' +
@@ -11103,7 +11089,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var email = ($('rpEmail').value || '').trim();
     var pass = $('rpPass').value || '';
     /* It used to fall back to the email prefix, which is how Robert ended up
-       called "lyonxdewitt" on his coach's phone. A name his coach recognises
+       called "lyonxdewitt" on their coach's phone. A name their coach recognises
        is worth one more required box. */
     if (!name) {
       msg('Your name, please — it is what your coach will see.', true);
@@ -11286,10 +11272,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* ------------------------------------------------------------------ */
   var acctSig = '';
   function accountRow() {
-    var host = $('youSlots');
-    if (!host) return;
     var fold = null;
-    var all = host.querySelectorAll('details.pfold');
+    /* rp-profile moves the fold into its Account page; look in both places */
+    var all = document.querySelectorAll('#youSlots details.pfold, #rpProfileHolders details.pfold');
     for (var i = 0; i < all.length; i++) {
       var sp = all[i].querySelector('summary span');
       if (sp && /^Account/i.test((sp.textContent || '').trim())) { fold = all[i]; break; }
@@ -11314,8 +11299,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           'or sign out from here.</div>' +
         '<button class="btn" id="rpAcctOpen" style="width:100%;padding:11px;margin-top:10px;font-size:12.5px">Open my account</button>';
     } else {
-      body.innerHTML = '<div class="measured">Not signed in. A coach can only find you if you have an account, and ' +
-          'your range and your takes only follow you to a new phone with one. Everything else works without.</div>' +
+      body.innerHTML = '<div class="measured">Not signed in. With an account a coach can find you, and your range and takes follow you to a new phone. Everything else works without one.</div>' +
         '<button class="btn primary" id="rpAcctOpen" style="width:100%;padding:11px;margin-top:10px;font-size:12.5px">Sign in or make an account</button>';
     }
     on($('rpAcctOpen'), 'click', function () { (RP.user && RP.profile) ? openAccount() : openAuth(); });
@@ -11331,7 +11315,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     /* Requiring a name at sign-up only helps people who have not signed up
        yet. Robert's own account was made before that and is still called
-       "lyonxdewitt" on his coach's phone, and deleting the account to fix a
+       "lyonxdewitt" on their coach's phone, and deleting the account to fix a
        name is not a thing anyone should have to do. */
     h += '<div class="rp-card" style="margin-top:14px;padding:11px">' +
       '<label class="rp-lab">THE NAME YOUR COACH SEES</label>' +
@@ -11340,6 +11324,21 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       'autocomplete="name" value="' + esc(p.display_name || '') + '">' +
       '<button class="btn primary" id="rpNameGo" style="padding:11px 15px">Save</button></div>' +
       '<div id="rpNameMsg" class="measured" style="margin-top:7px"></div></div>';
+
+    /* Robert, 14 Sep: "she should be able to change her email address,
+       password and the normal stuff." */
+    h += '<div class="rp-card" style="margin-top:10px;padding:11px">' +
+      '<label class="rp-lab">EMAIL</label>' +
+      '<div class="row" style="gap:7px;margin-top:6px;flex-wrap:nowrap">' +
+      '<input id="rpNewEmail" class="rp-inp" type="email" style="flex:1" autocomplete="email" value="' + esc(p.email || '') + '">' +
+      '<button class="btn primary" id="rpEmailGo" style="padding:11px 15px">Save</button></div>' +
+      '<div id="rpEmailMsg" class="measured" style="margin-top:7px"></div></div>';
+    h += '<div class="rp-card" style="margin-top:10px;padding:11px">' +
+      '<label class="rp-lab">NEW PASSWORD</label>' +
+      '<div class="row" style="gap:7px;margin-top:6px;flex-wrap:nowrap">' +
+      '<input id="rpNewPass" class="rp-inp" type="password" style="flex:1" autocomplete="new-password" placeholder="At least 6 characters">' +
+      '<button class="btn primary" id="rpPassGo" style="padding:11px 15px">Save</button></div>' +
+      '<div id="rpPassMsg" class="measured" style="margin-top:7px"></div></div>';
 
     if (p.is_coach) {
       h += '<div class="rp-card hot" style="margin-top:14px"><div class="rp-lab">YOUR COACH CODE</div>' +
@@ -11370,7 +11369,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       h += '<div class="row" style="gap:8px;margin-top:14px">' +
         '<button class="btn' + (RP.face === 'auto' ? ' primary' : '') + '" id="rpFaceC" style="flex:1;padding:10px">Coach view</button>' +
         '<button class="btn' + (RP.face === 'student' ? ' primary' : '') + '" id="rpFaceS" style="flex:1;padding:10px">Student view</button></div>' +
-        '<div class="measured" style="margin-top:8px">Coaches are learners too — the student view gives you the AI coach for your own practice.</div>';
+        '<div class="measured" style="margin-top:8px">Coaches are learners too — the student view is your own practice, set by Repertoire.</div>';
     }
     if (RP.coach) {
       h += '<div class="rp-card" style="margin-top:14px">' +
@@ -11397,6 +11396,31 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       });
     });
     on($('rpNewName'), 'keydown', function (e) { if (e.key === 'Enter') saveName(); });
+    on($('rpEmailGo'), 'click', function () {
+      var i = $('rpNewEmail'), m = $('rpEmailMsg'), b = $('rpEmailGo');
+      var email = (i.value || '').trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { m.textContent = 'That does not look like an email address.'; m.style.color = 'var(--miss)'; return; }
+      if (email === (RP.profile && RP.profile.email)) { m.textContent = 'That is already your email.'; m.style.color = 'var(--ink-dim)'; return; }
+      b.disabled = true; m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ email: email }).then(function (r) {
+        b.disabled = false;
+        if (r.error) { m.textContent = r.error.message; m.style.color = 'var(--miss)'; return; }
+        m.textContent = 'A link has gone to ' + email + '. Tap it and the change is done.';
+        m.style.color = 'var(--hit)';
+      });
+    });
+    on($('rpPassGo'), 'click', function () {
+      var i = $('rpNewPass'), m = $('rpPassMsg'), b = $('rpPassGo');
+      var pw = i.value || '';
+      if (pw.length < 6) { m.textContent = 'Six characters or more, please.'; m.style.color = 'var(--miss)'; return; }
+      b.disabled = true; m.textContent = 'Saving\u2026'; m.style.color = 'var(--ink-dim)';
+      RP.sb.auth.updateUser({ password: pw }).then(function (r) {
+        b.disabled = false;
+        if (r.error) { m.textContent = r.error.message; m.style.color = 'var(--miss)'; return; }
+        i.value = '';
+        m.textContent = 'Password changed.'; m.style.color = 'var(--hit)';
+      });
+    });
     on($('rpFaceC'), 'click', function () { setFace('auto'); closeSheet(); });
     on($('rpFaceS'), 'click', function () { setFace('student'); closeSheet(); });
     on($('rpCoachCol'), 'click', function () {
@@ -11715,9 +11739,30 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      the scorecard's "days practised" counted it under an invalid day, and the
      placement test could not see it at all. Keep what the database actually
      stored, not what we asked it to store. */
+  /* Briar, 14 Sep: her tests "did not count". She was not signed in, and a
+     result with nowhere to go was thrown away. Now it is kept on the phone,
+     so the test and the points see it; it is not sent anywhere. */
+  var LOCAL_KEY = 'rp_results_local';
+  function localResults() { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]') || []; } catch (e) { return []; } }
+  function keepLocal(r) {
+    try {
+      var all = localResults(); all.unshift(r); all = all.slice(0, 200);
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+  if (!RP.results) RP.results = [];
+  if (!RP.results.length) RP.results = localResults();
   RP.logResult = function (row) {
     try {
-      if (!RP.user || !RP.sb || !RP.profile) return;
+      if (!RP.user || !RP.sb || !RP.profile) {
+        var loc = { student_id: null, coach_id: null, created_at: new Date().toISOString(), local: true };
+        Object.keys(row || {}).forEach(function (k) { if (row[k] != null) loc[k] = row[k]; });
+        if (!RP.results) RP.results = [];
+        RP.results.unshift(loc);
+        keepLocal(loc);
+        try { rerender(); } catch (e) {}
+        return Promise.resolve(loc);
+      }
       var r = { student_id: RP.user.id, coach_id: RP.coach ? RP.coach.id : null };
       Object.keys(row || {}).forEach(function (k) { if (row[k] != null) r[k] = row[k]; });
       return RP.sb.from('results').insert(r).select().then(function (x) {
@@ -11790,7 +11835,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   });
 
   /* Whose colours am I looking at?
-       · A coach sees his own brand. It is his app as much as anyone's.
+       · A coach sees their own brand. It is their app as much as anyone's.
        · A student keeps REPERTOIRE unless they ask for their coach's look.
          Robert: "I like our colours the way they are, I don't want them to
          change." So this is off until someone turns it on, per person, per
@@ -12051,7 +12096,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div id="rpCodeMsg" class="measured" style="margin-top:8px"></div>';
 
       /* Robert, 13 Sep: "make it so students can request a coach for coaching."
-         The code is the coach's move — he reads it out. This is the student's:
+         The code is the coach's move — they read it out. This is the student's:
          they ask, and the coach says yes or no. Nobody ends up teaching someone
          they never agreed to. */
       var asked = (RP.myRequests || []).filter(function (r) { return r.status === 'pending'; });
@@ -12113,7 +12158,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
             (nextUp.blurb ? ' \u2014 ' + esc(nextUp.blurb) : '') + '</div>' : '') +
           '<div class="measured" style="margin-top:8px;font-size:11.5px">This is ' +
           esc(coach.display_name) + '\u2019s judgement, not something the app measured. ' +
-          'He moves it when he thinks you are ready.</div></div>';
+          'They move it when they think you are ready.</div></div>';
       }
     }
 
@@ -12137,7 +12182,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     } else {
       if (!open.length && !done.length) {
         h += '<div class="rp-empty">Nothing assigned yet. When ' + esc(coach.display_name) +
-          ' sets something on his phone it lands here — you will not need to refresh.</div>';
+          ' sets something on their phone it lands here — you will not need to refresh.</div>';
       }
       open.forEach(function (a) { h += assignmentCard(a, null); });
       if (done.length) {
@@ -13317,8 +13362,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var n = document.createElement('div');
       n.className = 'notice';
       n.style.cssText = 'margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px';
-      n.innerHTML = 'Working with a real coach? <b>Sign in</b> and their week appears here. ' +
-        'Everything below works without an account.';
+      n.innerHTML = 'Got a coach? <b>Sign in</b> and what they set you shows here. Everything below works without an account.';
       host.insertBefore(n, host.firstChild);
     }
   };
@@ -13744,7 +13788,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* ---------------------------------------------------------------- */
   /* marking the words up, without touching anything interactive      */
   /* ---------------------------------------------------------------- */
-  var SKIP = /^(SCRIPT|STYLE|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|LABEL|SVG|CANVAS|CODE)$/;
+  var SKIP = /^(SCRIPT|STYLE|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|LABEL|SVG|CANVAS|CODE|H1|H2|H3|H4|SUMMARY)$/;
+  var SKIPCLS = /(^|\s)(rp-ttl|rp-lab|pill|lt|gt|kbdlbl|seg)(\s|$)/;   /* titles and labels: the word is the name, not a term */
   function markUp(root, cap) {
     if (!root) return;
     var left = cap || 40, seen = {};
@@ -13754,6 +13799,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         var p = n.parentNode;
         while (p && p !== root) {
           if (SKIP.test(p.nodeName) || p.classList && p.classList.contains('rp-gl')) return NodeFilter.FILTER_REJECT;
+          if (SKIPCLS.test(p.className || '')) return NodeFilter.FILTER_REJECT;
           p = p.parentNode;
         }
         return RX.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
@@ -13860,7 +13906,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return '<button class="btn" data-skip="1" style="width:100%;padding:11px;margin-top:14px;' +
       'font-size:12.5px;color:var(--ink-dim)">Skip this \u2014 just let me in</button>' +
       '<div class="measured" style="margin-top:7px;font-size:11.5px;text-align:center">' +
-      'Nothing is lost. It all lives in <b>Profile</b> under <b>Where I have got you</b>, ' +
+      'Nothing is lost. It all lives in <b>Profile</b> under <b>Where you are</b>, ' +
       'and you can set them whenever you want.</div>';
   }
 
@@ -13974,10 +14020,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function ask() {
     /* step 0 is the OFFER. Nothing has been asked yet and nothing has to be. */
     if (step === 0) {
-      sheet('<b style="font-size:18px">Want me to work out where to start you?</b>' +
-        '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which ' +
-        'warm-ups you are given first and how the app words things \u2014 and you can change any of it later, ' +
-        'or ignore all of it and just have a look round.</div>' +
+      sheet('<b style="font-size:18px">Work out where to start?</b>' +
+        '<div class="measured" style="margin-top:8px">Six quick questions, about a minute. They decide which warm-ups you get first and how the app talks. Change any of it later, or skip it and look round.</div>' +
         '<button class="btn primary" id="rpGoQ" style="width:100%;padding:14px;margin-top:18px;font-size:15px">' +
         'Ask me the six questions</button>' +
         '<button class="btn" data-skip="1" style="width:100%;padding:12px;margin-top:9px;color:var(--ink-dim)">' +
@@ -14023,33 +14067,35 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     saveMe();
 
     var singLine = d.experience === 1
-      ? 'Starting you on the beginner warm-ups \u2014 the gentlest ones, and the ones that actually teach pitch.'
+      ? 'You start on the beginner warm-ups. They are the gentle ones, and they teach pitch.'
       : d.experience === 2
-      ? 'Starting you on the beginner and intermediate warm-ups.'
+      ? 'You start on the beginner and intermediate warm-ups.'
       : 'Every exercise is open to you.';
     var wordLine = d.taught === 1
-      ? 'Plain English throughout. Any word worth knowing is explained the first time it appears, and you can tap it again later.'
+      ? 'Plain words. Anything unusual gets an ⓘ you can tap.'
       : d.taught === 2
-      ? 'Normal words, and anything unusual is one tap from a plain sentence.'
-      : 'The proper terms, used properly, with no slowing down.';
+      ? 'Normal words. Anything unusual gets an ⓘ you can tap.'
+      : 'The proper terms.';
 
-    sheet('<b style="font-size:18px">Right \u2014 here is where I am putting you.</b>' +
+    sheet('<b style="font-size:18px">Here is where you start.</b>' +
       '<div class="rp-card" style="margin-top:14px;padding:12px">' +
       '<div class="rp-lab">YOUR SINGING</div>' +
       '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(singLine) + '</div></div>' +
       '<div class="rp-card" style="margin-top:9px;padding:12px">' +
       '<div class="rp-lab">WORDS AND MUSIC</div>' +
       '<div style="font-size:14px;line-height:1.55;margin-top:4px">' + esc(wordLine) + '</div></div>' +
-      '<div class="measured" style="margin-top:12px">This is what you <b>told</b> me \u2014 it is not measured. ' +
-      'If it is wrong, change it in <b>Profile</b>, or take the test, which measures instead of asking.</div>' +
-      '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Start</button>' +
-      '<button class="btn" id="rpTestNow" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px">' +
-      'Test me instead \u2014 measure it</button>');
-    on($('rpOK'), 'click', function () { shut(); apply(); offerRange(); });
-    on($('rpTestNow'), 'click', function () {
+      '<div class="measured" style="margin-top:12px">That is from your answers. Next, five short tests measure it.</div>' +
+      '<button class="btn primary" id="rpOK" style="width:100%;padding:14px;margin-top:16px;font-size:15px">Measure it</button>' +
+      '<button class="btn" id="rpTestLater" style="width:100%;padding:12px;margin-top:9px;font-size:12.5px;color:var(--ink-dim)">' +
+      'Later \u2014 it is in Profile</button>');
+    /* Robert, 14 Sep: "after the questions, give the test exercises so they
+       match your level and confirm where you are with more data." */
+    on($('rpOK'), 'click', function () {
       shut(); apply();
-      try { if (window.RPTest) RPTest.open(); } catch (e) {}
+      if (window.RPTest) { try { RPTest.open(); return; } catch (e) {} }
+      offerRange();
     });
+    on($('rpTestLater'), 'click', function () { shut(); apply(); });
   }
 
   /* Robert, 13 Sep: the range test is not something you do often, so it
@@ -14198,7 +14244,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var wrd  = ME.taught === 1 ? 'plain English'
              : ME.taught === 2 ? 'normal words, tap to explain' : 'proper terms';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">Where I have got you</div>' +
+      '<div><div class="rp-ttl">Where you are</div>' +
       '<div class="rp-sub">Singing: ' + sing + ' \u00b7 Words: ' + wrd + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
     if (fresh) {
@@ -14213,8 +14259,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var s = document.createElement('style');
     s.id = 'rpPlainCSS';
     s.textContent =
-      '.rp-gl{border-bottom:1px dashed var(--gold);cursor:pointer;}' +
-      '.rp-gl:active{background:rgba(232,179,74,.16);}' +
+      '.rp-gl{cursor:pointer;white-space:nowrap;}' +
+      '.rp-gl::after{content:"i";display:inline-block;width:14px;height:14px;line-height:13px;margin-left:3px;' +
+      'border-radius:50%;border:1px solid var(--gold);color:var(--gold);font-size:10px;font-weight:800;' +
+      'font-style:normal;text-align:center;vertical-align:1px;}' +
+      '.rp-gl:active::after{background:rgba(232,179,74,.25);}' +
       '.rp-whatis{font-size:12.5px;color:var(--ink-dim);line-height:1.5;margin-top:6px;' +
       'padding-left:9px;border-left:2px solid var(--line);}';
     document.head.appendChild(s);
@@ -14596,8 +14645,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var t = document.createElement('div');
     t.id = 'rpPitchTitle';
     t.innerHTML = '<h1 style="margin:0 0 2px">Pitch Tracker</h1>' +
-      '<div class="rp-sub" style="margin:0 0 12px">Every note you sing, measured. Record a take and ' +
-      'the notes are kept with it.</div>';
+      '<div class="rp-sub" style="margin:0 0 12px">See the notes you sing, as you sing them. Record a take and the notes are kept with it.</div>';
     if (back && back.parentNode === host) host.insertBefore(t, back.nextSibling);
     else host.insertBefore(t, host.firstChild);
   }
@@ -14798,9 +14846,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* An SVG the width of its box. The horizontal rules are semitones, named
      down the left, so "am I on the note" is a question you can answer by
      looking — which is the whole point of drawing it. */
+  var LINES = {};   /* id -> notes, so playback can put them on the big map */
   ST.lineHtml = function (notes, id) {
     var b = lineBounds(notes);
     if (!b) return '';
+    LINES[id || ''] = notes;
     var W = 300, H = LINE_H, PAD = 26;
     var y = function (m) { return H - ((m - b.lo) / (b.hi - b.lo)) * H; };
     var x = function (t) { return PAD + (t / b.dur) * (W - PAD); };
@@ -14849,6 +14899,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var dur = +svg.getAttribute('data-dur') || 0;
     var W = 300, PAD = 26;
     follow = { svg: svg, audio: audio, raf: 0 };
+    ST.overlay = { notes: LINES[svg.getAttribute('data-pl') || ''] || null, audio: audio };
     ph.setAttribute('opacity', '1');
     (function step() {
       if (!follow || follow.svg !== svg) return;
@@ -14866,6 +14917,53 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   ST.unfollow = function () {
     if (follow && follow.raf) cancelAnimationFrame(follow.raf);
     follow = null;
+    ST.overlay = null;
+  };
+
+  /* Robert, 13 Sep: "on the playback on the pitch tracker, show the notes
+     on the main key map so they can sing over it — a different colour for
+     the playback notes, keep the live vocals blue, so they can see where
+     they are hitting in comparison."
+
+     The tracker's own draw calls this after it has drawn the live line,
+     handing over its scale, so the take is drawn to the very same pixels:
+     now is the right edge, the past scrolls left. The take's own clock is
+     the audio, so its line sits exactly where it was at that moment of the
+     recording and yours sits where you are — the same x is the same
+     instant. Gold for the take, blue for you. A dot at the edge marks the
+     take's note right now, which is the one to aim at. */
+  window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
+    var o = ST.overlay;
+    if (!o || !o.notes || !o.audio || o.audio.ended) return;
+    var t0 = o.audio.currentTime || 0;
+    var notes = o.notes;
+    c2.save();
+    c2.beginPath();
+    var pen = false, prev = null, cur = null;
+    for (var i = 0; i < notes.length; i++) {
+      var n = notes[i];
+      if (n.m == null) { pen = false; prev = null; continue; }
+      var x = W - (t0 - n.t) * pps;
+      if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+      var y = yOf(n.m);
+      var leap = prev && Math.abs(n.m - prev.m) > 6;
+      if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+      pen = true; prev = n;
+      if (n.t <= t0) cur = n;
+    }
+    c2.strokeStyle = 'rgba(232,179,74,.95)';
+    c2.lineWidth = 2.5;
+    c2.shadowColor = 'rgba(232,179,74,.7)';
+    c2.shadowBlur = 8;
+    c2.stroke();
+    c2.shadowBlur = 0;
+    if (cur && !o.audio.paused) {
+      c2.beginPath();
+      c2.arc(W - 5, yOf(cur.m), 5, 0, Math.PI * 2);
+      c2.fillStyle = 'rgba(232,179,74,1)';
+      c2.fill();
+    }
+    c2.restore();
   };
 
   /* ---------------------------------------------------------------- */
@@ -14994,8 +15092,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.className = 'panel';
     d.style.cssText = 'margin-top:10px;padding:12px';
     d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Sing over one, keep it on your phone, or send it ' +
-      'to your coach — the notes go with it, so he sees where you were as well as hears it.</div>' +
+      '<div class="notice" style="margin:8px 0 9px">Play one back, keep it, or send it to your coach. The notes go with it.</div>' +
       '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
     fillTakes();
@@ -15287,10 +15384,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   function wireMonitor() {
     var n = live();
-    if (!n || typeof MIC === 'undefined' || !MIC.src) return;
-    try { MIC.src.connect(n.input); } catch (e) {}
+    if (!n) return;
+    if (typeof MIC !== 'undefined' && MIC.src) { try { MIC.src.connect(n.input); } catch (e) {} }
     try { n.out.disconnect(); } catch (e) {}
-    if (V.monitor) { try { n.out.connect(ctx.destination); } catch (e) {} }
+    /* Briar, 13 Sep: tapping an effect while a take was playing cut the
+       sound, and playing again did not carry the new effect. The output
+       was being unplugged to re-plug it for the monitor; the playback
+       runs through the same chain, so it went silent. Keep it plugged in
+       while anything is playing — the effects apply live. */
+    if (V.monitor || V.playing) { try { n.out.connect(ctx.destination); } catch (e) {} }
   }
 
   /* ---------------------------------------------------------------- */
@@ -15307,8 +15409,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return d;
   }
 
-  function seg(group, map, cur) {
-    var h = '<div class="rp-fxrow">';
+  var ABOUT = {
+    comp: 'Compressor: evens out your loud and quiet bits so a whisper and a belt sit closer together. Radio voices are compressed.',
+    eq:   'EQ: turns parts of the sound up or down. Warm adds body, Bright adds air, Telephone strips both.',
+    echo: 'Echo: repeats of your voice, fading. Slap is one quick repeat; Long is the canyon.',
+    verb: 'Reverb: the room. Off is a cupboard, Hall is a church. It hides small wobbles — which is why singers like it and why it is off on the Pitch Tracker.'
+  };
+  function seg(group, map, cur, label) {
+    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'COMPRESSOR' ? ';margin-top:12px' : '') + '">' +
+      '<div class="rp-lab" style="margin:0">' + label + '</div>' +
+      '<span class="rp-info" data-about="' + group + '" title="What is this?">i</span></div>' +
+      '<div class="rp-about measured" id="rpAbout_' + group + '" style="display:none;margin:2px 0 8px">' + esc(ABOUT[group] || '') + '</div>' +
+      '<div class="rp-fxrow">';
     Object.keys(map).forEach(function (k) {
       h += '<button class="rp-fxbtn' + (cur === k ? ' on' : '') + '" data-fx="' + group + '" data-val="' + k + '">' +
         esc(map[k].label) + '</button>';
@@ -15336,14 +15448,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<b style="font-size:13px">Hear yourself</b>' +
       '<button class="btn' + (V.monitor ? ' primary' : '') + '" id="rpVMon" style="padding:8px 13px;font-size:12.5px">' +
       (V.monitor ? 'On' : 'Off') + '</button></div>' +
-      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal. ' +
-      'There is a small delay on a phone; that is the phone, not you.</div></div>';
+      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal.</div>' +
+      '<div class="measured" style="margin-top:6px">There is a delay between your mouth and your ears on every phone — ' +
+      'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      '<div class="rp-lab">COMPRESSOR</div>' + seg('comp', COMP, V.fx.comp) +
-      '<div class="rp-lab" style="margin-top:12px">EQ</div>' + seg('eq', EQ, V.fx.eq) +
-      '<div class="rp-lab" style="margin-top:12px">ECHO</div>' + seg('echo', ECHO, V.fx.echo) +
-      '<div class="rp-lab" style="margin-top:12px">REVERB</div>' + seg('verb', VERB, V.fx.verb) +
+      seg('comp', COMP, V.fx.comp, 'COMPRESSOR') +
+      seg('eq', EQ, V.fx.eq, 'EQ') +
+      seg('echo', ECHO, V.fx.echo, 'ECHO') +
+      seg('verb', VERB, V.fx.verb, 'REVERB') +
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
@@ -15356,6 +15469,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
     on($('rpVMon'), 'click', toggleMonitor);
     visStart();
+    host.querySelectorAll('[data-about]').forEach(function (b) {
+      on(b, 'click', function () {
+        var a = $('rpAbout_' + b.dataset.about);
+        if (!a) return;
+        var show = a.style.display === 'none';
+        a.style.display = show ? '' : 'none';
+        b.classList.toggle('on', show);
+      });
+    });
     host.querySelectorAll('[data-fx]').forEach(function (b) {
       on(b, 'click', function () {
         V.fx[b.dataset.fx] = b.dataset.val;
@@ -15939,6 +16061,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   try { startedAt = +(localStorage.getItem('rp_test_at') || 0); } catch (e) {}
 
   var STEPS = [
+    { key: 'range', name: 'Sing your range',
+      what: 'Your lowest comfortable note, then your highest. About a minute. Every exercise is then built around it.',
+      measures: 'your range', mode: 'you',
+      go: function () {
+        try { if (window.RPProfile) RPProfile.open('voice'); } catch (e) {}
+        setTimeout(function () {
+          var b = $('btnRangeTest');
+          if (b) { try { b.scrollIntoView({ block: 'center' }); } catch (e) {} b.click(); }
+        }, 350);
+      } },
     { key: 'sustain', name: 'Hold one note steady',
       what: 'Five seconds on one note. It measures how much of the hold stayed on the note.',
       measures: 'breath and steadiness', mode: 'train',
@@ -15948,9 +16080,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       measures: 'your ear', mode: 'train',
       go: function () { try { V10.startDrill('hilo'); } catch (e) {} } },
     { key: 'sing', name: 'Sing the note back',
-      what: 'It plays a note, you sing it. Measured the same way — distance from the note.',
+      what: 'A note plays, you sing it and hold it. Ten rounds. It counts how many you matched.',
       measures: 'pitch, with your own voice', mode: 'train',
-      go: function () { try { V10.startDrill('tonic'); } catch (e) {} } },
+      go: function () { var b = $('btnMatch'); if (b) b.click(); } },
     { key: 'theory', name: 'Name the interval',
       what: 'Is that a third, a fifth, an octave? Three stars if you have it.',
       /* The theory games render into modeLearn, not modeTrain. Sending
@@ -15972,17 +16104,36 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     });
   }
 
+  function isMatch(r) { return /note match/i.test(r.label || ''); }
   function resultFor(key) {
     var rs = mine();
+    if (key === 'range') {
+      var rg = null;
+      try { rg = window.RPRange ? RPRange.get() : null; } catch (e) {}
+      if (!rg || rg.by !== 'test' || !rg.at) return null;
+      if (new Date(rg.at).getTime() < startedAt) return null;
+      return { lo: rg.lo, hi: rg.hi };
+    }
+    if (key === 'sing') {
+      var mm = rs.filter(function (r) { return r.kind === 'ear' && isMatch(r) && r.out_of; });
+      if (!mm.length) return null;
+      var best = mm.slice().sort(function (a, b) { return b.score / b.out_of - a.score / a.out_of; })[0];
+      return { score: best.score, outOf: best.out_of };
+    }
     if (key === 'sustain') {
       var s = rs.filter(function (r) { return r.kind === 'sustain' && r.pct != null; });
       return s.length ? { pct: Math.max.apply(null, s.map(function (r) { return r.pct; })) } : null;
     }
-    if (key === 'ear' || key === 'sing') {
-      var e = rs.filter(function (r) { return r.kind === 'ear' && r.cents != null; });
+    if (key === 'ear') {
+      /* Briar, 15 Sep: "Hear the note didn't save my progress." Higher or
+         lower is listening only, so its row has a score and no cents; this
+         only counted rows with cents. Either counts now. */
+      var e = rs.filter(function (r) { return r.kind === 'ear' && !isMatch(r) && (r.cents != null || r.out_of); });
       if (!e.length) return null;
-      return { cents: Math.min.apply(null, e.map(function (r) { return r.cents; })),
-               runs: e.length };
+      var withC = e.filter(function (r) { return r.cents != null; });
+      var best = e.slice().sort(function (a, b) { return (b.score || 0) / (b.out_of || 1) - (a.score || 0) / (a.out_of || 1); })[0];
+      return { cents: withC.length ? Math.min.apply(null, withC.map(function (r) { return r.cents; })) : null,
+               score: best.score, outOf: best.out_of, runs: e.length };
     }
     if (key === 'theory') {
       var g = rs.filter(function (r) { return r.kind === 'game' && r.score != null; });
@@ -15998,8 +16149,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      measurements — two runs of the same measure is what it is. */
   function said(key, r) {
     if (!r) return '';
+    if (key === 'range') { try { return midiName(r.lo) + ' to ' + midiName(r.hi); } catch (e) { return r.lo + ' to ' + r.hi; } }
     if (key === 'sustain') return r.pct + '% of the hold stayed on the note';
-    if (key === 'ear' || key === 'sing') return 'closest was ' + r.cents + ' cents off';
+    if (key === 'ear') return r.cents != null ? 'closest was ' + r.cents + ' cents off' : r.score + ' of ' + r.outOf + ' right';
+    if (key === 'sing') return r.score + ' of ' + r.outOf + ' notes matched';
     if (key === 'theory') return r.stars + ' of ' + r.outOf + ' stars';
     return '';
   }
@@ -16017,16 +16170,19 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* has to take the verdict's word for it.                              */
   /* ------------------------------------------------------------------ */
   T.place = function () {
-    var sus = resultFor('sustain'), ear = resultFor('ear'), th = resultFor('theory');
+    var sus = resultFor('sustain'), ear = resultFor('ear'), th = resultFor('theory'), mt = resultFor('sing'), rg = resultFor('range');
     var sing = null, taught = null, why = [];
 
-    if (sus || ear) {
+    if (rg) why.push('sang from ' + said('range', rg));
+    if (sus || ear || mt) {
       var n = 0, tot = 0;
       if (sus) { tot += sus.pct >= 75 ? 3 : sus.pct >= 45 ? 2 : 1; n++; }
-      if (ear) { tot += ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1; n++; }
+      if (ear) { var ef = ear.cents != null ? (ear.cents <= 20 ? 3 : ear.cents <= 45 ? 2 : 1) : ((ear.score || 0) / (ear.outOf || 1) >= 0.8 ? 3 : (ear.score || 0) / (ear.outOf || 1) >= 0.5 ? 2 : 1); tot += ef; n++; }
+      if (mt) { var f = mt.score / mt.outOf; tot += f >= 0.8 ? 3 : f >= 0.5 ? 2 : 1; n++; }
       sing = Math.round(tot / n);
       if (sus) why.push('held a note ' + sus.pct + '% steady');
-      if (ear) why.push('got within ' + ear.cents + ' cents of the note');
+      if (ear) why.push(ear.cents != null ? 'got within ' + ear.cents + ' cents of the note' : 'got ' + ear.score + ' of ' + ear.outOf + ' right by ear');
+      if (mt) why.push('matched ' + mt.score + ' of ' + mt.outOf + ' notes');
     }
     if (th) {
       taught = th.stars >= 3 ? 3 : th.stars >= 2 ? 2 : 1;
@@ -16067,10 +16223,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   function draw() {
     var p = T.place();
-    var h = '<b style="font-size:18px">Where am I actually at?</b>' +
-      '<div class="measured" style="margin-top:8px">Four short things. Nothing here is a guess — ' +
-      'each one measures something and shows you the number. Do them in any order, stop whenever ' +
-      'you like, come back to it later.</div>';
+    var h = '<b style="font-size:18px">Where are you at?</b>' +
+      '<div class="measured" style="margin-top:8px">Five short things. Each one measures something and shows you the number. Any order. Stop whenever you like.</div>';
 
     h += '<div class="rp-lab" style="margin-top:16px">' + p.done + ' OF ' + p.total + ' DONE</div>';
 
@@ -16125,14 +16279,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         /* Leave no other exercise open behind this one. Starting the ear drill
            straight after the steady note otherwise landed you on Train with
            both panels stacked up the screen. */
-        ['susPanel', 'v10Ear', 'v10Game', 'v10Guided'].forEach(function (id) {
+        ['susPanel', 'v10Ear', 'v10Game', 'v10Guided', 'matchPanel'].forEach(function (id) {
           var el = $(id);
           if (el) el.style.display = 'none';
         });
         try { window.switchMode(s.mode || 'train'); } catch (e) {}
         setTimeout(function () { s.go(); }, 140);
-        /* Coming back here afterwards is the singer's move, not ours — the
-           app must not yank them out of an exercise the moment it finishes. */
+        /* Briar, 15 Sep: both drills "sent me back to the train menu". So:
+           when the step's own screen closes, the test comes back — never
+           before, so nobody is yanked out of an exercise mid-way. */
+        pending = { key: s.key, since: Date.now() };
       });
     });
     on($('rpTestX'), 'click', shut);
@@ -16148,10 +16304,29 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       ME.measured = { at: new Date().toISOString(), sing: q.sing, taught: q.taught, why: q.why };
       ME.save();
       shut();
-      try { if (window.RP && RP.toast) RP.toast('Done — that is measured, not guessed.'); } catch (e) {}
+      try { if (window.RP && RP.toast) RP.toast('Done. That is measured.'); } catch (e) {}
       try { if (ME.apply) ME.apply(); } catch (e) {}
     });
   }
+
+  /* ------------------------------------------------------------------ */
+  /* back to the test when a step's screen has closed                    */
+  /* ------------------------------------------------------------------ */
+  var pending = null;
+  var PANEL = { range: 'rtBox', sustain: 'susPanel', ear: 'v10Ear', sing: 'matchPanel', theory: 'v10Game' };
+  function visible(id) { var el = $(id); return !!(el && el.offsetParent !== null && el.style.display !== 'none'); }
+  setInterval(function () {
+    if (!pending) return;
+    var id = PANEL[pending.key];
+    /* the drill's own "Back to Train" says where it really goes */
+    var eb = $('earBack'); if (eb && eb.textContent !== 'Back to the test') eb.textContent = 'Back to the test';
+    if (Date.now() - pending.since < 1500) return;          /* give the screen time to open */
+    if (visible(id)) { pending.seen = true; return; }
+    if (!pending.seen) { if (Date.now() - pending.since > 8000) pending = null; return; }   /* never opened: let it go */
+    var key = pending.key; pending = null;
+    try { T.open(); } catch (e) {}
+    try { if (window.RP && RP.toast && resultFor(key)) RP.toast('Saved. Next one when you are ready.'); } catch (e) {}
+  }, 500);
 
   /* ------------------------------------------------------------------ */
   /* the way in, from Profile                                            */
@@ -16169,10 +16344,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     var p = T.place();
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div style="flex:1;min-width:0"><div class="rp-ttl">Test me — where am I actually at?</div>' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Test me</div>' +
       '<div class="rp-sub">' + (p.done
-        ? p.done + ' of ' + p.total + ' done. Measured, not guessed.'
-        : 'Four short things that measure instead of asking.') + '</div></div>' +
+        ? p.done + ' of ' + p.total + ' done.'
+        : 'Five short things that measure where you are.') + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     if (fresh) {
       on(d, 'click', function () { T.open(); });
@@ -16733,7 +16908,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var cur = T.dose();
     var h = '<b style="font-size:18px">How much extra?</b>' +
       '<div class="measured" style="margin-top:8px">Words, and the reason an exercise works. ' +
-      'It is meant to be a nudge, not homework — so you set how much of it you want.</div>' +
+      'You choose how much of it you want.</div>' +
       '<div style="margin-top:14px">';
     DOSES.forEach(function (d) {
       h += '<div class="rp-card' + (d.k === cur ? ' hot' : '') + '" data-dose="' + d.k + '" ' +
@@ -16743,11 +16918,6 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div class="rp-sub">' + esc(d.sub) + '</div></div>';
     });
     h += '</div>' +
-      '<div class="rp-card" style="margin-top:6px;padding:12px;border-left:3px solid var(--gold)">' +
-      '<div style="font-size:12.5px;line-height:1.55">What you will <i>not</i> see yet is trivia about ' +
-      'songs and artists — the Grammy year, the thing the singer did in 1974. That needs a catalogue of ' +
-      'songs, and this app does not take lyrics or audio from anywhere. Until there is a source we are ' +
-      'allowed to use, saying nothing beats making something up.</div></div>' +
       '<button class="btn" id="rpDoseX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
     var box = sheet(h);
     on($('rpDoseX'), 'click', shut);
@@ -17041,20 +17211,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   B.open = function (openId) {
     var h = '<b style="font-size:18px">Before the voice</b>' +
       '<div class="measured" style="margin-top:8px">About ' + mins() + ' minutes, and none of it ' +
-      'makes a sound. Do the lot or pick one — it is not a routine you can fail.</div>';
+      'makes a sound. Do the lot or pick one.</div>';
 
     /* The safety panel is not small print and is not at the bottom. */
     h += '<div class="rp-card" style="margin-top:14px;padding:13px;border-left:3px solid var(--miss)">' +
       '<div class="rp-lab" style="color:var(--miss)">THE ONE RULE</div>' +
       '<div style="font-size:13.5px;line-height:1.55;margin-top:5px">' +
-      '<b>Nothing here touches the front of your throat.</b> You will find videos telling singers ' +
-      'to massage their own voice box. We are not going to, and neither should you on your own: the ' +
-      'front of the neck carries the artery to your brain and a bone that breaks, and people have ' +
-      'been seriously hurt doing it to themselves.</div>' +
+      '<b>Nothing here touches the front of your throat.</b> Some videos tell singers to massage their own voice box. Do not. The front of the neck carries the artery to your brain and a bone that breaks.</div>' +
       '<div style="font-size:13px;line-height:1.55;margin-top:8px;color:var(--ink-dim)">' +
-      'That work is real and it helps — but it is a voice therapist’s hands, in a room with you. ' +
-      'If your throat feels tight and it will not settle, that is who to see. An app cannot do it ' +
-      'and should not pretend.</div></div>';
+      'If your throat feels tight and will not settle, see a voice therapist.</div></div>';
 
     ITEMS.forEach(function (x) {
       var open = x.id === openId;
@@ -17077,9 +17242,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       h += '</div>';
     });
 
-    h += '<div class="measured" style="margin-top:14px;font-size:11.5px">Hold anything here briefly ' +
-      'and keep moving. A long stretch before you sing takes strength out of you rather than ' +
-      'putting it in — which is the opposite of what most people have been told.</div>';
+    h += '<div class="measured" style="margin-top:14px;font-size:11.5px">Hold anything here briefly and keep moving. A long stretch before you sing takes strength out, not in.</div>';
     h += '<button class="btn" id="rpBodyX" style="width:100%;padding:12px;margin-top:14px">Close</button>';
 
     var box = sheet(h);
@@ -17321,8 +17484,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   G.open = function (id) {
     if (id) return one(id);
     var h = '<b style="font-size:18px">What do you want to be able to do?</b>' +
-      '<div class="measured" style="margin-top:8px">Say it however you would say it out loud. ' +
-      'You do not need to know what any exercise is called — that is the app’s job.</div>' +
+      '<div class="measured" style="margin-top:8px">Say it the way you would say it out loud. You do not need to know what any exercise is called.</div>' +
       '<div style="margin-top:14px">';
     GOALS.forEach(function (g) {
       h += '<div class="rp-card" data-goal="' + esc(g.id) + '" style="cursor:pointer;padding:12px;' +
@@ -17519,8 +17681,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     function draw() {
       var h = '<b style="font-size:18px">What you teach</b>' +
         '<div class="measured" style="margin-top:8px">Your words, not the app’s. Nothing here is ' +
-        'worked out from your students or what you have assigned — a coach saying what he teaches ' +
-        'is a claim he gets to make himself.</div>';
+        'worked out from your students or what you have assigned — a coach saying what they teach ' +
+        'is a claim they get to make themselves.</div>';
 
       h += '<div class="rp-lab" style="margin-top:16px">MUSIC</div><div style="margin-top:7px">';
       GENRES.forEach(function (x) {
@@ -17960,8 +18122,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         'name on it. Two minutes of singing gets you your own.</div></div>';
     }
 
-    h += '<div class="measured" style="margin-top:12px">Every exercise ladders through this, so it is ' +
-      'worth it being right. It is kept on this phone and on your account, and your coach can see it.</div>';
+    h += '<div class="measured" style="margin-top:12px">Every exercise is built around this, so it is worth getting right. Your coach can see it.</div>';
 
     h += '<button class="btn primary" id="rpRgTest" style="width:100%;padding:11px;margin-top:12px;' +
       'font-size:12.5px">Sing it and measure it</button>';
@@ -18161,7 +18322,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div class="sub" style="font-size:12.5px;color:var(--ink-dim);font-weight:600">' +
         (window.RP && RP.user && !RP.coach
           ? 'Nobody has set you work, so this is Repertoire’s own plan. Join a coach on the Coach tab and theirs goes here instead.'
-          : 'Repertoire’s own plan, built from what it has measured. It changes as you do.') + '</div>';
+          : 'Repertoire’s plan for today. It changes as you do.') + '</div>';
       if (plan) {
         h += '<div style="margin:12px 0 4px">' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
@@ -18391,11 +18552,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   var LEVELS = [[0, 'Any level'], [1, 'Beginner'], [2, 'Intermediate'], [3, 'Advanced']];
   var TOOLS = [
     ['btnMatch',   'Note Match',   'A note plays, you sing it back and hold it. Ten rounds.'],
-    ['btnKbd',     'Keyboard',     'Press a note, hear it, sing it back, see where you landed.'],
+    ['btnKbd',     'Keyboard',     'Free play: press a note, sing it back. Not scored — Note Match and Sustain Hold are.'],
     ['btnSustain', 'Sustain Hold', 'Hold one note dead steady for five seconds.']
   ];
   var DRILLS = [
-    ['tonic',   'Find home',       'A phrase plays. Sing the note it wants to rest on.'],
+    ['tonic',   'Sing the home note', 'A short tune plays. Sing the note it sounds finished on.'],
     ['degree',  'Name the degree', 'A key is set, then one note plays. Which one is it, 1 to 7?'],
     ['singdeg', 'Sing the degree', 'A key is set. Then sing the one it asks for.'],
     ['hilo',    'Higher or lower', 'Two notes. Which was higher? Listening only.']
@@ -18423,6 +18584,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return '<div class="rp-card" data-exopen="' + esc(e.id) + '" style="padding:12px;cursor:pointer;margin-top:8px">' +
       '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
       '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(e.name) +
+      '<span class="rp-info" title="What is this?">i</span>' +
       (e.quiet ? '<span class="rp-tag">quiet ok</span>' : '') + '</div>' +
       '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
       (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
@@ -18431,6 +18593,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '</div></div>';
   }
   function wireEx(root, backTo) {
+    if (window.RPExample) { try { RPExample.wire(root); } catch (e) {} }
     root.querySelectorAll('[data-exstart]').forEach(function (b) {
       on(b, 'click', function (ev) { ev.stopPropagation(); TR.start(b.dataset.exstart); });
     });
@@ -18474,6 +18637,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="width:100%;padding:13px;font-size:14px">Start</button>' +
       '<div class="rp-card" style="margin-top:14px;padding:13px;font-size:13.5px;line-height:1.55">' +
       '<div class="rp-lab">WHAT</div><div>' + strip(e.what) + '</div>' +
+      (window.RPExample ? '<div style="margin-top:10px">' + RPExample.button(e.id) + '</div>' : '') +
       (e.how ? '<div class="rp-lab" style="margin-top:12px">HOW</div><div>' + e.how + '</div>' : '') +
       (e.miss ? '<div class="rp-lab" style="margin-top:12px">WATCH FOR</div><div>' + e.miss + '</div>' : '') +
       (e.why ? '<div class="rp-lab" style="margin-top:12px">WHY IT WORKS</div><div>' + e.why + '</div>' : '') +
@@ -18506,7 +18670,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(t[1]) + '</div><div class="rp-sub">' + esc(t[2]) + '</div></div>' +
           '<button class="btn primary" data-drill="' + t[0] + '" style="padding:9px 14px;font-size:12.5px">Play</button></div></div>';
       });
-      h += '<div class="measured" style="margin-top:10px">These ask you to sing back, not just tap an answer — hearing a note and producing it are different skills, and only one of them makes you sing better.</div>';
+      h += '<div class="measured" style="margin-top:10px">Most of these ask you to sing the answer, not tap it. Hearing a note and singing it are different skills.</div>';
     }
     var list = listFor(cat, level);
     if (list.length) {
@@ -18580,9 +18744,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
           (sel.level ? ' · ' + esc(lvlName(sel.level).toUpperCase()) : '') + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
-          '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(one.name) + '</div>' +
+          '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
+          '<span class="rp-info" title="What is this?">i</span></div>' +
           '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
           '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
+          (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(one.id, true) + '</div>' : '') +
           '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See more ' +
           esc(c.name.toLowerCase()) + '</button></div>';
       }
@@ -18638,14 +18804,38 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   /* hide the top while something is actually running, so the exercise is
      the first thing on the screen */
+  /* Only what is actually on the screen counts. The first version also
+     asked the routine whether it was "on" — and a routine you walk out of
+     half-way stays on forever, so the Train tab came back black until a
+     refresh. Briar found that one. */
+  /* Profile → Help: every exercise, what it is and how to do it */
+  function helpRow() {
+    var d = $('rpExRow');
+    if (d) return;
+    d = document.createElement('div');
+    d.id = 'rpExRow';
+    d.className = 'rp-card';
+    d.style.cursor = 'pointer';
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">Every exercise, explained</div>' +
+      '<div class="rp-sub">What each one is and how to do it.</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
+    on(d, 'click', function () {
+      try { window.switchMode('train'); } catch (e) {}
+      setTimeout(TR.all, 120);
+    });
+    var host = $('modeYou') || document.body;
+    host.appendChild(d);
+  }
+  setInterval(helpRow, 1500);
+  setTimeout(helpRow, 800);
+
   function running() {
-    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel'];
+    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox'];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
-      if (el && el.style.display && el.style.display !== 'none') return true;
-      if (el && !el.style.display && ids[i] === 'v10Guided') return false;
+      if (el && el.offsetParent !== null) return true;
     }
-    try { if (V10.routineState && V10.routineState.on) return true; } catch (e) {}
     return false;
   }
   function watch() {
@@ -18743,6 +18933,61 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return out;
   }
 
+  /* Robert, 14 Sep: "maybe we can have an example to show/hear on the
+     cards to help people visualise and understand." Each is a few notes
+     played with the app's own reference sound: (midi, seconds from now,
+     length). Same offset = together. */
+  function P(m, at, dur, vol) { try { V10._play(m, at, dur == null ? 0.7 : dur, vol == null ? 0.5 : vol); } catch (e) {} }
+  function run(list, gap, dur) { list.forEach(function (m, i) { P(m, i * (gap || 0.45), dur || 0.42); }); return list.length * (gap || 0.45); }
+  function chord(list, at, dur) { list.forEach(function (m) { P(m, at || 0, dur || 1.2, 0.36); }); }
+  var EX = {
+    1:  { say: 'One note, held', go: function () { P(60, 0, 1.4); } },
+    2:  { say: 'A to G, then A again', go: function () { run([57, 59, 60, 62, 64, 65, 67, 69]); } },
+    3:  { say: 'A half step, then a whole step', go: function () { run([60, 61]); run([60, 62]).valueOf(); P(60, 1.2, 0.42); P(62, 1.65, 0.42); } },
+    4:  { say: 'C, C sharp, D', go: function () { run([60, 61, 62], 0.55); } },
+    5:  { say: 'C, then the C an octave up', go: function () { P(60, 0, 0.8); P(72, 0.9, 0.8); chord([60, 72], 2.0, 1.2); } },
+    7:  { say: 'Four beats', go: function () { run([67, 67, 67, 67], 0.6, 0.15); } },
+    14: { say: 'A scale, bottom to top', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.38); } },
+    15: { say: 'The major scale from C', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.38); } },
+    16: { say: 'Up the scale, then home', go: function () { var t = run([60, 62, 64, 65, 67, 69, 71], 0.36); P(72, t, 0.5); P(60, t + 0.9, 1.3); } },
+    17: { say: 'Degrees 1 to 7, then 1 again', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.4); } },
+    20: { say: 'Major, then minor: only the middle note moves', go: function () { chord([60, 64, 67], 0, 1.1); chord([60, 63, 67], 1.4, 1.3); } },
+    21: { say: 'The natural minor scale from A', go: function () { run([57, 59, 60, 62, 64, 65, 67, 69], 0.38); } },
+    25: { say: 'A third, then a fifth', go: function () { P(60, 0, 0.5); P(64, 0.55, 0.6); P(60, 1.5, 0.5); P(67, 2.05, 0.7); } },
+    28: { say: 'Three notes at once: a chord', go: function () { chord([60, 64, 67], 0, 1.6); } },
+    29: { say: 'Root, third, fifth — then together', go: function () { run([60, 64, 67], 0.5, 0.45); chord([60, 64, 67], 1.7, 1.4); } },
+    30: { say: 'The chord, then its third on its own', go: function () { chord([60, 64, 67], 0, 1.2); P(64, 1.5, 1.2); } },
+    31: { say: 'Four chords that all belong to C', go: function () { chord([60, 64, 67], 0, 0.7); chord([65, 69, 72], 0.8, 0.7); chord([67, 71, 74], 1.6, 0.7); chord([60, 64, 67], 2.4, 1.2); } },
+    33: { say: 'Home, away, tension, home', go: function () { chord([60, 64, 67], 0, 0.7); chord([65, 69, 72], 0.8, 0.7); chord([67, 71, 74], 1.6, 0.7); chord([60, 64, 67], 2.4, 1.2); } },
+    34: { say: 'A cadence: the tension chord, then home', go: function () { chord([67, 71, 74], 0, 0.9); chord([60, 64, 67], 1.0, 1.5); } },
+    35: { say: 'A plain chord, then the same with a seventh', go: function () { chord([60, 64, 67], 0, 1.1); chord([60, 64, 67, 70], 1.4, 1.4); } },
+    43: { say: 'A tune, then the same tune a third higher', go: function () { run([60, 62, 64, 62, 60], 0.36); run([64, 65, 67, 65, 64].map(function (m) { return m; }), 0.36).valueOf(); } },
+    45: { say: 'Major, then the same notes started on D', go: function () { run([60, 62, 64, 65, 67, 69, 71, 72], 0.3); [62, 64, 65, 67, 69, 71, 72, 74].forEach(function (m, i) { P(m, 2.7 + i * 0.3, 0.32); }); } },
+    47: { say: 'The pentatonic: five notes', go: function () { run([60, 62, 64, 67, 69, 72], 0.38); } }
+  };
+  /* two runs one after the other, for the rows above that play two things */
+  EX[3].go = function () { P(60, 0, 0.42); P(61, 0.45, 0.42); P(60, 1.3, 0.42); P(62, 1.75, 0.42); };
+  EX[43].go = function () { run([60, 62, 64, 62, 60], 0.36); [64, 65, 67, 65, 64].forEach(function (m, i) { P(m, 2.1 + i * 0.36, 0.34); }); };
+  function hearButton(row) {
+    if (!(window.RPExample && RPExample.enabled)) return;   /* off with the rest of Hear it */
+    var body = row.querySelector('.lsnbody');
+    if (!body || body.querySelector('[data-lhear]')) return;
+    var n = +row.dataset.lsn;
+    var ex = EX[n];
+    if (!ex) return;
+    var b = document.createElement('button');
+    b.className = 'btn';
+    b.setAttribute('data-lhear', n);
+    b.style.cssText = 'padding:8px 12px;font-size:12.5px;margin:2px 0 10px';
+    b.textContent = '▶ Hear it — ' + ex.say;
+    on(b, 'click', function (ev) {
+      ev.stopPropagation();
+      try { if (typeof ensureCtx === 'function') ensureCtx(); } catch (e) {}
+      ex.go();
+    });
+    body.insertBefore(b, body.firstChild);
+  }
+
   function infoButton(row) {
     if (row.querySelector('.rp-info')) return;
     var b = document.createElement('span');
@@ -18782,7 +19027,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
                      tag: nd ? nd + ' of ' + list.length : '' });
       });
       top.innerHTML = '<h1 style="margin:0 0 2px">Learn</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when he says it. Pick a subject.</div>' +
+        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when they say it. Pick a subject.</div>' +
         RPPage.tiles(tiles);
       top.style.display = '';
       unit.style.display = 'none';
@@ -18803,7 +19048,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         ' Tap ⓘ for what a row is about.</div>';
       var box = document.createElement('div');
       unit.appendChild(box);
-      rows.forEach(function (el) { el.style.display = ''; box.appendChild(el); infoButton(el); });
+      rows.forEach(function (el) { el.style.display = ''; box.appendChild(el); infoButton(el); hearButton(el); });
       /* the rows the base drew that are not this subject stay parked */
       h.games.forEach(function (el) { if (rows.indexOf(el) < 0) el.style.display = 'none'; });
       h.order.forEach(function (u) { h.units[u].forEach(function (el) { if (rows.indexOf(el) < 0) el.style.display = 'none'; }); });
@@ -18886,11 +19131,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
-      folds: ['Sound', 'Reference notes', 'Microphone'], cards: [] },
+      folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
-      folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow'] }
+      folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
   ];
 
   function foldNamed(name) {
@@ -18935,17 +19180,46 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var box = holder('rpPG_' + g.key);
       if (!box) return;
       g.folds.forEach(function (name) {
-        var f = foldNamed(name);
-        if (f && f.parentElement !== box) box.appendChild(f);
+        /* Briar, 15 Sep: five "Your voice" rows stacked up. The base rebuilds
+           its folds when a level button is tapped; the new one was moved in
+           beside the old ones instead of in their place. Newest wins. */
+        var fresh = null, all = document.querySelectorAll('#youSlots details.pfold');
+        for (var i = 0; i < all.length; i++) {
+          var sp = all[i].querySelector('summary span');
+          if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) { fresh = all[i]; break; }
+        }
+        if (fresh) {
+          Array.prototype.slice.call(box.querySelectorAll('details.pfold')).forEach(function (d) {
+            var sp = d.querySelector('summary span');
+            if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) d.remove();
+          });
+          box.appendChild(fresh);
+          fresh.open = true;
+          if (name === 'Your voice') tidyVoice(fresh);
+        }
       });
       g.cards.forEach(function (id) {
         var c = $(id);
+        if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (c && c.parentElement !== box) {
-          if (id === 'rpRangePanelHolder') box.insertBefore(c, box.firstChild); else box.appendChild(c);
+          if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
       });
     });
   }
+
+  /* the base's own "Your voice" fold repeats the range the panel above it
+     already shows, and tells you to test it on the Train tab — which is no
+     longer where it is */
+  function tidyVoice(f) {
+    var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
+    var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
+    var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
+  }
+  /* while a Profile page is open, a rebuilt fold is picked up straight away */
+  setInterval(function () {
+    try { if (window.RPPage && RPPage.isOpen() && document.querySelector('#youSlots details.pfold')) gather(); } catch (e) {}
+  }, 600);
 
   PR.open = function (key) {
     var g = GROUPS.filter(function (x) { return x.key === key; })[0];
@@ -18956,17 +19230,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* folds open by default on a page — the page is the fold now */
     box.querySelectorAll('details.pfold').forEach(function (d) { d.open = true; });
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
-    if (key === 'voice') {
-      /* the base's own "Your voice" fold repeats the range the panel above
-         it already shows, and tells you to test it on the Train tab — which
-         is no longer where it is */
-      var f = foldNamed('Your voice');
-      if (f) {
-        var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
-        var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
-        var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
-      }
-    }
+    if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 
@@ -19584,6 +19848,144 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 </script>
 <script>
 /* ======================================================================
+   Repertoire Pro — keys under the Sustain Hold.
+
+   Robert, 13 Sep: "on the sustain hold exercise I want to see keys like
+   the piano exercise." And 14 Sep: "I want the keys to look and function
+   just like the keyboard feature."
+
+   So they are the keyboard's own keys — the same .kbd / .kbdkey markup
+   and styles the Keyboard tool uses — an octave wide, centred on the note
+   to hold. The note to hold is gold. The key you are singing lights the
+   way it does on the Keyboard. Tap a key and it plays; tap and it becomes
+   the note to hold, so you can pick your own note instead of the dealt
+   one. It reads the same numbers the exercise scores with — SUS.target
+   and the smoothed pitch — so it can never disagree with the "% steady".
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var raf = null, els = {}, lo = null, drawnTarget = null;
+  var NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function black(m) { return [1, 3, 6, 8, 10].indexOf(((m % 12) + 12) % 12) >= 0; }
+  function name(m) { try { return midiName(m); } catch (e) { return NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1); } }
+
+  function css() {
+    if ($('rpSusCSS')) return;
+    var s = document.createElement('style');
+    s.id = 'rpSusCSS';
+    s.textContent =
+      '#rpSusKeys{height:120px;margin:10px auto 4px;max-width:460px;}' +
+      '#rpSusKeys .kbdkey.white.target{background:linear-gradient(180deg,#f5d27a,#e8b34a);}' +
+      '#rpSusKeys .kbdkey.white.target span{color:#1a1408;}' +
+      '#rpSusKeys .kbdkey.black.target{background:#b8862c;}' +
+      '#rpSusKeys .kbdkey.black.lit{background:#7c5cff;}' +
+      '#rpSusHint{font-size:11.5px;color:var(--ink-faint);text-align:center;margin-bottom:6px;}';
+    document.head.appendChild(s);
+  }
+
+  function ensure() {
+    var panel = $('susPanel');
+    if (!panel) return null;
+    var k = $('rpSusKeys');
+    if (k) return k;
+    css();
+    k = document.createElement('div');
+    k.id = 'rpSusKeys';
+    k.className = 'kbd';
+    var hint = document.createElement('div');
+    hint.id = 'rpSusHint';
+    hint.textContent = 'Gold is the note to hold. Tap any key to hear it, or to hold that one instead.';
+    var live = $('susLive');
+    if (live && live.parentElement) { live.parentElement.insertBefore(k, live); live.parentElement.insertBefore(hint, live); }
+    else { panel.appendChild(k); panel.appendChild(hint); }
+    return k;
+  }
+
+  /* the keyboard's own key press: hear it, and make it the note to hold */
+  function press(m) {
+    try { if (typeof ensureCtx === 'function') ensureCtx(); } catch (e) {}
+    try {
+      var play = (window.V10 && V10.playRef) ? V10.playRef : window.playPiano;
+      if (play) play(m, ctx.currentTime + 0.02, 1.0, guideGain, 0.7);
+    } catch (e) {}
+    try {
+      if (typeof SUS !== 'undefined' && !SUS.running && m !== SUS.target) {
+        SUS.target = m;
+        var t = $('susTarget'); if (t) t.textContent = name(m);
+        var r = $('susResult'); if (r) r.textContent = '';
+      }
+    } catch (e) {}
+  }
+
+  function build(target) {
+    var host = ensure();
+    if (!host) return;
+    lo = target - 6;
+    host.innerHTML = '';
+    els = {};
+    var notes = [];
+    for (var m = lo; m <= target + 6; m++) notes.push(m);
+    while (notes.length && black(notes[notes.length - 1])) notes.pop();
+    while (notes.length && black(notes[0])) notes.shift();
+    var whites = notes.filter(function (m) { return !black(m); });
+    var wPct = 100 / whites.length, wi = 0;
+    notes.forEach(function (m) {
+      if (black(m)) return;
+      var el = document.createElement('div');
+      el.className = 'kbdkey white';
+      el.style.left = (wi * wPct) + '%';
+      el.style.width = wPct + '%';
+      el.innerHTML = '<span>' + name(m) + '</span>';
+      el.addEventListener('pointerdown', function (e) { e.preventDefault(); press(m); });
+      host.appendChild(el); els[m] = el; wi++;
+    });
+    wi = 0;
+    notes.forEach(function (m) {
+      if (!black(m)) { wi++; return; }
+      var el = document.createElement('div');
+      el.className = 'kbdkey black';
+      el.style.left = 'calc(' + (wi * wPct) + '% - ' + (wPct * 0.30) + '%)';
+      el.style.width = (wPct * 0.60) + '%';
+      el.addEventListener('pointerdown', function (e) { e.preventDefault(); press(m); });
+      host.appendChild(el); els[m] = el;
+    });
+    drawnTarget = target;
+  }
+
+  function frame() {
+    var panel = $('susPanel');
+    if (!panel || panel.offsetParent === null) { raf = null; return; }
+    var target = null, live = null;
+    try { target = (typeof SUS !== 'undefined' && SUS.target != null) ? Math.round(SUS.target) : null; } catch (e) {}
+    try { live = (typeof MIC !== 'undefined' && MIC.on && typeof smoothedMidi === 'function') ? smoothedMidi() : null; } catch (e) {}
+    if (target == null) { raf = requestAnimationFrame(frame); return; }
+    if (target !== drawnTarget || !$('rpSusKeys') || !Object.keys(els).length) build(target);
+
+    var lit = null;
+    if (live != null) {
+      var d = live - target;
+      d = ((d % 12) + 18) % 12 - 6;         /* fold to the strip so an octave slip still shows */
+      lit = Math.round(target + d);
+    }
+    for (var k in els) {
+      var m = +k;
+      els[k].classList.toggle('target', m === target);
+      els[k].classList.toggle('lit', lit != null && m === lit && m !== target);
+      els[k].classList.toggle('down', lit != null && m === lit && m === target);
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  setInterval(function () {
+    var panel = $('susPanel');
+    if (panel && panel.offsetParent !== null && !raf) raf = requestAnimationFrame(frame);
+  }, 400);
+})();
+
+</script>
+<script>
+/* ======================================================================
    Repertoire Pro — the walkthrough.
 
    Robert, 13 Sep: "I should not have to sit next to Briar or Ja Ronn and
@@ -19635,7 +20037,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first — through the speaker the app squeals.' },
+      text: 'Put headphones in first — through the speaker the app squeals. Sound check is on Home if you are not sure they work.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
@@ -19645,10 +20047,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       text: 'Every day, press this — fifteen minutes, from whoever is coaching you.' },
     { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
       text: 'Want one thing? Pick what to work on up top, then Start.' },
+    /* Briar, 14 Sep: did not know what a lip trill was, and did not know
+       the card would tell her. */
+    { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
+      text: 'Tap any exercise to read what it is and how to do it, and tap any word with an ⓘ for what it means.' },
     { mode: 'train', find: function () { return $('rpTileTracker'); },
       text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
       text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
+    /* Robert, 13 Sep: "need a card to teach about the live microphone
+       feedback." It lives on Free Sing, so the tour goes there for it. */
+    { mode: 'voice', find: function () { return $('rpVMon'); },
+      text: 'Hear yourself: with headphones in, this plays your own voice back to you live, as you sing.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
@@ -19739,7 +20149,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   function end(kind) {
-    if (run) markDone(run.kind);
+    if (run && KEY[run.kind]) markDone(run.kind);   /* tips mark themselves when first shown */
     run = null;
     teardown();
   }
@@ -19820,8 +20230,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try {
       var want = st.mode;
       var active = document.querySelector('.mode.active');
+      if (!want) throw 0;   /* a tip stays on the screen it is on */
       var map = { home: 'modeHome', train: 'modeTrain', learn: 'modeLearn', singhub: 'modeSing',
-                  coach: 'modeCoach', lib: 'modeLib', you: 'modeYou' };
+                  coach: 'modeCoach', lib: 'modeLib', you: 'modeYou', voice: 'modeVoice' };
       if (want && (!active || active.id !== map[want])) window.switchMode(want);
     } catch (e) {}
     setTimeout(function () {
@@ -19872,6 +20283,108 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       if (m && m.classList.contains('active') && $('rpAddStu')) T.start('coach');
     }
   }, 700);
+
+  /* ================================================================== */
+  /* TIPS — a short tour on one screen.                                  */
+  /* Robert, 13 Sep: "small tutorials on the individual pages for some    */
+  /* features like the pitch tracker, to let people know what they can   */
+  /* do with it." Same ring and card as the big tour, two or three steps, */
+  /* shown the first time the screen opens and again from a ? button.    */
+  /* ================================================================== */
+  var TIPS = {
+    tracker: { host: 'modeFree', anchor: 'rpStudio', steps: [
+      { find: function () { return $('freeCanvas'); },
+        text: 'Sing. The blue line is your voice; the gold lines are the notes. Hold a note and keep the line flat on one.' },
+      { find: function () { return $('rpStRec'); },
+        text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
+      { find: function () { return $('rpTakeList') || $('rpTakes'); },
+        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' },
+      { find: function () { return $('freeCanvas'); },
+        text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
+    ] },
+    guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
+      { find: function () { return $('gBig'); },
+        text: 'The clock runs while you do it. Press Done when you have finished.' }
+    ] },
+    ladder: { host: 'trainLadderBar', anchor: 'ladderTitle', steps: [
+      { find: function () { return $('gameCanvas'); },
+        text: 'The gold bars are the notes to sing. Your voice is the blue line. Fill a bar to score it.' },
+      { find: function () { return $('btnExPause'); },
+        text: 'Pause to think, Restart to take it from the top, Record to keep the run.' },
+      { find: function () { return $('gameCanvas'); },
+        text: 'Paused or finished, drag the chart to the right to see what you sang.' }
+    ] },
+    match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
+      { find: function () { return $('matchTarget'); },
+        text: 'This is the note, sung by a voice. Replay plays it again.' },
+      { find: function () { return $('matchHold'); },
+        text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
+    ] },
+    voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
+      { find: function () { return $('rpVis'); },
+        text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
+      { find: function () { return $('rpVMon'); },
+        text: 'Hear yourself, live, through your headphones. Speaker off, or it squeals.' },
+      { find: function () { return $('rpVRec'); },
+        text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
+    ] },
+    sustain: { host: 'susPanel', anchor: 'btnSusStart', steps: [
+      { find: function () { return $('rpSusKeys'); },
+        text: 'The lit key is the note to hold. Your voice is the dot — green when it is on the note.' },
+      { find: function () { return $('btnSusStart'); },
+        text: 'Start hold, then keep the note dead steady for five seconds. New note picks another.' }
+    ] },
+    keys: { host: 'kbdPanel', anchor: 'kbdUp', steps: [
+      { find: function () { return $('kbdKeys'); },
+        text: 'Tap a key, then sing it. The key you are singing lights up.' },
+      { find: function () { return $('kbdMsg'); },
+        text: 'A held key goes quiet after a second so the mic hears you, not the key. Sideways gives more keys.' }
+    ] },
+    ear: { host: 'v10Ear', anchor: 'earQuit', steps: [
+      { find: function () { return $('earReplay'); },
+        text: 'Listen, then answer or sing. Play again plays it once more.' }
+    ] },
+    range: { host: 'rangePanel', anchor: 'btnRangeTest', steps: [
+      { find: function () { return $('btnRangeTest'); },
+        text: 'Sing your lowest comfortable note on “oooh” and keep going until the bar fills, then your highest. About a minute.' }
+    ] }
+  };
+  function tipDone(k) { try { return localStorage.getItem('rp_tip_' + k) === 'done'; } catch (e) { return false; } }
+  function tipMark(k) { try { localStorage.setItem('rp_tip_' + k, 'done'); } catch (e) {} }
+
+  T.tip = function (key) {
+    var tp = TIPS[key];
+    if (!tp) return;
+    if (run) teardown();
+    run = { kind: 'tip:' + key, steps: tp.steps.map(function (st) { return { mode: null, find: st.find, text: st.text }; }), i: 0 };
+    ensure();
+    window.addEventListener('resize', relayout);
+    window.addEventListener('scroll', relayout, true);
+    document.addEventListener('click', onAnyClick, true);
+    document.addEventListener('keydown', onKey);
+    show();
+  };
+
+  /* a ? on each of those screens, and the first-time showing */
+  function tipButtons() {
+    Object.keys(TIPS).forEach(function (k) {
+      var tp = TIPS[k];
+      var host = $(tp.host), anchor = $(tp.anchor);
+      if (!host || !anchor || host.offsetParent === null) return;
+      if (!$('rpTipBtn_' + k)) {
+        var b = document.createElement('button');
+        b.id = 'rpTipBtn_' + k;
+        b.className = 'btn';
+        b.title = 'What can I do here?';
+        b.textContent = '?';
+        b.style.cssText = 'padding:6px 11px;font-size:13px;font-weight:900;margin-left:8px;flex:none';
+        on(b, 'click', function (ev) { ev.stopPropagation(); T.tip(k); });
+        try { anchor.parentElement.insertBefore(b, anchor.nextSibling); } catch (e) {}
+      }
+      if (!tipDone(k) && !run && !sheetUp()) { tipMark(k); setTimeout(function () { T.tip(k); }, 500); }
+    });
+  }
+  setInterval(tipButtons, 900);
 
   /* ================================================================== */
   /* THE GUIDE — "How to use Repertoire"                                  */
@@ -19994,6 +20507,592 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
   setInterval(row, 1500);
   setTimeout(row, 900);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — "Hear it": an example of each exercise.
+
+   Robert, 13 Sep: "add audio examples for the exercises to teach people
+   what they are supposed to sound like — a voice performing the right
+   sound, so we don't have to guess if it's ooo or uuuu."
+
+   What this is, and what it is not. It is the app's own voice-like tone —
+   the one Note Match already uses — shaped into the vowel the exercise
+   asks for, singing the exercise's actual pattern in the singer's own
+   range. It is a synthesised voice, and every button says so. It is NOT a
+   recording of a singer: the app does not take audio from anywhere, and
+   a real human example is something a coach records. That is the next
+   step, and it is built to plug in here: a coach's recording for an
+   exercise, when there is one, plays instead of this.
+
+   Vowels are made the way the reference voice is made — a buzz through
+   two or three band-pass filters sitting on the vowel's formants. The
+   numbers are the standard ones (Peterson & Barney): oo 300/870, ah
+   730/1090, ee 270/2290, uh 640/1190, ay 530/1840, and a hum is a buzz
+   with the mouth closed (a low-pass, no formants).
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+
+  var X = window.RPExample = {};
+  /* Briar, 15 Sep: "the Hear it just sounds like a rain stick … it doesn't
+     emulate the actual sound you are supposed to make." So the button is
+     OFF everywhere until a real recording replaces the synth. Everything
+     that plays stays in place; a recording per exercise plugs into X.play
+     (look up exId in a table of audio URLs before falling back to the
+     synth) and this switch goes back on. */
+  X.enabled = false;
+  var VOWELS = {
+    oo: [[300, 3.5, 1.0], [870, 6, 0.35], [2240, 8, 0.10]],
+    ah: [[730, 3.2, 1.0], [1090, 5, 0.55], [2440, 7, 0.22]],
+    ee: [[270, 4, 1.0], [2290, 8, 0.45], [3010, 9, 0.18]],
+    uh: [[640, 3.2, 1.0], [1190, 5, 0.5], [2390, 7, 0.2]],
+    ay: [[530, 3.5, 1.0], [1840, 6, 0.5], [2480, 7, 0.2]],
+    oh: [[570, 3.2, 1.0], [840, 5, 0.5], [2410, 7, 0.18]]
+  };
+  /* what each exercise's syllable is, in vowel terms; a hum is 'm' */
+  function vowelOf(e) {
+    var s = String((e && e.syl) || '').toLowerCase();
+    if (/^(mmm|hum|m,|m$|nnn|ng)/.test(s) || /^m\b/.test(s)) return 'm';
+    if (/oo|through a straw|noo|loo/.test(s)) return 'oo';
+    if (/ee|mee|gee|kee/.test(s)) return 'ee';
+    if (/ay|nay|bay|bae/.test(s)) return 'ay';
+    if (/oh|ol\b|knoll/.test(s)) return 'oh';
+    if (/uh|mum|buh/.test(s)) return 'uh';
+    if (/brrr|lip/.test(s)) return 'lip';
+    if (/sss|silent|hiss/.test(s)) return 'sss';
+    return 'ah';
+  }
+
+  function f0(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  /* one voiced note, in one vowel */
+  function voice(ac, midi, when, dur, vowel, dest, vol) {
+    var out = ac.createGain();
+    out.gain.setValueAtTime(0.0001, when);
+    out.gain.linearRampToValueAtTime(vol, when + 0.06);
+    out.gain.setValueAtTime(vol, when + Math.max(0.08, dur - 0.08));
+    out.gain.linearRampToValueAtTime(0.0001, when + dur);
+    out.connect(dest);
+    var osc = ac.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f0(midi), when);
+    /* a little vibrato, late, like a voice */
+    var lfo = ac.createOscillator(), lg = ac.createGain();
+    lfo.frequency.value = 5.5; lg.gain.setValueAtTime(0, when);
+    lg.gain.linearRampToValueAtTime(f0(midi) * 0.012, when + Math.min(0.6, dur));
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var pre = ac.createGain(); pre.gain.value = 0.35;
+    osc.connect(pre);
+    if (vowel === 'm') {
+      var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; lp.Q.value = 0.7;
+      pre.connect(lp); lp.connect(out);
+    } else if (vowel === 'lip') {
+      /* a lip trill is a voice chopped ~28 times a second by the lips */
+      var chop = ac.createGain(); chop.gain.value = 0.5;
+      var trill = ac.createOscillator(); trill.type = 'square'; trill.frequency.value = 28;
+      var tg = ac.createGain(); tg.gain.value = 0.5;
+      trill.connect(tg); tg.connect(chop.gain);
+      var lp2 = ac.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 900;
+      pre.connect(lp2); lp2.connect(chop); chop.connect(out);
+      trill.start(when); trill.stop(when + dur + 0.05);
+    } else {
+      var form = VOWELS[vowel] || VOWELS.ah;
+      form.forEach(function (f) {
+        var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f[0]; bp.Q.value = f[1];
+        var g = ac.createGain(); g.gain.value = f[2];
+        pre.connect(bp); bp.connect(g); g.connect(out);
+      });
+    }
+    osc.start(when); osc.stop(when + dur + 0.05);
+    lfo.start(when); lfo.stop(when + dur + 0.05);
+    return when + dur;
+  }
+  /* unvoiced: a hiss is band-passed noise */
+  function hiss(ac, when, dur, dest, vol) {
+    var len = Math.ceil(ac.sampleRate * dur), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    var src = ac.createBufferSource(); src.buffer = buf;
+    var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5500; bp.Q.value = 0.8;
+    var out = ac.createGain();
+    out.gain.setValueAtTime(0.0001, when);
+    out.gain.linearRampToValueAtTime(vol * 0.5, when + 0.15);
+    out.gain.setValueAtTime(vol * 0.5, when + dur - 0.3);
+    out.gain.linearRampToValueAtTime(0.0001, when + dur);
+    src.connect(bp); bp.connect(out); out.connect(dest);
+    src.start(when); src.stop(when + dur);
+    return when + dur;
+  }
+
+  var stopAt = 0;
+  X.playing = function () { return (typeof ctx !== 'undefined' && ctx) ? ctx.currentTime < stopAt : false; };
+
+  /* the pattern the exercise actually uses, in the singer's own range */
+  X.play = function (exId) {
+    var e = null; try { e = V10.exById(exId); } catch (err) {}
+    if (!e) return false;
+    try { ensureCtx(); } catch (err) {}
+    if (typeof ctx === 'undefined' || !ctx) return false;
+    var dest = (typeof guideGain !== 'undefined' && guideGain) ? guideGain : ctx.destination;
+    var lo = 48, hi = 72;
+    try { lo = RANGE.lo; hi = RANGE.hi; } catch (err) {}
+    var mid = Math.round((lo + hi) / 2);
+    var t = ctx.currentTime + 0.08;
+    var vw = vowelOf(e);
+    var eng = e.engine || {};
+    var end = t;
+    if (vw === 'sss' || eng.kind === 'timed' || eng.kind === 'cycle') {
+      end = hiss(ctx, t, 3.0, dest, 0.6);
+    } else if (eng.kind === 'glide') {
+      /* a siren: one long note sliding up an octave and back */
+      var o = ctx.createGain(); o.gain.setValueAtTime(0.0001, t); o.gain.linearRampToValueAtTime(0.45, t + 0.15);
+      o.gain.setValueAtTime(0.45, t + 3.6); o.gain.linearRampToValueAtTime(0.0001, t + 4); o.connect(dest);
+      var osc = ctx.createOscillator(); osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(f0(mid - 5), t);
+      osc.frequency.exponentialRampToValueAtTime(f0(mid + 7), t + 2);
+      osc.frequency.exponentialRampToValueAtTime(f0(mid - 5), t + 4);
+      var pre = ctx.createGain(); pre.gain.value = 0.35; osc.connect(pre);
+      (VOWELS.oo).forEach(function (f) { var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f[0]; bp.Q.value = f[1]; var g = ctx.createGain(); g.gain.value = f[2]; pre.connect(bp); bp.connect(g); g.connect(o); });
+      osc.start(t); osc.stop(t + 4.1); end = t + 4;
+    } else if (eng.kind === 'ladder' && eng.pattern && window.V10 && V10.PATTERNS && V10.PATTERNS[eng.pattern]) {
+      var p = V10.PATTERNS[eng.pattern], bpm = eng.bpm || 120, spb = 60 / bpm;
+      var root = mid - Math.floor((p.span || 7) / 2);
+      var at = t;
+      for (var i = 0; i < p.deg.length; i++) {
+        var d = (p.dur && p.dur[i]) || 1;
+        voice(ctx, root + p.deg[i], at, d * spb * 0.95, vw === 'lip' ? 'lip' : vw, dest, 0.55);
+        at += d * spb;
+      }
+      end = at;
+    } else {
+      /* hold, guided: one comfortable note, in the vowel, for three seconds */
+      end = voice(ctx, mid, t, 3.0, vw === 'lip' ? 'lip' : vw, dest, 0.55);
+    }
+    stopAt = end;
+    return true;
+  };
+
+  /* a Hear-it button, wired: says what it is */
+  X.button = function (exId, small) {
+    if (!X.enabled) return '';
+    return '<button class="btn" data-hear="' + exId + '" style="padding:' + (small ? '7px 11px;font-size:12px' : '9px 14px;font-size:12.5px') +
+      '" title="A synthesised voice, not a singer">▶ Hear it</button>';
+  };
+  X.wire = function (root) {
+    (root || document).querySelectorAll('[data-hear]').forEach(function (b) {
+      if (b.dataset.wired) return;
+      b.dataset.wired = '1';
+      on(b, 'click', function (ev) {
+        ev.stopPropagation();
+        var ok = X.play(b.dataset.hear);
+        var was = b.textContent;
+        b.textContent = ok ? 'Playing… (a synthesised voice, not a singer)' : 'No sound yet — tap once more';
+        setTimeout(function () { b.textContent = was; }, ok ? 3200 : 1500);
+      });
+    });
+  };
+  setInterval(function () { X.wire(document); }, 800);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — timing.
+
+   Briar, 13 Sep: the words light up out of step with the note bars, a
+   held note seems to run into the next word, and the live mic feedback
+   is late. Two delays are behind all of that, and the app had a fixed
+   guess (100 ms) for one and nothing for the other:
+
+   1. The phone plays sound LATER than the app schedules it. The browser
+      reports how much (outputLatency). The chart and the words are now
+      drawn where the sound has reached the ears — window.__rpHeardS,
+      read by the base's chart (patch 22).
+   2. The singer's voice reaches the app later still, through the mic.
+      That is state.latencyMs, which scores and draws the voice earlier
+      to make up for it. It now starts from the reported output delay
+      plus 100 ms for the mic, instead of a flat 100, and the singer can
+      set it by hand in Profile → Sound and microphone. A hand-set value
+      is kept and wins over the automatic one.
+
+   Nothing here can remove the delay you HEAR through headphones — that
+   is the phone's own; Bluetooth adds the most.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'rp_timing';
+  var TM = window.RPTiming = {};
+  var saved = null;
+  try { var v = localStorage.getItem(KEY); if (v != null && v !== '' && isFinite(+v)) saved = +v; } catch (e) {}
+  var autoMs = 100;
+  window.__rpHeardS = 0;
+
+  function outLat() {
+    try {
+      if (typeof ctx === 'undefined' || !ctx) return 0;
+      var o = ctx.outputLatency;
+      if (!(o > 0)) o = ctx.baseLatency;
+      return (o > 0 && o < 1) ? o : 0;
+    } catch (e) { return 0; }
+  }
+  function apply(ms) {
+    try { state.latencyMs = ms; } catch (e) {}
+    var r = $('rLat'), o = $('oLat');
+    if (r && +r.value !== ms) r.value = ms;
+    if (o) o.textContent = ms + ' ms';
+    var m = $('rpTimingRange'), mo = $('rpTimingOut');
+    if (m && +m.value !== ms) m.value = ms;
+    if (mo) mo.textContent = ms + ' ms' + (saved == null ? ' · automatic' : '');
+  }
+  TM.auto = function () { return autoMs; };
+  TM.get = function () { return saved != null ? saved : autoMs; };
+  TM.set = function (ms) {
+    ms = Math.max(0, Math.min(400, Math.round(ms / 10) * 10));
+    saved = ms;
+    try { localStorage.setItem(KEY, String(ms)); } catch (e) {}
+    apply(ms);
+  };
+  TM.reset = function () {
+    saved = null;
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    apply(autoMs);
+  };
+
+  function tick() {
+    var out = outLat();
+    window.__rpHeardS = out;
+    var a = Math.round((out * 1000 + 100) / 10) * 10;
+    if (a !== autoMs) { autoMs = a; if (saved == null) apply(autoMs); }
+  }
+
+  /* the base's own slider (in the Sing settings) keeps working; a move
+     there is a hand-set value too */
+  function wire() {
+    var r = $('rLat');
+    if (r && !r.dataset.rpTiming) {
+      r.dataset.rpTiming = '1';
+      r.addEventListener('input', function (e) { TM.set(+e.target.value); });
+    }
+  }
+
+  /* the Profile row: one slider, one line of what it is for, one reset */
+  TM.row = function () {
+    var d = $('rpTimingRow');
+    if (d) return d;
+    d = document.createElement('div');
+    d.id = 'rpTimingRow';
+    d.className = 'rp-card';
+    d.style.padding = '13px';
+    d.innerHTML =
+      '<div class="rp-ttl">Timing</div>' +
+      '<div class="rp-sub" style="margin-bottom:8px">If your voice shows up late on the note map, move this right. Early, move it left.</div>' +
+      '<label style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--ink-faint)">' +
+        '<span>Mic delay</span><output id="rpTimingOut">100 ms</output></label>' +
+      '<input type="range" id="rpTimingRange" min="0" max="400" value="100" step="10" style="width:100%">' +
+      '<button class="btn ghost" id="rpTimingAuto" style="margin-top:8px;padding:8px 12px;font-size:12.5px">Back to automatic</button>';
+    d.querySelector('#rpTimingRange').addEventListener('input', function (e) {
+      TM.set(+e.target.value);
+      var r = $('rLat'); if (r) { r.value = e.target.value; }
+    });
+    d.querySelector('#rpTimingAuto').addEventListener('click', TM.reset);
+    return d;
+  };
+
+  function boot() {
+    wire();
+    apply(saved != null ? saved : autoMs);
+    tick();
+    setInterval(function () { tick(); wire(); }, 1000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — scroll the chart back.
+
+   Robert, 13 Sep: "when you're doing an exercise and you pause it, or
+   after you've completed it, you should be able to scroll back and see
+   the notes you've hit."
+
+   Drag the chart to the right and it shows what came before; a pill says
+   how far back you are and puts you back to now. Both charts get it —
+   the exercise chart (beats) and the Pitch Tracker (seconds). The charts
+   themselves read one number each, window.__rpScrollB / __rpScrollS,
+   and subtract it from their clock; that is the whole of the patch to
+   the base app. A new start clears it.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  window.__rpScrollB = 0;   /* beats, the exercise chart */
+  window.__rpScrollS = 0;   /* seconds, the Pitch Tracker */
+
+  function pill(id, text, reset) {
+    var d = $(id);
+    if (!text) { if (d) d.style.display = 'none'; return; }
+    if (!d) {
+      d = document.createElement('button');
+      d.id = id;
+      d.className = 'btn primary';
+      d.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:8px;padding:6px 12px;font-size:12px;z-index:5;white-space:nowrap';
+      d.addEventListener('click', function (e) { e.stopPropagation(); reset(); });
+    }
+    d.textContent = text;
+    d.style.display = '';
+    return d;
+  }
+
+  function attach(canvasId, opts) {
+    var cv = $(canvasId);
+    if (!cv || cv.dataset.rpScroll) return;
+    cv.dataset.rpScroll = '1';
+    var wrap = cv.parentElement;
+    if (wrap && getComputedStyle(wrap).position === 'static') wrap.style.position = 'relative';
+    var down = null, moved = false;
+    cv.style.touchAction = 'pan-y';
+    cv.addEventListener('pointerdown', function (e) {
+      if (opts.live()) return;                 /* not while it is running */
+      down = { x: e.clientX, v: opts.get() }; moved = false;
+      try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!down) return;
+      var dx = e.clientX - down.x;
+      if (Math.abs(dx) > 4) moved = true;
+      var v = Math.max(0, Math.min(opts.max(), down.v + dx / opts.pxPer()));
+      opts.set(v);
+      opts.redraw();
+      var p = pill(canvasId + 'Back', v > 0.01 ? '← ' + opts.label(v) + ' back · tap for now' : '', function () { opts.set(0); opts.redraw(); pill(canvasId + 'Back', ''); });
+      if (p && !p.parentElement && wrap) wrap.appendChild(p);
+    });
+    var up = function () { down = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    /* a running chart means now — clear any old scroll and the pill */
+    setInterval(function () {
+      if (opts.live() && opts.get() !== 0) { opts.set(0); pill(canvasId + 'Back', ''); }
+    }, 300);
+  }
+
+  var n = 0;
+  var iv = setInterval(function () {
+    if (!$('gameCanvas') || !$('freeCanvas')) { if (++n > 80) clearInterval(iv); return; }
+    clearInterval(iv);
+    /* the exercise chart: beats; ppb is what the chart last drew with */
+    attach('gameCanvas', {
+      live: function () { try { return !!(G.running && !T.paused); } catch (e) { return false; } },
+      get: function () { return window.__rpScrollB; },
+      set: function (v) { window.__rpScrollB = v; },
+      /* Briar, 15 Sep: "only 4 notes, then it locks." G.lastBeat is only set
+         when a run STOPS; paused, it was still 0, so the limit was 4 beats.
+         Paused or stopped, the limit is where the run has got to. */
+      max: function () { try { return Math.max(0, (G.running ? songBeat() : (G.lastBeat || 0)) + 1); } catch (e) { return 64; } },
+      pxPer: function () { return window.__rpPpb || 60; },
+      label: function (v) { return Math.round(v) + ' beats'; },
+      redraw: function () { try { drawGame(); } catch (e) {} }
+    });
+    /* the Pitch Tracker: seconds; W/7 pixels per second, always */
+    attach('freeCanvas', {
+      live: function () { try { return typeof MIC !== 'undefined' && MIC.on && !window.__rpFreeHeld; } catch (e) { return true; } },
+      get: function () { return window.__rpScrollS; },
+      set: function (v) { window.__rpScrollS = v; },
+      max: function () { try { return Math.max(0, FREE.trail.length ? (FREE.trail[FREE.trail.length - 1].t - FREE.trail[0].t) : 0); } catch (e) { return 60; } },
+      pxPer: function () { var c = $('freeCanvas'); return (c ? c.clientWidth : 360) / 7; },
+      label: function (v) { return Math.round(v) + ' seconds'; },
+      redraw: function () {}
+    });
+  }, 250);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the phone's back button.
+
+   Briar, 13 Sep: pressing back on any page took her all the way out to
+   Google, and she had to click her way back to where she was. The app
+   never put anything in the browser's history, so "back" meant "leave".
+
+   Every screen change now leaves a footprint in the history. Back walks
+   the footprints: a page goes back to the tab it came from, a running
+   exercise is left the way its own Done button leaves it, a tab goes
+   back to the tab before it — and the very first screen stays put, so
+   back never leaves the app by accident. Forward is left alone.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var stack = [];          /* ['home', 'train', 'page:cat:breath', ...] */
+  var applying = false;    /* true while we are the ones navigating */
+  var seeded = false;
+  window.RPBack = { stack: function () { return stack.slice(); } };
+
+  function current() {
+    try {
+      if (window.RPPage && RPPage.isOpen()) return 'page';
+      if (typeof state !== 'undefined' && state.mode) return state.mode;
+    } catch (e) {}
+    return 'home';
+  }
+  function push(key) {
+    if (applying) return;
+    /* a tab change stands any open page down, so its footprint goes too */
+    if (key !== 'page') while (stack.length && stack[stack.length - 1] === 'page') stack.pop();
+    if (stack.length && stack[stack.length - 1] === key) return;
+    stack.push(key);
+    if (stack.length > 40) stack.shift();
+    try { history.pushState({ rp: key, n: stack.length }, ''); } catch (e) {}
+  }
+
+  /* something is running on the Train tab — leave it the way its own
+     button would, and stay on the tab */
+  function leaveRunning() {
+    var ids = ['gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit', 'btnKbdBack'];
+    for (var i = 0; i < ids.length; i++) {
+      var b = $(ids[i]);
+      if (b && b.offsetParent !== null) { b.click(); return true; }
+    }
+    return false;
+  }
+
+  function goBack() {
+    applying = true;
+    try {
+      /* a sheet on top closes first */
+      var o = $('rpSheet');
+      if (o && o.style.display !== 'none' && o.innerHTML) { o.style.display = 'none'; o.innerHTML = ''; return; }
+      /* the tour or a tip */
+      if (window.RPTour && RPTour.running()) { RPTour.stop(); return; }
+      if (window.RPPage && RPPage.isOpen()) { RPPage.back(); stack.pop(); return; }
+      if (leaveRunning()) return;   /* still on the same tab: its footprint stays */
+      stack.pop();
+      var prev = stack.length ? stack[stack.length - 1] : 'home';
+      if (prev === 'page') prev = 'home';
+      try { window.switchMode(prev); } catch (e) {}
+    } finally {
+      setTimeout(function () { applying = false; }, 60);
+    }
+  }
+
+  window.addEventListener('popstate', function () {
+    /* the browser has already stepped back one entry; put one back so the
+       next press is ours again, then do our own going-back */
+    if (!seeded) return;
+    try { history.pushState({ rp: 'hold' }, ''); } catch (e) {}
+    goBack();
+  });
+
+  /* seed one entry so the first press never leaves the site */
+  var n = 0;
+  var iv = setInterval(function () {
+    if (typeof window.switchMode !== 'function') { if (++n > 50) clearInterval(iv); return; }
+    clearInterval(iv);
+    try { history.replaceState({ rp: 'root' }, ''); history.pushState({ rp: 'home' }, ''); } catch (e) {}
+    stack = ['home'];
+    seeded = true;
+    var prev = window.switchMode;
+    window.switchMode = function (m) {
+      var r = prev.apply(this, arguments);
+      push(m === 'page' ? 'page' : m);
+      return r;
+    };
+    if (window.RPPage) {
+      var open = RPPage.open;
+      RPPage.open = function (o) { var r = open.apply(this, arguments); push('page'); return r; };
+    }
+  }, 200);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — one press, one note.
+
+   Briar, 14 Sep: "when you hit play note again twice by accident it
+   plays the note twice at the same time." The buttons that play a
+   reference note now ignore a second press while the first is still
+   sounding. Nothing else about them changes.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var IDS = { earReplay: 1400, btnSusHear: 1400, btnMatchReplay: 1400, gHear: 1400 };
+  var last = {};
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!b || !IDS[b.id]) return;
+    var now = Date.now();
+    if (last[b.id] && now - last[b.id] < IDS[b.id]) { e.stopPropagation(); e.preventDefault(); return; }
+    last[b.id] = now;
+  }, true);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — sound check.
+
+   Briar, 15 Sep, could not tell whether her headphones were the problem.
+   One button, one note, one question: did you hear it? It sits on Home
+   under Today, and at the top of Profile → Sound and microphone. The note
+   is the app's own reference sound, so what you hear here is what every
+   exercise plays.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var SC = window.RPSound = {};
+
+  SC.check = function () {
+    try { if (typeof ensureCtx === 'function') ensureCtx(); } catch (e) {}
+    try {
+      if (typeof ctx !== 'undefined' && ctx && ctx.state === 'suspended') ctx.resume();
+      var play = (window.V10 && V10.playRef) ? V10.playRef : window.playPiano;
+      if (play) play(60, ctx.currentTime + 0.05, 1.2, guideGain, 0.8);
+      return true;
+    } catch (e) { return false; }
+  };
+
+  function card(id) {
+    var d = document.createElement('div');
+    d.id = id;
+    d.className = 'rp-card';
+    d.style.cssText = 'padding:12px;margin-top:10px';
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl">Sound check</div>' +
+      '<div class="rp-sub" data-sc-msg>Not sure your headphones work? Play a note.</div></div>' +
+      '<button class="btn primary" data-sc-go style="padding:9px 14px;font-size:12.5px;flex:none">Play a note</button></div>';
+    var msg = d.querySelector('[data-sc-msg]');
+    d.querySelector('[data-sc-go]').addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var ok = SC.check();
+      msg.textContent = ok
+        ? 'Heard a note? Your headphones are fine. Nothing? Turn the volume up, then check the plug or the Bluetooth connection.'
+        : 'The phone would not play sound. Tap once more, and check the volume.';
+      setTimeout(function () { msg.textContent = 'Not sure your headphones work? Play a note.'; }, 9000);
+    });
+    return d;
+  }
+
+  function mount() {
+    /* Home, under Today */
+    var today = $('rpToday');
+    if (today && !$('rpSoundHome')) {
+      try { today.parentElement.insertBefore(card('rpSoundHome'), today.nextSibling); } catch (e) {}
+    }
+    /* Profile → Sound and microphone: rp-profile picks this row up by id */
+    if (!$('rpSoundRow')) {
+      var host = $('modeYou');
+      if (host) host.appendChild(card('rpSoundRow'));
+    }
+  }
+  setInterval(mount, 1200);
+  setTimeout(mount, 700);
 })();
 
 </script>
