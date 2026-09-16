@@ -188,7 +188,7 @@
 
   /* words that are also ordinary English ("keep it flat") are not marked up
      on sight — they stay in the glossary for a page that asks */
-  var PLAIN_WORDS = { flat: 1, sharp: 1, tone: 1, mix: 1, register: 1, sustain: 1 };
+  var PLAIN_WORDS = { flat: 1, sharp: 1, tone: 1, mix: 1, register: 1, sustain: 1, pitch: 1, range: 1 };
   var TERMS = Object.keys(G).filter(function (t) { return !PLAIN_WORDS[t]; }).sort(function (a, b) { return b.length - a.length; });
   var RX = new RegExp('\\b(' + TERMS.map(function (t) {
     return t.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
@@ -198,7 +198,7 @@
   /* marking the words up, without touching anything interactive      */
   /* ---------------------------------------------------------------- */
   var SKIP = /^(SCRIPT|STYLE|BUTTON|INPUT|TEXTAREA|SELECT|OPTION|LABEL|SVG|CANVAS|CODE|H1|H2|H3|H4|SUMMARY)$/;
-  var SKIPCLS = /(^|\s)(rp-ttl|rp-lab|pill|lt|gt|kbdlbl|seg)(\s|$)/;   /* titles and labels: the word is the name, not a term */
+  var SKIPCLS = /(^|\s)(rp-ttl|rp-lab|pill|lt|gt|kbdlbl|seg|rp-take|rp-takes-h|rp-lrow|rp-sub|sub)(\s|$)/;   /* titles and labels: the word is the name, not a term */
   function markUp(root, cap) {
     if (!root) return;
     var left = cap || 40, seen = {};

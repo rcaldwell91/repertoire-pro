@@ -284,6 +284,7 @@
         '<div class="row" style="gap:7px">' +
         '<button class="btn" id="rpVPlay" style="flex:1;padding:11px">' + (V.playing ? 'Stop' : 'Play it back') + '</button>' +
         '<button class="btn primary" id="rpVKeep" style="flex:1;padding:11px">Keep</button></div>' +
+        '<input id="rpVName" class="rp-inp" maxlength="60" placeholder="Name it (optional)" style="width:100%;margin-top:8px">' +
         '<button class="btn" id="rpVBin" style="width:100%;padding:10px;margin-top:7px;color:var(--miss)">Discard</button>';
     }
     return h;
@@ -428,8 +429,8 @@
     var d = new Date();
     var song = {
       id: 'sing' + Date.now(), kind: 'recording',
-      title: 'Free Sing ' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
-             String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'),
+      title: (($('rpVName') || {}).value || '').trim() || ('Free Sing ' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+             String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')),
       artist: 'My Recordings', blob: V.blob, addedAt: Date.now(),
       key: null, lrc: null, duration: V.activeMs / 1000,
       fx: JSON.parse(JSON.stringify(V.fx))     // what it sounded like, kept beside it

@@ -194,6 +194,7 @@
     try { V10.renderLibFilters(); } catch (e) {}
   }
 
+  L.show = function (c) { chip = c; L.draw(); try { window.scrollTo(0, 0); } catch (e) {} };
   L.draw = function () {
     var mode = $('modeLib');
     if (!mode) return;
@@ -205,7 +206,7 @@
       top.id = 'rpLibTop';
       mode.insertBefore(top, mode.firstChild);
     }
-    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Recordings'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
+    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h1 style="margin:0">Your Library</h1>' +
       '<div class="row" style="gap:4px;flex:none">' +
@@ -233,7 +234,7 @@
     if (chip === 'all' || chip === 'playlists') {
       if (chip === 'all') {
         body += row({ title: 'All songs', sub: 'Everything you own · ' + owned().length, icon: 'i-music', data: 'data-pin="all"' });
-        body += row({ title: 'My Recordings', sub: 'Your takes · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
+        body += row({ title: 'Takes', sub: 'Everything you have recorded · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
         if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Kept on their own · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
       }
       plists().forEach(function (p) {
@@ -249,6 +250,10 @@
     if (chip === 'maps') {
       body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + (window.RPMaps ? RPMaps.rowsHtml(row, grid) : '') + '</div>';
     }
+    /* Robert, 17 Sep: takes get their own list, organised by exercise */
+    if (chip === 'recordings' && window.RPTakes) {
+      body = RPTakes.listHtml();
+    }
     h += '<div id="rpLibBody">' + body + '</div>';
 
     if (chip === 'all') {
@@ -259,7 +264,10 @@
 
     /* the real list belongs under the chrome for Songs and Recordings */
     var panel = listPanel();
-    if (chip === 'songs' || chip === 'recordings') {
+    if (chip === 'recordings' && window.RPTakes) {
+      panel.style.display = 'none';
+      RPTakes.wire(top);
+    } else if (chip === 'songs' || chip === 'recordings') {
       panel.style.display = '';
       setList(chip === 'songs' ? 'all' : 'recordings');
       var q = $('rpLibQ');

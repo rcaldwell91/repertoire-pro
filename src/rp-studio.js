@@ -111,6 +111,7 @@
       var svg = ST.lineHtml(ST.notes, 'pending');
       if (svg) h += svg + '<div class="measured" style="margin-top:6px;font-size:11.5px">' +
         'Where you actually were. Press play and the marker follows.</div>';
+      h += '<input id="rpStName" class="rp-inp" maxlength="60" placeholder="Name it (or leave it as ' + esc(defaultTitle()) + ')" style="width:100%;margin-top:9px" value="' + esc(ST.nameDraft || '') + '">';
       h += '<div class="row" style="gap:7px;margin-top:9px">' +
         '<button class="btn" id="rpStPlay" style="flex:1;padding:11px">' +
         (ST.playing ? 'Stop' : 'Play it back') + '</button>' +
@@ -132,6 +133,7 @@
     on($('rpStPeek'), 'click', peek);
     on($('rpStPlay'), 'click', play);
     on($('rpStKeep'), 'click', keep);
+    on($('rpStName'), 'input', function (e) { ST.nameDraft = e.target.value; });
     on($('rpStBin'), 'click', bin);
   }
 
@@ -439,14 +441,19 @@
     say('Thrown away. Nothing was saved.');
   }
 
+  function defaultTitle() {
+    var d = new Date();
+    return 'Take ' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+           String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
   async function keep() {
     var b = blobNow();
     if (!b) return say('Nothing to keep.');
-    var d = new Date();
+    var named = (ST.nameDraft || '').trim();
+    ST.nameDraft = '';
     var song = {
       id: 'rec' + Date.now(), kind: 'recording',
-      title: 'Take ' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
-             String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'),
+      title: named || defaultTitle(),
       artist: 'My Recordings', blob: b, addedAt: Date.now(),
       key: null, lrc: null, duration: ST.activeMs / 1000,
       notes: ST.notes                       // the pitch line, saved with the audio
@@ -464,7 +471,7 @@
       song.exId = ST.assign.app_ex_id || null;
       song.exTitle = ST.assign.title;
       song.artist = 'Exercise takes';
-      song.title = ST.assign.title + ' · take ' + takeNoFor(ST.assign.id);
+      if (!named) song.title = ST.assign.title + ' · take ' + takeNoFor(ST.assign.id);
       song.autoTitle = song.title;
       try { song.exRange = midiName(RANGE.lo) + '\u2013' + midiName(RANGE.hi); } catch (e) {}
     }
@@ -485,7 +492,7 @@
       say('Saved to your phone. Not sent yet — submit the one you like.');
       try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
     } else {
-      say('Kept, in My Recordings.');
+      say('Kept. It is in the Library, under Takes.');
     }
   }
 
@@ -508,8 +515,9 @@
     d.id = 'rpTakes';
     d.className = 'panel';
     d.style.cssText = 'margin-top:10px;padding:12px';
-    d.innerHTML = '<b style="font-size:13px">Your takes</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Play one back, keep it, or send it to your coach. The notes go with it.</div>' +
+    d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<b style="font-size:13px">Your takes</b>' +
+      '<button class="btn" id="rpTakesAll" style="padding:7px 11px;font-size:12px">All takes ›</button></div>' +
       '<div id="rpTakeList"></div>';
     st && st.parentNode ? st.parentNode.insertBefore(d, st.nextSibling) : host.appendChild(d);
     fillTakes();
@@ -532,11 +540,22 @@
     } catch (e) { return 1; }
   }
 
+  /* Robert, 17 Sep: the tracker shows the newest take and a door to the
+     Library's Takes page, organised by exercise, instead of a wall. */
   function fillTakes() {
     var box = $('rpTakeList');
-    if (!box || !window.RPSend) return;
-    box.innerHTML = RPSend.listHtml('pitch');
-    RPSend.wireList(box, 'pitch', loadTake);
+    if (!box) return;
+    var list = takes().filter(function (s) { return !s.assignId; });
+    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>'; }
+    else if (window.RPTakes) {
+      box.innerHTML = '<div class="measured" style="margin:6px 0 4px">Newest</div>' + RPTakes.rowHtml(list[0]) +
+        (list.length > 1 ? '<div class="measured" style="margin-top:6px">' + (list.length - 1) + ' more in the Library.</div>' : '');
+      RPTakes.wire(box);
+    }
+    on($('rpTakesAll'), 'click', function () {
+      try { switchMode('lib'); } catch (e) {}
+      setTimeout(function () { if (window.RPLib && RPLib.show) RPLib.show('recordings'); }, 150);
+    });
   }
 
   /* Robert, 16 Sep: "Sing over it should do what Listen already does, plus
