@@ -6360,7 +6360,7 @@ function soundBox(){
     '<div class="notice" id="soundMsg" style="margin-top:8px">Press <b>1 Test sound</b> &mdash; you should hear ' +
       'a piano note. If you do not, the problem is the app’s output, not your voice.</div>' +
     '<div class="ctl" style="margin-top:10px;background:transparent;border:0;padding:0">' +
-      '<label><span>Guide &amp; warm-up volume</span><output id="sbGuideOut">40%</output></label>' +
+      '<label><span>Exercise notes volume</span><output id="sbGuideOut">40%</output></label>' +
       '<input type="range" id="sbGuide" min="0" max="100" value="40" step="5">' +
     '</div>';
   return box;
@@ -6665,7 +6665,7 @@ function quickBuild(){
     '<div class="michelp-box">' +
       '<h3 style="margin-top:0">Quick settings</h3>' +
       '<div class="ctl" style="background:transparent;border:0;padding:0">' +
-        '<label><span>Guide &amp; warm-up volume</span><output id="qGuideOut">70%</output></label>' +
+        '<label><span>Exercise notes volume</span><output id="qGuideOut">70%</output></label>' +
         '<input type="range" id="qGuide" min="0" max="100" value="70" step="5">' +
       '</div>' +
       '<div class="ctl" style="background:transparent;border:0;padding:0;margin-top:10px">' +
@@ -7187,7 +7187,7 @@ renderJourney();
     basic.id = 'v10basic';
     basic.innerHTML =
       '<div class="ctl" style="background:transparent;border:0;padding:0">' +
-        '<label><span>Guide &amp; warm-up volume</span><output id="xGuideOut">70%</output></label>' +
+        '<label><span>Exercise notes volume</span><output id="xGuideOut">70%</output></label>' +
         '<input type="range" id="xGuide" min="0" max="100" value="70" step="5">' +
       '</div>' +
       '<div class="ctl" style="background:transparent;border:0;padding:0;margin-top:10px">' +
@@ -15154,6 +15154,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      way. One bar under the map shows what is playing and stops it. */
   ST.hearTake = false;
   try { ST.hearTake = localStorage.getItem('rp_hear_take') === '1'; } catch (e) {}
+  /* Robert, 16 Sep: "I can't change the volume of the take I'm singing over." */
+  ST.takeVol = 0.8;
+  try { var tv = localStorage.getItem('rp_take_vol'); if (tv != null && isFinite(+tv)) ST.takeVol = Math.max(0, Math.min(1, +tv)); } catch (e) {}
   var over = null;   /* { audio, url, title, mode } */
   function stopOver() {
     if (over) {
@@ -15178,6 +15181,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var url = URL.createObjectURL(s.blob);
       var a = new Audio(url);
       a.muted = !ST.hearTake;
+      try { a.volume = ST.takeVol; } catch (e) {}
       over = { audio: a, url: url, title: s.title, mode: 'over' };
       ST.overlay = { notes: s.notes, audio: a };
       a.onended = function () { if (over && over.audio === a) stopOver(); };
@@ -15250,8 +15254,17 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn' + (paused ? ' primary' : '') + '" id="rpPauseOver" style="padding:7px 12px;font-size:12px">' + (paused ? 'Resume' : 'Pause') + '</button>' +
       '<button class="btn" id="rpRestartOver" style="padding:7px 12px;font-size:12px">Restart</button>' +
       '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>' +
-      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '');
+      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '') +
+      (mode && ST.hearTake ? '<label style="flex:1 1 100%;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-dim)">Take volume' +
+        '<input type="range" id="rpTakeVol" min="0" max="100" step="5" value="' + Math.round(ST.takeVol * 100) + '" style="flex:1">' +
+        '<output id="rpTakeVolOut">' + Math.round(ST.takeVol * 100) + '%</output></label>' : '');
     bar.style.display = '';
+    on($('rpTakeVol'), 'input', function (e) {
+      ST.takeVol = (+e.target.value) / 100;
+      try { localStorage.setItem('rp_take_vol', String(ST.takeVol)); } catch (err) {}
+      if (over && over.audio && 'volume' in over.audio) { try { over.audio.volume = ST.takeVol; } catch (err) {} }
+      var o = $('rpTakeVolOut'); if (o) o.textContent = Math.round(ST.takeVol * 100) + '%';
+    });
     on($('rpStopOver'), 'click', function () { ST.stopAll(); say('Stopped.'); });
     on($('rpPauseOver'), 'click', function () {
       var a = ST.overlay && ST.overlay.audio; if (!a) return;
@@ -16239,7 +16252,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       measures: 'breath and steadiness', mode: 'train',
       go: function () { var b = $('btnSustain'); if (b) b.click(); } },
     { key: 'ear', name: 'Hear the note',
-      what: 'A few rounds of ear training. It measures how far off you are, in cents.',
+      what: 'Two notes play, ten times. Which was higher? It counts how many you got right.',
       measures: 'your ear', mode: 'train',
       go: function () { try { V10.startDrill('hilo'); } catch (e) {} } },
     { key: 'sing', name: 'Sing the note back',
@@ -18993,6 +19006,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   setInterval(helpRow, 1500);
   setTimeout(helpRow, 800);
 
+  TR.running = function () { return running(); };
   function running() {
     var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox'];
     for (var i = 0; i < ids.length; i++) {
@@ -20498,7 +20512,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     ] },
     match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
       { find: function () { return $('matchTarget'); },
-        text: 'This is the note, sung by a voice. Replay plays it again.' },
+        text: 'This is the note to sing. Replay plays it again.' },
       { find: function () { return $('matchHold'); },
         text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
     ] },
@@ -21317,7 +21331,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.style.cssText = 'background:transparent;border:0;padding:0;margin-top:10px';
     var v = saved(); if (v == null) { try { v = MONITOR.vol; } catch (e) { v = 0.75; } }
     d.innerHTML = '<label><span>Live vocals volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
-      '<input type="range" id="qMonVol" min="0" max="100" value="' + Math.round(v * 100) + '" step="5">';
+      '<input type="range" id="qMonVol" min="0" max="200" value="' + Math.round(v * 100) + '" step="5">';
     row.parentElement.insertBefore(d, row);
     d.querySelector('#qMonVol').addEventListener('input', function (e) {
       var f = (+e.target.value) / 100;
@@ -21327,11 +21341,36 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     });
   }
 
+  /* Robert, 16 Sep: "Live vocals are on everywhere … browsing the Library,
+     reading a lesson, sitting on Home. Live vocals should be live where it
+     makes sense — an exercise, the tracker, singing — and off everywhere
+     else, without me having to remember to switch it." The switch stays
+     as the singer left it; the sound only flows on a singing screen. */
+  function singingHere() {
+    try {
+      var m = state.mode;
+      if (m === 'free' || m === 'song' || m === 'voice' || m === 'yt') return true;
+      if (m === 'train') return !!(window.RPTrain && RPTrain.running && RPTrain.running());
+      if (m === 'lib') { var k = $('libKarBox'); return !!(k && k.offsetParent !== null); }
+    } catch (e) {}
+    return false;
+  }
+  var lastWant = null;
+  function gate() {
+    try {
+      if (!MONITOR.gain) return;
+      var want = (MONITOR.on && MIC.on && singingHere()) ? MONITOR.vol : 0;
+      if (want === lastWant && Math.abs(MONITOR.gain.gain.value - want) < 0.01) return;
+      lastWant = want;
+      MONITOR.gain.gain.setTargetAtTime(want, ctx.currentTime, 0.03);
+    } catch (e) {}
+  }
   function boot() {
     var v = saved();
     if (v != null) apply(v);
     mount();
     setInterval(mount, 1200);
+    setInterval(gate, 250);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

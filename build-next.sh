@@ -624,6 +624,12 @@ WRITING = [
 ]
 base = rewrite(base, WRITING, 'base')
 
+# Robert, 16 Sep: "make every label say what it actually controls". This
+# slider is the piano and the notes to match in exercises, not a guide.
+base, _n = _re.subn(_re.escape("Guide &amp; warm-up volume"), "Exercise notes volume", base)
+assert _n >= 3, 'guide volume label: found %d' % _n
+base, _n = _re.subn(_re.escape("Guide & warm-up volume"), "Exercise notes volume", base)
+
 # the transposition note, in both places it is written
 base = rewrite(base, [
     ("Use these if the notes feel too high or too low for your voice. It moves the whole song, not just one note.",

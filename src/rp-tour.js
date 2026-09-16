@@ -329,7 +329,7 @@
     ] },
     match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
       { find: function () { return $('matchTarget'); },
-        text: 'This is the note, sung by a voice. Replay plays it again.' },
+        text: 'This is the note to sing. Replay plays it again.' },
       { find: function () { return $('matchHold'); },
         text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
     ] },

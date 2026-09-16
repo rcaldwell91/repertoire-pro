@@ -548,6 +548,9 @@
      way. One bar under the map shows what is playing and stops it. */
   ST.hearTake = false;
   try { ST.hearTake = localStorage.getItem('rp_hear_take') === '1'; } catch (e) {}
+  /* Robert, 16 Sep: "I can't change the volume of the take I'm singing over." */
+  ST.takeVol = 0.8;
+  try { var tv = localStorage.getItem('rp_take_vol'); if (tv != null && isFinite(+tv)) ST.takeVol = Math.max(0, Math.min(1, +tv)); } catch (e) {}
   var over = null;   /* { audio, url, title, mode } */
   function stopOver() {
     if (over) {
@@ -572,6 +575,7 @@
       var url = URL.createObjectURL(s.blob);
       var a = new Audio(url);
       a.muted = !ST.hearTake;
+      try { a.volume = ST.takeVol; } catch (e) {}
       over = { audio: a, url: url, title: s.title, mode: 'over' };
       ST.overlay = { notes: s.notes, audio: a };
       a.onended = function () { if (over && over.audio === a) stopOver(); };
@@ -644,8 +648,17 @@
       '<button class="btn' + (paused ? ' primary' : '') + '" id="rpPauseOver" style="padding:7px 12px;font-size:12px">' + (paused ? 'Resume' : 'Pause') + '</button>' +
       '<button class="btn" id="rpRestartOver" style="padding:7px 12px;font-size:12px">Restart</button>' +
       '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>' +
-      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '');
+      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '') +
+      (mode && ST.hearTake ? '<label style="flex:1 1 100%;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-dim)">Take volume' +
+        '<input type="range" id="rpTakeVol" min="0" max="100" step="5" value="' + Math.round(ST.takeVol * 100) + '" style="flex:1">' +
+        '<output id="rpTakeVolOut">' + Math.round(ST.takeVol * 100) + '%</output></label>' : '');
     bar.style.display = '';
+    on($('rpTakeVol'), 'input', function (e) {
+      ST.takeVol = (+e.target.value) / 100;
+      try { localStorage.setItem('rp_take_vol', String(ST.takeVol)); } catch (err) {}
+      if (over && over.audio && 'volume' in over.audio) { try { over.audio.volume = ST.takeVol; } catch (err) {} }
+      var o = $('rpTakeVolOut'); if (o) o.textContent = Math.round(ST.takeVol * 100) + '%';
+    });
     on($('rpStopOver'), 'click', function () { ST.stopAll(); say('Stopped.'); });
     on($('rpPauseOver'), 'click', function () {
       var a = ST.overlay && ST.overlay.audio; if (!a) return;

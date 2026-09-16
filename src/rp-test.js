@@ -65,7 +65,7 @@
       measures: 'breath and steadiness', mode: 'train',
       go: function () { var b = $('btnSustain'); if (b) b.click(); } },
     { key: 'ear', name: 'Hear the note',
-      what: 'A few rounds of ear training. It measures how far off you are, in cents.',
+      what: 'Two notes play, ten times. Which was higher? It counts how many you got right.',
       measures: 'your ear', mode: 'train',
       go: function () { try { V10.startDrill('hilo'); } catch (e) {} } },
     { key: 'sing', name: 'Sing the note back',

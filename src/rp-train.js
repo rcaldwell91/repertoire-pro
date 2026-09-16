@@ -315,6 +315,7 @@
   setInterval(helpRow, 1500);
   setTimeout(helpRow, 800);
 
+  TR.running = function () { return running(); };
   function running() {
     var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox'];
     for (var i = 0; i < ids.length; i++) {
