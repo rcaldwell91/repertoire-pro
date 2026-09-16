@@ -391,7 +391,8 @@
     return new Blob(ST.chunks, { type: (ST.rec && ST.rec.mimeType) || 'audio/webm' });
   }
   function stopPlay() {
-    ST.unfollow();
+    /* only the pending take's own playback; a guide being sung over stays */
+    if (follow && ST.audio && follow.audio === ST.audio) ST.unfollow();
     if (ST.audio) { try { ST.audio.pause(); } catch (e) {} ST.audio = null; }
     if (ST.url) { URL.revokeObjectURL(ST.url); ST.url = null; }
     ST.playing = false;
@@ -550,7 +551,7 @@
   var over = null;   /* { audio, url, title, mode } */
   function stopOver() {
     if (over) {
-      try { over.audio.pause(); } catch (e) {}
+      try { if (over.audio.end) over.audio.end(); else over.audio.pause(); } catch (e) {}
       if (over.url) { try { URL.revokeObjectURL(over.url); } catch (e) {} }
       over = null;
     }
@@ -588,14 +589,20 @@
      object that looks enough like an audio element for __rpOverlay and
      the bar (currentTime, paused, ended, pause). Nothing is heard. */
   function clockFor(dur) {
-    var t0 = performance.now(), c = { paused: false, ended: false, muted: true, _dur: dur || 0 };
-    Object.defineProperty(c, 'currentTime', { get: function () {
-      if (c.ended) return c._dur;
-      var t = (performance.now() - t0) / 1000;
-      if (c._dur && t > c._dur + 0.6) { c.ended = true; return c._dur; }
-      return t;
-    } });
-    c.pause = function () { c.paused = true; c.ended = true; };
+    var t0 = performance.now(), held = 0, c = { paused: false, ended: false, muted: true, _dur: dur || 0 };
+    Object.defineProperty(c, 'currentTime', {
+      get: function () {
+        if (c.ended) return c._dur;
+        if (c.paused) return held;
+        var t = (performance.now() - t0) / 1000;
+        if (c._dur && t > c._dur + 0.6) { c.ended = true; return c._dur; }
+        return t;
+      },
+      set: function (v) { held = v || 0; t0 = performance.now() - held * 1000; c.ended = false; }
+    });
+    c.pause = function () { if (!c.paused) { held = c.currentTime; c.paused = true; } };
+    c.play = function () { if (c.paused) { t0 = performance.now() - held * 1000; c.paused = false; } return Promise.resolve(); };
+    c.end = function () { c.paused = true; c.ended = true; };
     return c;
   }
   ST.guide = function (notes, title, dur) {
@@ -629,12 +636,28 @@
     var title = over ? over.title : 'the take';
     var mode = over && over.mode === 'over';
     var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing over ' : 'Listening to ');
-    bar.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
-        lead + '<span style="color:var(--gold)">' + esc(title) + '</span></div>' +
-      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '') +
-      '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>';
+    var paused = !!o.audio.paused;
+    bar.dataset.paused = paused ? '1' : '0';
+    /* Robert, 16 Sep: "still need a pause, restart and end button." */
+    bar.innerHTML = '<div style="flex:1 1 100%;min-width:0;font-size:12.5px;font-weight:700">' +
+        lead + '<span style="color:var(--gold)">' + esc(title) + '</span>' + (paused ? ' · paused' : '') + '</div>' +
+      '<button class="btn' + (paused ? ' primary' : '') + '" id="rpPauseOver" style="padding:7px 12px;font-size:12px">' + (paused ? 'Resume' : 'Pause') + '</button>' +
+      '<button class="btn" id="rpRestartOver" style="padding:7px 12px;font-size:12px">Restart</button>' +
+      '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>' +
+      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '');
     bar.style.display = '';
     on($('rpStopOver'), 'click', function () { ST.stopAll(); say('Stopped.'); });
+    on($('rpPauseOver'), 'click', function () {
+      var a = ST.overlay && ST.overlay.audio; if (!a) return;
+      if (a.paused) { try { var pr = a.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {} }
+      else { try { a.pause(); } catch (e) {} }
+      setTimeout(playBar, 60);
+    });
+    on($('rpRestartOver'), 'click', function () {
+      var a = ST.overlay && ST.overlay.audio; if (!a) return;
+      try { a.currentTime = 0; var pr = a.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+      setTimeout(playBar, 60);
+    });
     on($('rpHearTake'), 'click', function () {
       ST.hearTake = !ST.hearTake;
       try { localStorage.setItem('rp_hear_take', ST.hearTake ? '1' : '0'); } catch (e) {}
@@ -643,10 +666,18 @@
     });
   }
   /* Listen (from the take list) sets the overlay too; the bar follows it */
+  document.addEventListener('visibilitychange', function () {
+    /* Robert, 16 Sep: "my phone is asleep and it's still playing." */
+    if (document.hidden && ST.overlay && ST.overlay.audio && !ST.overlay.audio.paused) {
+      try { ST.overlay.audio.pause(); } catch (e) {}
+      setTimeout(playBar, 60);
+    }
+  });
   setInterval(function () {
     var bar = $('rpPlayBar');
     var o = ST.overlay, live = o && o.audio && !o.audio.ended && !o.audio.paused;
     if (live && (!bar || bar.style.display === 'none')) playBar();
+    if (o && o.audio && bar && bar.style.display !== 'none' && bar.dataset.paused !== (o.audio.paused ? '1' : '0')) playBar();
     if (!live && bar && bar.style.display !== 'none' && !(o && o.audio && !o.audio.ended)) playBar();
     if (o && o.audio && o.audio.ended && over && over.mode === 'guide') stopOver();
   }, 400);
