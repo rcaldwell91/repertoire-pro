@@ -217,6 +217,14 @@
     return h;
   };
 
+  /* Robert, 16 Sep: Listen had no stop. */
+  S.stopListen = function () {
+    if (!S._a) return;
+    try { S._a.pause(); } catch (e) {}
+    try { URL.revokeObjectURL(S._a._u); } catch (e) {}
+    S._a = null;
+  };
+
   S.wireList = function (root, kind, onLoad) {
     if (!root) return;
     root._rpOnLoad = onLoad || root._rpOnLoad || null;
@@ -245,7 +253,8 @@
         var s = find(b.dataset.hear);
         if (!s) return;
         try {
-          if (S._a) { S._a.pause(); URL.revokeObjectURL(S._a._u); }
+          S.stopListen();
+          try { if (window.RPStudio && RPStudio.stopAll) RPStudio.stopAll(); } catch (e) {}
           var a = new Audio(); a._u = URL.createObjectURL(s.blob); a.src = a._u;
           a.play(); S._a = a;
           var svg = root.querySelector('[data-pl="' + (window.CSS && CSS.escape ? CSS.escape(s.id) : s.id) + '"]');

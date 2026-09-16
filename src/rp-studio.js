@@ -310,6 +310,12 @@
     var W = 300, PAD = 26;
     follow = { svg: svg, audio: audio, raf: 0 };
     ST.overlay = { notes: LINES[svg.getAttribute('data-pl') || ''] || null, audio: audio };
+    if (!over || over.audio !== audio) {
+      var card = svg.closest ? svg.closest('.rp-card') : null;
+      var tt = card && card.querySelector('.rp-ttl');
+      over = { audio: audio, url: null, title: tt ? (tt.childNodes[0] && tt.childNodes[0].textContent || tt.textContent) : 'the take', mode: 'listen' };
+    }
+    try { playBar(); } catch (e) {}
     ph.setAttribute('opacity', '1');
     (function step() {
       if (!follow || follow.svg !== svg) return;
@@ -532,18 +538,86 @@
     RPSend.wireList(box, 'pitch', loadTake);
   }
 
+  /* Robert, 16 Sep: "Sing over it should do what Listen already does, plus
+     my voice." It used to play the take through the tracker's track player
+     and never set ST.overlay, so the big map never saw it. Now it sets the
+     same overlay Listen sets — the take's notes in gold on the big map, the
+     take's clock as the guide — and your voice draws over them in blue. The
+     take's sound is off unless "Hear the take" is on; the clock runs either
+     way. One bar under the map shows what is playing and stops it. */
+  ST.hearTake = false;
+  try { ST.hearTake = localStorage.getItem('rp_hear_take') === '1'; } catch (e) {}
+  var over = null;   /* { audio, url, title, mode } */
+  function stopOver() {
+    if (over) {
+      try { over.audio.pause(); } catch (e) {}
+      if (over.url) { try { URL.revokeObjectURL(over.url); } catch (e) {} }
+      over = null;
+    }
+    ST.unfollow();
+    playBar();
+  }
+  ST.stopAll = function () {
+    stopOver();
+    try { if (window.RPSend && RPSend.stopListen) RPSend.stopListen(); } catch (e) {}
+    playBar();
+  };
   function loadTake(s) {
     if (!s) return say('Keep a take first.');
-    var a = $('freeAudio');
-    if (!a) return;
+    if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
+    ST.stopAll();
+    (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
     try {
-      if (a._rpUrl) URL.revokeObjectURL(a._rpUrl);
-      a._rpUrl = URL.createObjectURL(s.blob);
-      a.src = a._rpUrl;
-      a.play().catch(function () {});
-      say('Playing ' + s.title + '. Sing along and watch your line.');
+      var url = URL.createObjectURL(s.blob);
+      var a = new Audio(url);
+      a.muted = !ST.hearTake;
+      over = { audio: a, url: url, title: s.title, mode: 'over' };
+      ST.overlay = { notes: s.notes, audio: a };
+      a.onended = function () { if (over && over.audio === a) stopOver(); };
+      a.play().catch(function () { say('The phone would not play it.'); });
+      say('Singing over ' + s.title + '. Gold is the take; blue is you now.');
+      try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     } catch (e) { say('Could not load that take.'); }
+    playBar();
   }
+
+  /* the bar under the big map: what is playing, a Stop, and the sound switch */
+  function playBar() {
+    var cv = $('freeCanvas');
+    if (!cv || !cv.parentElement) return;
+    var bar = $('rpPlayBar');
+    var o = ST.overlay;
+    var live = o && o.audio && !o.audio.ended;
+    if (!live) { if (bar) bar.style.display = 'none'; return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'rpPlayBar';
+      bar.className = 'row';
+      bar.style.cssText = 'align-items:center;gap:8px;margin:8px 0 2px;flex-wrap:wrap';
+      cv.parentElement.insertBefore(bar, cv.nextSibling);
+    }
+    var title = over ? over.title : 'the take';
+    var mode = over && over.mode === 'over';
+    bar.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
+        (mode ? 'Singing over ' : 'Listening to ') + '<span style="color:var(--gold)">' + esc(title) + '</span></div>' +
+      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '') +
+      '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>';
+    bar.style.display = '';
+    on($('rpStopOver'), 'click', function () { ST.stopAll(); say('Stopped.'); });
+    on($('rpHearTake'), 'click', function () {
+      ST.hearTake = !ST.hearTake;
+      try { localStorage.setItem('rp_hear_take', ST.hearTake ? '1' : '0'); } catch (e) {}
+      if (over && over.audio) over.audio.muted = !ST.hearTake;
+      playBar();
+    });
+  }
+  /* Listen (from the take list) sets the overlay too; the bar follows it */
+  setInterval(function () {
+    var bar = $('rpPlayBar');
+    var o = ST.overlay, live = o && o.audio && !o.audio.ended && !o.audio.paused;
+    if (live && (!bar || bar.style.display === 'none')) playBar();
+    if (!live && bar && bar.style.display !== 'none' && !(o && o.audio && !o.audio.ended)) playBar();
+  }, 400);
 
   /* ---------------------------------------------------------------- */
   /* a running clock while recording                                   */
