@@ -431,10 +431,10 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     </div>
     <h3 style="margin:18px 4px 2px">Or jump right in</h3>
     <div class="homegrid">
-      <div class="mcard hue1" id="mcTrain"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-activity"/></svg></div><div><h4>Vocal Trainer</h4><p>Exercises that build your voice, a level at a time</p></div><div class="chev">›</div></div>
+      <div class="mcard hue1" id="mcTrain"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-activity"/></svg></div><div><h4>Train</h4><p>Exercises that build your voice, a level at a time</p></div><div class="chev">›</div></div>
       <div class="mcard hue2" id="mcSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
       <div class="mcard hue3" id="mcYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Sing along to any video, kept in your range</p></div><div class="chev">›</div></div>
-      <div class="mcard hue4" id="mcLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>My Music</h4><p>Your songs, and every take you have recorded</p></div><div class="chev">›</div></div>
+      <div class="mcard hue4" id="mcLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Library</h4><p>Your songs, and every take you have recorded</p></div><div class="chev">›</div></div>
       <div class="mcard hue5" id="mcFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p></div><div class="chev">›</div></div>
     </div>
   </div>
@@ -447,8 +447,8 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     </div>
     <div class="homegrid" style="margin-top:12px">
       <div class="mcard hue2" id="shSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
-      <div class="mcard hue3" id="shYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>YouTube Karaoke</h4><p>Search any song's karaoke version, auto key detect</p></div><div class="chev">›</div></div>
-      <div class="mcard hue4" id="shLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Sing My Music</h4><p>Sing over songs you own, kept in your range</p></div><div class="chev">›</div></div>
+      <div class="mcard hue3" id="shYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Search any song's karaoke version, auto key detect</p></div><div class="chev">›</div></div>
+      <div class="mcard hue4" id="shLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Sing from your Library</h4><p>Sing over songs you own, kept in your range</p></div><div class="chev">›</div></div>
       <div class="mcard hue5" id="shFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p></div><div class="chev">›</div></div>
     </div>
   </div>
@@ -6674,7 +6674,7 @@ function quickBuild(){
       '</div>' +
       '<div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">' +
         '<button class="btn" id="qMonitor" style="padding:8px 12px;font-size:12.5px">Hear me</button>' +
-        '<button class="btn" id="qMic" style="padding:8px 12px;font-size:12.5px">Turn mic on</button>' +
+        '<button class="btn" id="qMic" style="padding:8px 12px;font-size:12.5px">Microphone: off</button>' +
       '</div>' +
       '<div class="notice" style="margin-top:10px">Everything else &mdash; testing the sound, the ' +
       'microphone check, appearance &mdash; is on the <b>You</b> tab.</div>' +
@@ -6721,7 +6721,7 @@ function quickSync(){
   const mb = $$('qMonitor');
   if(mb) mb.textContent = (typeof MONITOR !== 'undefined' && MONITOR.on) ? 'Stop hearing me' : 'Hear me';
   const mc = $$('qMic');
-  if(mc) mc.textContent = MIC.on ? 'Turn mic off' : 'Turn mic on';
+  if(mc) mc.textContent = MIC.on ? 'Microphone: on' : 'Microphone: off';
 }
 function quickOpen(){ quickBuild(); quickSync(); $$('quickSheet').style.display = 'flex'; }
 function quickClose(){ const d = $$('quickSheet'); if(d) d.style.display = 'none'; }
@@ -7099,7 +7099,7 @@ renderJourney();
     const t = $('qTheme');
     if (!t) return;
     const light = document.body.classList.contains('light');
-    t.textContent = light ? 'Dark mode' : 'Light mode';
+    t.textContent = light ? 'Light mode: on' : 'Light mode: off';
   }
   V10.syncTheme = v10SyncTheme;
 
@@ -9473,7 +9473,7 @@ renderJourney();
     h += '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) +
       '</div><div class="pd">Lip trills, straws and hums first. The gentlest way to start.</div></div></div>';
     h += '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-      ' <span class="extag" style="color:var(--accent)">TODAY\'S ONE THING</span></div>' +
+      '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">Today\'s one thing</div></div>' +
       '<div class="pd">' + esc(plan.focus.what.replace(/<[^>]+>/g, '')) + '</div></div></div>';
     h += '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div>' +
       '<div class="pd">Pick any song and use today\'s one thing on it.</div></div></div>';
@@ -9484,7 +9484,7 @@ renderJourney();
     /* ---- this week ---- */
     h += '<div class="panel" style="margin-top:12px">';
     h += '<div class="row" style="justify-content:space-between;align-items:baseline">' +
-      '<b style="font-size:14px">This week</b><span class="pill">' + nWk + ' of 6 days</span></div>';
+      '<b style="font-size:14px">This week</b><span class="pill">' + nWk + (nWk === 1 ? ' day' : ' days') + '</span></div>';
     h += '<div class="row" style="gap:6px;margin-top:10px">';
     wk.forEach(d => {
       h += '<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--ink-faint);font-weight:800">' +
@@ -9505,7 +9505,7 @@ renderJourney();
     });
     h += '</div>';
 
-    if (P.goal === 'tone') {
+    if (P.goal === 'tone' && P.goalChosen) {
       h += '<div class="measured">Most coaches would start you on pitch, because it shows fastest. You picked tone. That works too, and you still get a little pitch work from the start. Change it any time.</div>';
     } else if (P.goal === 'pitch') {
       h += '<div class="measured">Pitch first is the usual order, and it shows fast. If sounding rough puts you off practising, switch to tone for a few weeks. That is a real plan, not a cop-out.</div>';
@@ -9559,7 +9559,7 @@ renderJourney();
       '<b style="font-size:14px">Working with a real coach</b>' +
       '<button class="btn" id="cCoachMode" style="padding:8px 12px;font-size:12.5px">' +
       (P.coachMode ? 'On' : 'Off') + '</button></div>';
-    h += '<div class="notice" style="margin-top:6px">Sign in and join your coach with their code, and this tab becomes their channel: they set the work, you record, they listen in their own time.</div>';
+    h += '<div class="notice" style="margin-top:6px">Once you have joined a coach with their code at the top of this tab, what they set you shows there.</div>';
     if (P.coachMode) {
       h += '<div class="ctl" style="margin-top:10px"><label>Coach</label>' +
         '<input id="cCoachName" type="text" placeholder="your coach\'s name" value="' + esc(P.coachName) + '" ' +
@@ -9590,7 +9590,7 @@ renderJourney();
 
     /* wiring */
     host.querySelectorAll('[data-goal]').forEach(b =>
-      b.addEventListener('click', () => { P.goal = b.dataset.goal; save(); renderCoach(); }));
+      b.addEventListener('click', () => { P.goal = b.dataset.goal; P.goalChosen = true; save(); renderCoach(); }));
     host.querySelectorAll('[data-dial]').forEach(b =>
       b.addEventListener('click', () => { P.dial = b.dataset.dial; save(); renderCoach(); }));
     host.querySelectorAll('[data-heard]').forEach(b =>
@@ -15362,8 +15362,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (sig !== takesSig) { takesSig = sig; if ($('rpTakeList')) fillTakes(); }
   }
   function boot() {
-    setInterval(function () { mount(); mountTakes(); mountTrainEntry(); refreshTakes(); }, 1200);
-    mount(); mountTakes(); mountTrainEntry();
+    setInterval(function () { mount(); mountTakes(); refreshTakes(); }, 1200);
+    mount(); mountTakes();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
     try { if (typeof libReady !== 'undefined' && libReady && libReady.then) libReady.then(function () { setTimeout(refreshTakes, 50); }); } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
@@ -16792,7 +16792,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.innerHTML = '<span style="font-weight:900;color:var(--gold);font-size:12.5px">Level ' +
       c.level + '</span>' +
       '<span style="font-weight:700">' + esc(c.name) + '</span>' +
-      '<span style="opacity:.6">· ' + c.points + ' points</span>';
+      '<span style="opacity:.6">· ' + c.points + ' points</span>' +
+      '<span style="opacity:.6;margin-left:auto">' + (c.points ? 'what counts ›' : 'how points work ›') + '</span>';
     if (fresh) {
       on(d, 'click', L.open);
       try { host.insertBefore(d, host.firstChild); } catch (e) {}
@@ -18179,6 +18180,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!live) return;
     var lo = Math.round(live.lo), hi = Math.round(live.hi);
     if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return;
+    /* Robert, 17 Sep: his phone measured F3–A♯5 and the app still said
+       A2–A4. The first time this ran was the END of the test, on a phone
+       that had never opened the Train tab: "seen" was empty, so it took the
+       measured range as the starting point and saved nothing. Now the
+       starting point is read at boot, so the first real change is kept. */
     if (!seen) { seen = { lo: lo, hi: hi }; if (!readLocal()) return; }
     if (seen.lo === lo && seen.hi === hi) return;            /* nothing moved */
     seen = { lo: lo, hi: hi };
@@ -18222,10 +18228,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
               : (!theirs.at ? mine2
               : (new Date(theirs.at) > new Date(mine2.at) ? theirs : mine2));
     if (newer === theirs) { writeLocal(theirs); apply(theirs.lo, theirs.hi); }
+    else if (mine2 && mine2.at && (!theirs.at || theirs.lo !== mine2.lo || theirs.hi !== mine2.hi)) push(mine2);
     else push(mine2);
   }
 
   /* ---- hook every place the range can change ----------------------- */
+  (function primeSeen() {
+    var n = 0, iv = setInterval(function () {
+      var live = null; try { live = theRange(); } catch (e) {}
+      if (live && isFinite(live.lo) && isFinite(live.hi)) { if (!seen) seen = { lo: Math.round(live.lo), hi: Math.round(live.hi) }; clearInterval(iv); }
+      else if (++n > 60) clearInterval(iv);
+    }, 100);
+  })();
   (function hook() {
     function attach() {
       if (typeof updateRangeDisp !== 'function' || updateRangeDisp.__rp) return false;
@@ -18524,7 +18538,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
           '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-          ' <span class="extag" style="color:var(--accent)">TODAY’S ONE THING</span></div></div></div>' +
+          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">Today’s one thing</div></div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
           '</div>';
@@ -18774,14 +18788,24 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
   function catOf(id) { return CATS.filter(function (c) { return c.id === id; })[0]; }
   function lvlName(l) { return ['', 'Beginner', 'Intermediate', 'Advanced'][l] || ''; }
+  /* Robert, 17 Sep: never offer a level that has nothing in it, and never
+     recommend "Lip trills · ADVANCED" when the list at Advanced is empty. */
+  function levelsIn(cat) {
+    var have = {};
+    listFor(cat, 0).forEach(function (e) { have[e.level] = 1; });
+    return LEVELS.filter(function (l) { return l[0] === 0 || have[l[0]]; });
+  }
+  function effectiveLevel(cat, level) {
+    return levelsIn(cat).some(function (l) { return l[0] === level; }) ? level : 0;
+  }
 
   /* ---- one exercise, as a card -------------------------------------- */
   function exCard(e, big) {
     return '<div class="rp-card" data-exopen="' + esc(e.id) + '" style="padding:12px;cursor:pointer;margin-top:8px">' +
       '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
-      '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(e.name) +
-      '<span class="rp-info" title="What is this?">i</span>' +
-      (e.quiet ? '<span class="rp-tag">quiet ok</span>' : '') + '</div>' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl"><span class="rp-name">' + esc(e.name) + '</span>' +
+      '<span class="rp-info" role="button" aria-label="What is this?" title="What is this?">i</span>' +
+      (e.quiet ? ' <span class="rp-tag" aria-label="quiet, fine where people can hear you">quiet ok</span>' : '') + '</div>' +
       '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
       (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
       '</div>' +
@@ -18849,6 +18873,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (level == null) level = sel.level;
     var h = '<div class="segrow" style="margin-bottom:4px">';
     LEVELS.forEach(function (l) {
+      if (!levelsIn(cat).some(function (x) { return x[0] === l[0]; })) return;
       h += '<button class="seg' + (level === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
     });
     h += '</div>';
@@ -18879,7 +18904,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       wire: function (root) {
         wireEx(root, { label: c.name, go: function () { TR.category(cat, sel.level); } });
         root.querySelectorAll('[data-lv]').forEach(function (b) {
-          on(b, 'click', function () { sel.level = +b.dataset.lv; try { localStorage.setItem('rp_tr_lvl', sel.level); } catch (e) {} TR.category(cat, sel.level); });
+          on(b, 'click', function () { sel.level = +b.dataset.lv; try { localStorage.setItem('rp_tr_lvl', sel.level); } catch (e) {} draw(); TR.category(cat, sel.level); });
         });
       } });
   };
@@ -18921,8 +18946,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       h += '<button class="seg' + (sel.cat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' + esc(c.name) + '</button>';
     });
     h += '</div><div class="segrow">';
-    LEVELS.forEach(function (l) {
-      h += '<button class="seg' + (sel.level === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
+    var eff = effectiveLevel(sel.cat, sel.level);
+    levelsIn(sel.cat).forEach(function (l) {
+      h += '<button class="seg' + (eff === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
     });
     h += '</div>';
 
@@ -18935,10 +18961,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
         '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See all ear drills</button></div>';
     } else {
-      var one = pickOne(sel.cat, sel.level);
+      var one = pickOne(sel.cat, effectiveLevel(sel.cat, sel.level));
       if (one) {
         h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
-          (sel.level ? ' · ' + esc(lvlName(sel.level).toUpperCase()) : '') + '</div>' +
+          ' · ' + esc(lvlName(one.level).toUpperCase()) + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
           '<span class="rp-info" title="What is this?">i</span></div>' +
@@ -18954,12 +18980,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
       '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>';
 
-    h += '<h3 style="margin:18px 4px 2px">Work on</h3>';
-    h += RPPage.tiles(CATS.map(function (c) {
-      var n = c.id === 'ear' ? DRILLS.length : (c.id === 'pitch' ? listFor('pitch', 0).length + TOOLS.length : listFor(c.id, 0).length);
-      return { icon: c.icon, title: c.name, sub: c.sub, data: 'data-more="' + c.id + '"' };
-    }));
-
+    /* Robert, 17 Sep: the seven categories were on the screen twice — the
+       chips at the top and a tile for each below. The chips choose; See
+       more opens the list. The tiles went. */
     h += '<h3 style="margin:18px 4px 2px">Also</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, drawn live. Record a take.', id: 'rpTileTracker' },
@@ -19754,7 +19777,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     if (chip === 'all') {
       h += '<div class="measured" style="margin-top:14px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
-        ' · stored on this device.' + (owned().length ? '' : ' Add songs you own with the ＋, or record a take.') + '</div>';
+        ' on this phone. Songs and takes stay on the phone they were made on; a take you send to your coach reaches them.' +
+        (owned().length ? '' : ' Add songs you own with the ＋, or record a take.') + '</div>';
     }
     top.innerHTML = h;
 
@@ -21383,6 +21407,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.innerHTML = '<label><span>Live vocals volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
       '<input type="range" id="qMonVol" min="0" max="200" value="' + Math.round(v * 100) + '" step="5">';
     row.parentElement.insertBefore(d, row);
+    var note = document.createElement('div');
+    note.className = 'measured'; note.style.marginTop = '4px';
+    note.textContent = 'The take you sing over has its own volume, on the bar under the Pitch Tracker.';
+    row.parentElement.insertBefore(note, row);
     d.querySelector('#qMonVol').addEventListener('input', function (e) {
       var f = (+e.target.value) / 100;
       $('qMonVolOut').textContent = Math.round(f * 100) + '%';

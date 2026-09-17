@@ -258,7 +258,8 @@
 
     if (chip === 'all') {
       h += '<div class="measured" style="margin-top:14px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
-        ' · stored on this device.' + (owned().length ? '' : ' Add songs you own with the ＋, or record a take.') + '</div>';
+        ' on this phone. Songs and takes stay on the phone they were made on; a take you send to your coach reaches them.' +
+        (owned().length ? '' : ' Add songs you own with the ＋, or record a take.') + '</div>';
     }
     top.innerHTML = h;
 

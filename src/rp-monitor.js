@@ -38,6 +38,10 @@
     d.innerHTML = '<label><span>Live vocals volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
       '<input type="range" id="qMonVol" min="0" max="200" value="' + Math.round(v * 100) + '" step="5">';
     row.parentElement.insertBefore(d, row);
+    var note = document.createElement('div');
+    note.className = 'measured'; note.style.marginTop = '4px';
+    note.textContent = 'The take you sing over has its own volume, on the bar under the Pitch Tracker.';
+    row.parentElement.insertBefore(note, row);
     d.querySelector('#qMonVol').addEventListener('input', function (e) {
       var f = (+e.target.value) / 100;
       $('qMonVolOut').textContent = Math.round(f * 100) + '%';

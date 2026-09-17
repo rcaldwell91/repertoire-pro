@@ -233,7 +233,8 @@
     d.innerHTML = '<span style="font-weight:900;color:var(--gold);font-size:12.5px">Level ' +
       c.level + '</span>' +
       '<span style="font-weight:700">' + esc(c.name) + '</span>' +
-      '<span style="opacity:.6">· ' + c.points + ' points</span>';
+      '<span style="opacity:.6">· ' + c.points + ' points</span>' +
+      '<span style="opacity:.6;margin-left:auto">' + (c.points ? 'what counts ›' : 'how points work ›') + '</span>';
     if (fresh) {
       on(d, 'click', L.open);
       try { host.insertBefore(d, host.firstChild); } catch (e) {}

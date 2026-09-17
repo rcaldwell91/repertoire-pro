@@ -105,6 +105,11 @@
     if (!live) return;
     var lo = Math.round(live.lo), hi = Math.round(live.hi);
     if (!isFinite(lo) || !isFinite(hi) || hi <= lo) return;
+    /* Robert, 17 Sep: his phone measured F3–A♯5 and the app still said
+       A2–A4. The first time this ran was the END of the test, on a phone
+       that had never opened the Train tab: "seen" was empty, so it took the
+       measured range as the starting point and saved nothing. Now the
+       starting point is read at boot, so the first real change is kept. */
     if (!seen) { seen = { lo: lo, hi: hi }; if (!readLocal()) return; }
     if (seen.lo === lo && seen.hi === hi) return;            /* nothing moved */
     seen = { lo: lo, hi: hi };
@@ -148,10 +153,18 @@
               : (!theirs.at ? mine2
               : (new Date(theirs.at) > new Date(mine2.at) ? theirs : mine2));
     if (newer === theirs) { writeLocal(theirs); apply(theirs.lo, theirs.hi); }
+    else if (mine2 && mine2.at && (!theirs.at || theirs.lo !== mine2.lo || theirs.hi !== mine2.hi)) push(mine2);
     else push(mine2);
   }
 
   /* ---- hook every place the range can change ----------------------- */
+  (function primeSeen() {
+    var n = 0, iv = setInterval(function () {
+      var live = null; try { live = theRange(); } catch (e) {}
+      if (live && isFinite(live.lo) && isFinite(live.hi)) { if (!seen) seen = { lo: Math.round(live.lo), hi: Math.round(live.hi) }; clearInterval(iv); }
+      else if (++n > 60) clearInterval(iv);
+    }, 100);
+  })();
   (function hook() {
     function attach() {
       if (typeof updateRangeDisp !== 'function' || updateRangeDisp.__rp) return false;

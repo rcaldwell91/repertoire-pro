@@ -117,7 +117,7 @@
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
           '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-          ' <span class="extag" style="color:var(--accent)">TODAY’S ONE THING</span></div></div></div>' +
+          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">Today’s one thing</div></div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
           '</div>';

@@ -468,6 +468,34 @@ PATCHES = [
     ("const qb = $('gQuit'); if (qb) qb.addEventListener('click', quit);",
      "const qb = p.querySelector('#gameQuit'); if (qb) qb.addEventListener('click', quit);"),
 
+    # 37. ROBERT'S CONFIRMED LIST, 17 Sep.
+    #  #1 "Mum TODAY'S ONE THING" ran together as one line on the Coach plan.
+    ("      ' <span class=\"extag\" style=\"color:var(--accent)\">TODAY\\'S ONE THING</span></div>' +",
+     "      '<div class=\"extag\" style=\"display:block;margin-top:3px;color:var(--accent)\">Today\\'s one thing</div></div>' +"),
+    #  #3 one name per thing: the tabs' names, everywhere.
+    ("<h4>Vocal Trainer</h4>", "<h4>Train</h4>"),
+    ("<h4>My Music</h4>", "<h4>Library</h4>"),
+    ("<h4>YouTube Karaoke</h4>", "<h4>Karaoke</h4>"),
+    ("<h4>Sing My Music</h4>", "<h4>Sing from your Library</h4>"),
+    #  #13 "0 of 6 days" over seven day letters.
+    ("'<b style=\"font-size:14px\">This week</b><span class=\"pill\">' + nWk + ' of 6 days</span></div>';",
+     "'<b style=\"font-size:14px\">This week</b><span class=\"pill\">' + nWk + (nWk === 1 ? ' day' : ' days') + '</span></div>';"),
+    #  #14 "You picked tone" when nothing was picked: tone is the default.
+    ("    if (P.goal === 'tone') {\n      h += '<div class=\"measured\">Most coaches would start you on pitch",
+     "    if (P.goal === 'tone' && P.goalChosen) {\n      h += '<div class=\"measured\">Most coaches would start you on pitch"),
+    ("      b.addEventListener('click', () => { P.goal = b.dataset.goal; save(); renderCoach(); }));",
+     "      b.addEventListener('click', () => { P.goal = b.dataset.goal; P.goalChosen = true; save(); renderCoach(); }));"),
+    #  #17 the gear's three buttons read the same way: a name, then its state.
+    ("        '<button class=\"btn\" id=\"qMic\" style=\"padding:8px 12px;font-size:12.5px\">Turn mic on</button>' +",
+     "        '<button class=\"btn\" id=\"qMic\" style=\"padding:8px 12px;font-size:12.5px\">Microphone: off</button>' +"),
+    ("  if(mc) mc.textContent = MIC.on ? 'Turn mic off' : 'Turn mic on';",
+     "  if(mc) mc.textContent = MIC.on ? 'Microphone: on' : 'Microphone: off';"),
+    ("    t.textContent = light ? 'Dark mode' : 'Light mode';",
+     "    t.textContent = light ? 'Light mode: on' : 'Light mode: off';"),
+    #  #12 the base's old "working with a real coach" note, said right.
+    ("Sign in and join your coach with their code, and this tab becomes their channel: they set the work, you record, they listen in their own time.",
+     "Once you have joined a coach with their code at the top of this tab, what they set you shows there."),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the

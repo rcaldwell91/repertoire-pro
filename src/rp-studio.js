@@ -756,8 +756,8 @@
     if (sig !== takesSig) { takesSig = sig; if ($('rpTakeList')) fillTakes(); }
   }
   function boot() {
-    setInterval(function () { mount(); mountTakes(); mountTrainEntry(); refreshTakes(); }, 1200);
-    mount(); mountTakes(); mountTrainEntry();
+    setInterval(function () { mount(); mountTakes(); refreshTakes(); }, 1200);
+    mount(); mountTakes();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
     try { if (typeof libReady !== 'undefined' && libReady && libReady.then) libReady.then(function () { setTimeout(refreshTakes, 50); }); } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -63,14 +63,24 @@
   }
   function catOf(id) { return CATS.filter(function (c) { return c.id === id; })[0]; }
   function lvlName(l) { return ['', 'Beginner', 'Intermediate', 'Advanced'][l] || ''; }
+  /* Robert, 17 Sep: never offer a level that has nothing in it, and never
+     recommend "Lip trills · ADVANCED" when the list at Advanced is empty. */
+  function levelsIn(cat) {
+    var have = {};
+    listFor(cat, 0).forEach(function (e) { have[e.level] = 1; });
+    return LEVELS.filter(function (l) { return l[0] === 0 || have[l[0]]; });
+  }
+  function effectiveLevel(cat, level) {
+    return levelsIn(cat).some(function (l) { return l[0] === level; }) ? level : 0;
+  }
 
   /* ---- one exercise, as a card -------------------------------------- */
   function exCard(e, big) {
     return '<div class="rp-card" data-exopen="' + esc(e.id) + '" style="padding:12px;cursor:pointer;margin-top:8px">' +
       '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
-      '<div style="flex:1;min-width:0"><div class="rp-ttl">' + esc(e.name) +
-      '<span class="rp-info" title="What is this?">i</span>' +
-      (e.quiet ? '<span class="rp-tag">quiet ok</span>' : '') + '</div>' +
+      '<div style="flex:1;min-width:0"><div class="rp-ttl"><span class="rp-name">' + esc(e.name) + '</span>' +
+      '<span class="rp-info" role="button" aria-label="What is this?" title="What is this?">i</span>' +
+      (e.quiet ? ' <span class="rp-tag" aria-label="quiet, fine where people can hear you">quiet ok</span>' : '') + '</div>' +
       '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
       (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
       '</div>' +
@@ -138,6 +148,7 @@
     if (level == null) level = sel.level;
     var h = '<div class="segrow" style="margin-bottom:4px">';
     LEVELS.forEach(function (l) {
+      if (!levelsIn(cat).some(function (x) { return x[0] === l[0]; })) return;
       h += '<button class="seg' + (level === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
     });
     h += '</div>';
@@ -168,7 +179,7 @@
       wire: function (root) {
         wireEx(root, { label: c.name, go: function () { TR.category(cat, sel.level); } });
         root.querySelectorAll('[data-lv]').forEach(function (b) {
-          on(b, 'click', function () { sel.level = +b.dataset.lv; try { localStorage.setItem('rp_tr_lvl', sel.level); } catch (e) {} TR.category(cat, sel.level); });
+          on(b, 'click', function () { sel.level = +b.dataset.lv; try { localStorage.setItem('rp_tr_lvl', sel.level); } catch (e) {} draw(); TR.category(cat, sel.level); });
         });
       } });
   };
@@ -210,8 +221,9 @@
       h += '<button class="seg' + (sel.cat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' + esc(c.name) + '</button>';
     });
     h += '</div><div class="segrow">';
-    LEVELS.forEach(function (l) {
-      h += '<button class="seg' + (sel.level === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
+    var eff = effectiveLevel(sel.cat, sel.level);
+    levelsIn(sel.cat).forEach(function (l) {
+      h += '<button class="seg' + (eff === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
     });
     h += '</div>';
 
@@ -224,10 +236,10 @@
         '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
         '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See all ear drills</button></div>';
     } else {
-      var one = pickOne(sel.cat, sel.level);
+      var one = pickOne(sel.cat, effectiveLevel(sel.cat, sel.level));
       if (one) {
         h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
-          (sel.level ? ' · ' + esc(lvlName(sel.level).toUpperCase()) : '') + '</div>' +
+          ' · ' + esc(lvlName(one.level).toUpperCase()) + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
           '<span class="rp-info" title="What is this?">i</span></div>' +
@@ -243,12 +255,9 @@
       '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
       '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>';
 
-    h += '<h3 style="margin:18px 4px 2px">Work on</h3>';
-    h += RPPage.tiles(CATS.map(function (c) {
-      var n = c.id === 'ear' ? DRILLS.length : (c.id === 'pitch' ? listFor('pitch', 0).length + TOOLS.length : listFor(c.id, 0).length);
-      return { icon: c.icon, title: c.name, sub: c.sub, data: 'data-more="' + c.id + '"' };
-    }));
-
+    /* Robert, 17 Sep: the seven categories were on the screen twice — the
+       chips at the top and a tile for each below. The chips choose; See
+       more opens the list. The tiles went. */
     h += '<h3 style="margin:18px 4px 2px">Also</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, drawn live. Record a take.', id: 'rpTileTracker' },
