@@ -624,7 +624,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <div class="grow">
           <h3><svg class="ic"><use href="#i-mic"/></svg> Your vocal range</h3>
           <div style="font-size:26px;font-weight:800;margin:4px 0" id="rangeDisp">A2 – A4</div>
-          <div class="notice" style="margin:0" id="rangeSub">Exercises automatically ladder through this range. Test it for a perfect fit.</div>
+          <div class="notice" style="margin:0" id="rangeSub">Every exercise is built to fit between your lowest and highest note.</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="btn primary" id="btnRangeTest">Test my range</button>
@@ -3500,7 +3500,7 @@ const RANGE = { lo:45, hi:69 }; // A2–A4 default
 
 function updateRangeDisp(){
   $('rangeDisp').textContent = midiName(RANGE.lo)+' – '+midiName(RANGE.hi);
-  $('rangeSub').textContent = (RANGE.hi-RANGE.lo)+' semitones. Exercises ladder through this range — retest any time.';
+  $('rangeSub').textContent = (RANGE.hi-RANGE.lo)+' semitones. Every exercise is built to fit between those two notes. Sing it again any time.';
 }
 $('rangePreset').addEventListener('change', e=>{
   if(!e.target.value) return;
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 832c3d4f';
+const APP_VERSION = '17 Sep 2026 · build d8d0a6b4';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -18534,6 +18534,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   R.lineNode = function () {
+    if (!R.measured()) return null;
     var d = document.createElement('div');
     d.id = 'rpRangeLine';
     d.className = 'rp-card';
@@ -18546,12 +18547,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function fillLine(line) {
     var v = R.get();
     if (!v) return;
-    var head = !R.measured() ? UNTESTED
-             : (v.by === 'preset' ? 'Picked from the list, not measured'
-             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
-    var sub = !R.measured()
-      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
-      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
+    if (!R.measured()) { if (line.parentElement) line.parentElement.removeChild(line); return; }
+    var head = v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured');
+    var sub = (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
     line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">' + esc(head) + '</div>' +
       '<div class="rp-sub">' + esc(sub) + '</div></div>' +
@@ -18608,8 +18607,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     d.textContent = UNTESTED;
     d.style.fontSize = '22px';
-    if (sb) sb.textContent = 'Sing your lowest and your highest note once, and every exercise ' +
-      'fits your voice. Until then it uses a starting range.';
+    if (sb) sb.textContent = 'Sing your lowest note and your highest note \u2014 about a minute \u2014 ' +
+      'and every exercise is built around your voice. Until then it uses a starting range.';
   }
   setInterval(function () { row(); untestedDisp(); }, 1500);
   setTimeout(function () { row(); untestedDisp(); }, 1150);
@@ -19706,7 +19705,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function tidyVoice(f) {
     var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
     var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
-    var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
+    /* Robert, 18 Sep: this was the third explanation of the same thing on
+       one page, and the only one that said "ladders through it". The range
+       card above owns the explanation now. */
+    var nt = f.querySelector('.notice'); if (nt) nt.style.display = 'none';
   }
   /* while a Profile page is open, a rebuilt fold is picked up straight away */
   setInterval(function () {
@@ -22483,20 +22485,28 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   /* midi -> the frequency that sample actually sounds, measured.
 
-     Re-measured 18 Sep on an eight-second window after Briar read C2 nine
-     cents below my first figure. She was right about the fundamental and
-     the fundamental is the wrong thing to read down there: at C2 the bin
+     Re-measured 17 Sep on an eight-second window after a review pass read
+     C2 nine cents below my first figure. That reading was right about the
+     fundamental, and the fundamental is the wrong thing to read down
+     there: at C2 the bin
      next to it is a cabinet resonance, and it sits eleven cents away from
      where partials 2 to 11 say the string is. Below G#3 these come from a
      weighted fit of f0 and inharmonicity across partials 2 to 11; from C4
      up the fundamental is strong and clean and is read directly. Both
      methods agree to half a cent at C4, which is the crossover.
 
-     Method note, from her: autocorrelation is biased about twelve cents
-     sharp here by the inharmonic partials and the decaying envelope, and
-     it bends the Railsback curve the wrong way. Use a fine-grid DFT on a
-     window past the hammer knock. Never report a pitch from
-     autocorrelation alone. */
+     Method note from the same pass: autocorrelation is biased about
+     twelve cents sharp here by the inharmonic partials and the decaying
+     envelope, and it bends the Railsback curve the wrong way. Use a
+     fine-grid DFT on a window past the hammer knock. Never report a pitch
+     from autocorrelation alone.
+
+     And measure the file that SHIPS, not the source. The two disagree by
+     about five cents at C3 and C5, because a piano note's pitch drifts as
+     it decays \u2014 middle C slides 1.6 to 5.4 cents over a second \u2014 and
+     these files are 3.03 s against the eight-second window measured here.
+     Five cents against roughly forty-six of sung-voice error is noise.
+     Recorded so nobody reopens it. */
   var TUNING = {
     36: 65.068,   40: 82.081,   44: 103.716,  48: 130.543,
     52: 164.451,  56: 207.211,  60: 261.359,  64: 329.284,

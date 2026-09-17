@@ -846,6 +846,14 @@ WORDS = [
     ('Saving keeps it on your phone.', 'Saving keeps it on this device.'),
     ('<b>Songs from this phone</b>', '<b>Songs from this device</b>'),
 
+    # the measured state of the same line still said "ladders through",
+    # which is the jargon Robert pulled out of the untested one
+    ("' semitones. Exercises ladder through this range \u2014 retest any time.'",
+     "' semitones. Every exercise is built to fit between those two notes. Sing it again any time.'"),
+
+    ('Exercises automatically ladder through this range. Test it for a perfect fit.',
+     'Every exercise is built to fit between your lowest and highest note.'),
+
     # two more that are about the machine, not a phone
     ('Inputs the phone offers', 'Inputs this device offers'),
     ('Asking the phone for the microphone\u2026', 'Asking for the microphone\u2026'),

@@ -139,7 +139,10 @@
   function tidyVoice(f) {
     var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
     var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
-    var nt = f.querySelector('.notice'); if (nt) nt.textContent = 'Test it above and every exercise ladders through it instead of guessing.';
+    /* Robert, 18 Sep: this was the third explanation of the same thing on
+       one page, and the only one that said "ladders through it". The range
+       card above owns the explanation now. */
+    var nt = f.querySelector('.notice'); if (nt) nt.style.display = 'none';
   }
   /* while a Profile page is open, a rebuilt fold is picked up straight away */
   setInterval(function () {

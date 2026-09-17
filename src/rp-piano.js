@@ -29,20 +29,28 @@
 
   /* midi -> the frequency that sample actually sounds, measured.
 
-     Re-measured 18 Sep on an eight-second window after Briar read C2 nine
-     cents below my first figure. She was right about the fundamental and
-     the fundamental is the wrong thing to read down there: at C2 the bin
+     Re-measured 17 Sep on an eight-second window after a review pass read
+     C2 nine cents below my first figure. That reading was right about the
+     fundamental, and the fundamental is the wrong thing to read down
+     there: at C2 the bin
      next to it is a cabinet resonance, and it sits eleven cents away from
      where partials 2 to 11 say the string is. Below G#3 these come from a
      weighted fit of f0 and inharmonicity across partials 2 to 11; from C4
      up the fundamental is strong and clean and is read directly. Both
      methods agree to half a cent at C4, which is the crossover.
 
-     Method note, from her: autocorrelation is biased about twelve cents
-     sharp here by the inharmonic partials and the decaying envelope, and
-     it bends the Railsback curve the wrong way. Use a fine-grid DFT on a
-     window past the hammer knock. Never report a pitch from
-     autocorrelation alone. */
+     Method note from the same pass: autocorrelation is biased about
+     twelve cents sharp here by the inharmonic partials and the decaying
+     envelope, and it bends the Railsback curve the wrong way. Use a
+     fine-grid DFT on a window past the hammer knock. Never report a pitch
+     from autocorrelation alone.
+
+     And measure the file that SHIPS, not the source. The two disagree by
+     about five cents at C3 and C5, because a piano note's pitch drifts as
+     it decays \u2014 middle C slides 1.6 to 5.4 cents over a second \u2014 and
+     these files are 3.03 s against the eight-second window measured here.
+     Five cents against roughly forty-six of sung-voice error is noise.
+     Recorded so nobody reopens it. */
   var TUNING = {
     36: 65.068,   40: 82.081,   44: 103.716,  48: 130.543,
     52: 164.451,  56: 207.211,  60: 261.359,  64: 329.284,

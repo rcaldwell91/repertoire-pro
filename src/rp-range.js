@@ -309,6 +309,7 @@
   }
 
   R.lineNode = function () {
+    if (!R.measured()) return null;
     var d = document.createElement('div');
     d.id = 'rpRangeLine';
     d.className = 'rp-card';
@@ -321,12 +322,10 @@
   function fillLine(line) {
     var v = R.get();
     if (!v) return;
-    var head = !R.measured() ? UNTESTED
-             : (v.by === 'preset' ? 'Picked from the list, not measured'
-             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
-    var sub = !R.measured()
-      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
-      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
+    if (!R.measured()) { if (line.parentElement) line.parentElement.removeChild(line); return; }
+    var head = v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured');
+    var sub = (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
     line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">' + esc(head) + '</div>' +
       '<div class="rp-sub">' + esc(sub) + '</div></div>' +
@@ -383,8 +382,8 @@
     }
     d.textContent = UNTESTED;
     d.style.fontSize = '22px';
-    if (sb) sb.textContent = 'Sing your lowest and your highest note once, and every exercise ' +
-      'fits your voice. Until then it uses a starting range.';
+    if (sb) sb.textContent = 'Sing your lowest note and your highest note \u2014 about a minute \u2014 ' +
+      'and every exercise is built around your voice. Until then it uses a starting range.';
   }
   setInterval(function () { row(); untestedDisp(); }, 1500);
   setTimeout(function () { row(); untestedDisp(); }, 1150);
