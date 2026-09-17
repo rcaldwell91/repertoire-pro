@@ -849,7 +849,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
           <span>Ignore background noise</span><b id="ngateOut" style="color:var(--ink)">light</b></label>
         <input type="range" id="ngateRange" min="0" max="100" value="20" step="5" style="width:100%">
         <div class="row" style="gap:6px;margin-top:4px">
-          <button class="btn" id="ngateCal" style="padding:8px 11px;font-size:12px">Listen to my room</button>
+          <button class="btn" id="ngateCal" style="padding:8px 11px;font-size:12px">Measure my room noise</button>
         </div>
         <div class="notice" id="ngateMsg" style="margin-top:6px">Turn this up if music or TV in the room
           draws notes you did not sing. It only changes what gets <b>tracked</b> &mdash; recordings still
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build fcb10ce1';
+const APP_VERSION = '17 Sep 2026 · build e9350d8c';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -8670,7 +8670,7 @@ renderJourney();
       h += '<h3 style="margin:14px 0 8px">Pitch</h3>';
       const tools = [
         ['btnMatch', 'Note Match', 'I play a note, you sing it back and hold it. Ten rounds.',
-         'Now uses a voice-like tone instead of a piano — people match a voice about four times more accurately.'],
+         'Reference notes are a recorded piano. Switch them to a voice-like tone in Profile if that suits you better.'],
         ['btnKbd', 'Keyboard', 'Press a note, hear it, sing it back, see exactly where you landed.',
          'Note Match, except you choose the note.'],
         ['btnSustain', 'Sustain Hold', 'Hold one note dead steady for five seconds.',
@@ -9773,17 +9773,17 @@ renderJourney();
       '<div class="prow"><span class="pk">When</span><span class="pv">' + esc(P.when || '—') + '</span></div>' +
       '<div class="prow"><span class="pk">Where</span><span class="pv">' + esc(P.where || '—') + '</span></div>' +
       '<div class="prow"><span class="pk">Quiet sessions</span><span class="pv">' + (P.quietDefault ? 'default' : 'off') + '</span></div>' +
-      '<div class="notice" style="margin-top:8px">Set these on Your plan, in Profile.</div>';
+      '<div class="notice" style="margin-top:8px">Set these on Your plan.</div>';
     host.appendChild(prac.el);
 
     /* --- sound --- */
     if (soundPanel) {
-      const f = fold('Sound', 'volume, testing, troubleshooting', '', false, 'v10FoldSound');
+      const f = fold('Sound', 'set how loud things are, test the sound, fix it when it stops', '', false, 'v10FoldSound');
       f.body.appendChild(soundPanel);
       soundPanel.style.margin = '0';
       host.appendChild(f.el);
     } else {
-      host.appendChild(fold('Sound', 'volume, testing, troubleshooting', '', false, 'v10FoldSound').el);
+      host.appendChild(fold('Sound', 'set how loud things are, test the sound, fix it when it stops', '', false, 'v10FoldSound').el);
     }
 
     /* reference tone — the finding worth surfacing to him directly */
@@ -9793,12 +9793,12 @@ renderJourney();
       '<button data-ref="voice" class="' + (V10.refVoice ? 'on' : '') + '">Voice-like</button>' +
       '<button data-ref="piano" class="' + (!V10.refVoice ? 'on' : '') + '">Piano</button></div>' +
       '<div class="row" style="margin-top:10px"><button class="btn" id="pRefTry" style="padding:8px 12px;font-size:12.5px">Hear the difference</button></div>' +
-      '<div class="measured">People match a voice more closely than a piano, and the ones who find a piano hardest gain the most from a voice. So every reference note here is a voice-like tone. It is made by the app, not recorded from a person. A real recorded voice would be better.</div>';
+      '<div class="measured"><b>Piano</b> is a recording of a real grand piano, one note every few semitones. It is what you get unless you change it.<br><br><b>Voice-like</b> is a tone the app builds to sit where a voice sits. Nobody sang it. People match a voice more closely than a piano, and the singers who find a piano hardest gain the most, so it is here if the piano is not working for you.</div>';
     host.appendChild(ref.el);
 
     /* --- mic --- */
     {
-      const f = fold('Microphone', 'input, mic check, background noise', '', false, 'v10FoldMic');
+      const f = fold('Microphone', 'choose which microphone, check it is hearing you, set how much room noise to ignore', '', false, 'v10FoldMic');
       const inner = micWrap ? (micWrap.querySelector('#micCheck') || micWrap) : $('micCheck');
       if (inner) f.body.appendChild(inner);
       host.appendChild(f.el);
@@ -17280,7 +17280,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">Words and extras</div>' +
-      '<div class="rp-sub">' + esc(doseName()) + '</div></div>' +
+      /* Robert, 17 Sep: Appearance right above this explains itself. This
+         said "Medium", which says nothing about what it turns up or down. */
+      '<div class="rp-sub">How much the app explains while you practise \u00b7 <b>' +
+      esc(doseName().toLowerCase()) + '</b></div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     if (fresh) {
       on(d, 'click', T.chooseDose);

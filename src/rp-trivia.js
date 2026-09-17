@@ -299,7 +299,10 @@
     }
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">Words and extras</div>' +
-      '<div class="rp-sub">' + esc(doseName()) + '</div></div>' +
+      /* Robert, 17 Sep: Appearance right above this explains itself. This
+         said "Medium", which says nothing about what it turns up or down. */
+      '<div class="rp-sub">How much the app explains while you practise \u00b7 <b>' +
+      esc(doseName().toLowerCase()) + '</b></div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     if (fresh) {
       on(d, 'click', T.chooseDose);

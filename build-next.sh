@@ -861,6 +861,32 @@ WORDS = [
 
     ('<h3 style="margin:16px 0 4px">Play it</h3>', '<h3 style="margin:16px 0 4px">Ear games</h3>'),
 
+    # ---------------------------------------------------------------
+    # Robert, 17 Sep: Profile > Sound > Reference notes described the app
+    # as it was two rounds ago. It said every reference note is a
+    # voice-like tone made by the app, directly under a toggle set to
+    # Piano, and the piano is now a real recorded Steinway. Say what each
+    # option actually is. No claim about a recorded human voice: coach
+    # recordings are parked and the question is with Robert.
+    # ---------------------------------------------------------------
+    # Note Match's blurb still announced the change away from the piano,
+    # which is now the default again.
+    ("'Now uses a voice-like tone instead of a piano \u2014 people match a voice about four times more accurately.'",
+     "'Reference notes are a recorded piano. Switch them to a voice-like tone in Profile if that suits you better.'"),
+
+    # Fold subtitles were keyword lists. Say what you can do in there.
+    ("fold('Sound', 'volume, testing, troubleshooting'",
+     "fold('Sound', 'set how loud things are, test the sound, fix it when it stops'"),
+    ("fold('Microphone', 'input, mic check, background noise'",
+     "fold('Microphone', 'choose which microphone, check it is hearing you, set how much room noise to ignore'"),
+
+    # "Listen to my room" and "Ignore background noise" are opposite verbs
+    # for the same setting, next to each other. One framing: the noise.
+    ('<button class="btn" id="ngateCal" style="padding:8px 11px;font-size:12px">Listen to my room</button>',
+     '<button class="btn" id="ngateCal" style="padding:8px 11px;font-size:12px">Measure my room noise</button>'),
+
+    # The reader is already in Profile when they read this.
+
     # two more that are about the machine, not a phone
     ('Inputs the phone offers', 'Inputs this device offers'),
     ('Asking the phone for the microphone\u2026', 'Asking for the microphone\u2026'),
@@ -917,7 +943,7 @@ def rewrite(text, pairs, where):
 WRITING = [
     # Robert, 17 Sep: the four plan panels moved to Profile → Your plan,
     # so the Practice fold can no longer send people to the Coach tab.
-    ("Set these on the Coach tab.", "Set these on Your plan, in Profile."),
+    ("Set these on the Coach tab.", "Set these on Your plan."),
     # ROBERT, 17 Sep — PHONE WALK-THROUGH OF 98e321d.
 
     #  #4 one feature, four names. The button said "Hear me" / "Hearing you",
@@ -994,7 +1020,7 @@ WRITING = [
     ("Everything in Repertoire lives on this phone and nowhere else. There is no account, no server and no sign-in — so nothing here is sent anywhere, and clearing your browser data would clear it. Accounts and sync are a later job.",
      "Sign in and your range, your takes and your progress follow you to a new phone."),
     ("<b>This one is worth a minute of your time.</b> In a study where people matched pitch against five different reference sounds, the average error was 46 cents against a live voice and about 188 against a piano — four times worse. The people who were <i>worst</i> with the piano improved the most with a voice. Every reference note in this app used to be a piano.<br><br>Being straight with you: what you get here is a <b>synthesised voice-like tone</b>, not a recording of a person. It has a soft onset, vibrato and vowel-shaped resonance, so it is far closer to a sung note than a piano is — but the study measured real voices and I am not claiming this recovers the whole difference. A real recorded voice would be better, and you recording your own reference notes is the honest way to get there.",
-     "People match a voice more closely than a piano, and the ones who find a piano hardest gain the most from a voice. So every reference note here is a voice-like tone. It is made by the app, not recorded from a person. A real recorded voice would be better."),
+     "<b>Piano</b> is a recording of a real grand piano, one note every few semitones. It is what you get unless you change it.<br><br><b>Voice-like</b> is a tone the app builds to sit where a voice sits. Nobody sang it. People match a voice more closely than a piano, and the singers who find a piano hardest gain the most, so it is here if the piano is not working for you."),
     # ---- exercise scoring notes ----
     ("The app tracks your pitch on this one and can tell you how far off you were, in cents. It cannot tell you whether it sounded good — that part is still yours.",
      "The app tracks your pitch on this one and tells you how far off you were. Whether it sounded good is your call."),
