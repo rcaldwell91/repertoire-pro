@@ -339,7 +339,7 @@
              : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
     var sub = !R.measured()
       ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
-      : (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your account';
+      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
     line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">' + esc(head) + '</div>' +
       '<div class="rp-sub">' + esc(sub) + '</div></div>' +

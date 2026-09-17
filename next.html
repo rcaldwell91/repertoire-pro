@@ -512,7 +512,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <b id="edTime" style="min-width:74px;text-align:right;font-variant-numeric:tabular-nums">0:00</b>
       </div>
       <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
-        <button class="btn" id="edAdd">&#65291; Note</button>
+        <button class="btn" id="edAdd">+ Note</button>
         <button class="btn" id="edDel">Delete</button>
         <button class="btn" id="edLeft">&#9664; earlier</button>
         <button class="btn" id="edRight">later &#9654;</button>
@@ -523,14 +523,14 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       </div>
       <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap">
         <select id="midiTrackSel" style="display:none;min-width:160px"></select>
-        <button class="btn" id="edFromAudio">&#65291; from audio</button>
+        <button class="btn" id="edFromAudio">+ from audio</button>
         <button class="btn primary" id="edSingIn">Sing it in</button>
         <button class="btn" id="edLineUp">Line up take</button>
         <button class="btn" id="edTakeEarlier">take earlier</button>
         <button class="btn" id="edTakeLater">take later</button>
       </div>
       <div class="notice" style="margin-top:6px">The blue line is the pitch the app hears in the song.
-        Where she sings but no bar sits on that line, press &#65291; from audio. Or press
+        Where she sings but no bar sits on that line, press + from audio. Or press
         <b>Sing it in</b> and sing the melody yourself &mdash; one clean voice is far easier to read than a full mix.</div>
       <div class="notice" id="edMsg" style="margin-top:6px">&nbsp;</div>
       <details style="margin-top:8px">
@@ -1536,7 +1536,7 @@ function micCheckUpdate(){
     ['It is hearing', MIC.on ? (MIC.level > 0.004 ? 'your voice' : 'nothing yet — sing') : '—'],
     ['Using', MIC.deviceLabel || '—'],
     ['Another app has it', MIC.stolen ? 'yes — close that app' : 'no'],
-    ['Inputs the phone offers', MIC.inputs && MIC.inputs.length
+    ['Inputs this device offers', MIC.inputs && MIC.inputs.length
         ? MIC.inputs.length + (MIC.inputs.length > 1 ? ' — ' + MIC.inputs.map(d => d.label).join(' / ') : '')
         : '—'],
     ['Sound', audioRunning() ? 'working' : 'not started — tap anything']
@@ -2744,7 +2744,7 @@ function audioWatch(){
     if(!AUD.suspendedSince) AUD.suspendedSince = now;
     // a blink (screenshot, notification) heals itself — only nag if it lasts
     if(now - AUD.suspendedSince > 1000)
-      audioBanner('Sound is paused on this phone — tap here to start it.', 'resume');
+      audioBanner('Sound is paused — tap here to start it.', 'resume');
     return;
   }
   AUD.suspendedSince = 0;
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 1d4f4750';
+const APP_VERSION = '17 Sep 2026 · build d6784b69';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -4638,7 +4638,7 @@ $('edSave').addEventListener('click', async ()=>{
   updateLibMapPanel();
   $('edMsg').textContent = saved
     ? 'Saved. Press Start to sing it — your changes are kept on this device.'
-    : 'COULD NOT SAVE — this phone refused to store it (storage may be full). Your edits are still on '
+    : 'COULD NOT SAVE — this device refused to store it (storage may be full). Your edits are still on '
       + 'screen, so do not leave this screen. Free some space, then press Save again.';
 });
 window.addEventListener('resize', ()=>{ if(EDIT.on){ edSize(); edDraw(); } });
@@ -5438,7 +5438,7 @@ $('btnNewPl').addEventListener('click', async ()=>{
   await dbPut('playlists',p).catch(()=>{ plOk = false; });
   LIB.listId=p.id;
   libRenderPlaylists(); libRender();
-  if(!plOk) libNotice('Made the playlist, but this phone would not store it — it will be gone '
+  if(!plOk) libNotice('Made the playlist, but this device would not store it — it will be gone '
                     + 'when you close the app. Storage may be full.');
 });
 function visibleSongs(){
@@ -5492,7 +5492,7 @@ function libRender(){
       }));
     } else {
       row.appendChild(iconBtn('plus','Add to playlist', async ()=>{
-        if(!LIB.playlists.length) return alert('Make a playlist first (＋ Playlist button).');
+        if(!LIB.playlists.length) return alert('Make a playlist first (+ Playlist button).');
         const names=LIB.playlists.map((p,j)=>(j+1)+'. '+p.name).join('\n');
         const pick=prompt('Add to which playlist?\n'+names+'\n\nType the number:');
         const p=LIB.playlists[parseInt(pick,10)-1];
@@ -5532,7 +5532,7 @@ lyrInput.addEventListener('change', ()=>{
     libRender();
     libNotice(lrcOk
       ? 'Lyrics attached to "'+lyricTargetSong.title+'". Synced .lrc files scroll with the music.'
-      : 'Could not keep those lyrics — this phone refused to store them (storage may be full). '
+      : 'Could not keep those lyrics — this device refused to store them (storage may be full). '
         + 'They will work until you close the app, then they are gone.');
   };
   rd.readAsText(f);
@@ -5667,7 +5667,7 @@ async function detectSongKey(song){
     song.key={root:est.root, minor:est.minor};
     let keyOk = true;
     await dbPut('songs',song).catch(()=>{ keyOk = false; });
-    if(!keyOk) libNotice('Found the key, but this phone would not store it — it will need finding '
+    if(!keyOk) libNotice('Found the key, but this device would not store it — it will need finding '
                        + 'again next time. Storage may be full.');
     if(LIB.cur && LIB.cur.id===song.id){
       const kb=$('pbKey'); kb.style.display='inline-block';
@@ -5751,7 +5751,7 @@ $('ngateCal').addEventListener('click', ngateCalibrate);
 window.addEventListener('DOMContentLoaded', ngateUi);
 $('btnMicRetry').addEventListener('click', async ()=>{
   const note = $('micCheckMsg');
-  note.textContent = 'Asking the phone for the microphone…';
+  note.textContent = 'Asking for the microphone…';
   try{
     await startMic({deviceId: $('micDevSel').value || null});
     note.textContent = MIC.silent
@@ -6488,7 +6488,7 @@ function soundReport(p){
     return html;
   }
   html += '<br><b style="color:var(--gold)">The sound engine is dead — this is what plugging or unplugging '
-        + 'headphones does to this phone.</b>'
+        + 'headphones does to this device.</b>'
         + '<br><b>Next: press 2 Test without mic</b> — it says whether the microphone is what killed it. '
         + 'If that does not bring it back, press <b>3 Restart sound</b>.';
   // only once a restart has already been tried and failed is it fair to send
@@ -6595,8 +6595,8 @@ function soundWire(){
           : 'Still no sound — signal ' + p.peak.toFixed(3) + ', clock '
             + (p.moved ? 'moving' : 'frozen') + '.');
         if(p.made && p.moved && wasOn){
-          html += '<br><b style="color:var(--gold)">That is the answer: on this phone the sound dies when the '
-                + 'microphone opens.</b> Two things fix it — pick <b>the phone’s own microphone</b> in the input '
+          html += '<br><b style="color:var(--gold)">That is the answer: on this device the sound dies when the '
+                + 'microphone opens.</b> Two things fix it — pick <b>the built-in microphone</b> in the input '
                 + 'list above instead of the headset’s, or take the headset out while you warm up. Turn the mic '
                 + 'back on with the <b>Mic off</b> chip at the top, then press <b>1 Test sound</b> to check.';
         } else if(p.made && p.moved){
@@ -10221,7 +10221,7 @@ renderJourney();
         // this, correctly, on the first build.
         if (!ok) {
           s.title = was;
-          libNotice('Could not rename it — this phone would not store the change. Storage may be full.');
+          libNotice('Could not rename it — this device would not store the change. Storage may be full.');
         } else {
           libNotice('Renamed to "' + t + '".');
         }
@@ -18564,7 +18564,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
              : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
     var sub = !R.measured()
       ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
-      : (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your account';
+      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
     line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">' + esc(head) + '</div>' +
       '<div class="rp-sub">' + esc(sub) + '</div></div>' +
@@ -22448,12 +22448,27 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   var P = {};
   window.RPPiano = P;
 
-  /* midi -> the frequency that sample actually sounds, measured */
+  /* midi -> the frequency that sample actually sounds, measured.
+
+     Re-measured 18 Sep on an eight-second window after Briar read C2 nine
+     cents below my first figure. She was right about the fundamental and
+     the fundamental is the wrong thing to read down there: at C2 the bin
+     next to it is a cabinet resonance, and it sits eleven cents away from
+     where partials 2 to 11 say the string is. Below G#3 these come from a
+     weighted fit of f0 and inharmonicity across partials 2 to 11; from C4
+     up the fundamental is strong and clean and is read directly. Both
+     methods agree to half a cent at C4, which is the crossover.
+
+     Method note, from her: autocorrelation is biased about twelve cents
+     sharp here by the inharmonic partials and the decaying envelope, and
+     it bends the Railsback curve the wrong way. Use a fine-grid DFT on a
+     window past the hammer knock. Never report a pitch from
+     autocorrelation alone. */
   var TUNING = {
-    36: 64.911,  40: 81.988,  44: 103.749, 48: 130.506,
-    52: 164.423, 56: 207.258, 60: 261.269, 64: 329.250,
-    68: 414.691, 72: 521.108, 76: 658.776, 80: 830.029,
-    84: 1048.313, 88: 1322.752, 92: 1663.746, 96: 2109.428
+    36: 65.068,   40: 82.081,   44: 103.716,  48: 130.543,
+    52: 164.451,  56: 207.211,  60: 261.359,  64: 329.284,
+    68: 414.913,  72: 523.040,  76: 659.731,  80: 831.498,
+    84: 1048.525, 88: 1319.141, 92: 1666.925, 96: 2109.326
   };
   var ANCHORS = Object.keys(TUNING).map(Number).sort(function (a, b) { return a - b; });
   var DIR = 'audio/piano/';

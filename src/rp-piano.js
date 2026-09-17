@@ -27,12 +27,27 @@
   var P = {};
   window.RPPiano = P;
 
-  /* midi -> the frequency that sample actually sounds, measured */
+  /* midi -> the frequency that sample actually sounds, measured.
+
+     Re-measured 18 Sep on an eight-second window after Briar read C2 nine
+     cents below my first figure. She was right about the fundamental and
+     the fundamental is the wrong thing to read down there: at C2 the bin
+     next to it is a cabinet resonance, and it sits eleven cents away from
+     where partials 2 to 11 say the string is. Below G#3 these come from a
+     weighted fit of f0 and inharmonicity across partials 2 to 11; from C4
+     up the fundamental is strong and clean and is read directly. Both
+     methods agree to half a cent at C4, which is the crossover.
+
+     Method note, from her: autocorrelation is biased about twelve cents
+     sharp here by the inharmonic partials and the decaying envelope, and
+     it bends the Railsback curve the wrong way. Use a fine-grid DFT on a
+     window past the hammer knock. Never report a pitch from
+     autocorrelation alone. */
   var TUNING = {
-    36: 64.911,  40: 81.988,  44: 103.749, 48: 130.506,
-    52: 164.423, 56: 207.258, 60: 261.269, 64: 329.250,
-    68: 414.691, 72: 521.108, 76: 658.776, 80: 830.029,
-    84: 1048.313, 88: 1322.752, 92: 1663.746, 96: 2109.428
+    36: 65.068,   40: 82.081,   44: 103.716,  48: 130.543,
+    52: 164.451,  56: 207.211,  60: 261.359,  64: 329.284,
+    68: 414.913,  72: 523.040,  76: 659.731,  80: 831.498,
+    84: 1048.525, 88: 1319.141, 92: 1666.925, 96: 2109.326
   };
   var ANCHORS = Object.keys(TUNING).map(Number).sort(function (a, b) { return a - b; });
   var DIR = 'audio/piano/';

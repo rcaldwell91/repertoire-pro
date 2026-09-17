@@ -817,6 +817,48 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
 # "scale ladder", "note maps" and "key guardrails" told a beginner nothing.
 # ---------------------------------------------------------------------
 WORDS = [
+    # ---------------------------------------------------------------
+    # Robert, 18 Sep: the app is a web page. It says "phone" on a laptop.
+    # Every user-facing claim about where something lives now says
+    # "device", or drops the word. (The fix landed in the Library only
+    # last round; this is the rest of them.)
+    # ---------------------------------------------------------------
+    ('Sound is paused on this phone \u2014 tap here to start it.',
+     'Sound is paused \u2014 tap here to start it.'),
+    ('Recordings stay on this phone unless you send one to your coach.',
+     'Recordings stay on this device unless you send one to your coach.'),
+    ('Open it on this phone and you can choose a new password.',
+     'Open it on this device and you can choose a new password.'),
+    ('Link sent. Open it on this phone and you are in.',
+     'Link sent. Open it on this device and you are in.'),
+    ('this phone refused to store it', 'this device refused to store it'),
+    ('this phone refused to store them', 'this device refused to store them'),
+    ('this phone would not store it', 'this device would not store it'),
+    ('this phone would not store the change', 'this device would not store the change'),
+    ('this phone would not run it through the effects',
+     'this device would not run it through the effects'),
+    ('headphones does to this phone.', 'headphones does to this device.'),
+    ('That is the answer: on this phone the sound dies when the ',
+     'That is the answer: on this device the sound dies when the '),
+    ('pick <b>the phone\u2019s own microphone</b>', 'pick <b>the built-in microphone</b>'),
+    ('It is not your phone and it is not the ', 'It is not your device and it is not the '),
+    ('Saved to your phone.', 'Saved to this device.'),
+    ('Saved to your phone. Not sent yet', 'Saved to this device. Not sent yet'),
+    ('keep one on your phone, or send it to ', 'keep one on this device, or send it to '),
+    ('Saving keeps it on your phone.', 'Saving keeps it on this device.'),
+    ('<b>Songs from this phone</b>', '<b>Songs from this device</b>'),
+
+    # two more that are about the machine, not a phone
+    ('Inputs the phone offers', 'Inputs this device offers'),
+    ('Asking the phone for the microphone\u2026', 'Asking for the microphone\u2026'),
+
+    # The fullwidth plus renders oversized beside text. Three of these are
+    # HTML entities and one is the character itself.
+    ('&#65291; Note</button>', '+ Note</button>'),
+    ('&#65291; from audio</button>', '+ from audio</button>'),
+    ('press &#65291; from audio.', 'press + from audio.'),
+    ('Make a playlist first (\uff0b Playlist button).', 'Make a playlist first (+ Playlist button).'),
+
     ('<div class="js">scale ladder &middot; 5 min</div>', '<div class="js">Step 1 &middot; 5 min</div>'),
     ('<div class="js">scale ladder · 5 min</div>',        '<div class="js">Step 1 · 5 min</div>'),
     ('<div class="js">note match · 5 min</div>',          '<div class="js">Step 2 · 5 min</div>'),
