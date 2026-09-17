@@ -116,8 +116,12 @@
         h += '<div style="margin:12px 0 4px">' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
           '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
-          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div></div>' +
+          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) + '</div>' +
+          /* Robert, 17 Sep: every other row on this card names something a
+             beginner can picture. This one is an exercise name, and it is
+             the one being singled out, so it gets the line. */
+          (plan.focus.what ? '<div class="pd">' + esc(String(plan.focus.what).replace(/<[^>]*>/g, '')) + '</div>' : '') +
+          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
           '</div>';

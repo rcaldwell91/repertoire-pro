@@ -30,7 +30,7 @@
       folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
     { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when. Change any of it here.',
       folds: [], cards: ['rpPlanHolder'] },
-    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
+    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Pick which microphone to use, set how loud things are, and check your headphones.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'How it looks, and how much it explains', sub: 'Light or dark, and long or short wording.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },

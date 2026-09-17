@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build ad1fbd99';
+const APP_VERSION = '17 Sep 2026 · build fcb10ce1';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -9408,7 +9408,7 @@ renderJourney();
     if (!L.tier || L.tier === 1) {
       const gs = V10.gameStars ? V10.gameStars() : {};
       const nxt = V10.gameNextUp ? V10.gameNextUp() : null;
-      h += '<h3 style="margin:16px 0 4px">Play it</h3>';
+      h += '<h3 style="margin:16px 0 4px">Ear games</h3>';
       h += '<div class="notice" style="margin-bottom:9px">Theory you tap, not theory you read. ' +
         'Every answer plays, so your ear and your eyes learn it together. They are in a sensible ' +
         'order but nothing is locked — play whichever you like.</div>';
@@ -13448,7 +13448,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var n = document.createElement('div');
       n.className = 'notice';
       n.style.cssText = 'margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px';
-      n.innerHTML = 'Got a coach? <b>Sign in</b>, then put their code in at the top of this tab. What they set you appears below it. Everything else here works without an account.';
+      n.innerHTML = 'Got a coach? <b>Sign in</b>, then put their code in at the top of this tab. What they set you appears below it. Your practice is on the Home tab either way, with a coach or without one.';
       host.insertBefore(n, host.firstChild);
     }
   };
@@ -18723,8 +18723,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         h += '<div style="margin:12px 0 4px">' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
           '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
-          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div></div>' +
+          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) + '</div>' +
+          /* Robert, 17 Sep: every other row on this card names something a
+             beginner can picture. This one is an exercise name, and it is
+             the one being singled out, so it gets the line. */
+          (plan.focus.what ? '<div class="pd">' + esc(String(plan.focus.what).replace(/<[^>]*>/g, '')) + '</div>' : '') +
+          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
           '</div>';
@@ -19303,11 +19307,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   var LN = window.RPLearn = {};
   var open = null;    /* unit name, or 'games', or null for the tiles */
-  var ICON = { 'Play it': 'i-play', 'Sound and pitch': 'i-target', 'Time': 'i-repeat',
+  var ICON = { 'Ear games': 'i-play', 'Sound and pitch': 'i-target', 'Time': 'i-repeat',
                'The major scale and key': 'i-bar-chart', 'Minor and the third': 'i-trending-up',
                'Intervals': 'i-layers', 'Chords and harmony': 'i-music', 'Song form': 'i-file',
                'Your voice': 'i-mic', 'Advanced': 'i-package' };
-  var SUB = { 'Play it': 'Games you play by ear. Every answer plays the notes, so your ear learns it too.',
+  var SUB = { 'Ear games': 'Games you play by ear. Every answer plays the notes, so your ear learns it too.',
               'Sound and pitch': 'What a note is, and what "in tune" means.',
               'Time': 'Beats, bars, and counting in.',
               'The major scale and key': 'Do-re-mi, and what a key is.',
@@ -19339,7 +19343,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       if (el.id === 'rpLearnTop' || el.id === 'rpLearnUnit' || el.id === 'rpTriviaRow') return;
       if (el.tagName === 'H3') {
         var t = (el.textContent || '').trim();
-        cur = (t === 'Play it') ? 'games' : t;
+        cur = (t === 'Ear games' || t === 'Play it') ? 'games' : t;
         if (cur !== 'games') { out.units[cur] = out.units[cur] || []; if (out.order.indexOf(cur) < 0) out.order.push(cur); }
         out.chrome.push(el);
         return;
@@ -19460,7 +19464,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!unit) { unit = document.createElement('div'); unit.id = 'rpLearnUnit'; host.appendChild(unit); }
 
     if (!open) {
-      var tiles = [{ icon: ICON['Play it'], title: 'Play it', sub: SUB['Play it'], data: 'data-unit="games"' }];
+      var tiles = [{ icon: ICON['Ear games'], title: 'Ear games', sub: SUB['Ear games'], data: 'data-unit="games"' }];
       h.order.forEach(function (u) {
         var list = h.units[u] || [];
         var nd = list.filter(function (el) { return el.classList.contains('done'); }).length;
@@ -19468,7 +19472,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
                      tag: nd ? nd + ' of ' + list.length : '' });
       });
       top.innerHTML = '<h1 style="margin:0 0 2px">Learn</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when they say it. Pick a subject.</div>' +
+        '<div class="rp-sub" style="margin:0 0 10px">The words singers use, in plain English. Pick a subject.</div>' +
         RPPage.tiles(tiles);
       top.style.display = '';
       unit.style.display = 'none';
@@ -19484,8 +19488,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       top.style.display = 'none';
       var rows = open === 'games' ? h.games : (h.units[open] || []);
       unit.innerHTML = '<button class="pill backpill" id="rpLearnBack">← Learn</button>' +
-        '<h1 style="margin:0 0 2px">' + esc(open === 'games' ? 'Play it' : open) + '</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">' + esc(SUB[open === 'games' ? 'Play it' : open] || '') +
+        '<h1 style="margin:0 0 2px">' + esc(open === 'games' ? 'Ear games' : open) + '</h1>' +
+        '<div class="rp-sub" style="margin:0 0 10px">' + esc(SUB[open === 'games' ? 'Ear games' : open] || '') +
         ' Tap ⓘ for what a row is about.</div>';
       var box = document.createElement('div');
       unit.appendChild(box);
@@ -19573,7 +19577,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
     { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when. Change any of it here.',
       folds: [], cards: ['rpPlanHolder'] },
-    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
+    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Pick which microphone to use, set how loud things are, and check your headphones.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'How it looks, and how much it explains', sub: 'Light or dark, and long or short wording.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
@@ -20037,7 +20041,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     h += '<div id="rpLibBody">' + body + '</div>';
 
     if (chip === 'all') {
-      h += '<div class="measured" style="margin-top:14px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
+      /* Robert, 17 Sep: a beginner meets "Note maps" on the chip row with
+         nothing on the tab saying what one is. Say it where they meet it. */
+      h += '<div class="measured" style="margin-top:12px">A <b>take</b> is something you recorded. ' +
+        'A <b>note map</b> is the picture of the notes in one of them.</div>';
+      h += '<div class="measured" style="margin-top:8px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
         ' here. Songs and takes stay on the device they were made on; a take you send to your coach reaches them.' +
         (owned().length ? '' : ' Add songs you own with the +, or record a take.') + '</div>';
     }

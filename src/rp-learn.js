@@ -24,11 +24,11 @@
 
   var LN = window.RPLearn = {};
   var open = null;    /* unit name, or 'games', or null for the tiles */
-  var ICON = { 'Play it': 'i-play', 'Sound and pitch': 'i-target', 'Time': 'i-repeat',
+  var ICON = { 'Ear games': 'i-play', 'Sound and pitch': 'i-target', 'Time': 'i-repeat',
                'The major scale and key': 'i-bar-chart', 'Minor and the third': 'i-trending-up',
                'Intervals': 'i-layers', 'Chords and harmony': 'i-music', 'Song form': 'i-file',
                'Your voice': 'i-mic', 'Advanced': 'i-package' };
-  var SUB = { 'Play it': 'Games you play by ear. Every answer plays the notes, so your ear learns it too.',
+  var SUB = { 'Ear games': 'Games you play by ear. Every answer plays the notes, so your ear learns it too.',
               'Sound and pitch': 'What a note is, and what "in tune" means.',
               'Time': 'Beats, bars, and counting in.',
               'The major scale and key': 'Do-re-mi, and what a key is.',
@@ -60,7 +60,7 @@
       if (el.id === 'rpLearnTop' || el.id === 'rpLearnUnit' || el.id === 'rpTriviaRow') return;
       if (el.tagName === 'H3') {
         var t = (el.textContent || '').trim();
-        cur = (t === 'Play it') ? 'games' : t;
+        cur = (t === 'Ear games' || t === 'Play it') ? 'games' : t;
         if (cur !== 'games') { out.units[cur] = out.units[cur] || []; if (out.order.indexOf(cur) < 0) out.order.push(cur); }
         out.chrome.push(el);
         return;
@@ -181,7 +181,7 @@
     if (!unit) { unit = document.createElement('div'); unit.id = 'rpLearnUnit'; host.appendChild(unit); }
 
     if (!open) {
-      var tiles = [{ icon: ICON['Play it'], title: 'Play it', sub: SUB['Play it'], data: 'data-unit="games"' }];
+      var tiles = [{ icon: ICON['Ear games'], title: 'Ear games', sub: SUB['Ear games'], data: 'data-unit="games"' }];
       h.order.forEach(function (u) {
         var list = h.units[u] || [];
         var nd = list.filter(function (el) { return el.classList.contains('done'); }).length;
@@ -189,7 +189,7 @@
                      tag: nd ? nd + ' of ' + list.length : '' });
       });
       top.innerHTML = '<h1 style="margin:0 0 2px">Learn</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">What your coach means when they say it. Pick a subject.</div>' +
+        '<div class="rp-sub" style="margin:0 0 10px">The words singers use, in plain English. Pick a subject.</div>' +
         RPPage.tiles(tiles);
       top.style.display = '';
       unit.style.display = 'none';
@@ -205,8 +205,8 @@
       top.style.display = 'none';
       var rows = open === 'games' ? h.games : (h.units[open] || []);
       unit.innerHTML = '<button class="pill backpill" id="rpLearnBack">← Learn</button>' +
-        '<h1 style="margin:0 0 2px">' + esc(open === 'games' ? 'Play it' : open) + '</h1>' +
-        '<div class="rp-sub" style="margin:0 0 10px">' + esc(SUB[open === 'games' ? 'Play it' : open] || '') +
+        '<h1 style="margin:0 0 2px">' + esc(open === 'games' ? 'Ear games' : open) + '</h1>' +
+        '<div class="rp-sub" style="margin:0 0 10px">' + esc(SUB[open === 'games' ? 'Ear games' : open] || '') +
         ' Tap ⓘ for what a row is about.</div>';
       var box = document.createElement('div');
       unit.appendChild(box);

@@ -260,7 +260,11 @@
     h += '<div id="rpLibBody">' + body + '</div>';
 
     if (chip === 'all') {
-      h += '<div class="measured" style="margin-top:14px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
+      /* Robert, 17 Sep: a beginner meets "Note maps" on the chip row with
+         nothing on the tab saying what one is. Say it where they meet it. */
+      h += '<div class="measured" style="margin-top:12px">A <b>take</b> is something you recorded. ' +
+        'A <b>note map</b> is the picture of the notes in one of them.</div>';
+      h += '<div class="measured" style="margin-top:8px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
         ' here. Songs and takes stay on the device they were made on; a take you send to your coach reaches them.' +
         (owned().length ? '' : ' Add songs you own with the +, or record a take.') + '</div>';
     }

@@ -859,6 +859,8 @@ WORDS = [
     ('''      '<div class="notice">Test it on the Train tab and every exercise ladders through it instead of guessing.</div>' +
 ''', ''),
 
+    ('<h3 style="margin:16px 0 4px">Play it</h3>', '<h3 style="margin:16px 0 4px">Ear games</h3>'),
+
     # two more that are about the machine, not a phone
     ('Inputs the phone offers', 'Inputs this device offers'),
     ('Asking the phone for the microphone\u2026', 'Asking for the microphone\u2026'),
