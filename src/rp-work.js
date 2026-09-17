@@ -152,7 +152,7 @@
         '<button class="btn primary" id="rpWkSave" style="flex:1;padding:9px;font-size:12px">Save</button>' +
         '<button class="btn" id="rpWkBin" style="flex:0 0 auto;padding:9px 11px;font-size:12px;' +
         'color:var(--miss)">Bin</button></div>' +
-        '<div class="measured" style="margin-top:7px;font-size:11.5px">Saving keeps it on your phone. ' +
+        '<div class="measured" style="margin-top:7px;font-size:11.5px">Saving keeps it on this device. ' +
         'Nothing goes to your coach until you submit one.</div>';
     } else {
       h += '<button class="btn primary" id="rpWkRec" style="width:100%;padding:11px;margin-top:9px">' +

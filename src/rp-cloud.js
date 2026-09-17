@@ -322,7 +322,7 @@
       /* Deliberately does not say whether that address has an account: that
          would tell a stranger who is signed up here. */
       msg('If there is an account for ' + email + ', a reset link is on its way. ' +
-          'Open it on this phone and you can choose a new password.');
+          'Open it on this device and you can choose a new password.');
     }).catch(function (e) { msg(String(e.message || e), true); });
   }
 
@@ -374,7 +374,7 @@
                  shouldCreateUser: authTab === 'up' }
     }).then(function (r) {
       if (!r.error) {
-        return msg('Link sent. Open it on this phone and you are in. ' +
+        return msg('Link sent. Open it on this device and you are in. ' +
                    'If it is not there in a minute, check your spam folder.');
       }
       var m = String(r.error.message || '');

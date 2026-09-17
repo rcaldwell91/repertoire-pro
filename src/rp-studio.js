@@ -489,7 +489,7 @@
     draw();
     fillTakes();
     if (ST.assign) {
-      say('Saved to your phone. Not sent yet — submit the one you like.');
+      say('Saved to this device. Not sent yet — submit the one you like.');
       try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
     } else {
       say('Kept. It is in the Library, under Takes.');
@@ -856,7 +856,7 @@
       return {
         title: 'DuckDuckGo will not give the app the microphone',
         why: 'This is the DuckDuckGo browser, and it does not pass the microphone '
-           + 'through to web pages properly. It is not your phone and it is not the '
+           + 'through to web pages properly. It is not your device and it is not the '
            + 'permissions — the same page works in Chrome or Safari.',
         steps: [
           'Open Chrome (Android) or Safari (iPhone).',

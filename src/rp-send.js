@@ -56,7 +56,7 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 4000);
-      say('Saved to your phone.');
+      say('Saved to this device.');
     } catch (e) {
       say('This browser would not save it: ' + (e.message || e));
     }

@@ -227,7 +227,7 @@
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
       '<b style="font-size:13px">Your songs</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on your phone, or send it to ' +
+      '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on this device, or send it to ' +
       'your coach.</div><div id="rpVList"></div></div>';
 
     host.innerHTML = h;
@@ -413,7 +413,7 @@
       n.out.connect(ctx.destination);       // you must hear the playback
     } catch (e) {
       a.play(); V.playEl = a; V.playing = true; redrawRec();
-      return say('Playing it dry — this phone would not run it through the effects.');
+      return say('Playing it dry — this device would not run it through the effects.');
     }
     V.playEl = a;
     a.play().then(function () { V.playing = true; redrawRec(); })

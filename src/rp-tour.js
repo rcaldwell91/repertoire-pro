@@ -456,7 +456,7 @@
     h += sec('8. What they set you', '07-assignment.jpg',
       'It appears here the moment they set it. Tap it and the exercise opens, already set up.');
     h += sec('9. Record, then send the one you like', '08-record.jpg',
-      '<b>Save</b> keeps a take on your phone. <b>Submit</b> sends it to your coach and ticks the work off. Nothing leaves your phone until you press Submit.');
+      '<b>Save</b> keeps a take on this device. <b>Submit</b> sends it to your coach and ticks the work off. Nothing leaves this device until you press Submit.');
 
     h += '<div class="rp-lab" style="margin-top:22px">GET THE MOST OUT OF IT</div>' +
       '<div class="rp-card" style="margin-top:8px;padding:12px;font-size:13.5px;line-height:1.6">' +

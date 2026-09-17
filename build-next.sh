@@ -825,8 +825,6 @@ WORDS = [
     # ---------------------------------------------------------------
     ('Sound is paused on this phone \u2014 tap here to start it.',
      'Sound is paused \u2014 tap here to start it.'),
-    ('Recordings stay on this phone unless you send one to your coach.',
-     'Recordings stay on this device unless you send one to your coach.'),
     ('Open it on this phone and you can choose a new password.',
      'Open it on this device and you can choose a new password.'),
     ('Link sent. Open it on this phone and you are in.',
@@ -975,7 +973,7 @@ WRITING = [
     ("<b>Sound not working? Plug your headphones in first</b> — that is when it breaks, so that is when to test it. Then press <b>1</b> and <b>2</b>, in that order. Each one prints an answer, and between them they say whether it is the app, the microphone, or the phone itself.",
      "<b>No sound?</b> Plug your headphones in first, then press <b>1</b> and <b>2</b> in that order. Each one says what it found."),
     ("Everything you record and every note map you build is stored on this device only. Nothing is uploaded anywhere.",
-     "Recordings stay on this phone unless you send one to your coach."),
+     "Recordings stay on this device unless you send one to your coach."),
     ("<b>How this app talks about your voice.</b> It reports what it measured and stops there. It will tell you how many cents off a note was, because it counted; it will not tell you whether you sounded good, because it cannot hear that and neither can any software. When conditions are too noisy to measure something honestly, it says so instead of guessing.",
      "The app tells you what it measured and stops there. It can say how far off a note was. It cannot say whether it sounded good, and it will not pretend to."),
     ("Everything in Repertoire lives on this phone and nowhere else. There is no account, no server and no sign-in — so nothing here is sent anywhere, and clearing your browser data would clear it. Accounts and sync are a later job.",

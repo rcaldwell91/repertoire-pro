@@ -324,7 +324,7 @@
       'width:100%;max-width:560px;padding:20px 16px calc(24px + env(safe-area-inset-bottom,0px))">' +
       '<b style="font-size:18px">Add to your library</b>' +
       '<button class="btn" id="rpAddFiles" style="width:100%;padding:13px;margin-top:14px;text-align:left">' +
-      '<b>Songs from this phone</b><div class="rp-sub" style="margin:2px 0 0">MP3, M4A or WAV you already own.</div></button>' +
+      '<b>Songs from this device</b><div class="rp-sub" style="margin:2px 0 0">MP3, M4A or WAV you already own.</div></button>' +
       '<button class="btn" id="rpAddRec" style="width:100%;padding:13px;margin-top:8px;text-align:left">' +
       '<b>Record something</b><div class="rp-sub" style="margin:2px 0 0">Straight into your recordings.</div></button>' +
       '<button class="btn" id="rpAddPl" style="width:100%;padding:13px;margin-top:8px;text-align:left">' +
