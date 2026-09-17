@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 836e9659';
+const APP_VERSION = '17 Sep 2026 · build 832c3d4f';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -18401,12 +18401,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     function attach() {
       if (typeof updateRangeDisp !== 'function' || updateRangeDisp.__rp) return false;
       var prev = updateRangeDisp;
+      orig = prev;
       var wrapped = function () {
         try { prev.apply(this, arguments); } catch (e) {}
+        if (!applying) { try { save(nextBy); } catch (e) {} nextBy = 'test'; }
         try { untestedDisp(); } catch (e) {}
-        if (applying) return;
-        try { save(nextBy); } catch (e) {}
-        nextBy = 'test';
       };
       wrapped.__rp = 1;
       window.updateRangeDisp = wrapped;
@@ -18534,7 +18533,34 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return null;
   }
 
+  R.lineNode = function () {
+    var d = document.createElement('div');
+    d.id = 'rpRangeLine';
+    d.className = 'rp-card';
+    d.style.cssText = 'padding:11px;margin-top:10px;cursor:pointer';
+    on(d, 'click', R.open);
+    fillLine(d);
+    return d;
+  };
+
+  function fillLine(line) {
+    var v = R.get();
+    if (!v) return;
+    var head = !R.measured() ? UNTESTED
+             : (v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
+    var sub = !R.measured()
+      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
+      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
+    line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">' + esc(head) + '</div>' +
+      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
+  }
+
   function row() {
+    var live = $('rpRangeLine');
+    if (live) fillLine(live);
     var d = voiceFold();
     if (!d) return;
     var v = R.get();
@@ -18570,10 +18596,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<div class="rp-sub">' + esc(sub) + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
+  var orig = null;
   function untestedDisp() {
     var d = $('rangeDisp'), sb = $('rangeSub');
     if (!d) return;
-    if (R.measured()) { d.style.fontSize = ''; return; }
+    if (R.measured()) {
+      d.style.fontSize = '';
+      /* we may have painted over the real numbers a moment ago */
+      if (orig && /[A-Za-z]{3}/.test(d.textContent || '')) { try { orig(); } catch (e) {} }
+      return;
+    }
     d.textContent = UNTESTED;
     d.style.fontSize = '22px';
     if (sb) sb.textContent = 'Sing your lowest and your highest note once, and every exercise ' +
@@ -19560,7 +19592,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Your name, your email and your password.',
       folds: ['Account'], cards: [] },
     { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and how hard the exercises are.',
-      folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
+      folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpRangeLine', 'rpTestRow', 'rpTalkRow'] },
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and where your points came from.',
       folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
     { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when. Change any of it here.',
@@ -19660,6 +19692,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         var c = $(id);
         if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (!c && id === 'rpPointsRow') c = pointsRow();
+        if (!c && id === 'rpRangeLine' && window.RPRange && RPRange.lineNode) c = RPRange.lineNode();
         if (c && c.parentElement !== box) {
           if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }

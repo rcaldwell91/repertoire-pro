@@ -176,12 +176,11 @@
     function attach() {
       if (typeof updateRangeDisp !== 'function' || updateRangeDisp.__rp) return false;
       var prev = updateRangeDisp;
+      orig = prev;
       var wrapped = function () {
         try { prev.apply(this, arguments); } catch (e) {}
+        if (!applying) { try { save(nextBy); } catch (e) {} nextBy = 'test'; }
         try { untestedDisp(); } catch (e) {}
-        if (applying) return;
-        try { save(nextBy); } catch (e) {}
-        nextBy = 'test';
       };
       wrapped.__rp = 1;
       window.updateRangeDisp = wrapped;
@@ -309,7 +308,34 @@
     return null;
   }
 
+  R.lineNode = function () {
+    var d = document.createElement('div');
+    d.id = 'rpRangeLine';
+    d.className = 'rp-card';
+    d.style.cssText = 'padding:11px;margin-top:10px;cursor:pointer';
+    on(d, 'click', R.open);
+    fillLine(d);
+    return d;
+  };
+
+  function fillLine(line) {
+    var v = R.get();
+    if (!v) return;
+    var head = !R.measured() ? UNTESTED
+             : (v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
+    var sub = !R.measured()
+      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
+      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
+    line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
+      '<div><div class="rp-ttl">' + esc(head) + '</div>' +
+      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
+  }
+
   function row() {
+    var live = $('rpRangeLine');
+    if (live) fillLine(live);
     var d = voiceFold();
     if (!d) return;
     var v = R.get();
@@ -345,10 +371,16 @@
       '<div class="rp-sub">' + esc(sub) + '</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
+  var orig = null;
   function untestedDisp() {
     var d = $('rangeDisp'), sb = $('rangeSub');
     if (!d) return;
-    if (R.measured()) { d.style.fontSize = ''; return; }
+    if (R.measured()) {
+      d.style.fontSize = '';
+      /* we may have painted over the real numbers a moment ago */
+      if (orig && /[A-Za-z]{3}/.test(d.textContent || '')) { try { orig(); } catch (e) {} }
+      return;
+    }
     d.textContent = UNTESTED;
     d.style.fontSize = '22px';
     if (sb) sb.textContent = 'Sing your lowest and your highest note once, and every exercise ' +

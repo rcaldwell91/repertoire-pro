@@ -25,7 +25,7 @@
     { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Your name, your email and your password.',
       folds: ['Account'], cards: [] },
     { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and how hard the exercises are.',
-      folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
+      folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpRangeLine', 'rpTestRow', 'rpTalkRow'] },
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and where your points came from.',
       folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
     { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when. Change any of it here.',
@@ -125,6 +125,7 @@
         var c = $(id);
         if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
         if (!c && id === 'rpPointsRow') c = pointsRow();
+        if (!c && id === 'rpRangeLine' && window.RPRange && RPRange.lineNode) c = RPRange.lineNode();
         if (c && c.parentElement !== box) {
           if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
