@@ -270,7 +270,8 @@
        more opens the list. The tiles went. */
     h += '<h3 style="margin:18px 4px 2px">Pick what to work on</h3>';
     h += RPPage.tiles([
-      { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
+      /* Robert, 17 Sep: the Pitch Tracker moved to the Sing tab — it belongs
+         with singing, not with the exercises. */
       { icon: 'i-layers',   title: 'Choose what to get better at', sub: 'Say what you want to sing better and Repertoire picks the exercises for it.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
@@ -297,7 +298,6 @@
       on(b, 'click', function () { TR.routine(b.dataset.routine); });
     });
     on($('rpTrainAll'), 'click', TR.all);
-    on($('rpTileTracker'), 'click', function () { var g = $('rpTrainPitchGo'); if (g) g.click(); });
     on($('rpTileGoals'), 'click', function () { if (window.RPGoals) RPGoals.open(); });
     on($('rpTileBody'), 'click', function () { if (window.RPBody) RPBody.open(); });
   }

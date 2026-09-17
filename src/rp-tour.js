@@ -64,7 +64,7 @@
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
       text: 'Further down, pick what to work on. Tap any exercise to read what it is.' },
-    { mode: 'train', find: function () { return $('rpTileTracker'); },
+    { mode: 'singhub', find: function () { return $('shTracker') || $('shLib'); },
       text: 'The Pitch Tracker draws the notes you sing, as you sing them.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
       text: 'Free Sing is for fun. A bit of echo, nothing measured.' },

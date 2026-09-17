@@ -42,7 +42,7 @@
     if (s.assignTitle) return s.assignTitle;
     if (s.notes && s.notes.length) return 'Pitch Tracker';
     if (s.fx || /^sing/.test(s.id || '')) return 'Free Sing';
-    return 'Song Trainer';
+    return 'Learn a song';
   };
   T.groups = function () {
     var g = {}, order = [];
