@@ -461,7 +461,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       <button class="btn primary play" id="btnPlay">Start</button>
       <button class="btn" id="btnStop" disabled>Stop</button>
       <span class="pill" id="micPill"><span class="dot" id="micDot"></span><span id="micTxt">Mic off</span></span>
-      <label class="pill" style="cursor:pointer"><svg class="ic"><use href="#i-package"/></svg> Add a song file<input type="file" id="packFile" accept=".json" style="display:none"></label>
+      <label class="pill" style="cursor:pointer"><svg class="ic"><use href="#i-package"/></svg> Add a note-map file<input type="file" id="packFile" accept=".json,application/json" style="display:none"></label><label class="pill" style="cursor:pointer"><svg class="ic"><use href="#i-music"/></svg> Add an audio file<input type="file" id="rpAudioFile" accept="audio/*" style="display:none"></label>
     </div>
     <div class="panel" style="margin-top:10px">
       <input type="range" id="songSeek" min="0" max="1000" value="0" disabled style="width:100%">
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 4ee047a9';
+const APP_VERSION = '17 Sep 2026 · build ea9c0087';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -22884,6 +22884,209 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   /* ---------------------------------------------------------------- */
+  /* THE AUDIO DOOR                                                     */
+  /*                                                                    */
+  /* The pill next to this one takes a note-map file, which is not what */
+  /* anybody arriving with a song has. This one takes the audio.        */
+  /* ---------------------------------------------------------------- */
+  function wireAudioDoor() {
+    var inp = $('rpAudioFile');
+    if (!inp || inp.dataset.rpWired) return;
+    inp.dataset.rpWired = '1';
+    on(inp, 'change', async function () {
+      var f = inp.files && inp.files[0];
+      inp.value = '';
+      if (!f) return;
+      var song = {
+        id: 'aud_' + Date.now(),
+        title: f.name.replace(/\.[^.]+$/, ''), artist: 'Added by you',
+        kind: 'song', blob: f, added: Date.now()
+      };
+      try {
+        await dbPut('songs', song);
+        LIB.songs.push(song);
+        libRender();
+        fillSongSel();
+        var sel = $('songSel');
+        if (sel) { sel.value = 'lib:' + song.id; sel.dispatchEvent(new Event('change')); }
+        say('Added <b>' + esc(song.title) + '</b>. Next: build its note map.');
+      } catch (e) {
+        say('Could not store that here: ' + (e && e.message ? e.message : 'storage refused') + '.');
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* THE MISSING STEP                                                   */
+  /*                                                                    */
+  /* Robert, 17 Sep: he added a voice-only file, pressed Start, and got */
+  /* an empty board. No note bars, no bubbles, dashes for a score. The  */
+  /* app had let him start a song it had never listened to, and said    */
+  /* nothing. Start now refuses, and says what is missing with the      */
+  /* button to fix it one tap away.                                     */
+  /* ---------------------------------------------------------------- */
+  function needsMap() {
+    var s = cur();
+    if (!s) return false;                       /* a built-in pack has its notes */
+    if (s.notes && s.notes.length) return false;
+    try { if (SONGLIB.pack) return false; } catch (e) {}
+    return true;
+  }
+
+  function guard() {
+    var host = $('modeSong');
+    if (!host) return;
+    var box = $('rpNeedMap');
+    var s = cur();
+    var play = $('btnPlay');
+
+    if (!needsMap()) {
+      if (box) box.style.display = 'none';
+      if (play && play.dataset.rpBlocked) {
+        play.disabled = false;
+        play.title = '';
+        delete play.dataset.rpBlocked;
+      }
+      return;
+    }
+
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'rpNeedMap';
+      box.className = 'panel';
+      box.style.cssText = 'margin-top:10px;border-left:3px solid var(--gold)';
+      var anchor = $('libMapPanel');
+      if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(box, anchor);
+      else host.appendChild(box);
+    }
+    box.style.display = '';
+    if (box.dataset.for !== s.id) {
+      box.dataset.for = s.id;
+      box.innerHTML = '<b style="font-size:14px">This song has no note map yet</b>' +
+        '<div class="measured" style="margin:6px 0 10px">The app has to listen to it once and work out ' +
+        'the tune. That is what the note bars and the bubbles are drawn from, so until it has done that ' +
+        'there is nothing to sing against.</div>' +
+        '<label style="display:flex;align-items:flex-start;gap:9px;margin:0 0 10px;cursor:pointer">' +
+        '<input type="checkbox" id="rpCleanBox" style="margin-top:3px;flex:none">' +
+        '<span style="font-size:12.5px"><b>This is a voice on its own</b> \u2014 no drums, no band, just ' +
+        'singing. Tick this and the app reads the tune far more accurately. Leave it unticked for a ' +
+        'normal recording with the music still in it.</span></label>' +
+        '<button class="btn primary" id="rpNeedMapGo" style="width:100%;padding:12px">Build note map</button>';
+      var mine = $('rpCleanBox'), theirs = $('cleanChk');
+      if (mine && theirs) {
+        mine.checked = theirs.checked;
+        on(mine, 'change', function () {
+          theirs.checked = mine.checked;
+          var sg = cur();
+          if (sg) { sg.cleanVox = mine.checked; try { dbPut('songs', sg); } catch (e) {} }
+        });
+      }
+      on($('rpNeedMapGo'), 'click', function () {
+        var b = $('btnBuildMap');
+        if (b) { b.scrollIntoView({ block: 'center' }); b.click(); }
+        else try { console.warn('RP: #btnBuildMap is not in the page'); } catch (e) {}
+      });
+    }
+    /* and Start does not run into an empty board */
+    if (play && !play.dataset.rpBlocked) {
+      play.dataset.rpBlocked = '1';
+      play.disabled = true;
+      play.title = 'Build the note map first';
+    }
+  }
+
+  /* Tidy the panel for a song with no map: the only thing that matters is
+     Build note map. Preview and Edit already hide themselves; the MIDI
+     import and the voice picker were still sitting in front of it. */
+  function tidyMapPanel() {
+    var panel = $('libMapPanel');
+    if (!panel || panel.style.display === 'none') return;
+    var row = panel.querySelector('.row');
+    var build = $('btnBuildMap');
+    if (row && build && row.firstChild !== build.parentElement && build.parentElement === row) {
+      row.insertBefore(build, row.firstChild);
+    }
+    var hide = needsMap();
+    var midi = $('midiFile');
+    if (midi && midi.parentElement) midi.parentElement.style.display = hide ? 'none' : '';
+    var vs = $('voiceSel');
+    if (vs) vs.style.display = hide ? 'none' : '';
+  }
+
+  /* ---- is this a voice on its own? --------------------------------- */
+  /* An acapella is the best case for mapping and nothing told him to say
+     so. A voice with no band under it has very little low end: no kick,
+     no bass. Measure that rather than ask. */
+  var sniffed = {};
+  function sniff(s) {
+    if (!s || !s.blob || sniffed[s.id]) return;
+    sniffed[s.id] = 'busy';
+    var c = null;
+    try { ensureCtx(); c = ctx; } catch (e) {}
+    if (!c) { sniffed[s.id] = null; return; }   /* no audio yet; try again next tick */
+    s.blob.arrayBuffer().then(function (raw) { return c.decodeAudioData(raw.slice(0)); })
+      .then(function (buf) {
+        var d = buf.getChannelData(0);
+        var sr = buf.sampleRate;
+        var from = Math.floor(d.length * 0.35), n = Math.min(Math.floor(sr * 15), d.length - from);
+        if (n < sr) { sniffed[s.id] = 'done'; return; }
+        /* Four one-pole sections at 120 Hz, so the slope is steep enough to
+           separate a kick and a bass from a voice. One pole was not: at
+           261 Hz it still passed 40% of a plain sung note. */
+        var a = Math.exp(-2 * Math.PI * 120 / sr), b = 1 - a;
+        var p1 = 0, p2 = 0, p3 = 0, p4 = 0, lo = 0, all = 0;
+        for (var i = 0; i < n; i++) {
+          var x = d[from + i];
+          p1 = a * p1 + b * x; p2 = a * p2 + b * p1;
+          p3 = a * p3 + b * p2; p4 = a * p4 + b * p3;
+          lo += p4 * p4; all += x * x;
+        }
+        var frac = all > 0 ? Math.sqrt(lo / all) : 0;
+        sniffed[s.id] = 'done';
+        s.lowFrac = frac;
+        /* Only when it is not a close call. I have no real acapella and no
+           real full mix to calibrate against, so this ticks a box on a
+           clear reading and says why; everything else is left to the
+           singer, with the box in front of them rather than buried. */
+        if (frac < 0.12 && !s.cleanVox) {
+          s.cleanVox = true;
+          try { dbPut('songs', s); } catch (e) {}
+          var ck = $('cleanChk');
+          if (ck) ck.checked = true;
+          var box = $('rpNeedMap');
+          if (box) box.dataset.for = '';          /* redraw with it ticked */
+          say('Ticked <b>a voice on its own</b> for you: there is almost no bass or drums in this. ' +
+              'Untick it if that is wrong.');
+        }
+      })
+      .catch(function () { sniffed[s.id] = 'done'; });
+  }
+
+  function say(html) {
+    var m = $('libMapMsg');
+    if (m) m.innerHTML = html;
+  }
+
+  /* ---- tell him it is working while it works ----------------------- */
+  var work = { on: false, t0: 0, iv: null };
+  function watchBuild() {
+    var busy = false;
+    try { busy = !!ANALYZE.busy; } catch (e) {}
+    if (busy && !work.on) {
+      work.on = true; work.t0 = Date.now();
+      work.iv = setInterval(function () {
+        var m = $('libMapMsg');
+        if (!m) return;
+        var secs = Math.round((Date.now() - work.t0) / 1000);
+        var lead = (m.textContent || '').split(' \u00b7 ')[0];
+        m.textContent = lead + ' \u00b7 ' + secs + 's so far. A long song takes a while \u2014 the bar moves as it goes.';
+      }, 1000);
+    } else if (!busy && work.on) {
+      work.on = false; clearInterval(work.iv);
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
   /* LISTEN TO THE ROOM                                                 */
   /*                                                                    */
   /* A neutral listening tool. It hears whatever is playing near the    */
@@ -23018,7 +23221,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     n++;
     hub();
     wire();
-    if ($('modeSong') && $('modeSong').classList.contains('active')) drawMix();
+    if ($('modeSong') && $('modeSong').classList.contains('active')) {
+      drawMix();
+      guard();
+      tidyMapPanel();
+      watchBuild();
+      wireAudioDoor();
+      try { if (needsMap()) sniff(cur()); } catch (e) {}
+    }
     if (n > 3000) clearInterval(iv);
   }, 500);
 })();

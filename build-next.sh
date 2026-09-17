@@ -926,6 +926,14 @@ WORDS = [
     ('pick the take in Song Trainer', 'pick the take in Learn a song'),
     ('<h3>Song Trainer</h3>', '<h3>Learn a song</h3>'),
 
+    # Robert, 17 Sep: "Add a song file" takes .json only — a note-map pack,
+    # not audio. He would reasonably have picked an MP3 there. Say which it
+    # is, and put the audio door next to it.
+    ('<use href="#i-package"/></svg> Add a song file<input type="file" id="packFile" accept=".json" style="display:none"></label>',
+     '<use href="#i-package"/></svg> Add a note-map file<input type="file" id="packFile" accept=".json,application/json" style="display:none"></label>'
+     '<label class="pill" style="cursor:pointer"><svg class="ic"><use href="#i-music"/></svg> Add an audio file'
+     '<input type="file" id="rpAudioFile" accept="audio/*" style="display:none"></label>'),
+
     # two more that are about the machine, not a phone
     ('Inputs the phone offers', 'Inputs this device offers'),
     ('Asking the phone for the microphone\u2026', 'Asking for the microphone\u2026'),
