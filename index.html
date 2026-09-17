@@ -429,7 +429,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       </div>
       <button id="btnJourney">Start: Warm up</button>
     </div>
-    <h3 style="margin:18px 4px 2px">Go straight to</h3>
+    <h3 style="margin:18px 4px 2px">Jump straight in</h3>
     <div class="homegrid">
       <div class="mcard hue1" id="mcTrain"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-activity"/></svg></div><div><h4>Train</h4><p>Exercises that build your voice, a level at a time</p></div><div class="chev">›</div></div>
       <div class="mcard hue2" id="mcSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
@@ -447,7 +447,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     </div>
     <div class="homegrid" style="margin-top:12px">
       <div class="mcard hue2" id="shSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
-      <div class="mcard hue3" id="shYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Search any song's karaoke version, auto key detect</p></div><div class="chev">›</div></div>
+      <div class="mcard hue3" id="shYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Find a karaoke video and sing over it</p></div><div class="chev">›</div></div>
       <div class="mcard hue4" id="shLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Sing from your Library</h4><p>Sing over songs you own, kept in your range</p></div><div class="chev">›</div></div>
       <div class="mcard hue5" id="shFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p></div><div class="chev">›</div></div>
     </div>
@@ -707,7 +707,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <div id="susLive" style="font-size:16px;font-weight:700;min-height:24px;color:var(--ink-dim)">press start</div>
         <div class="micmeter" style="max-width:420px;margin:12px auto;height:14px"><i id="susBar"></i></div>
         <div class="row" style="justify-content:center">
-          <button class="btn primary" id="btnSusStart">Start the hold</button>
+          <button class="btn primary" id="btnSusStart">Start</button>
           <button class="btn" id="btnSusNote">Another note</button>
           <button class="btn" id="btnSusHear"><svg class="ic"><use href="#i-volume"/></svg> Hear it</button>
         </div>
@@ -744,7 +744,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
           <option value="major">major</option>
           <option value="minor">minor</option>
         </select>
-        <span class="notice grow" style="margin:0">Pick the key and the notes that belong to it light up as guide rails.</span>
+        <span class="notice grow" style="margin:0">Pick the key. The notes in that key light up as you sing.</span>
       </div>
       <div id="ytKeyStatus" class="notice" style="display:none;margin-top:8px"></div>
       <div id="ytWarn" class="notice" style="display:none;color:#ffb3be"></div>
@@ -1096,25 +1096,53 @@ function playPiano(midi, when, dur, dest, vol){
   dest = dest || guideGain; vol = vol==null? 0.5 : vol;
   if(when < ctx.currentTime) when = ctx.currentTime;
   const hold = Math.max(0.4, dur);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.0001, when);
-  g.gain.linearRampToValueAtTime(vol, when+0.012);
-  g.gain.exponentialRampToValueAtTime(vol*0.55, when+0.18);
-  g.gain.setValueAtTime(vol*0.55, when+Math.max(0.19, hold*0.62));
-  g.gain.exponentialRampToValueAtTime(0.0001, when+hold);
-  const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
+  const f0 = midiFreq(midi);
+  const g = ctx.createGain(); g.gain.value = vol;
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass';
+  lp.frequency.setValueAtTime(Math.min(9000, f0*14), when);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(700, f0*4), when+hold*0.7);
   g.connect(lp); lp.connect(dest);
-  /* the four partials SUM, so a note asking for 0.85 was really producing
-     0.85 x 1.55 = 1.32 and clipping on its own. Normalising means `vol` is
-     the peak it actually makes, which is what every caller assumed. */
-  const PARTIALS = [[1,1],[2,0.35],[3,0.14],[4,0.06]];
-  const norm = PARTIALS.reduce((s,p)=>s+p[1], 0);
-  PARTIALS.forEach(pa=>{
-    const o = ctx.createOscillator(); o.type='sine';
-    o.frequency.value = midiFreq(midi)*pa[0];
-    const og = ctx.createGain(); og.gain.value = pa[1]/norm;
+  /* a hammer knock: thirty milliseconds of filtered noise. Felt more than
+     heard, but without it the note starts out of nowhere, which is the one
+     thing no struck string does. */
+  const nb = ctx.createBuffer(1, Math.ceil(ctx.sampleRate*0.03), ctx.sampleRate);
+  const nd = nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i] = Math.random()*2-1;
+  const ns = ctx.createBufferSource(); ns.buffer = nb;
+  const nf = ctx.createBiquadFilter(); nf.type='bandpass';
+  nf.frequency.value = Math.min(6000, f0*6); nf.Q.value = 0.7;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.16, when);
+  ng.gain.exponentialRampToValueAtTime(0.0001, when+0.03);
+  ns.connect(nf); nf.connect(ng); ng.connect(g);
+  ns.start(when); ns.stop(when+0.04);
+  /* Robert, 17 Sep: "piano in code often means a synth with a piano-ish
+     envelope." It did — four sine partials under one envelope. A struck
+     string is INHARMONIC (partial n sits a little sharp of n x f0) and its
+     high partials die away first. Those two things are most of what the ear
+     uses to say piano rather than synth. The partials still sum to 1, so
+     `vol` is the peak it actually makes. */
+  const B = 0.0004;
+  const PARTIALS = [1,0.62,0.42,0.28,0.18,0.12,0.08,0.055,0.035,0.022,0.014,0.009];
+  const norm = PARTIALS.reduce((s,a)=>s+a, 0);
+  PARTIALS.forEach((amp,i)=>{
+    const n = i+1;
+    const f = f0*n*Math.sqrt(1+B*n*n);
+    if(f > 17000) return;
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = f;
+    const og = ctx.createGain();
+    /* decay in dB per second, faster the higher the partial. Ramping
+       every partial to silence instead lost the note in half a second —
+       measured at 6 dB per 100 ms, where a real middle C loses about 1.5. */
+    const top = amp/norm;
+    const rate = 12*Math.pow(1.4, i);
+    const end = Math.max(0.00012, top*Math.pow(10, -rate*hold/20));
+    og.gain.setValueAtTime(0.0001, when);
+    og.gain.linearRampToValueAtTime(top, when+0.005);
+    og.gain.exponentialRampToValueAtTime(end, when+hold);
+    og.gain.linearRampToValueAtTime(0.0001, when+hold+0.06);
     o.connect(og); og.connect(g);
-    o.start(when); o.stop(when+hold+0.1);
+    o.start(when); o.stop(when+hold+0.09);
   });
 }
 function playDing(){
@@ -9743,7 +9771,7 @@ renderJourney();
       '<div class="prow"><span class="pk">When</span><span class="pv">' + esc(P.when || '—') + '</span></div>' +
       '<div class="prow"><span class="pk">Where</span><span class="pv">' + esc(P.where || '—') + '</span></div>' +
       '<div class="prow"><span class="pk">Quiet sessions</span><span class="pv">' + (P.quietDefault ? 'default' : 'off') + '</span></div>' +
-      '<div class="notice" style="margin-top:8px">Set these on the Coach tab.</div>';
+      '<div class="notice" style="margin-top:8px">Set these on Your plan, in Profile.</div>';
     host.appendChild(prac.el);
 
     /* --- sound --- */
@@ -19075,7 +19103,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var c = catOf(sel.cat);
     if (sel.cat === 'ear') {
       var dr = DRILLS[new Date().getDate() % DRILLS.length];
-      h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · EAR</div>' +
+      h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">START HERE · EAR</div>' +
         '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
         '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(dr[1]) + '</div><div class="rp-sub">' + esc(dr[2]) + '</div></div>' +
         '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
@@ -19083,7 +19111,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     } else {
       var one = pickOne(sel.cat, effectiveLevel(sel.cat, sel.level));
       if (one) {
-        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">ONE TO DO NOW · ' + esc(c.name.toUpperCase()) +
+        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">START HERE · ' + esc(c.name.toUpperCase()) +
           ' · ' + esc(lvlName(one.level).toUpperCase()) + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
@@ -19103,10 +19131,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 17 Sep: the seven categories were on the screen twice — the
        chips at the top and a tile for each below. The chips choose; See
        more opens the list. The tiles went. */
-    h += '<h3 style="margin:18px 4px 2px">Tools</h3>';
+    h += '<h3 style="margin:18px 4px 2px">More ways to practise</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Say what you want to sing better. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell it what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
     /* Robert, 17 Sep: the pillars as their own buttons with icons, in the
@@ -19497,8 +19525,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       folds: ['Account'], cards: [] },
     { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and how hard the exercises are.',
       folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
-    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your points.',
-      folds: ['Practice'], cards: ['rpLevelRow'] },
+    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and where your points came from.',
+      folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
+    { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when.',
+      folds: [], cards: ['rpPlanHolder'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
@@ -19514,6 +19544,29 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) return all[i];
     }
     return null;
+  }
+
+  /* Robert, 18 Sep: "points are never defined anywhere." Here is what
+     earns one, in the same words the level page uses. */
+  function pointsRow() {
+    var d = document.createElement('div');
+    d.id = 'rpPointsRow';
+    d.className = 'rp-card';
+    d.style.padding = '13px';
+    d.innerHTML = '<div class="rp-ttl">What earns a point</div>' +
+      '<div class="rp-sub" style="margin-bottom:8px">Points count what you did, not how well you sang.</div>' +
+      '<div style="font-size:13px;line-height:1.7">' +
+      '<div>A warm-up or exercise finished · <b>10</b></div>' +
+      '<div>An ear drill · <b>10</b></div>' +
+      '<div>A note held to the end · <b>10</b></div>' +
+      '<div>A theory star · <b>15</b></div>' +
+      '<div>The word of the day, right first time · <b>5</b></div>' +
+      '<div>A take sent to your coach · <b>25</b></div>' +
+      '<div>Any day you practised at all · <b>20</b></div>' +
+      '</div>';
+    var host = $('rpProfileHolders') || $('modeYou');
+    if (host) host.appendChild(d);
+    return d;
   }
 
   /* the range panel comes from the Train tab — rp-train hands it over */
@@ -19570,6 +19623,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       g.cards.forEach(function (id) {
         var c = $(id);
         if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
+        if (!c && id === 'rpPointsRow') c = pointsRow();
         if (c && c.parentElement !== box) {
           if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
@@ -19615,6 +19669,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
     if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
     if (key === 'help') { var fa = foldNamed('About'); if (fa) { fa.open = true; tidyAbout(fa); } }
+    if (key === 'plan') {
+      var ph = $('rpPlanHolder');
+      if (ph) { ph.style.display = ''; ph.querySelectorAll('.panel').forEach(function (p) { p.style.display = ''; p.style.marginTop = '10px'; }); }
+    }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 
@@ -20442,10 +20500,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 13 Sep: "walk me through what this app is for, what I get
        out of it, how to use it." The first and last cards answer the first
        two; everything between is the third. */
-    { mode: 'home', find: null,
-      text: 'Fifteen minutes a day. Repertoire sets it, or your coach does when you have one.' },
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
+    /* Robert, 17 Sep: this card and the Today card both said fifteen minutes
+       a day. The Today card points at the button, so it kept the line. */
     { mode: 'home', find: null,
       text: 'Put headphones in first. Through the speaker the app squeals.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
@@ -20742,13 +20800,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       { find: function () { return $('rpSusKeys'); },
         text: 'Gold is the note to hold. The key you are singing lights up.' },
       { find: function () { return $('btnSusStart'); },
-        text: 'Press Start the hold and keep the note steady for five seconds. Ten notes in all.' }
+        text: 'Press Start and keep the note steady for five seconds. Ten notes in all.' }
     ] },
     keys: { host: 'kbdPanel', anchor: 'kbdUp', steps: [
       { find: function () { return $('kbdKeys'); },
-        text: 'Tap a key, then sing that note. The key you are singing lights up.' },
-      { find: function () { return $('kbdMsg'); },
-        text: 'Turn the phone sideways for more keys.' }
+        text: 'Tap a key, then sing that note. The key you are singing lights up.' }
     ] },
     ear: { host: 'v10Ear', anchor: 'earQuit', steps: [
       { find: function () { return $('earReplay'); },
@@ -22209,6 +22265,104 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
   setInterval(mount, 1200);
   setTimeout(mount, 600);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — the Coach tab, split up.
+
+   Robert, 18 Sep: "Coach is one enormous screen holding ten unrelated
+   things. Break it up." He approved the layout: the tab is about the
+   person who teaches you, and nothing else. What Repertoire decides for
+   you — what to work on, how much it chooses, when and where you
+   practise, what it can and cannot measure — moves to Profile, under
+   "Your plan". The fifteen-minute plan itself already lives on Home, so
+   the copy of it that sat here is gone.
+
+   Nothing is rewritten: the base still builds those panels, and this
+   moves them. One set of controls, one place.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function text(el) { return (el.textContent || '').replace(/\s+/g, ' ').trim(); }
+
+  var KEEP = /^This week/;                       /* stays on the Coach tab */
+  var PLAN = /^(What I want to work on|How much should the app decide|When and where|What the app can and cannot tell you)/;
+  var DROP = /^(Working with a real coach)/;
+
+  function holder() {
+    var h = $('rpPlanHolder');
+    if (h) return h;
+    var host = $('modeYou');
+    if (!host) return null;
+    h = document.createElement('div');
+    h.id = 'rpPlanHolder';
+    h.style.display = 'none';
+    host.appendChild(h);
+    return h;
+  }
+
+  function heading(el) {
+    var b = el.querySelector('b, h1, h3');
+    return b ? text(b) : text(el).slice(0, 40);
+  }
+
+  function tidy() {
+    var host = $('modeCoach');
+    if (!host || !host.classList.contains('active')) return;
+    try { if (window.RP && RP.isCoachFace && RP.isCoachFace()) return; } catch (e) {}
+    var box = holder();
+    Array.prototype.slice.call(host.children).forEach(function (el) {
+      if (el.id === 'rpChannel' || el.id === 'rpCoachTop') return;
+      if (el.tagName === 'H1') { el.style.display = 'none'; return; }
+      if (el.classList.contains('notice') && !el.dataset.rpKeep) {
+        /* the line under the old heading, and the signed-out hint */
+        if (/plan for you|changes as you do/i.test(text(el))) { el.style.display = 'none'; return; }
+        return;
+      }
+      if (!el.classList.contains('panel')) return;
+      var head = heading(el);
+      if (KEEP.test(head)) { el.style.display = ''; return; }
+      if (DROP.test(head)) { el.style.display = 'none'; return; }
+      if (PLAN.test(head)) { if (box && el.parentElement !== box) box.appendChild(el); return; }
+      /* the plan itself — Home has it */
+      if (/Today · about|Today &middot; about/i.test(text(el).slice(0, 40))) { el.style.display = 'none'; return; }
+    });
+    header();
+  }
+
+  /* the tab's own heading: who this is about */
+  function header() {
+    var host = $('modeCoach');
+    if (!host) return;
+    var t = $('rpCoachTop');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'rpCoachTop';
+      host.insertBefore(t, host.firstChild);
+    }
+    var coach = null;
+    try { coach = window.RP && RP.coach; } catch (e) {}
+    var name = coach ? coach.display_name : null;
+    var sig = name || 'none';
+    if (t.dataset.sig === sig) return;
+    t.dataset.sig = sig;
+    t.innerHTML = '<h1 style="margin:0 0 2px">' + (name ? 'From ' + esc(name) : 'Coach') + '</h1>' +
+      '<div class="rp-sub" style="margin:0 0 12px">' +
+      (name ? 'What they set you, and what you have sent them.'
+            : 'A real person who sets your work and listens to your takes.') + '</div>';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  setInterval(tidy, 700);
+  setTimeout(tidy, 900);
+  window.RPCoachTab = { tidy: tidy };
 })();
 
 </script>

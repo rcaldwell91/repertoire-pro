@@ -231,7 +231,7 @@
     var c = catOf(sel.cat);
     if (sel.cat === 'ear') {
       var dr = DRILLS[new Date().getDate() % DRILLS.length];
-      h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · EAR</div>' +
+      h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">START HERE · EAR</div>' +
         '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
         '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(dr[1]) + '</div><div class="rp-sub">' + esc(dr[2]) + '</div></div>' +
         '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
@@ -239,7 +239,7 @@
     } else {
       var one = pickOne(sel.cat, effectiveLevel(sel.cat, sel.level));
       if (one) {
-        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">ONE TO DO NOW · ' + esc(c.name.toUpperCase()) +
+        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">START HERE · ' + esc(c.name.toUpperCase()) +
           ' · ' + esc(lvlName(one.level).toUpperCase()) + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
@@ -259,10 +259,10 @@
     /* Robert, 17 Sep: the seven categories were on the screen twice — the
        chips at the top and a tile for each below. The chips choose; See
        more opens the list. The tiles went. */
-    h += '<h3 style="margin:18px 4px 2px">Tools</h3>';
+    h += '<h3 style="margin:18px 4px 2px">More ways to practise</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Say what you want to sing better. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell it what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
     /* Robert, 17 Sep: the pillars as their own buttons with icons, in the

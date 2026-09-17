@@ -45,10 +45,10 @@
     /* Robert, 13 Sep: "walk me through what this app is for, what I get
        out of it, how to use it." The first and last cards answer the first
        two; everything between is the third. */
-    { mode: 'home', find: null,
-      text: 'Fifteen minutes a day. Repertoire sets it, or your coach does when you have one.' },
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
+    /* Robert, 17 Sep: this card and the Today card both said fifteen minutes
+       a day. The Today card points at the button, so it kept the line. */
     { mode: 'home', find: null,
       text: 'Put headphones in first. Through the speaker the app squeals.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
@@ -345,13 +345,11 @@
       { find: function () { return $('rpSusKeys'); },
         text: 'Gold is the note to hold. The key you are singing lights up.' },
       { find: function () { return $('btnSusStart'); },
-        text: 'Press Start the hold and keep the note steady for five seconds. Ten notes in all.' }
+        text: 'Press Start and keep the note steady for five seconds. Ten notes in all.' }
     ] },
     keys: { host: 'kbdPanel', anchor: 'kbdUp', steps: [
       { find: function () { return $('kbdKeys'); },
-        text: 'Tap a key, then sing that note. The key you are singing lights up.' },
-      { find: function () { return $('kbdMsg'); },
-        text: 'Turn the phone sideways for more keys.' }
+        text: 'Tap a key, then sing that note. The key you are singing lights up.' }
     ] },
     ear: { host: 'v10Ear', anchor: 'earQuit', steps: [
       { find: function () { return $('earReplay'); },

@@ -26,8 +26,10 @@
       folds: ['Account'], cards: [] },
     { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and how hard the exercises are.',
       folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
-    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your points.',
-      folds: ['Practice'], cards: ['rpLevelRow'] },
+    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and where your points came from.',
+      folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
+    { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when.',
+      folds: [], cards: ['rpPlanHolder'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
@@ -43,6 +45,29 @@
       if (sp && (sp.textContent || '').trim().replace(/\s+/g, ' ').indexOf(name) === 0) return all[i];
     }
     return null;
+  }
+
+  /* Robert, 18 Sep: "points are never defined anywhere." Here is what
+     earns one, in the same words the level page uses. */
+  function pointsRow() {
+    var d = document.createElement('div');
+    d.id = 'rpPointsRow';
+    d.className = 'rp-card';
+    d.style.padding = '13px';
+    d.innerHTML = '<div class="rp-ttl">What earns a point</div>' +
+      '<div class="rp-sub" style="margin-bottom:8px">Points count what you did, not how well you sang.</div>' +
+      '<div style="font-size:13px;line-height:1.7">' +
+      '<div>A warm-up or exercise finished · <b>10</b></div>' +
+      '<div>An ear drill · <b>10</b></div>' +
+      '<div>A note held to the end · <b>10</b></div>' +
+      '<div>A theory star · <b>15</b></div>' +
+      '<div>The word of the day, right first time · <b>5</b></div>' +
+      '<div>A take sent to your coach · <b>25</b></div>' +
+      '<div>Any day you practised at all · <b>20</b></div>' +
+      '</div>';
+    var host = $('rpProfileHolders') || $('modeYou');
+    if (host) host.appendChild(d);
+    return d;
   }
 
   /* the range panel comes from the Train tab — rp-train hands it over */
@@ -99,6 +124,7 @@
       g.cards.forEach(function (id) {
         var c = $(id);
         if (!c && id === 'rpTimingRow' && window.RPTiming) c = RPTiming.row();
+        if (!c && id === 'rpPointsRow') c = pointsRow();
         if (c && c.parentElement !== box) {
           if (id === 'rpRangePanelHolder' || id === 'rpSoundRow') box.insertBefore(c, box.firstChild); else box.appendChild(c);
         }
@@ -144,6 +170,10 @@
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
     if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
     if (key === 'help') { var fa = foldNamed('About'); if (fa) { fa.open = true; tidyAbout(fa); } }
+    if (key === 'plan') {
+      var ph = $('rpPlanHolder');
+      if (ph) { ph.style.display = ''; ph.querySelectorAll('.panel').forEach(function (p) { p.style.display = ''; p.style.marginTop = '10px'; }); }
+    }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 

@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -496,6 +496,91 @@ PATCHES = [
     ("Sign in and join your coach with their code, and this tab becomes their channel: they set the work, you record, they listen in their own time.",
      "Once you have joined a coach with their code at the top of this tab, what they set you shows there."),
 
+    # 45. ROBERT, 17 Sep — THE REFERENCE NOTE, CHECKED AND REBUILT.
+    #  He asked me to listen to the "piano". It was four sine partials under
+    #  one envelope — a synth with a piano-ish envelope, exactly what he
+    #  said he did not want. Rebuilt as an inharmonic struck string: twelve
+    #  partials, each stretched sharp and each dying faster than the one
+    #  below it, plus a hammer knock at the start.
+    ("""function playPiano(midi, when, dur, dest, vol){
+  dest = dest || guideGain; vol = vol==null? 0.5 : vol;
+  if(when < ctx.currentTime) when = ctx.currentTime;
+  const hold = Math.max(0.4, dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.linearRampToValueAtTime(vol, when+0.012);
+  g.gain.exponentialRampToValueAtTime(vol*0.55, when+0.18);
+  g.gain.setValueAtTime(vol*0.55, when+Math.max(0.19, hold*0.62));
+  g.gain.exponentialRampToValueAtTime(0.0001, when+hold);
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
+  g.connect(lp); lp.connect(dest);""",
+     """function playPiano(midi, when, dur, dest, vol){
+  dest = dest || guideGain; vol = vol==null? 0.5 : vol;
+  if(when < ctx.currentTime) when = ctx.currentTime;
+  const hold = Math.max(0.4, dur);
+  const f0 = midiFreq(midi);
+  const g = ctx.createGain(); g.gain.value = vol;
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass';
+  lp.frequency.setValueAtTime(Math.min(9000, f0*14), when);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(700, f0*4), when+hold*0.7);
+  g.connect(lp); lp.connect(dest);
+  /* a hammer knock: thirty milliseconds of filtered noise. Felt more than
+     heard, but without it the note starts out of nowhere, which is the one
+     thing no struck string does. */
+  const nb = ctx.createBuffer(1, Math.ceil(ctx.sampleRate*0.03), ctx.sampleRate);
+  const nd = nb.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i] = Math.random()*2-1;
+  const ns = ctx.createBufferSource(); ns.buffer = nb;
+  const nf = ctx.createBiquadFilter(); nf.type='bandpass';
+  nf.frequency.value = Math.min(6000, f0*6); nf.Q.value = 0.7;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.16, when);
+  ng.gain.exponentialRampToValueAtTime(0.0001, when+0.03);
+  ns.connect(nf); nf.connect(ng); ng.connect(g);
+  ns.start(when); ns.stop(when+0.04);"""),
+    ("""  /* the four partials SUM, so a note asking for 0.85 was really producing
+     0.85 x 1.55 = 1.32 and clipping on its own. Normalising means `vol` is
+     the peak it actually makes, which is what every caller assumed. */
+  const PARTIALS = [[1,1],[2,0.35],[3,0.14],[4,0.06]];
+  const norm = PARTIALS.reduce((s,p)=>s+p[1], 0);
+  PARTIALS.forEach(pa=>{
+    const o = ctx.createOscillator(); o.type='sine';
+    o.frequency.value = midiFreq(midi)*pa[0];
+    const og = ctx.createGain(); og.gain.value = pa[1]/norm;
+    o.connect(og); og.connect(g);
+    o.start(when); o.stop(when+hold+0.1);
+  });
+}""",
+     """  /* Robert, 17 Sep: "piano in code often means a synth with a piano-ish
+     envelope." It did \u2014 four sine partials under one envelope. A struck
+     string is INHARMONIC (partial n sits a little sharp of n x f0) and its
+     high partials die away first. Those two things are most of what the ear
+     uses to say piano rather than synth. The partials still sum to 1, so
+     `vol` is the peak it actually makes. */
+  const B = 0.0004;
+  const PARTIALS = [1,0.62,0.42,0.28,0.18,0.12,0.08,0.055,0.035,0.022,0.014,0.009];
+  const norm = PARTIALS.reduce((s,a)=>s+a, 0);
+  PARTIALS.forEach((amp,i)=>{
+    const n = i+1;
+    const f = f0*n*Math.sqrt(1+B*n*n);
+    if(f > 17000) return;
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = f;
+    const og = ctx.createGain();
+    /* decay in dB per second, faster the higher the partial. Ramping
+       every partial to silence instead lost the note in half a second \u2014
+       measured at 6 dB per 100 ms, where a real middle C loses about 1.5. */
+    const top = amp/norm;
+    const rate = 12*Math.pow(1.4, i);
+    const end = Math.max(0.00012, top*Math.pow(10, -rate*hold/20));
+    og.gain.setValueAtTime(0.0001, when);
+    og.gain.linearRampToValueAtTime(top, when+0.005);
+    og.gain.exponentialRampToValueAtTime(end, when+hold);
+    og.gain.linearRampToValueAtTime(0.0001, when+hold+0.06);
+    o.connect(og); og.connect(g);
+    o.start(when); o.stop(when+hold+0.09);
+  });
+}"""),
+
     # 38. ROBERT, 17 Sep — PART 3, THE EXERCISES.
     #  Reference notes default to a PIANO. "The synth throws me off and I
     #  don't know what I'm listening to." Still switchable in Profile; a
@@ -507,7 +592,7 @@ PATCHES = [
     #  Hold a note: a way back, a note worth singing, and a score out of ten.
     ("""          <button class="btn primary" id="btnSusStart">Start hold</button>
           <button class="btn" id="btnSusNote">New note</button>""",
-     """          <button class="btn primary" id="btnSusStart">Start the hold</button>
+     """          <button class="btn primary" id="btnSusStart">Start</button>
           <button class="btn" id="btnSusNote">Another note</button>"""),
     ("""    <div id="susPanel" class="panel" style="display:none">
       <div class="row" style="justify-content:space-between">
@@ -625,7 +710,7 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
     ("""<button class="btn primary" id="btnYtSearch"><svg class="ic"><use href="#i-search"/></svg> Find karaoke + detect key</button>""",
      """<button class="btn primary" id="btnYtSearch"><svg class="ic"><use href="#i-search"/></svg> Search YouTube for a karaoke version</button>"""),
     ("Auto-set when you search, or pick it yourself. The lanes that belong to the key light up as guide rails.",
-     "Pick the key and the notes that belong to it light up as guide rails."),
+     "Pick the key. The notes in that key light up as you sing."),
 
     # 41. THE MICROPHONE PANEL WAS A DEVELOPER TABLE. What a singer needs is
     #     whether it is on, what it can hear, and what to do if not.
@@ -664,7 +749,7 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
     ("'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing it. A held key goes quiet after a second so the mic hears you, not the key.' +\n"
      "      ' Turn the phone sideways for more keys. This is free play &mdash; Note Match and Sustain Hold are the scored versions.</div>'",
      "'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing that note. Turn the phone sideways for more keys. Nothing is scored here.</div>'"),
-    ("<h3 style=\"margin:18px 4px 2px\">Or jump right in</h3>", "<h3 style=\"margin:18px 4px 2px\">Go straight to</h3>"),
+    ("<h3 style=\"margin:18px 4px 2px\">Or jump right in</h3>", "<h3 style=\"margin:18px 4px 2px\">Jump straight in</h3>"),
 
     # 43. A SESSION SAYS IT IS A SESSION. Robert's audit: Done on the first
     #     step jumped into the next with nothing on screen saying where you
@@ -772,6 +857,13 @@ def rewrite(text, pairs, where):
     return text
 
 WRITING = [
+    # Robert, 17 Sep: the four plan panels moved to Profile → Your plan,
+    # so the Practice fold can no longer send people to the Coach tab.
+    ("Set these on the Coach tab.", "Set these on Your plan, in Profile."),
+    # The app stopped guessing the key in patch 40. This card still promised it.
+    ("Search any song's karaoke version, auto key detect",
+     "Find a karaoke video and sing over it"),
+
     # ---- Coach tab: From Repertoire ----
     ("I pick the session, I say why first, and I keep it to one thing at a time. Best if you do not yet know what you need — which is most people at the start, including me about you.",
      "Repertoire picks the session, says why, and keeps it to one thing at a time. Best if you do not yet know what you need."),
@@ -896,7 +988,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'
