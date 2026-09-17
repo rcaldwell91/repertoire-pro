@@ -571,11 +571,31 @@
         Array.prototype.slice.call(r.querySelectorAll('.iconbtn')).forEach(function (b) { tray.appendChild(b); });
         /* Robert, 16 Sep: a take in the Library should be singable over in
            the Pitch Tracker, and keepable as a note map, from here */
-        if (s.kind === 'recording' && s.notes && s.notes.length) {
-          var so = document.createElement('button');
-          so.className = 'iconbtn'; so.textContent = 'Sing over it'; so.title = 'Open the Pitch Tracker with this take as the guide';
-          so.onclick = function (ev) { ev.stopPropagation(); try { switchMode('free'); } catch (e) {} setTimeout(function () { if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s); }, 250); };
-          tray.appendChild(so);
+        var ln = document.createElement('button');
+        ln.className = 'iconbtn'; ln.textContent = 'Learn this song';
+        ln.title = 'Open Learn a song with this already loaded';
+        ln.onclick = function (ev) {
+          ev.stopPropagation();
+          try { switchMode('song'); } catch (e) {}
+          setTimeout(function () {
+            if (window.RPLearnSong) { RPLearnSong.reset(); RPLearnSong.open(s); }
+            else try { console.warn('RP: RPLearnSong is not loaded'); } catch (e) {}
+          }, 260);
+        };
+        tray.appendChild(ln);
+        var so = document.createElement('button');
+        so.className = 'iconbtn'; so.textContent = 'Sing over it';
+        so.title = 'Open the Pitch Tracker with this playing';
+        so.onclick = function (ev) {
+          ev.stopPropagation();
+          try { switchMode('free'); } catch (e) {}
+          setTimeout(function () {
+            if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s);
+            else try { console.warn('RP: RPStudio.singOver is not there'); } catch (e) {}
+          }, 260);
+        };
+        tray.appendChild(so);
+        if (s.notes && s.notes.length) {
           var nm = document.createElement('button');
           nm.className = 'iconbtn'; nm.textContent = 'Note map'; nm.title = 'Keep the notes on their own';
           nm.onclick = function (ev) { ev.stopPropagation(); if (window.RPMaps) RPMaps.fromTake(s); };

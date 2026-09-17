@@ -67,10 +67,17 @@
   T.fmt = fmt; T.day = day;
 
   T.rowHtml = function (s) {
+    /* Robert, 17 Sep: "a take he can't sing over" is a bug, not a
+       nice-to-have. The two things he would want to do with it live on the
+       row, in plain words. */
     return '<div class="rp-take" data-take="' + esc(s.id) + '">' +
       '<div class="ic"><svg class="ic"><use href="#i-mic"/></svg></div>' +
       '<div class="t"><b>' + esc(s.title) + (s.sentAt ? '<span class="rp-tag">sent</span>' : '') + '</b>' +
-      '<span>' + fmt(s.duration) + ' · ' + day(s.addedAt) + (s.notes && s.notes.length ? ' · notes' : '') + '</span></div>' +
+      '<span>' + fmt(s.duration) + ' · ' + day(s.addedAt) + (s.notes && s.notes.length ? ' · notes' : '') + '</span>' +
+      '<span class="rp-doers">' +
+        '<button class="rp-do" data-learn="' + esc(s.id) + '">Learn this song</button>' +
+        '<button class="rp-do" data-over="' + esc(s.id) + '">Sing over it</button>' +
+      '</span></div>' +
       '<button class="pl" data-play="' + esc(s.id) + '" title="Play">▶</button>' +
       '<span class="chev">›</span></div>';
   };
@@ -82,6 +89,9 @@
     st.textContent =
       '.rp-take{display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid var(--line);cursor:pointer}' +
       '.rp-take:first-child{border-top:0}' +
+      '.rp-doers{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}' +
+      '.rp-do{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:800;cursor:pointer}' +
+      '.rp-do:active{transform:scale(.97)}' +
       '.rp-take .ic{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#7c5cff,#ec4899);flex:none;display:flex;align-items:center;justify-content:center}' +
       '.rp-take .ic .ic{width:18px;height:18px;color:#fff}' +
       '.rp-take .t{flex:1;min-width:0}.rp-take .t b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
@@ -108,6 +118,30 @@
   T.wire = function (root) {
     root.querySelectorAll('[data-play]').forEach(function (b) {
       on(b, 'click', function (ev) { ev.stopPropagation(); var s = T.get(b.dataset.play); if (s) T.play(s); });
+    });
+    root.querySelectorAll('[data-learn]').forEach(function (b) {
+      on(b, 'click', function (ev) {
+        ev.stopPropagation();
+        var s = T.get(b.dataset.learn);
+        if (!s) return;
+        try { switchMode('song'); } catch (e) {}
+        setTimeout(function () {
+          if (window.RPLearnSong) { RPLearnSong.reset(); RPLearnSong.open(s); }
+          else try { console.warn('RP: RPLearnSong is not loaded'); } catch (e) {}
+        }, 260);
+      });
+    });
+    root.querySelectorAll('[data-over]').forEach(function (b) {
+      on(b, 'click', function (ev) {
+        ev.stopPropagation();
+        var s = T.get(b.dataset.over);
+        if (!s) return;
+        try { switchMode('free'); } catch (e) {}
+        setTimeout(function () {
+          if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s);
+          else try { console.warn('RP: RPStudio.singOver is not there'); } catch (e) {}
+        }, 260);
+      });
     });
     root.querySelectorAll('[data-take]').forEach(function (r) {
       on(r, 'click', function () { T.open(r.dataset.take); });

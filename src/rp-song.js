@@ -66,11 +66,9 @@
     var h = '<div class="rp-sub" style="margin:0 0 10px">The app maps the melody, then you sing it and see ' +
       'every note you hit. Where is the song coming from?</div>';
     h += door({ id: 'rpLsOwn',   icon: 'i-book',     title: 'A song you own',
-                sub: 'Pick it from the list at the top of the next screen. Add more in your Library.' });
+                sub: 'Pick one from your Library, or add an audio file now.' });
     h += door({ id: 'rpLsBuilt', icon: 'i-music',    title: 'Built-in songs',
                 sub: 'Six that come with the app, ready to sing.' });
-    h += door({ id: 'rpLsSing',  icon: 'i-mic',      title: 'Sing it in yourself',
-                sub: 'Sing the tune once and the app writes the notes down.' });
     h += door({ id: 'rpLsPair',  icon: 'i-layers',   title: 'A song split in two', lock: !paid,
                 sub: paid ? 'The singer on one file, the music on the other. Two sliders, live while it plays.'
                           : 'The singer on one file, the music on the other.' });
@@ -86,11 +84,7 @@
       html: h, backLabel: 'Sing',
       wire: function (root) {
         on(root.querySelector('#rpLsOwn'), 'click', S.pickOwn);
-        on(root.querySelector('#rpLsBuilt'), 'click', function () { go('song'); });
-        on(root.querySelector('#rpLsSing'), 'click', function () {
-          go('song');
-          setTimeout(function () { var b = $('edSingIn'); if (b) b.scrollIntoView({ block: 'center' }); }, 400);
-        });
+        on(root.querySelector('#rpLsBuilt'), 'click', S.pickBuiltIn);
         on(root.querySelector('#rpLsPair'), 'click', function () {
           if (!S.founder()) { locked(); return; }
           S.pairSheet();
@@ -151,6 +145,36 @@
         go('song');
         setTimeout(function () { RPLearnSong.open(song); }, 260);
       } catch (e) { alert('Could not store that here: ' + (e && e.message ? e.message : 'storage refused')); }
+    });
+  };
+
+  /* The six that come with the app. They have their notes already and no
+     file, so the app plays the tune itself \u2014 same screen, same map. */
+  S.pickBuiltIn = function () {
+    var list = [];
+    try { list = SONGS || []; } catch (e) {}
+    var h = '<b style="font-size:18px">Built-in songs</b>' +
+      '<div class="measured" style="margin-top:8px">These come with the app and are ready to sing. ' +
+      'The app plays the tune and you sing over it.</div><div style="margin-top:10px">';
+    list.forEach(function (x, i) {
+      h += '<button class="rp-card" data-built="' + i + '" style="width:100%;text-align:left;padding:12px;' +
+        'margin-top:6px;border:0;cursor:pointer"><div class="rp-ttl">' + esc(x.title) + '</div>' +
+        '<div class="rp-sub">' + (x.notes ? x.notes.length + ' notes' : '') + '</div></button>';
+    });
+    h += '</div><button class="btn" id="rpBiX" style="width:100%;padding:12px;margin-top:12px">Close</button>';
+    var node = sheet(h);
+    on($('rpBiX'), 'click', shut);
+    node.querySelectorAll('[data-built]').forEach(function (b) {
+      on(b, 'click', function () {
+        var x = list[+b.dataset.built];
+        if (!x) return;
+        shut();
+        go('song');
+        setTimeout(function () {
+          RPLearnSong.reset();
+          RPLearnSong.open({ id: 'built_' + b.dataset.built, title: x.title, notes: x.notes, blob: null });
+        }, 260);
+      });
     });
   };
 

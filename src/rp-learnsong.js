@@ -43,7 +43,8 @@
   var S = {
     song: null, open: false, playing: false, raf: null,
     trail: [], t0: 0, vox: null, mus: null, voxUrl: null, musUrl: null,
-    countdown: 0, hid: [], mapping: false
+    countdown: 0, hid: [], mapping: false,
+    synth: false, clock0: 0, sung: 0   /* a built-in has no file: the app plays it */
   };
 
   /* ---------------------------------------------------------------- */
@@ -88,8 +89,13 @@
     size();
     mix();
     phones();
-    if (!(song.notes && song.notes.length)) autoMap();
-    else { sub('Press Start. The bubbles are the song. Your line is you.'); foot(''); }
+    S.synth = !song.blob && !!(song.notes && song.notes.length);
+    if (!song.blob && !S.synth) { sub('There is no sound on this one.'); foot(''); }
+    else if (!(song.notes && song.notes.length)) autoMap();
+    else {
+      sub('Press Start. The bubbles are the song. Your line is you.');
+      foot(S.synth ? 'This one is built in, so the app plays the tune itself.' : '');
+    }
     loop();
   };
 
@@ -200,6 +206,7 @@
     if (!box) return;
     var s = S.song;
     var two = !!(s && s.musicBlob);
+    if (s && !s.blob) { box.innerHTML = ''; return; }   /* built in: nothing to mix */
     function row(id, label, v) {
       return '<label style="display:block;margin-top:8px"><span style="font-size:12.5px;font-weight:800">' +
         label + '</span><output id="' + id + 'Out" style="float:right;font-size:12px;color:var(--ink-dim)">' +
@@ -233,11 +240,13 @@
     if (!(s.notes && s.notes.length)) { autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
-    if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
-    if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);
-    S.voxUrl = URL.createObjectURL(s.blob);
-    S.vox.src = S.voxUrl;
-    if (s.musicBlob) {
+    if (!S.synth) {
+      if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
+      if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);
+      S.voxUrl = URL.createObjectURL(s.blob);
+      S.vox.src = S.voxUrl;
+    }
+    if (!S.synth && s.musicBlob) {
       if (!S.mus) { S.mus = new Audio(); S.mus.preload = 'auto'; }
       if (S.musUrl) URL.revokeObjectURL(S.musUrl);
       S.musUrl = URL.createObjectURL(s.musicBlob);
@@ -262,9 +271,12 @@
       } else {
         if (cd) cd.style.display = 'none';
         S.t0 = (window.performance ? performance.now() : Date.now()) / 1000;
-        S.vox.currentTime = 0;
-        S.vox.play().catch(function () {});
-        if (S.mus) { S.mus.currentTime = 0; S.mus.play().catch(function () {}); }
+        if (S.synth) { S.clock0 = S.t0; S.sung = 0; }
+        else {
+          S.vox.currentTime = 0;
+          S.vox.play().catch(function () {});
+          if (S.mus) { S.mus.currentTime = 0; S.mus.play().catch(function () {}); }
+        }
       }
     };
     sub(first > 0.6 ? 'First note comes in after ' + first.toFixed(1) + ' seconds.'
@@ -284,6 +296,10 @@
   }
 
   function songTime() {
+    if (S.synth) {
+      if (!S.playing || !S.clock0) return 0;
+      return ((window.performance ? performance.now() : Date.now()) / 1000) - S.clock0;
+    }
     if (!S.vox || S.vox.paused) return 0;
     return S.vox.currentTime || 0;
   }
@@ -320,7 +336,19 @@
       }
       var cl = $('rpLsClock');
       if (cl) cl.textContent = Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2);
-      if (S.vox.ended) stop(false);
+      if (S.synth) {
+        var ns2 = S.song.notes;
+        while (S.sung < ns2.length && ns2[S.sung].t <= t + 0.05) {
+          var nn = ns2[S.sung];
+          try {
+            (window.V10 && V10.playRef ? V10.playRef : playPiano)(
+              nn.m, ctx.currentTime + 0.01, Math.max(0.3, nn.d || 0.5), null, 0.5);
+          } catch (e) {}
+          S.sung++;
+        }
+        var last = ns2[ns2.length - 1];
+        if (t > (last.t + (last.d || 0.5) + 1.5)) stop(false);
+      } else if (S.vox.ended) stop(false);
     }
 
     mine = true;
