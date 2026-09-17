@@ -461,7 +461,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       <button class="btn primary play" id="btnPlay">Start</button>
       <button class="btn" id="btnStop" disabled>Stop</button>
       <span class="pill" id="micPill"><span class="dot" id="micDot"></span><span id="micTxt">Mic off</span></span>
-      <label class="pill" style="cursor:pointer"><svg class="ic"><use href="#i-package"/></svg> Import song pack<input type="file" id="packFile" accept=".json" style="display:none"></label>
+      <label class="pill" style="cursor:pointer"><svg class="ic"><use href="#i-package"/></svg> Add a song file<input type="file" id="packFile" accept=".json" style="display:none"></label>
     </div>
     <div class="panel" style="margin-top:10px">
       <input type="range" id="songSeek" min="0" max="1000" value="0" disabled style="width:100%">
@@ -569,7 +569,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <button class="btn primary play" id="btnEnableMic"><svg class="ic"><use href="#i-mic"/></svg> Enable microphone</button>
         <p>Plug in your <b>wired headphones</b> first so the music stays in your ears and the mic only hears your voice. Then allow microphone access.</p>
         <button class="btn ghost" id="btnNoMic">Continue without mic →</button>
-        <p style="font-size:11.5px">Mic blocked or no prompt appearing? You're probably in a preview window — open this file in Chrome or Safari instead, then tap the "Mic off" chip up top any time to turn it on.</p>
+        <p style="font-size:11.5px">No prompt, or you said no by mistake? The browser is holding the microphone, not the app. In Chrome, tap the icon at the left of the address bar and turn Microphone on for this site. In Safari, tap <b>aA</b> there, then Website Settings. Then tap the <b>Mic off</b> chip at the top of the screen.</p>
       </div>
       <div id="results">
         <div class="card">
@@ -720,7 +720,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
   <div id="modeYT" class="mode">
     <button class="pill backpill" id="bsYT">← Sing menu</button>
     <div class="panel">
-      <h3><svg class="ic"><use href="#i-tv"/></svg> YouTube Karaoke</h3>
+      <h3><svg class="ic"><use href="#i-tv"/></svg>Karaoke</h3>
       <div class="notice" style="margin:0 0 12px">Almost every song has a <b>karaoke / instrumental version</b> on YouTube already. Find it, paste the link, and sing over it while the app tracks your pitch live. Wired headphones in — so the mic only hears you.</div>
       <div class="row">
         <input type="text" id="ytQuery" class="grow" placeholder="Song name + artist…">
@@ -752,10 +752,10 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     <div class="ytwrap" id="ytWrap" style="margin-top:10px;display:none"><div id="ytPlayer"></div></div>
     <div class="hud">
       <div class="stat grow" style="flex:2"><div id="ytNote" style="font-size:44px;font-weight:900">–</div><div id="ytCents" style="font-size:13px;color:var(--ink-dim);font-weight:700">sing to see your note</div></div>
-      <div class="stat"><div class="v" id="ytSteady">–</div><div class="l">Steadiness</div></div>
+      <div class="stat"><div class="v" id="ytSteady">–</div><div class="l">Steady</div></div>
     </div>
     <div style="margin-top:10px"><canvas id="ytCanvas"></canvas></div>
-    <div class="panel notice" style="margin-top:10px">Tip: add the word <b>"karaoke"</b> or <b>"instrumental with lyrics"</b> to get versions with no lead vocal and on-screen words. The blue line is your voice — keep it flat and on a note line.</div>
+    <div class="measured" style="margin-top:8px"><b>Steady</b> is how still you held the pitch over the last second. 100% is dead still; anything above about 85% is a held note rather than a wobble. It only moves while you are singing.</div><div class="panel notice" style="margin-top:10px">Tip: add the word <b>"karaoke"</b> or <b>"instrumental with lyrics"</b> to get versions with no lead vocal and on-screen words. The blue line is your voice — keep it flat and on a note line.</div>
   </div>
 
   <!-- ============ LIBRARY (LOCKER + PLAYER) ============ -->
@@ -3488,7 +3488,7 @@ $('packFile').addEventListener('change', e=>{
       try{ await savePack(p); msg += '\n\nSaved on this device — it will be here next time.'; }
       catch(err){ msg += '\n\n(Could not save it permanently, so you would need to re-import after a refresh.)'; }
       alert(msg);
-    }catch(err){ alert('Could not read that song pack: '+err.message); }
+    }catch(err){ alert('Could not read that song file: '+err.message); }
   };
   rd.readAsText(f);
 });
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build e9350d8c';
+const APP_VERSION = '17 Sep 2026 · build 300d4cdf';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -4930,7 +4930,7 @@ function edExportMap(){
   a.click();
   setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
   $('edMsg').textContent = 'Saved '+a.download+' to your downloads. Send it to your other device and '+
-    'use Import song pack there — with the same song in that Library, it will line up automatically.';
+    'use Add a song file there — with the same song in that Library, it will line up automatically.';
 }
 $('edLineUp').addEventListener('click', edLineUpTake);
 $('edExport').addEventListener('click', edExportMap);
@@ -15621,22 +15621,22 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     strong:   { label: 'Strong',   on: true, threshold: -32, ratio: 12, knee: 6,  attack: 0.003, release: 0.15 }
   };
   var EQ = {
-    flat:      { label: 'Flat',      low: 0,  mid: 0,   high: 0 },
-    warm:      { label: 'Warm',      low: 4,  mid: -2,  high: -3 },
-    bright:    { label: 'Bright',    low: -2, mid: 1.5, high: 5 },
-    telephone: { label: 'Telephone', low: -18, mid: 8,  high: -20 }
+    flat:      { label: 'As it is',     low: 0,  mid: 0,   high: 0 },
+    warm:      { label: 'Warmer',       low: 4,  mid: -2,  high: -3 },
+    bright:    { label: 'Brighter',     low: -2, mid: 1.5, high: 5 },
+    telephone: { label: 'Like a phone', low: -18, mid: 8,  high: -20 }
   };
   var ECHO = {
     off:    { label: 'Off',     wet: 0 },
-    slap:   { label: 'Slap',    time: 0.11, fb: 0.15, wet: 0.28 },
-    eighth: { label: 'Eighth',  time: 0.25, fb: 0.32, wet: 0.30 },
+    slap:   { label: 'Quick',   time: 0.11, fb: 0.15, wet: 0.28 },
+    eighth: { label: 'Bouncy',  time: 0.25, fb: 0.32, wet: 0.30 },
     long:   { label: 'Long',    time: 0.45, fb: 0.45, wet: 0.32 }
   };
   var VERB = {
-    off:   { label: 'Off',        wet: 0 },
-    room:  { label: 'Room',       secs: 0.9, decay: 3.2, wet: 0.20 },
-    club:  { label: 'Small club', secs: 1.7, decay: 2.6, wet: 0.28 },
-    hall:  { label: 'Hall',       secs: 3.0, decay: 2.0, wet: 0.34 }
+    off:   { label: 'Off',         wet: 0 },
+    room:  { label: 'Small room',  secs: 0.9, decay: 3.2, wet: 0.20 },
+    club:  { label: 'Small club',  secs: 1.7, decay: 2.6, wet: 0.28 },
+    hall:  { label: 'Big hall',    secs: 3.0, decay: 2.0, wet: 0.34 }
   };
 
   /* A reverb needs an impulse to convolve with. Rather than ship an audio
@@ -15743,14 +15743,19 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return d;
   }
 
+  /* Robert, 17 Sep: this was the most jargon-dense screen in the app —
+     COMPRESSOR, EQ, ECHO, REVERB in caps with Telephone, Slap and Eighth
+     under them. Eleven audio terms at once, for somebody who is not an
+     engineer. The labels say what they do now; the real names stay in
+     here, where they can be learnt rather than guessed. */
   var ABOUT = {
-    comp: 'Compressor: evens out your loud and quiet bits so a whisper and a belt sit closer together. Radio voices are compressed.',
-    eq:   'EQ: turns parts of the sound up or down. Warm adds body, Bright adds air, Telephone strips both.',
-    echo: 'Echo: repeats of your voice, fading. Slap is one quick repeat; Long is the canyon.',
-    verb: 'Reverb: the room. Off is a cupboard, Hall is a church. It hides small wobbles — which is why singers like it and why it is off on the Pitch Tracker.'
+    comp: 'An engineer calls this a compressor. It evens out your loud and quiet bits, so a whisper and a belt sit closer together. Radio voices are compressed.',
+    eq:   'An engineer calls this EQ. It turns parts of the sound up or down: warmer adds body, brighter adds air, and Like a phone strips both away.',
+    echo: 'Repeats of your voice, fading out. Quick is one fast slap back, Bouncy repeats in time, Long is the canyon.',
+    verb: 'An engineer calls this reverb: the room you sound like you are in. Off is a cupboard, Big hall is a church. It hides small wobbles — which is why singers like it, and why it is off on the Pitch Tracker.'
   };
   function seg(group, map, cur, label) {
-    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'COMPRESSOR' ? ';margin-top:12px' : '') + '">' +
+    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'EVEN OUT LOUD AND QUIET' ? ';margin-top:12px' : '') + '">' +
       '<div class="rp-lab" style="margin:0">' + label + '</div>' +
       '<span class="rp-info" data-about="' + group + '" title="What is this?">i</span></div>' +
       '<div class="rp-about measured" id="rpAbout_' + group + '" style="display:none;margin:2px 0 8px">' + esc(ABOUT[group] || '') + '</div>' +
@@ -15787,15 +15792,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      seg('comp', COMP, V.fx.comp, 'COMPRESSOR') +
-      seg('eq', EQ, V.fx.eq, 'EQ') +
+      seg('comp', COMP, V.fx.comp, 'EVEN OUT LOUD AND QUIET') +
+      seg('eq', EQ, V.fx.eq, 'WARMER OR BRIGHTER') +
       seg('echo', ECHO, V.fx.echo, 'ECHO') +
-      seg('verb', VERB, V.fx.verb, 'REVERB') +
+      seg('verb', VERB, V.fx.verb, 'WHAT ROOM IT SOUNDS LIKE') +
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      '<b style="font-size:13px">Your songs</b>' +
+      '<b style="font-size:13px">Your takes</b>' +
       '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on this device, or send it to ' +
       'your coach.</div><div id="rpVList"></div></div>';
 
@@ -18999,7 +19004,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
       '<div style="flex:1;min-width:0"><div class="rp-ttl"><span class="rp-name">' + esc(e.name) + '</span>' +
       '<span class="rp-info" role="button" aria-label="What is this?" title="What is this?">i</span>' +
-      (e.quiet ? ' <span class="rp-tag" aria-label="quiet, fine where people can hear you">quiet ok</span>' : '') + '</div>' +
+      (e.quiet ? ' <span class="rp-tag" aria-label="quiet, fine where people can hear you">quiet</span>' : '') + '</div>' +
       '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
       (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
       '</div>' +
@@ -19047,7 +19052,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var e = null; try { e = V10.exById(id); } catch (err) {}
     if (!e || !window.RPPage) return;
     var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(lvlName(e.level)) +
-      (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + (e.quiet ? ' · quiet ok' : '') + '</div>' +
+      (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + (e.quiet ? ' · can be done quietly' : '') + '</div>' +
       '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="width:100%;padding:13px;font-size:14px">Start</button>' +
       '<div class="rp-card" style="margin-top:14px;padding:13px;font-size:13.5px;line-height:1.55">' +
       '<div class="rp-lab">WHAT</div><div>' + strip(e.what) + '</div>' +
@@ -19105,7 +19110,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   TR.all = function () {
     if (!window.RPPage) return;
-    var h = '';
+    /* Robert, 17 Sep: the "quiet" tag was defined only in an aria-label,
+       so a sighted reader met a word with no key. Here is the key, where
+       the tag appears most. */
+    var h = '<div class="measured"><b>quiet</b> marks the ones that work at ' +
+      'speaking volume \u2014 hums, hisses and straws. Fine where people can hear you.</div>';
     CATS.forEach(function (c) {
       var list = listFor(c.id, 0);
       if (!list.length) return;
@@ -20864,7 +20873,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       { find: function () { return $('rpVis'); },
         text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
       { find: function () { return $('rpVMon'); },
-        text: 'Hear yourself, live, through your headphones. Speaker off, or it howls.' },
+        text: 'Turn this on to hear your own voice in your headphones while you sing.' },
       { find: function () { return $('rpVRec'); },
         text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
     ] },

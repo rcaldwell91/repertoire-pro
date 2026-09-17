@@ -52,22 +52,22 @@
     strong:   { label: 'Strong',   on: true, threshold: -32, ratio: 12, knee: 6,  attack: 0.003, release: 0.15 }
   };
   var EQ = {
-    flat:      { label: 'Flat',      low: 0,  mid: 0,   high: 0 },
-    warm:      { label: 'Warm',      low: 4,  mid: -2,  high: -3 },
-    bright:    { label: 'Bright',    low: -2, mid: 1.5, high: 5 },
-    telephone: { label: 'Telephone', low: -18, mid: 8,  high: -20 }
+    flat:      { label: 'As it is',     low: 0,  mid: 0,   high: 0 },
+    warm:      { label: 'Warmer',       low: 4,  mid: -2,  high: -3 },
+    bright:    { label: 'Brighter',     low: -2, mid: 1.5, high: 5 },
+    telephone: { label: 'Like a phone', low: -18, mid: 8,  high: -20 }
   };
   var ECHO = {
     off:    { label: 'Off',     wet: 0 },
-    slap:   { label: 'Slap',    time: 0.11, fb: 0.15, wet: 0.28 },
-    eighth: { label: 'Eighth',  time: 0.25, fb: 0.32, wet: 0.30 },
+    slap:   { label: 'Quick',   time: 0.11, fb: 0.15, wet: 0.28 },
+    eighth: { label: 'Bouncy',  time: 0.25, fb: 0.32, wet: 0.30 },
     long:   { label: 'Long',    time: 0.45, fb: 0.45, wet: 0.32 }
   };
   var VERB = {
-    off:   { label: 'Off',        wet: 0 },
-    room:  { label: 'Room',       secs: 0.9, decay: 3.2, wet: 0.20 },
-    club:  { label: 'Small club', secs: 1.7, decay: 2.6, wet: 0.28 },
-    hall:  { label: 'Hall',       secs: 3.0, decay: 2.0, wet: 0.34 }
+    off:   { label: 'Off',         wet: 0 },
+    room:  { label: 'Small room',  secs: 0.9, decay: 3.2, wet: 0.20 },
+    club:  { label: 'Small club',  secs: 1.7, decay: 2.6, wet: 0.28 },
+    hall:  { label: 'Big hall',    secs: 3.0, decay: 2.0, wet: 0.34 }
   };
 
   /* A reverb needs an impulse to convolve with. Rather than ship an audio
@@ -174,14 +174,19 @@
     return d;
   }
 
+  /* Robert, 17 Sep: this was the most jargon-dense screen in the app —
+     COMPRESSOR, EQ, ECHO, REVERB in caps with Telephone, Slap and Eighth
+     under them. Eleven audio terms at once, for somebody who is not an
+     engineer. The labels say what they do now; the real names stay in
+     here, where they can be learnt rather than guessed. */
   var ABOUT = {
-    comp: 'Compressor: evens out your loud and quiet bits so a whisper and a belt sit closer together. Radio voices are compressed.',
-    eq:   'EQ: turns parts of the sound up or down. Warm adds body, Bright adds air, Telephone strips both.',
-    echo: 'Echo: repeats of your voice, fading. Slap is one quick repeat; Long is the canyon.',
-    verb: 'Reverb: the room. Off is a cupboard, Hall is a church. It hides small wobbles — which is why singers like it and why it is off on the Pitch Tracker.'
+    comp: 'An engineer calls this a compressor. It evens out your loud and quiet bits, so a whisper and a belt sit closer together. Radio voices are compressed.',
+    eq:   'An engineer calls this EQ. It turns parts of the sound up or down: warmer adds body, brighter adds air, and Like a phone strips both away.',
+    echo: 'Repeats of your voice, fading out. Quick is one fast slap back, Bouncy repeats in time, Long is the canyon.',
+    verb: 'An engineer calls this reverb: the room you sound like you are in. Off is a cupboard, Big hall is a church. It hides small wobbles — which is why singers like it, and why it is off on the Pitch Tracker.'
   };
   function seg(group, map, cur, label) {
-    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'COMPRESSOR' ? ';margin-top:12px' : '') + '">' +
+    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'EVEN OUT LOUD AND QUIET' ? ';margin-top:12px' : '') + '">' +
       '<div class="rp-lab" style="margin:0">' + label + '</div>' +
       '<span class="rp-info" data-about="' + group + '" title="What is this?">i</span></div>' +
       '<div class="rp-about measured" id="rpAbout_' + group + '" style="display:none;margin:2px 0 8px">' + esc(ABOUT[group] || '') + '</div>' +
@@ -218,15 +223,15 @@
       'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      seg('comp', COMP, V.fx.comp, 'COMPRESSOR') +
-      seg('eq', EQ, V.fx.eq, 'EQ') +
+      seg('comp', COMP, V.fx.comp, 'EVEN OUT LOUD AND QUIET') +
+      seg('eq', EQ, V.fx.eq, 'WARMER OR BRIGHTER') +
       seg('echo', ECHO, V.fx.echo, 'ECHO') +
-      seg('verb', VERB, V.fx.verb, 'REVERB') +
+      seg('verb', VERB, V.fx.verb, 'WHAT ROOM IT SOUNDS LIKE') +
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      '<b style="font-size:13px">Your songs</b>' +
+      '<b style="font-size:13px">Your takes</b>' +
       '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on this device, or send it to ' +
       'your coach.</div><div id="rpVList"></div></div>';
 

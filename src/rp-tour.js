@@ -337,7 +337,7 @@
       { find: function () { return $('rpVis'); },
         text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
       { find: function () { return $('rpVMon'); },
-        text: 'Hear yourself, live, through your headphones. Speaker off, or it howls.' },
+        text: 'Turn this on to hear your own voice in your headphones while you sing.' },
       { find: function () { return $('rpVRec'); },
         text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
     ] },

@@ -81,7 +81,7 @@
       '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
       '<div style="flex:1;min-width:0"><div class="rp-ttl"><span class="rp-name">' + esc(e.name) + '</span>' +
       '<span class="rp-info" role="button" aria-label="What is this?" title="What is this?">i</span>' +
-      (e.quiet ? ' <span class="rp-tag" aria-label="quiet, fine where people can hear you">quiet ok</span>' : '') + '</div>' +
+      (e.quiet ? ' <span class="rp-tag" aria-label="quiet, fine where people can hear you">quiet</span>' : '') + '</div>' +
       '<div class="rp-sub">' + esc(lvlName(e.level)) + (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + '</div>' +
       (big ? '<div style="font-size:12.5px;line-height:1.5;margin-top:6px">' + esc(strip(e.what)) + '</div>' : '') +
       '</div>' +
@@ -129,7 +129,7 @@
     var e = null; try { e = V10.exById(id); } catch (err) {}
     if (!e || !window.RPPage) return;
     var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(lvlName(e.level)) +
-      (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + (e.quiet ? ' · quiet ok' : '') + '</div>' +
+      (e.syl ? ' · on “' + esc(e.syl) + '”' : '') + (e.quiet ? ' · can be done quietly' : '') + '</div>' +
       '<button class="btn primary" data-exstart="' + esc(e.id) + '" style="width:100%;padding:13px;font-size:14px">Start</button>' +
       '<div class="rp-card" style="margin-top:14px;padding:13px;font-size:13.5px;line-height:1.55">' +
       '<div class="rp-lab">WHAT</div><div>' + strip(e.what) + '</div>' +
@@ -187,7 +187,11 @@
 
   TR.all = function () {
     if (!window.RPPage) return;
-    var h = '';
+    /* Robert, 17 Sep: the "quiet" tag was defined only in an aria-label,
+       so a sighted reader met a word with no key. Here is the key, where
+       the tag appears most. */
+    var h = '<div class="measured"><b>quiet</b> marks the ones that work at ' +
+      'speaking volume \u2014 hums, hisses and straws. Fine where people can hear you.</div>';
     CATS.forEach(function (c) {
       var list = listFor(c.id, 0);
       if (!list.length) return;

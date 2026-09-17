@@ -887,6 +887,35 @@ WORDS = [
 
     # The reader is already in Profile when they read this.
 
+    # ---------------------------------------------------------------
+    # Robert, 17 Sep, walking screens nobody had opened before.
+    # ---------------------------------------------------------------
+
+    #  #1 Song Trainer was telling real users they were "probably in a
+    #  preview window" and to "open this file in Chrome or Safari". The app
+    #  is a hosted site. There is no file. This is the screen Ja Ronn sees.
+    ('''Mic blocked or no prompt appearing? You're probably in a preview window — open this file in Chrome or Safari instead, then tap the "Mic off" chip up top any time to turn it on.''',
+     '''No prompt, or you said no by mistake? The browser is holding the microphone, not the app. In Chrome, tap the icon at the left of the address bar and turn Microphone on for this site. In Safari, tap <b>aA</b> there, then Website Settings. Then tap the <b>Mic off</b> chip at the top of the screen.'''),
+
+    #  #7 one name for the screen, and no space left hanging after the icon
+    ('<h3><svg class="ic"><use href="#i-tv"/></svg> YouTube Karaoke</h3>',
+     '<h3><svg class="ic"><use href="#i-tv"/></svg>Karaoke</h3>'),
+
+    #  #6 a number with no idea what it measures or what good looks like
+    ('<div class="stat"><div class="v" id="ytSteady">\u2013</div><div class="l">Steadiness</div></div>',
+     '<div class="stat"><div class="v" id="ytSteady">\u2013</div><div class="l">Steady</div></div>'),
+    ('<div class="panel notice" style="margin-top:10px">Tip: add the word <b>"karaoke"</b>',
+     '<div class="measured" style="margin-top:8px"><b>Steady</b> is how still you held the pitch over the last second. '
+     '100% is dead still; anything above about 85% is a held note rather than a wobble. It only moves while you are singing.</div>'
+     '<div class="panel notice" style="margin-top:10px">Tip: add the word <b>"karaoke"</b>'),
+
+    #  #5 "song pack" appears nowhere else and says nothing
+    ('<use href="#i-package"/></svg> Import song pack<input type="file"',
+     '<use href="#i-package"/></svg> Add a song file<input type="file"'),
+    ("'use Import song pack there \u2014 with the same song in that Library, it will line up automatically.'",
+     "'use Add a song file there \u2014 with the same song in that Library, it will line up automatically.'"),
+    ("'Could not read that song pack: '", "'Could not read that song file: '"),
+
     # two more that are about the machine, not a phone
     ('Inputs the phone offers', 'Inputs this device offers'),
     ('Asking the phone for the microphone\u2026', 'Asking for the microphone\u2026'),
