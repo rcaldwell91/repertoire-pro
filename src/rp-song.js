@@ -85,10 +85,7 @@
       key: 'learnsong', title: 'Learn a song', sub: 'Pick a song, sing it, see every note you hit.',
       html: h, backLabel: 'Sing',
       wire: function (root) {
-        on(root.querySelector('#rpLsOwn'), 'click', function () {
-          go('song');
-          setTimeout(function () { var sel = $('songSel'); if (sel) sel.scrollIntoView({ block: 'center' }); }, 400);
-        });
+        on(root.querySelector('#rpLsOwn'), 'click', S.pickOwn);
         on(root.querySelector('#rpLsBuilt'), 'click', function () { go('song'); });
         on(root.querySelector('#rpLsSing'), 'click', function () {
           go('song');
@@ -100,6 +97,60 @@
         });
         on(root.querySelector('#rpLsRoom'), 'click', S.roomSheet);
       }
+    });
+  };
+
+  /* A song you own: the list, and the way to add one. Picking one opens
+     the map screen \u2014 nothing else. */
+  S.pickOwn = function () {
+    var songs = [];
+    try { songs = (LIB.songs || []).filter(function (x) { return x.kind !== 'recording' && x.blob; }); } catch (e) {}
+    var h = '<b style="font-size:18px">A song you own</b>';
+    if (!songs.length) {
+      h += '<div class="measured" style="margin-top:8px">Nothing here yet. Add an audio file of a song and ' +
+        'the app will work out its tune. It reads a voice on its own most accurately.</div>';
+    } else {
+      h += '<div class="measured" style="margin-top:8px">Pick one. If it has no note map yet, the app ' +
+        'works it out when you open it.</div><div style="margin-top:10px">';
+      songs.slice(0, 40).forEach(function (x) {
+        h += '<button class="rp-card" data-song="' + esc(x.id) + '" style="width:100%;text-align:left;' +
+          'padding:12px;margin-top:6px;border:0;cursor:pointer">' +
+          '<div class="rp-ttl">' + esc(x.title) + '</div><div class="rp-sub">' +
+          (x.notes && x.notes.length ? x.notes.length + ' notes mapped' : 'not mapped yet') +
+          (x.musicBlob ? ' \u00b7 singer and music' : '') + '</div></button>';
+      });
+      h += '</div>';
+    }
+    h += '<label class="btn primary" style="display:block;width:100%;padding:12px;margin-top:14px;' +
+      'text-align:center;cursor:pointer">Add an audio file' +
+      '<input type="file" id="rpOwnFile" accept="audio/*" style="display:none"></label>' +
+      '<button class="btn" id="rpOwnX" style="width:100%;padding:12px;margin-top:8px">Close</button>';
+    var node = sheet(h);
+    on($('rpOwnX'), 'click', shut);
+    node.querySelectorAll('[data-song]').forEach(function (b) {
+      on(b, 'click', function () {
+        var x = null;
+        try { x = (LIB.songs || []).filter(function (y) { return y.id === b.dataset.song; })[0]; } catch (e) {}
+        if (!x) return;
+        shut();
+        go('song');
+        setTimeout(function () { RPLearnSong.open(x); }, 260);
+      });
+    });
+    on($('rpOwnFile'), 'change', async function () {
+      var f = $('rpOwnFile').files && $('rpOwnFile').files[0];
+      if (!f) return;
+      var song = { id: 'aud_' + Date.now(), title: f.name.replace(/\.[^.]+$/, ''),
+                   artist: 'Added by you', kind: 'song', blob: f, added: Date.now() };
+      try {
+        await dbPut('songs', song);
+        LIB.songs.push(song);
+        libRender();
+        fillSongSel();
+        shut();
+        go('song');
+        setTimeout(function () { RPLearnSong.open(song); }, 260);
+      } catch (e) { alert('Could not store that here: ' + (e && e.message ? e.message : 'storage refused')); }
     });
   };
 
@@ -160,12 +211,7 @@
       setTimeout(function () {
         shut();
         go('song');
-        setTimeout(function () {
-          var sel = $('songSel');
-          if (sel) { sel.value = 'lib:' + song.id; sel.dispatchEvent(new Event('change')); }
-          var b = $('btnBuildMap');
-          if (b) b.scrollIntoView({ block: 'center' });
-        }, 500);
+        setTimeout(function () { RPLearnSong.open(song); }, 300);
       }, 600);
     } catch (e) { msg('Could not store it here: ' + (e && e.message ? e.message : 'storage refused')); }
   }
@@ -615,7 +661,9 @@
     n++;
     hub();
     wire();
-    if ($('modeSong') && $('modeSong').classList.contains('active')) {
+    var onMap = false;
+    try { onMap = window.RPLearnSong && RPLearnSong.isOpen(); } catch (e) {}
+    if (!onMap && $('modeSong') && $('modeSong').classList.contains('active')) {
       drawMix();
       guard();
       tidyMapPanel();
