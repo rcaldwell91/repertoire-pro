@@ -213,7 +213,7 @@
       '<b style="font-size:13px">Hear yourself</b>' +
       '<button class="btn' + (V.monitor ? ' primary' : '') + '" id="rpVMon" style="padding:8px 13px;font-size:12.5px">' +
       (V.monitor ? 'On' : 'Off') + '</button></div>' +
-      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal.</div>' +
+      '<div class="notice" style="margin-top:7px">Headphones only — on the speaker this will howl.</div>' +
       '<div class="measured" style="margin-top:6px">There is a delay between your mouth and your ears on every phone — ' +
       'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 

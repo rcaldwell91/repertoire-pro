@@ -35,7 +35,7 @@
     d.className = 'ctl';
     d.style.cssText = 'background:transparent;border:0;padding:0;margin-top:10px';
     var v = saved(); if (v == null) { try { v = MONITOR.vol; } catch (e) { v = 0.75; } }
-    d.innerHTML = '<label><span>Live vocals volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
+    d.innerHTML = '<label><span>Hear yourself volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
       '<input type="range" id="qMonVol" min="0" max="200" value="' + Math.round(v * 100) + '" step="5">';
     row.parentElement.insertBefore(d, row);
     var note = document.createElement('div');

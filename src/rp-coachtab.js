@@ -51,6 +51,9 @@
         if (/plan for you|changes as you do/i.test(text(el))) { el.style.display = 'none'; return; }
         return;
       }
+      /* Robert, 18 Sep: the same five steps and the same Start button were
+         printed on Home and here. Home owns today; this tab is the coach. */
+      if (el.classList.contains('plan')) { el.style.display = 'none'; return; }
       if (!el.classList.contains('panel')) return;
       var head = heading(el);
       if (KEEP.test(head)) { el.style.display = ''; return; }

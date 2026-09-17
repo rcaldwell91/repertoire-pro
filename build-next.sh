@@ -827,13 +827,13 @@ WORDS = [
     ('<p>Songs, takes &amp; note maps</p>',
      '<p>Your songs, and every take you have recorded</p>'),
     ('<h4>Pitch Monitor</h4><p>Your voice, live on the keyboard</p>',
-     '<h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p>'),
+     '<h4>Free Sing</h4><p>Sing anything and watch your pitch line move</p>'),
     ('<p>Note bars, words &amp; scoring &mdash; your songs, takes or built-ins</p>',
      '<p>Sing a song and see every note you hit</p>'),
     ('<p>Karaoke over songs you own, with key rails</p>',
-     '<p>Sing over songs you own, kept in your range</p>'),
+     '<p>Sing over songs you already own</p>'),
     ('<h4>Pitch Monitor</h4><p>Live pitch on the keys — see the exact note</p>',
-     '<h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p>'),
+     '<h4>Free Sing</h4><p>Sing anything and watch your pitch line move</p>'),
 ]
 for a, r in WORDS:
     if a in base:
@@ -860,6 +860,37 @@ WRITING = [
     # Robert, 17 Sep: the four plan panels moved to Profile → Your plan,
     # so the Practice fold can no longer send people to the Coach tab.
     ("Set these on the Coach tab.", "Set these on Your plan, in Profile."),
+    # ROBERT, 18 Sep — PHONE WALK-THROUGH OF 98e321d.
+
+    #  #4 one feature, four names. The button said "Hear me" / "Hearing you",
+    #  the gear said "Live vocals", the tour said "Hear yourself". Picked the
+    #  one that says what pressing it does, in a beginner's words.
+    ('id="btnMonitor" style="padding:7px 11px;font-size:12px;margin-right:6px">Hear me</button>',
+     'id="btnMonitor" style="padding:7px 11px;font-size:12px;margin-right:6px">Hear yourself</button>'),
+    ('id="qMonitor" style="padding:8px 12px;font-size:12.5px">Hear me</button>',
+     'id="qMonitor" style="padding:8px 12px;font-size:12.5px">Hear yourself</button>'),
+    ("MONITOR.on ? 'Hearing you' : 'Hear me'", "MONITOR.on ? 'Stop hearing yourself' : 'Hear yourself'"),
+    ("MONITOR.on) ? 'Stop hearing me' : 'Hear me'", "MONITOR.on) ? 'Stop hearing yourself' : 'Hear yourself'"),
+    ("q.innerHTML = HEADPHONE + (on ? 'Live vocals: on' : 'Live vocals: off');",
+     "q.innerHTML = HEADPHONE + (on ? 'Hear yourself: on' : 'Hear yourself: off');"),
+    ("m.innerHTML = HEADPHONE + (on ? 'Live vocals: on' : 'Live vocals: off');",
+     "m.innerHTML = HEADPHONE + (on ? 'Hear yourself: on' : 'Hear yourself: off');"),
+    ("'<b>Live vocals</b> plays your own voice back in your ears as you sing, '",
+     "'<b>Hear yourself</b> plays your own voice back in your ears as you sing, '"),
+
+    #  #5 the same warning was "squeals" in one place and "howl" in another.
+    ("Headphones only &mdash; through the speaker this will squeal.",
+     "Headphones only &mdash; on the speaker this will howl."),
+    ("'Headphones only \u2014 through the speaker this will squeal.'",
+     "'Headphones only \u2014 on the speaker this will howl.'"),
+    ("Headphones only \u2014 through a speaker it will howl.",
+     "Headphones only \u2014 on the speaker it will howl."),
+
+    #  #2 nothing transposes a karaoke video or a song file. The app shows
+    #  the key and lights the notes in it; it does not move them into your
+    #  range, so these three cards were promising something we do not do.
+    ("<p>Sing along to any video, kept in your range</p>",
+     "<p>Sing along to a karaoke video and watch your pitch</p>"),
     # The app stopped guessing the key in patch 40. This card still promised it.
     ("Search any song's karaoke version, auto key detect",
      "Find a karaoke video and sing over it"),

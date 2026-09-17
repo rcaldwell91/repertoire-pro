@@ -262,7 +262,7 @@
     h += '<h3 style="margin:18px 4px 2px">More ways to practise</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell it what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell Repertoire what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
     /* Robert, 17 Sep: the pillars as their own buttons with icons, in the

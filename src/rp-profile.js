@@ -34,7 +34,7 @@
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
-    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A walk round the app, and a guide with pictures.',
+    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A tour of the app, and a guide with pictures.',
       folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
   ];
 

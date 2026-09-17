@@ -66,6 +66,13 @@
     return null;
   };
 
+  /* Robert, 18 Sep: "Profile > Your voice reads A2\u2013A4 on an account that
+     has never sung a note." A2\u2013A4 is base.html's built-in default RANGE.
+     Nothing is written down until the test runs or a preset is picked, so
+     an empty store IS the answer to "has this ever been measured". */
+  R.measured = function () { return !!readLocal(); };
+  var UNTESTED = 'Not measured yet';
+
   /* Is this pair one of the presets in the dropdown? Then the singer chose
      it rather than sang it, and it should not be reported as measured. */
   function looksPicked(lo, hi) {
@@ -171,6 +178,7 @@
       var prev = updateRangeDisp;
       var wrapped = function () {
         try { prev.apply(this, arguments); } catch (e) {}
+        try { untestedDisp(); } catch (e) {}
         if (applying) return;
         try { save(nextBy); } catch (e) {}
         nextBy = 'test';
@@ -242,15 +250,22 @@
     if (!v) return;
     var semis = v.hi - v.lo;
 
-    var h = '<b style="font-size:18px">Your range</b>' +
-      '<div style="font-size:34px;font-weight:900;color:var(--gold);margin-top:8px">' +
-      esc(name(v.lo)) + ' – ' + esc(name(v.hi)) + '</div>' +
-      '<div class="rp-sub" style="margin-top:2px">' + semis + ' semitones' +
-      (v.by === 'preset'
-        ? ' · picked from the list, not measured'
-        : (v.at ? ' · sung and measured on ' + esc(when(v.at)) : '')) + '</div>';
+    var h = '<b style="font-size:18px">Your range</b>';
+    if (!R.measured()) {
+      h += '<div style="font-size:24px;font-weight:900;color:var(--gold);margin-top:8px">' +
+        UNTESTED + '</div>' +
+        '<div class="rp-sub" style="margin-top:2px">The exercises are using a starting range ' +
+        'until you sing your own.</div>';
+    } else {
+      h += '<div style="font-size:34px;font-weight:900;color:var(--gold);margin-top:8px">' +
+        esc(name(v.lo)) + ' – ' + esc(name(v.hi)) + '</div>' +
+        '<div class="rp-sub" style="margin-top:2px">' + semis + ' semitones' +
+        (v.by === 'preset'
+          ? ' · picked from the list, not measured'
+          : (v.at ? ' · sung and measured on ' + esc(when(v.at)) : '')) + '</div>';
+    }
 
-    if (v.by === 'preset') {
+    if (R.measured() && v.by === 'preset') {
       h += '<div class="rp-card" style="margin-top:12px;padding:12px;border-left:3px solid var(--gold)">' +
         '<div style="font-size:13px;line-height:1.55">This one came off the list. It is a fair ' +
         'starting point and the exercises will use it, but it is somebody else’s range with your ' +
@@ -299,7 +314,7 @@
     if (!d) return;
     var v = R.get();
     if (!v) return;
-    var txt = name(v.lo) + ' \u2013 ' + name(v.hi);
+    var txt = R.measured() ? name(v.lo) + ' \u2013 ' + name(v.hi) : UNTESTED;
 
     var sub = d.querySelector('summary .psub');
     if (sub && sub.textContent !== txt) sub.textContent = txt;
@@ -319,15 +334,28 @@
     }
     /* the notes themselves are already on the two lines above this one, so
        this row carries the thing they do not: where the number came from */
-    var head = v.by === 'preset' ? 'Picked from the list, not measured'
-             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured');
+    var head = !R.measured() ? UNTESTED
+             : (v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
+    var sub = !R.measured()
+      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
+      : (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your account';
     line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">' + esc(head) + '</div>' +
-      '<div class="rp-sub">' + (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your ' +
-      'account</div></div><div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
+      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
-  setInterval(row, 1500);
-  setTimeout(row, 1150);
+  function untestedDisp() {
+    var d = $('rangeDisp'), sb = $('rangeSub');
+    if (!d) return;
+    if (R.measured()) { d.style.fontSize = ''; return; }
+    d.textContent = UNTESTED;
+    d.style.fontSize = '22px';
+    if (sb) sb.textContent = 'Sing your lowest and your highest note once, and every exercise ' +
+      'fits your voice. Until then it uses a starting range.';
+  }
+  setInterval(function () { row(); untestedDisp(); }, 1500);
+  setTimeout(function () { row(); untestedDisp(); }, 1150);
 
   /* ---- one line for the coach, on his student's screen -------------- */
   R.lineFor = function (p) {

@@ -409,12 +409,12 @@ body.light .michelp{background:rgba(60,54,48,.5);}
   <header>
     <div class="logo"><div class="mic-ic"><svg class="ic" style="width:18px;height:18px"><use href="#i-mic"/></svg></div><div>Repertoire<small>SING · TRAIN · OWN YOUR MUSIC</small></div></div>
     <button class="btn" id="btnQuick" title="Quick settings" style="padding:7px 9px;font-size:12px;margin-right:6px"><svg class="ic" style="width:16px;height:16px"><use href="#i-settings"/></svg></button>
-    <button class="btn" id="btnMonitor" style="padding:7px 11px;font-size:12px;margin-right:6px">Hear me</button>
+    <button class="btn" id="btnMonitor" style="padding:7px 11px;font-size:12px;margin-right:6px">Hear yourself</button>
     <span class="pill" id="micPillTop" style="cursor:pointer"><span class="dot" id="micDotTop"></span><span id="micTxtTop">Mic off</span></span>
   </header>
 
   <div class="notice" id="monitorNote" style="display:none;margin:0 2px 8px;color:var(--gold)">
-    Headphones only &mdash; through the speaker this will squeal.</div>
+    Headphones only &mdash; on the speaker this will howl.</div>
 
   <!-- ============ HOME ============ -->
   <div id="modeHome" class="mode active">
@@ -433,9 +433,9 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     <div class="homegrid">
       <div class="mcard hue1" id="mcTrain"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-activity"/></svg></div><div><h4>Train</h4><p>Exercises that build your voice, a level at a time</p></div><div class="chev">›</div></div>
       <div class="mcard hue2" id="mcSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
-      <div class="mcard hue3" id="mcYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Sing along to any video, kept in your range</p></div><div class="chev">›</div></div>
+      <div class="mcard hue3" id="mcYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Sing along to a karaoke video and watch your pitch</p></div><div class="chev">›</div></div>
       <div class="mcard hue4" id="mcLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Library</h4><p>Your songs, and every take you have recorded</p></div><div class="chev">›</div></div>
-      <div class="mcard hue5" id="mcFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p></div><div class="chev">›</div></div>
+      <div class="mcard hue5" id="mcFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing anything and watch your pitch line move</p></div><div class="chev">›</div></div>
     </div>
   </div>
 
@@ -448,8 +448,8 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     <div class="homegrid" style="margin-top:12px">
       <div class="mcard hue2" id="shSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
       <div class="mcard hue3" id="shYT"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-tv"/></svg></div><div><h4>Karaoke</h4><p>Find a karaoke video and sing over it</p></div><div class="chev">›</div></div>
-      <div class="mcard hue4" id="shLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Sing from your Library</h4><p>Sing over songs you own, kept in your range</p></div><div class="chev">›</div></div>
-      <div class="mcard hue5" id="shFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing freely and watch your pitch, and record a take</p></div><div class="chev">›</div></div>
+      <div class="mcard hue4" id="shLib"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-book"/></svg></div><div><h4>Sing from your Library</h4><p>Sing over songs you already own</p></div><div class="chev">›</div></div>
+      <div class="mcard hue5" id="shFree"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-headphones"/></svg></div><div><h4>Free Sing</h4><p>Sing anything and watch your pitch line move</p></div><div class="chev">›</div></div>
     </div>
   </div>
 
@@ -1291,7 +1291,7 @@ function monitorWire(){
 function monitorUi(){
   const b = document.getElementById('btnMonitor');
   if(!b) return;
-  b.textContent = MONITOR.on ? 'Hearing you' : 'Hear me';
+  b.textContent = MONITOR.on ? 'Stop hearing yourself' : 'Hear yourself';
   b.style.background = MONITOR.on ? 'var(--gold)' : '';
   b.style.color = MONITOR.on ? '#231a00' : '';
   const s = document.getElementById('monitorNote');
@@ -1305,7 +1305,7 @@ async function monitorToggle(){
     if(!MONITOR.warned){
       MONITOR.warned = true;
       const s = document.getElementById('monitorNote');
-      if(s) s.textContent = 'Headphones only — through the speaker this will squeal.';
+      if(s) s.textContent = 'Headphones only — on the speaker this will howl.';
     }
   } else {
     MONITOR.on = false;
@@ -6732,7 +6732,7 @@ function quickBuild(){
         '<input type="range" id="qGate" min="0" max="100" value="20" step="5">' +
       '</div>' +
       '<div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">' +
-        '<button class="btn" id="qMonitor" style="padding:8px 12px;font-size:12.5px">Hear me</button>' +
+        '<button class="btn" id="qMonitor" style="padding:8px 12px;font-size:12.5px">Hear yourself</button>' +
         '<button class="btn" id="qMic" style="padding:8px 12px;font-size:12.5px">Microphone: off</button>' +
       '</div>' +
       '<div class="notice" style="margin-top:10px">Everything else &mdash; testing the sound, the ' +
@@ -6778,7 +6778,7 @@ function quickSync(){
     if($$('qGateOut')) $$('qGateOut').textContent = lbl ? lbl.textContent : n.value;
   }
   const mb = $$('qMonitor');
-  if(mb) mb.textContent = (typeof MONITOR !== 'undefined' && MONITOR.on) ? 'Stop hearing me' : 'Hear me';
+  if(mb) mb.textContent = (typeof MONITOR !== 'undefined' && MONITOR.on) ? 'Stop hearing yourself' : 'Hear yourself';
   const mc = $$('qMic');
   if(mc) mc.textContent = MIC.on ? 'Microphone: on' : 'Microphone: off';
 }
@@ -7122,7 +7122,7 @@ renderJourney();
     if (!q) return;
     let on = false;
     try { on = !!(typeof MONITOR !== 'undefined' && MONITOR.on); } catch (e) {}
-    q.innerHTML = HEADPHONE + (on ? 'Live vocals: on' : 'Live vocals: off');
+    q.innerHTML = HEADPHONE + (on ? 'Hear yourself: on' : 'Hear yourself: off');
     q.classList.toggle('primary', on);
   }
   V10.syncLiveVocals = v10SyncLiveVocals;
@@ -7150,8 +7150,8 @@ renderJourney();
     const note = document.createElement('div');
     note.className = 'notice';
     note.style.marginTop = '8px';
-    note.innerHTML = '<b>Live vocals</b> plays your own voice back in your ears as you sing, ' +
-      'so you can hear yourself over the guide. Headphones only — through a speaker it will howl.';
+    note.innerHTML = '<b>Hear yourself</b> plays your own voice back in your ears as you sing, ' +
+      'so you can hear yourself over the guide. Headphones only — on the speaker it will howl.';
     row.parentElement.insertBefore(note, row.nextSibling);
   }
   function v10SyncTheme() {
@@ -7310,7 +7310,7 @@ renderJourney();
     if (m) {
       let on = false;
       try { on = !!(typeof MONITOR !== 'undefined' && MONITOR.on); } catch (e) {}
-      m.innerHTML = HEADPHONE + (on ? 'Live vocals: on' : 'Live vocals: off');
+      m.innerHTML = HEADPHONE + (on ? 'Hear yourself: on' : 'Hear yourself: off');
       m.classList.toggle('primary', on);
     }
   }
@@ -15780,7 +15780,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<b style="font-size:13px">Hear yourself</b>' +
       '<button class="btn' + (V.monitor ? ' primary' : '') + '" id="rpVMon" style="padding:8px 13px;font-size:12.5px">' +
       (V.monitor ? 'On' : 'Off') + '</button></div>' +
-      '<div class="notice" style="margin-top:7px">Headphones only — through the speaker this will squeal.</div>' +
+      '<div class="notice" style="margin-top:7px">Headphones only — on the speaker this will howl.</div>' +
       '<div class="measured" style="margin-top:6px">There is a delay between your mouth and your ears on every phone — ' +
       'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
 
@@ -18288,6 +18288,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return null;
   };
 
+  /* Robert, 18 Sep: "Profile > Your voice reads A2\u2013A4 on an account that
+     has never sung a note." A2\u2013A4 is base.html's built-in default RANGE.
+     Nothing is written down until the test runs or a preset is picked, so
+     an empty store IS the answer to "has this ever been measured". */
+  R.measured = function () { return !!readLocal(); };
+  var UNTESTED = 'Not measured yet';
+
   /* Is this pair one of the presets in the dropdown? Then the singer chose
      it rather than sang it, and it should not be reported as measured. */
   function looksPicked(lo, hi) {
@@ -18393,6 +18400,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var prev = updateRangeDisp;
       var wrapped = function () {
         try { prev.apply(this, arguments); } catch (e) {}
+        try { untestedDisp(); } catch (e) {}
         if (applying) return;
         try { save(nextBy); } catch (e) {}
         nextBy = 'test';
@@ -18464,15 +18472,22 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!v) return;
     var semis = v.hi - v.lo;
 
-    var h = '<b style="font-size:18px">Your range</b>' +
-      '<div style="font-size:34px;font-weight:900;color:var(--gold);margin-top:8px">' +
-      esc(name(v.lo)) + ' – ' + esc(name(v.hi)) + '</div>' +
-      '<div class="rp-sub" style="margin-top:2px">' + semis + ' semitones' +
-      (v.by === 'preset'
-        ? ' · picked from the list, not measured'
-        : (v.at ? ' · sung and measured on ' + esc(when(v.at)) : '')) + '</div>';
+    var h = '<b style="font-size:18px">Your range</b>';
+    if (!R.measured()) {
+      h += '<div style="font-size:24px;font-weight:900;color:var(--gold);margin-top:8px">' +
+        UNTESTED + '</div>' +
+        '<div class="rp-sub" style="margin-top:2px">The exercises are using a starting range ' +
+        'until you sing your own.</div>';
+    } else {
+      h += '<div style="font-size:34px;font-weight:900;color:var(--gold);margin-top:8px">' +
+        esc(name(v.lo)) + ' – ' + esc(name(v.hi)) + '</div>' +
+        '<div class="rp-sub" style="margin-top:2px">' + semis + ' semitones' +
+        (v.by === 'preset'
+          ? ' · picked from the list, not measured'
+          : (v.at ? ' · sung and measured on ' + esc(when(v.at)) : '')) + '</div>';
+    }
 
-    if (v.by === 'preset') {
+    if (R.measured() && v.by === 'preset') {
       h += '<div class="rp-card" style="margin-top:12px;padding:12px;border-left:3px solid var(--gold)">' +
         '<div style="font-size:13px;line-height:1.55">This one came off the list. It is a fair ' +
         'starting point and the exercises will use it, but it is somebody else’s range with your ' +
@@ -18521,7 +18536,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!d) return;
     var v = R.get();
     if (!v) return;
-    var txt = name(v.lo) + ' \u2013 ' + name(v.hi);
+    var txt = R.measured() ? name(v.lo) + ' \u2013 ' + name(v.hi) : UNTESTED;
 
     var sub = d.querySelector('summary .psub');
     if (sub && sub.textContent !== txt) sub.textContent = txt;
@@ -18541,15 +18556,28 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     /* the notes themselves are already on the two lines above this one, so
        this row carries the thing they do not: where the number came from */
-    var head = v.by === 'preset' ? 'Picked from the list, not measured'
-             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured');
+    var head = !R.measured() ? UNTESTED
+             : (v.by === 'preset' ? 'Picked from the list, not measured'
+             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
+    var sub = !R.measured()
+      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
+      : (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your account';
     line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">' + esc(head) + '</div>' +
-      '<div class="rp-sub">' + (v.hi - v.lo) + ' semitones \u00b7 kept on this phone and on your ' +
-      'account</div></div><div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
+      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
+      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
-  setInterval(row, 1500);
-  setTimeout(row, 1150);
+  function untestedDisp() {
+    var d = $('rangeDisp'), sb = $('rangeSub');
+    if (!d) return;
+    if (R.measured()) { d.style.fontSize = ''; return; }
+    d.textContent = UNTESTED;
+    d.style.fontSize = '22px';
+    if (sb) sb.textContent = 'Sing your lowest and your highest note once, and every exercise ' +
+      'fits your voice. Until then it uses a starting range.';
+  }
+  setInterval(function () { row(); untestedDisp(); }, 1500);
+  setTimeout(function () { row(); untestedDisp(); }, 1150);
 
   /* ---- one line for the coach, on his student's screen -------------- */
   R.lineFor = function (p) {
@@ -19134,7 +19162,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     h += '<h3 style="margin:18px 4px 2px">More ways to practise</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell it what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell Repertoire what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
     /* Robert, 17 Sep: the pillars as their own buttons with icons, in the
@@ -19533,7 +19561,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
     { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
-    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A walk round the app, and a guide with pictures.',
+    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A tour of the app, and a guide with pictures.',
       folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
   ];
 
@@ -19925,7 +19953,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       top.id = 'rpLibTop';
       mode.insertBefore(top, mode.firstChild);
     }
-    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
+    /* Robert, 18 Sep: the chips said Songs / Takes / Note maps and then
+       three cards under them said Songs / Takes / Note maps. The chips
+       are the navigation, so the cards went and All now shows the songs. */
+    var CHIPS = [['all', 'All'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h1 style="margin:0">Your Library</h1>' +
       '<div class="row" style="gap:4px;flex:none">' +
@@ -19951,11 +19982,6 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var body = '';
     var cur = (lib() || {}).cur;
     if (chip === 'all' || chip === 'playlists') {
-      if (chip === 'all') {
-        body += row({ title: 'All songs', sub: 'Everything you own · ' + owned().length, icon: 'i-music', data: 'data-pin="all"' });
-        body += row({ title: 'Takes', sub: 'Everything you have recorded · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
-        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Saved from a take · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
-      }
       plists().forEach(function (p) {
         var ss = plSongs(p);
         body += row({ title: p.name, sub: 'Playlist · ' + ss.length + (ss.length === 1 ? ' song' : ' songs'),
@@ -19987,9 +20013,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (chip === 'recordings' && window.RPTakes) {
       panel.style.display = 'none';
       RPTakes.wire(top);
-    } else if (chip === 'songs' || chip === 'recordings') {
+    } else if (chip === 'all' || chip === 'songs' || chip === 'recordings') {
       panel.style.display = '';
-      setList(chip === 'songs' ? 'all' : 'recordings');
+      setList(chip === 'recordings' ? 'recordings' : 'all');
       var q = $('rpLibQ');
       if (q) { q.value = ($('libSearch') || {}).value || ''; }
     } else {
@@ -20505,16 +20531,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 17 Sep: this card and the Today card both said fifteen minutes
        a day. The Today card points at the button, so it kept the line. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first. Through the speaker the app squeals.' },
+      text: 'Put headphones in first. On the speaker the microphone hears the app, and it howls.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
                           : 'Make an account here so a coach can find you.';
       } },
     { mode: 'home', find: function () { return $('rpTodayGo') || $('btnJourney'); },
-      text: 'Press this every day. Fifteen minutes, set by whoever is coaching you.' },
+      text: 'Press this every day. Fifteen minutes, picked by Repertoire — or by your coach, once you have one.' },
     { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
-      text: 'One thing to do now, at your level. Press Start.' },
+      text: 'The card marked START HERE is your one for today, at your level. Press Start.' },
     /* Briar, 14 Sep: did not know what a lip trill was, and did not know
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
@@ -20526,20 +20552,20 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 13 Sep: "need a card to teach about the live microphone
        feedback." It lives on Free Sing, so the tour goes there for it. */
     { mode: 'voice', find: function () { return $('rpVMon'); },
-      text: 'Hear yourself: with headphones in, this plays your own voice back to you live, as you sing.' },
+      text: 'Hear yourself plays your own voice back in your ears as you sing. Headphones in first.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
       text: function () {
         if (hasCoach()) return 'What your coach sets you lands here — tap it, record, send the take you like.';
-        return 'Got a coach? Their code goes in here, and what they set you shows up here.';
+        return 'Got a coach? Put their code in at the top of this tab, and what they set you appears below it.';
       } },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="voice"]'); },
       text: 'Sing your range once here, and every exercise fits your voice.' },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="help"]'); },
-      text: 'Lost? This walk-round and a guide with pictures are here.' },
+      text: 'Lost? This tour and a guide with pictures start again from here.' },
     { mode: 'home', find: null,
-      text: 'Do the fifteen minutes most days. The app counts the days, and what you can do now.' }
+      text: 'Do the fifteen minutes most days. The app counts the days, and keeps a record of what you have sung.' }
   ];
 
   var COACH = [
@@ -20792,7 +20818,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       { find: function () { return $('rpVis'); },
         text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
       { find: function () { return $('rpVMon'); },
-        text: 'Hear yourself, live, through your headphones. Speaker off, or it squeals.' },
+        text: 'Hear yourself, live, through your headphones. Speaker off, or it howls.' },
       { find: function () { return $('rpVRec'); },
         text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
     ] },
@@ -20888,7 +20914,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     h += '<div class="rp-lab" style="margin-top:22px">FIRST TIME</div>';
     h += sec('1. Headphones in', '01-headphones.jpg',
-      'Wired ones if you have them. Through the speaker the app hears itself and squeals. ' +
+      'Wired ones if you have them. On the speaker the app hears itself and howls. ' +
       'Then make an account with the button at the top right — a coach can only find you if you have one.');
     h += sec('2. Find your range', '02-range.jpg',
       'Profile, <b>Your voice</b>, <b>Test my range</b>. Sing your lowest comfortable note, then your highest. ' +
@@ -21600,7 +21626,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.className = 'ctl';
     d.style.cssText = 'background:transparent;border:0;padding:0;margin-top:10px';
     var v = saved(); if (v == null) { try { v = MONITOR.vol; } catch (e) { v = 0.75; } }
-    d.innerHTML = '<label><span>Live vocals volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
+    d.innerHTML = '<label><span>Hear yourself volume</span><output id="qMonVolOut">' + Math.round(v * 100) + '%</output></label>' +
       '<input type="range" id="qMonVol" min="0" max="200" value="' + Math.round(v * 100) + '" step="5">';
     row.parentElement.insertBefore(d, row);
     var note = document.createElement('div');
@@ -22322,6 +22348,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         if (/plan for you|changes as you do/i.test(text(el))) { el.style.display = 'none'; return; }
         return;
       }
+      /* Robert, 18 Sep: the same five steps and the same Start button were
+         printed on Home and here. Home owns today; this tab is the coach. */
+      if (el.classList.contains('plan')) { el.style.display = 'none'; return; }
       if (!el.classList.contains('panel')) return;
       var head = heading(el);
       if (KEEP.test(head)) { el.style.display = ''; return; }

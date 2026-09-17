@@ -50,16 +50,16 @@
     /* Robert, 17 Sep: this card and the Today card both said fifteen minutes
        a day. The Today card points at the button, so it kept the line. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first. Through the speaker the app squeals.' },
+      text: 'Put headphones in first. On the speaker the microphone hears the app, and it howls.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
                           : 'Make an account here so a coach can find you.';
       } },
     { mode: 'home', find: function () { return $('rpTodayGo') || $('btnJourney'); },
-      text: 'Press this every day. Fifteen minutes, set by whoever is coaching you.' },
+      text: 'Press this every day. Fifteen minutes, picked by Repertoire — or by your coach, once you have one.' },
     { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
-      text: 'One thing to do now, at your level. Press Start.' },
+      text: 'The card marked START HERE is your one for today, at your level. Press Start.' },
     /* Briar, 14 Sep: did not know what a lip trill was, and did not know
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
@@ -71,20 +71,20 @@
     /* Robert, 13 Sep: "need a card to teach about the live microphone
        feedback." It lives on Free Sing, so the tour goes there for it. */
     { mode: 'voice', find: function () { return $('rpVMon'); },
-      text: 'Hear yourself: with headphones in, this plays your own voice back to you live, as you sing.' },
+      text: 'Hear yourself plays your own voice back in your ears as you sing. Headphones in first.' },
     { mode: 'coach', find: function () {
         return $('rpChannel') || $('rpCode') || first('#modeCoach .notice');
       },
       text: function () {
         if (hasCoach()) return 'What your coach sets you lands here — tap it, record, send the take you like.';
-        return 'Got a coach? Their code goes in here, and what they set you shows up here.';
+        return 'Got a coach? Put their code in at the top of this tab, and what they set you appears below it.';
       } },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="voice"]'); },
       text: 'Sing your range once here, and every exercise fits your voice.' },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="help"]'); },
-      text: 'Lost? This walk-round and a guide with pictures are here.' },
+      text: 'Lost? This tour and a guide with pictures start again from here.' },
     { mode: 'home', find: null,
-      text: 'Do the fifteen minutes most days. The app counts the days, and what you can do now.' }
+      text: 'Do the fifteen minutes most days. The app counts the days, and keeps a record of what you have sung.' }
   ];
 
   var COACH = [
@@ -337,7 +337,7 @@
       { find: function () { return $('rpVis'); },
         text: 'Something to watch — it swells when you sing louder and shifts colour with the sound.' },
       { find: function () { return $('rpVMon'); },
-        text: 'Hear yourself, live, through your headphones. Speaker off, or it squeals.' },
+        text: 'Hear yourself, live, through your headphones. Speaker off, or it howls.' },
       { find: function () { return $('rpVRec'); },
         text: 'Record when you want to keep one. Nothing is sent anywhere unless you send it.' }
     ] },
@@ -433,7 +433,7 @@
 
     h += '<div class="rp-lab" style="margin-top:22px">FIRST TIME</div>';
     h += sec('1. Headphones in', '01-headphones.jpg',
-      'Wired ones if you have them. Through the speaker the app hears itself and squeals. ' +
+      'Wired ones if you have them. On the speaker the app hears itself and howls. ' +
       'Then make an account with the button at the top right — a coach can only find you if you have one.');
     h += sec('2. Find your range', '02-range.jpg',
       'Profile, <b>Your voice</b>, <b>Test my range</b>. Sing your lowest comfortable note, then your highest. ' +

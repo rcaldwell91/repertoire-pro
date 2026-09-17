@@ -206,7 +206,10 @@
       top.id = 'rpLibTop';
       mode.insertBefore(top, mode.firstChild);
     }
-    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
+    /* Robert, 18 Sep: the chips said Songs / Takes / Note maps and then
+       three cards under them said Songs / Takes / Note maps. The chips
+       are the navigation, so the cards went and All now shows the songs. */
+    var CHIPS = [['all', 'All'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h1 style="margin:0">Your Library</h1>' +
       '<div class="row" style="gap:4px;flex:none">' +
@@ -232,11 +235,6 @@
     var body = '';
     var cur = (lib() || {}).cur;
     if (chip === 'all' || chip === 'playlists') {
-      if (chip === 'all') {
-        body += row({ title: 'All songs', sub: 'Everything you own · ' + owned().length, icon: 'i-music', data: 'data-pin="all"' });
-        body += row({ title: 'Takes', sub: 'Everything you have recorded · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
-        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Saved from a take · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
-      }
       plists().forEach(function (p) {
         var ss = plSongs(p);
         body += row({ title: p.name, sub: 'Playlist · ' + ss.length + (ss.length === 1 ? ' song' : ' songs'),
@@ -268,9 +266,9 @@
     if (chip === 'recordings' && window.RPTakes) {
       panel.style.display = 'none';
       RPTakes.wire(top);
-    } else if (chip === 'songs' || chip === 'recordings') {
+    } else if (chip === 'all' || chip === 'songs' || chip === 'recordings') {
       panel.style.display = '';
-      setList(chip === 'songs' ? 'all' : 'recordings');
+      setList(chip === 'recordings' ? 'recordings' : 'all');
       var q = $('rpLibQ');
       if (q) { q.value = ($('libSearch') || {}).value || ''; }
     } else {
