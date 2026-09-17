@@ -36,9 +36,10 @@
   ];
   var LEVELS = [[0, 'Any level'], [1, 'Beginner'], [2, 'Intermediate'], [3, 'Advanced']];
   var TOOLS = [
-    ['btnMatch',   'Note Match',   'A note plays, you sing it back and hold it. Ten rounds.'],
-    ['btnKbd',     'Keyboard',     'Free play: press a note, sing it back. Not scored — Note Match and Sustain Hold are.'],
-    ['btnSustain', 'Sustain Hold', 'Hold one note dead steady for five seconds.']
+    ['btnMatch',   'Match the note',  'A note plays. Sing it back and hold it. Ten notes.'],
+    ['btnKbd',     'Keyboard',        'Press a note and sing it back. Nothing is scored here.'],
+    ['btnSustain', 'Hold a note',     'Hold one note steady for five seconds. Ten notes.'],
+    ['rpIntervalGo', 'Hold the interval', 'A note plays. Sing the one a step above it, and hold it.']
   ];
   var DRILLS = [
     ['tonic',   'Sing the home note', 'A short tune plays. Sing the note it sounds finished on.'],
@@ -193,7 +194,7 @@
       h += '<div class="rp-lab" style="margin-top:14px">' + esc(c.name.toUpperCase()) + '</div>';
       list.forEach(function (e) { h += exCard(e, false); });
     });
-    RPPage.open({ key: 'all', title: 'Every exercise', sub: EX().length + ' of them. Tap a name to read about it.', html: h, backLabel: 'Train',
+    RPPage.open({ key: 'all', title: 'Every exercise', sub: 'Tap a name to read what it is.', html: h, backLabel: 'Train',
       wire: function (root) { wireEx(root, { label: 'Every exercise', go: TR.all }); } });
   };
 
@@ -216,11 +217,11 @@
       top.id = 'rpTrainTop';
       mode.insertBefore(top, mode.firstChild);
     }
+    /* Robert, 17 Sep: the seven categories were on the screen twice — pills
+       at the top and a list below, doing two different jobs. The pills are
+       gone; the buttons in the body are the way in. The level chips stay:
+       they say which level the one below came from. */
     var h = '<div class="segrow" style="margin-top:2px">';
-    CATS.forEach(function (c) {
-      h += '<button class="seg' + (sel.cat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' + esc(c.name) + '</button>';
-    });
-    h += '</div><div class="segrow">';
     var eff = effectiveLevel(sel.cat, sel.level);
     levelsIn(sel.cat).forEach(function (l) {
       h += '<button class="seg' + (eff === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
@@ -234,11 +235,11 @@
         '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
         '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(dr[1]) + '</div><div class="rp-sub">' + esc(dr[2]) + '</div></div>' +
         '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
-        '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See all ear drills</button></div>';
+        '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">All ear exercises</button></div>';
     } else {
       var one = pickOne(sel.cat, effectiveLevel(sel.cat, sel.level));
       if (one) {
-        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
+        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">ONE TO DO NOW · ' + esc(c.name.toUpperCase()) +
           ' · ' + esc(lvlName(one.level).toUpperCase()) + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
@@ -246,8 +247,8 @@
           '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
           '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
           (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(one.id, true) + '</div>' : '') +
-          '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See more ' +
-          esc(c.name.toLowerCase()) + '</button></div>';
+          '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">All ' +
+          esc(c.name.toLowerCase()) + ' exercises</button></div>';
       }
     }
 
@@ -258,13 +259,19 @@
     /* Robert, 17 Sep: the seven categories were on the screen twice — the
        chips at the top and a tile for each below. The chips choose; See
        more opens the list. The tiles went. */
-    h += '<h3 style="margin:18px 4px 2px">Also</h3>';
+    h += '<h3 style="margin:18px 4px 2px">Tools</h3>';
     h += RPPage.tiles([
-      { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, drawn live. Record a take.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'I want to be able to…', sub: 'Say what you want. It picks the exercises.', id: 'rpTileGoals' },
-      { icon: 'i-user',     title: 'Before the voice', sub: 'Posture, jaw, tongue, shoulders. No sound.', id: 'rpTileBody' }
+      { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
+      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Say what you want to sing better. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
-    h += '<button class="btn" id="rpTrainAll" style="width:100%;padding:11px;margin-top:14px;font-size:12.5px">Every exercise, all at once</button>';
+    /* Robert, 17 Sep: the pillars as their own buttons with icons, in the
+       body of the screen, under the tools and above the browse link. */
+    h += '<h3 style="margin:18px 4px 2px">What do you want to work on?</h3>';
+    h += RPPage.tiles(CATS.map(function (c) {
+      return { icon: c.icon, title: c.name, sub: c.sub, data: 'data-more="' + c.id + '"' };
+    }));
+    h += '<button class="btn" id="rpTrainAll" style="width:100%;padding:11px;margin-top:14px;font-size:12.5px">Browse every exercise</button>';
 
     top.innerHTML = h;
     wireEx(top);
@@ -312,7 +319,7 @@
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">Every exercise, explained</div>' +
-      '<div class="rp-sub">What each one is and how to do it.</div></div>' +
+      '<div class="rp-sub">What each one is, and how to do it.</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', function () {
       try { window.switchMode('train'); } catch (e) {}
@@ -325,8 +332,9 @@
   setTimeout(helpRow, 800);
 
   TR.running = function () { return running(); };
+  TR.redraw = function () { try { draw(); } catch (e) {} };
   function running() {
-    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox'];
+    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox', 'rpIntervalPanel'];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
       if (el && el.offsetParent !== null) return true;

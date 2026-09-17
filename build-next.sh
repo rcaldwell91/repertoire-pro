@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -496,6 +496,221 @@ PATCHES = [
     ("Sign in and join your coach with their code, and this tab becomes their channel: they set the work, you record, they listen in their own time.",
      "Once you have joined a coach with their code at the top of this tab, what they set you shows there."),
 
+    # 38. ROBERT, 17 Sep — PART 3, THE EXERCISES.
+    #  Reference notes default to a PIANO. "The synth throws me off and I
+    #  don't know what I'm listening to." Still switchable in Profile; a
+    #  recorded voice replaces it when a coach records one.
+    ("  try { V10.refVoice = localStorage.getItem('rep_refvoice') !== 'piano'; } catch (e) {}",
+     "  try { V10.refVoice = localStorage.getItem('rep_refvoice') === 'voice'; } catch (e) {}"),
+    ("  V10.refVoice = true;", "  V10.refVoice = false;"),
+
+    #  Hold a note: a way back, a note worth singing, and a score out of ten.
+    ("""          <button class="btn primary" id="btnSusStart">Start hold</button>
+          <button class="btn" id="btnSusNote">New note</button>""",
+     """          <button class="btn primary" id="btnSusStart">Start the hold</button>
+          <button class="btn" id="btnSusNote">Another note</button>"""),
+    ("""    <div id="susPanel" class="panel" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <h3>Sustain Hold</h3>
+        <button class="btn danger ghost" id="btnSusQuit">Quit</button>
+      </div>""",
+     """    <div id="susPanel" class="panel" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <button class="btn ghost" id="btnSusQuit">&lsaquo; Exercises</button>
+        <div class="pill" id="susRound">Note 1 of 10</div>
+      </div>
+      <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
+        <h3 style="margin:0">Hold a note</h3>
+        <div class="pill">Held: <b id="susScore" style="color:var(--hit)">0</b></div>
+      </div>"""),
+    #  The note to hold: random in your range, and every third one out at the
+    #  edge, which is where the range grows. Never the same note twice.
+    ("""function susPickNote(){
+  SUS.target = Math.round((RANGE.lo+RANGE.hi)/2) + (Math.floor(Math.random()*5)-2);
+  $('susTarget').textContent = midiName(SUS.target);
+  $('susResult').textContent='';
+}""",
+     """function susPickNote(){
+  const lo = Math.round(RANGE.lo), hi = Math.round(RANGE.hi);
+  const pick = () => {
+    const edge = (SUS.round % 3 === 2) && hi - lo > 10;   /* every third note, out at the edge */
+    if (edge) {
+      const top = Math.random() < 0.5;
+      const from = top ? hi - 3 : lo, to = top ? hi : lo + 3;
+      return from + Math.floor(Math.random() * (to - from + 1));
+    }
+    const a = Math.min(lo + 3, hi), b = Math.max(hi - 3, lo);
+    return a + Math.floor(Math.random() * Math.max(1, b - a + 1));
+  };
+  let t = pick();
+  for (let i = 0; i < 6 && t === SUS.target; i++) t = pick();
+  SUS.target = t;
+  $('susTarget').textContent = midiName(SUS.target);
+  $('susResult').textContent='';
+}
+function susNewRound(){
+  SUS.round = (SUS.round || 0) + 1;
+  if (SUS.round > 10) return susDone();
+  const r = $('susRound'); if (r) r.textContent = 'Note ' + SUS.round + ' of 10';
+  susPickNote();
+}
+function susDone(){
+  SUS.running = false;
+  const held = SUS.held || 0;
+  const pct = Math.round(100*held/10);
+  $('susTarget').textContent = held + ' of 10';
+  $('susRound').textContent = 'Done';
+  $('susLive').textContent = '';
+  $('susResult').textContent = pct >= 80 ? 'Held ' + held + ' of 10. Steady.'
+    : pct >= 50 ? 'Held ' + held + ' of 10. Getting there.'
+    : 'Held ' + held + ' of 10. Slower air, comfier notes.';
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Hold a note', score: held, out_of: 10 }); } catch(e){}
+  try { V10.markPractised('Hold a note'); } catch(e){}
+  SUS.round = 0; SUS.held = 0;
+}"""),
+    ("""$('btnSustain').addEventListener('click', async ()=>{
+  if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
+  ensureCtx();
+  TRAIN.kind='sustain';
+  trainView('sustain');
+  susPickNote();
+});
+$('btnSusNote').addEventListener('click', susPickNote);""",
+     """$('btnSustain').addEventListener('click', async ()=>{
+  if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
+  ensureCtx();
+  TRAIN.kind='sustain';
+  trainView('sustain');
+  SUS.round = 0; SUS.held = 0;
+  const sc = $('susScore'); if (sc) sc.textContent = '0';
+  susNewRound();
+});
+$('btnSusNote').addEventListener('click', susPickNote);"""),
+    ("""    $('susResult').textContent = pct+'% steady — '+msg;
+    if(pct>=70) playDing(); else playBuzz();""",
+     """    $('susResult').textContent = pct+'% steady — '+msg;
+    if(pct>=70){ SUS.held = (SUS.held||0)+1; const sc=$('susScore'); if(sc) sc.textContent=SUS.held; playDing(); } else playBuzz();
+    setTimeout(()=>{ if(TRAIN.kind==='sustain' && SUS.round) susNewRound(); }, 1500);"""),
+
+    # 39. NOTE MATCH ENDS ON THE SCREEN, NOT IN A BROWSER BOX, and leaves you
+    #     looking at what you did rather than back at the menu.
+    ("""function matchEnd(){
+  MATCH.active=false;
+  TRAIN.kind=null;
+  journeyMark('train');
+  trainView('grid');
+  const pct = Math.round(100*MATCH.score/MATCH.total);
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Ear · Note Match', score: MATCH.score, out_of: MATCH.total }); } catch (e) {}
+  const msg = pct>=90?'Incredible ear.':pct>=70?'Strong — keep drilling.':pct>=40?'Coming along — get your reps in daily.':'Everyone starts here. Run it again.';
+  setTimeout(()=>alert('Note Match: '+MATCH.score+'/'+MATCH.total+' ('+pct+'%)\\n'+msg), 50);
+}""",
+     """function matchEnd(){
+  MATCH.active=false;
+  journeyMark('train');
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Ear · Note Match', score: MATCH.score, out_of: MATCH.total }); } catch (e) {}
+  const pct = Math.round(100*MATCH.score/MATCH.total);
+  const msg = pct>=90?'Nearly every one.':pct>=70?'Most of them.':pct>=40?'About half. Daily beats long.':'Run it again tomorrow.';
+  $('matchTarget').textContent = MATCH.score + ' of ' + MATCH.total;
+  $('matchFeedback').textContent = msg;
+  $('matchFeedback').style.color = 'var(--ink)';
+  $('matchRound').textContent = 'Done';
+}"""),
+
+    # 40. KARAOKE NO LONGER FETCHES AUDIO. Robert's standing rule: never
+    #     source audio. The key detector pulled a 30-second clip from
+    #     Deezer. It opens the YouTube search and stops there; the key is
+    #     yours to set, which is one tap on the row below.
+    ("  window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(q+' karaoke'), '_blank');\n  autoDetectKey(q);",
+     "  window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(q+' karaoke'), '_blank');\n  ytKeyStatus('Opened a YouTube search for “' + q + ' karaoke”. Paste the link below, and set the key yourself.');"),
+    ("""<button class="btn primary" id="btnYtSearch"><svg class="ic"><use href="#i-search"/></svg> Find karaoke + detect key</button>""",
+     """<button class="btn primary" id="btnYtSearch"><svg class="ic"><use href="#i-search"/></svg> Search YouTube for a karaoke version</button>"""),
+    ("Auto-set when you search, or pick it yourself. The lanes that belong to the key light up as guide rails.",
+     "Pick the key and the notes that belong to it light up as guide rails."),
+
+    # 41. THE MICROPHONE PANEL WAS A DEVELOPER TABLE. What a singer needs is
+    #     whether it is on, what it can hear, and what to do if not.
+    ("""  const rows = [
+    ['Sound clock', audioRunning() ? 'running' : (typeof ctx !== 'undefined' && ctx ? ctx.state : 'not started')],
+    ['Microphone', MIC.on ? 'on' : 'off'],
+    ['Input mode', MIC.profile || '—'],
+    ['Device', MIC.deviceLabel || '—'],
+    ['Held by another app', MIC.stolen ? 'YES — that is the problem' : 'no'],""",
+     """  const rows = [
+    ['Microphone', MIC.on ? 'on' : 'off'],
+    ['It is hearing', MIC.on ? (MIC.level > 0.004 ? 'your voice' : 'nothing yet — sing') : '—'],
+    ['Using', MIC.deviceLabel || '—'],
+    ['Another app has it', MIC.stolen ? 'yes — close that app' : 'no'],"""),
+    ("""    ['Mic requests this session', String(MIC.asks || 0)],
+    ['Last input that hung the page', MIC.badDev
+        ? ((MIC.inputs.find(d => d.id === MIC.badDev) || {}).label || 'one of them') + ' — avoid it'
+        : 'none'],
+    ['Sound engine built', String(window.__ctxMade || 0) + (typeof AUD !== 'undefined' && AUD.rebuilt ? ' (rebuilt ' + AUD.rebuilt + ')' : '')],
+    ['Let go when you left the app', String(MIC.autoReleases || 0) + ' time' + ((MIC.autoReleases||0) === 1 ? '' : 's')
+        + ((MIC.autoResumes||0) ? ', picked back up ' + MIC.autoResumes : '')],
+    ['Level now', MIC.on ? (MIC.level > 0.004 ? 'hearing you (' + MIC.level.toFixed(3) + ')'
+                                              : 'silent (' + (MIC.level || 0).toFixed(3) + ')') : '—']
+  ];""",
+     """    ['Sound', audioRunning() ? 'working' : 'not started — tap anything']
+  ];"""),
+
+    # 42. PART 1, THE WRITING — base screens.
+    ("<h3>Note Match — <span id=\"matchRound\">Round 1/10</span></h3>",
+     "<h3>Match the note — <span id=\"matchRound\">Note 1 of 10</span></h3>"),
+    ("  $('matchRound').textContent='Round '+MATCH.round+'/'+MATCH.total;",
+     "  $('matchRound').textContent='Note '+MATCH.round+' of '+MATCH.total;"),
+    ("Hold the note in the green zone to fill the bar. Any octave counts — sing it where your voice is comfortable.",
+     "Hold the note in the green band to fill the bar. Any octave counts."),
+    ("<div class=\"pill\">Keyboard &mdash; you pick the note</div>", "<div class=\"pill\">Keyboard</div>"),
+    ("'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing it. A held key goes quiet after a second so the mic hears you, not the key.' +\n"
+     "      ' Turn the phone sideways for more keys. This is free play &mdash; Note Match and Sustain Hold are the scored versions.</div>'",
+     "'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing that note. Turn the phone sideways for more keys. Nothing is scored here.</div>'"),
+    ("<h3 style=\"margin:18px 4px 2px\">Or jump right in</h3>", "<h3 style=\"margin:18px 4px 2px\">Go straight to</h3>"),
+
+    # 43. A SESSION SAYS IT IS A SESSION. Robert's audit: Done on the first
+    #     step jumped into the next with nothing on screen saying where you
+    #     were, and no way out but Done, again and again.
+    ("""  function startRoutine(rt) {
+    ROUTINE.on = true; ROUTINE.steps = rt.steps.slice(); ROUTINE.i = -1; ROUTINE.name = rt.name;""",
+     """  function routineBar() {
+    let b = $('rpSessionBar');
+    if (!ROUTINE.on) { if (b) b.style.display = 'none'; return; }
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'rpSessionBar';
+      b.className = 'row';
+      b.style.cssText = 'align-items:center;gap:10px;margin:0 0 10px';
+      const slot = $('trainSlot') || $('modeTrain');
+      slot.parentElement.insertBefore(b, slot);
+    }
+    b.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
+      esc(ROUTINE.name) + ' · step ' + (ROUTINE.i + 1) + ' of ' + ROUTINE.steps.length + '</div>' +
+      '<button class="btn danger ghost" id="rpSessionEnd" style="padding:7px 12px;font-size:12px">End the session</button>';
+    b.style.display = 'flex';
+    $('rpSessionEnd').addEventListener('click', () => {
+      ROUTINE.on = false;
+      routineBar();
+      const g = $('gQuit'); if (g && g.offsetParent !== null) g.click();
+      const t = $('btnTrainStop'); if (t && t.offsetParent !== null) t.click();
+      renderTrain();
+    });
+  }
+  function startRoutine(rt) {
+    ROUTINE.on = true; ROUTINE.steps = rt.steps.slice(); ROUTINE.i = -1; ROUTINE.name = rt.name;"""),
+    ("""    startEx(ROUTINE.steps[ROUTINE.i]);
+  }""",
+     """    startEx(ROUTINE.steps[ROUTINE.i]);
+    routineBar();
+  }"""),
+    ("""      ROUTINE.on = false;
+      V10.markPractised(ROUTINE.name);""",
+     """      ROUTINE.on = false;
+      routineBar();
+      V10.markPractised(ROUTINE.name);"""),
+
+    # 44. MORE OF THE WRITING (Part 1).
+    ("Pause to think, Restart to take it from the top, Record to keep the run.",
+     "Pause, start again, or record this run."),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the
@@ -588,7 +803,7 @@ WRITING = [
     ("Pick your stage.", "Pick one."),
     ("Settings for this device. Everything here is remembered.", "Your account, your voice, and how the app works."),
     ("The horizontal lines are notes (C in gold). Hold a note and try to keep your blue line flat and centered on a note line. Steadiness scores how level you hold your pitch.",
-     "The lines are notes, with C in gold. The blue line is your voice. Keep it flat on a line and Steadiness goes up."),
+     "The lines are notes, C in gold. The blue line is your voice. Hold it flat on a line."),
     ("<b>Sound not working? Plug your headphones in first</b> — that is when it breaks, so that is when to test it. Then press <b>1</b> and <b>2</b>, in that order. Each one prints an answer, and between them they say whether it is the app, the microphone, or the phone itself.",
      "<b>No sound?</b> Plug your headphones in first, then press <b>1</b> and <b>2</b> in that order. Each one says what it found."),
     ("Everything you record and every note map you build is stored on this device only. Nothing is uploaded anywhere.",
@@ -681,7 +896,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js'):
+for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js'):
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'

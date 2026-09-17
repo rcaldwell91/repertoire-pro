@@ -139,7 +139,7 @@
     var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(T.groupOf(s)) + ' · ' + fmt(s.duration) + ' · ' + day(s.addedAt) +
       (s.sentAt ? ' · sent to your coach' : '') + '</div>' +
       (hasNotes ? '<canvas id="rpTakeCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
-        '<div class="measured" style="margin-top:6px">The notes you sang. Blue is you; gold lines are C.</div>' : '') +
+        '<div class="measured" style="margin-top:6px">The notes you sang. Gold lines are C.</div>' : '') +
       (hasNotes ? '<button class="btn primary" id="rpTkOver" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing over it</button>' : '') +
       '<div class="row" style="gap:6px;margin-top:8px">' +
       '<button class="btn" id="rpTkPlay" style="flex:1;padding:10px;font-size:12.5px">Listen</button>' +

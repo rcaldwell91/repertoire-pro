@@ -22,17 +22,17 @@
   var PR = window.RPProfile = {};
 
   var GROUPS = [
-    { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Who you are signed in as.',
+    { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Your name, your email and your password.',
       folds: ['Account'], cards: [] },
-    { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and where you are.',
+    { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and how hard the exercises are.',
       folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
-    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
+    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your points.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
-    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
+    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
-    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
+    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
-    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
+    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A walk round the app, and a guide with pictures.',
       folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
   ];
 
@@ -119,6 +119,20 @@
     try { if (window.RPPage && RPPage.isOpen() && document.querySelector('#youSlots details.pfold')) gather(); } catch (e) {}
   }, 600);
 
+  /* Robert's audit: the Help page said "About" twice — the fold's summary
+     and the heading inside it — and showed a version string. */
+  function tidyAbout(f) {
+    var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
+    f.querySelectorAll('b').forEach(function (b) {
+      if ((b.textContent || '').trim() === 'About') b.style.display = 'none';
+    });
+    var v = f.querySelector('#youVer');
+    if (v && v.parentElement) {
+      var n = v.parentElement;
+      n.innerHTML = n.innerHTML.replace(/Version\s*<b[^>]*id="youVer"[^>]*>[^<]*<\/b><br>\s*/i, '');
+    }
+  }
+
   PR.open = function (key) {
     var g = GROUPS.filter(function (x) { return x.key === key; })[0];
     if (!g || !window.RPPage) return;
@@ -129,6 +143,7 @@
     box.querySelectorAll('details.pfold').forEach(function (d) { d.open = true; });
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
     if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
+    if (key === 'help') { var fa = foldNamed('About'); if (fa) { fa.open = true; tidyAbout(fa); } }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 

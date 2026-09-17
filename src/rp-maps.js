@@ -165,8 +165,8 @@
     var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(fmt(map.dur)) +
       (map.from ? ' · from ' + esc(map.from) : '') + ' · kept ' + (d.getMonth() + 1) + '/' + d.getDate() + '</div>' +
       '<canvas id="rpMapCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
-      '<div class="measured" style="margin-top:6px">Blue is what was sung. Gold lines are C. Time runs left to right.</div>' +
-      '<button class="btn primary" id="rpMapGuide" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Play it as a guide on the Pitch Tracker</button>' +
+      '<div class="measured" style="margin-top:6px">The notes that were sung. Gold lines are C. Time runs left to right.</div>' +
+      '<button class="btn primary" id="rpMapGuide" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing over it on the Pitch Tracker</button>' +
       '<div class="row" style="gap:8px;margin-top:8px">' +
       '<button class="btn" id="rpMapImg" style="flex:1;padding:10px;font-size:12.5px">Save as picture</button>' +
       '<button class="btn" id="rpMapName" style="flex:1;padding:10px;font-size:12.5px">Rename</button>' +

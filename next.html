@@ -429,7 +429,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       </div>
       <button id="btnJourney">Start: Warm up</button>
     </div>
-    <h3 style="margin:18px 4px 2px">Or jump right in</h3>
+    <h3 style="margin:18px 4px 2px">Go straight to</h3>
     <div class="homegrid">
       <div class="mcard hue1" id="mcTrain"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-activity"/></svg></div><div><h4>Train</h4><p>Exercises that build your voice, a level at a time</p></div><div class="chev">›</div></div>
       <div class="mcard hue2" id="mcSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
@@ -671,7 +671,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
     <!-- Note Match -->
     <div id="matchPanel" class="panel" style="display:none">
       <div class="row" style="justify-content:space-between">
-        <h3>Note Match — <span id="matchRound">Round 1/10</span></h3>
+        <h3>Match the note — <span id="matchRound">Note 1 of 10</span></h3>
         <div class="pill">Hits: <b id="matchScore" style="color:var(--hit)">0</b></div>
       </div>
       <div class="row" style="margin-top:10px;align-items:stretch">
@@ -688,14 +688,18 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <canvas id="matchCanvas" style="flex:1;min-width:200px;border-radius:12px;background:#0d1126;border:1px solid var(--line)"></canvas>
       </div>
       <div class="micmeter" style="margin-top:10px"><i id="matchHold"></i></div>
-      <div class="notice">Hold the note in the green zone to fill the bar. Any octave counts — sing it where your voice is comfortable.</div>
+      <div class="notice">Hold the note in the green band to fill the bar. Any octave counts.</div>
     </div>
 
     <!-- Sustain -->
     <div id="susPanel" class="panel" style="display:none">
-      <div class="row" style="justify-content:space-between">
-        <h3>Sustain Hold</h3>
-        <button class="btn danger ghost" id="btnSusQuit">Quit</button>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <button class="btn ghost" id="btnSusQuit">&lsaquo; Exercises</button>
+        <div class="pill" id="susRound">Note 1 of 10</div>
+      </div>
+      <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">
+        <h3 style="margin:0">Hold a note</h3>
+        <div class="pill">Held: <b id="susScore" style="color:var(--hit)">0</b></div>
       </div>
       <div style="text-align:center;margin-top:8px">
         <div style="font-size:12px;color:var(--ink-dim);font-weight:700;letter-spacing:1px">HOLD THIS NOTE FOR <span id="susDur">5</span> SECONDS</div>
@@ -703,8 +707,8 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <div id="susLive" style="font-size:16px;font-weight:700;min-height:24px;color:var(--ink-dim)">press start</div>
         <div class="micmeter" style="max-width:420px;margin:12px auto;height:14px"><i id="susBar"></i></div>
         <div class="row" style="justify-content:center">
-          <button class="btn primary" id="btnSusStart">Start hold</button>
-          <button class="btn" id="btnSusNote">New note</button>
+          <button class="btn primary" id="btnSusStart">Start the hold</button>
+          <button class="btn" id="btnSusNote">Another note</button>
           <button class="btn" id="btnSusHear"><svg class="ic"><use href="#i-volume"/></svg> Hear it</button>
         </div>
         <div id="susResult" style="font-size:17px;font-weight:800;margin-top:12px;min-height:24px"></div>
@@ -720,7 +724,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       <div class="notice" style="margin:0 0 12px">Almost every song has a <b>karaoke / instrumental version</b> on YouTube already. Find it, paste the link, and sing over it while the app tracks your pitch live. Wired headphones in — so the mic only hears you.</div>
       <div class="row">
         <input type="text" id="ytQuery" class="grow" placeholder="Song name + artist…">
-        <button class="btn primary" id="btnYtSearch"><svg class="ic"><use href="#i-search"/></svg> Find karaoke + detect key</button>
+        <button class="btn primary" id="btnYtSearch"><svg class="ic"><use href="#i-search"/></svg> Search YouTube for a karaoke version</button>
       </div>
       <div class="row" style="margin-top:8px">
         <input type="text" id="ytUrl" class="grow" placeholder="Paste the YouTube link here…">
@@ -740,7 +744,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
           <option value="major">major</option>
           <option value="minor">minor</option>
         </select>
-        <span class="notice grow" style="margin:0">Auto-set when you search, or pick it yourself. The lanes that belong to the key light up as guide rails.</span>
+        <span class="notice grow" style="margin:0">Pick the key and the notes that belong to it light up as guide rails.</span>
       </div>
       <div id="ytKeyStatus" class="notice" style="display:none;margin-top:8px"></div>
       <div id="ytWarn" class="notice" style="display:none;color:#ffb3be"></div>
@@ -855,7 +859,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
         <b>Try another mode</b> — some phones only give sound on one of them.</div>
     </div>
     <div style="margin-top:10px"><canvas id="freeCanvas"></canvas></div>
-    <div class="panel notice" style="margin-top:10px">The lines are notes, with C in gold. The blue line is your voice. Keep it flat on a line and Steadiness goes up.</div>
+    <div class="panel notice" style="margin-top:10px">The lines are notes, C in gold. The blue line is your voice. Hold it flat on a line.</div>
   </div>
   <!-- ============ YOU / SETTINGS ============ -->
   <div id="modeYou" class="mode">
@@ -1497,23 +1501,14 @@ function micCheckUpdate(){
   const el = document.getElementById('micCheck');
   if(!el) return;
   const rows = [
-    ['Sound clock', audioRunning() ? 'running' : (typeof ctx !== 'undefined' && ctx ? ctx.state : 'not started')],
     ['Microphone', MIC.on ? 'on' : 'off'],
-    ['Input mode', MIC.profile || '—'],
-    ['Device', MIC.deviceLabel || '—'],
-    ['Held by another app', MIC.stolen ? 'YES — that is the problem' : 'no'],
+    ['It is hearing', MIC.on ? (MIC.level > 0.004 ? 'your voice' : 'nothing yet — sing') : '—'],
+    ['Using', MIC.deviceLabel || '—'],
+    ['Another app has it', MIC.stolen ? 'yes — close that app' : 'no'],
     ['Inputs the phone offers', MIC.inputs && MIC.inputs.length
         ? MIC.inputs.length + (MIC.inputs.length > 1 ? ' — ' + MIC.inputs.map(d => d.label).join(' / ') : '')
         : '—'],
-    ['Mic requests this session', String(MIC.asks || 0)],
-    ['Last input that hung the page', MIC.badDev
-        ? ((MIC.inputs.find(d => d.id === MIC.badDev) || {}).label || 'one of them') + ' — avoid it'
-        : 'none'],
-    ['Sound engine built', String(window.__ctxMade || 0) + (typeof AUD !== 'undefined' && AUD.rebuilt ? ' (rebuilt ' + AUD.rebuilt + ')' : '')],
-    ['Let go when you left the app', String(MIC.autoReleases || 0) + ' time' + ((MIC.autoReleases||0) === 1 ? '' : 's')
-        + ((MIC.autoResumes||0) ? ', picked back up ' + MIC.autoResumes : '')],
-    ['Level now', MIC.on ? (MIC.level > 0.004 ? 'hearing you (' + MIC.level.toFixed(3) + ')'
-                                              : 'silent (' + (MIC.level || 0).toFixed(3) + ')') : '—']
+    ['Sound', audioRunning() ? 'working' : 'not started — tap anything']
   ];
   el.innerHTML = rows.map(r =>
     '<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--ink-faint)">'
@@ -3364,7 +3359,7 @@ $('btnYtSearch').addEventListener('click', ()=>{
   if(!q){ ytWarn('Type a song name first, then I’ll open the YouTube search for its karaoke version.'); return; }
   ytWarn(null);
   window.open('https://www.youtube.com/results?search_query='+encodeURIComponent(q+' karaoke'), '_blank');
-  autoDetectKey(q);
+  ytKeyStatus('Opened a YouTube search for “' + q + ' karaoke”. Paste the link below, and set the key yourself.');
 });
 $('btnYtLoad').addEventListener('click', ()=>{
   const id = parseYtId($('ytUrl').value);
@@ -3608,20 +3603,21 @@ function matchNext(){
   let t = lo + Math.floor(Math.random()*(hi-lo+1));
   if(t===MATCH.target) t = lo + Math.floor(Math.random()*(hi-lo+1));
   MATCH.target=t; MATCH.held=0; MATCH.cooling=false;
-  $('matchRound').textContent='Round '+MATCH.round+'/'+MATCH.total;
+  $('matchRound').textContent='Note '+MATCH.round+' of '+MATCH.total;
   $('matchTarget').textContent=midiName(t);
   $('matchFeedback').textContent='listen…';
   matchPlayTarget();
 }
 function matchEnd(){
   MATCH.active=false;
-  TRAIN.kind=null;
   journeyMark('train');
-  trainView('grid');
-  const pct = Math.round(100*MATCH.score/MATCH.total);
   try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Ear · Note Match', score: MATCH.score, out_of: MATCH.total }); } catch (e) {}
-  const msg = pct>=90?'Incredible ear.':pct>=70?'Strong — keep drilling.':pct>=40?'Coming along — get your reps in daily.':'Everyone starts here. Run it again.';
-  setTimeout(()=>alert('Note Match: '+MATCH.score+'/'+MATCH.total+' ('+pct+'%)\n'+msg), 50);
+  const pct = Math.round(100*MATCH.score/MATCH.total);
+  const msg = pct>=90?'Nearly every one.':pct>=70?'Most of them.':pct>=40?'About half. Daily beats long.':'Run it again tomorrow.';
+  $('matchTarget').textContent = MATCH.score + ' of ' + MATCH.total;
+  $('matchFeedback').textContent = msg;
+  $('matchFeedback').style.color = 'var(--ink)';
+  $('matchRound').textContent = 'Done';
 }
 async function startMatchGame(){
   if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
@@ -3705,16 +3701,51 @@ function matchFrame(dt, um){
 /* ---- sustain hold ---- */
 const SUS = { running:false, t:0, dur:5, within:0, target:57 };
 function susPickNote(){
-  SUS.target = Math.round((RANGE.lo+RANGE.hi)/2) + (Math.floor(Math.random()*5)-2);
+  const lo = Math.round(RANGE.lo), hi = Math.round(RANGE.hi);
+  const pick = () => {
+    const edge = (SUS.round % 3 === 2) && hi - lo > 10;   /* every third note, out at the edge */
+    if (edge) {
+      const top = Math.random() < 0.5;
+      const from = top ? hi - 3 : lo, to = top ? hi : lo + 3;
+      return from + Math.floor(Math.random() * (to - from + 1));
+    }
+    const a = Math.min(lo + 3, hi), b = Math.max(hi - 3, lo);
+    return a + Math.floor(Math.random() * Math.max(1, b - a + 1));
+  };
+  let t = pick();
+  for (let i = 0; i < 6 && t === SUS.target; i++) t = pick();
+  SUS.target = t;
   $('susTarget').textContent = midiName(SUS.target);
   $('susResult').textContent='';
+}
+function susNewRound(){
+  SUS.round = (SUS.round || 0) + 1;
+  if (SUS.round > 10) return susDone();
+  const r = $('susRound'); if (r) r.textContent = 'Note ' + SUS.round + ' of 10';
+  susPickNote();
+}
+function susDone(){
+  SUS.running = false;
+  const held = SUS.held || 0;
+  const pct = Math.round(100*held/10);
+  $('susTarget').textContent = held + ' of 10';
+  $('susRound').textContent = 'Done';
+  $('susLive').textContent = '';
+  $('susResult').textContent = pct >= 80 ? 'Held ' + held + ' of 10. Steady.'
+    : pct >= 50 ? 'Held ' + held + ' of 10. Getting there.'
+    : 'Held ' + held + ' of 10. Slower air, comfier notes.';
+  try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Hold a note', score: held, out_of: 10 }); } catch(e){}
+  try { V10.markPractised('Hold a note'); } catch(e){}
+  SUS.round = 0; SUS.held = 0;
 }
 $('btnSustain').addEventListener('click', async ()=>{
   if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
   ensureCtx();
   TRAIN.kind='sustain';
   trainView('sustain');
-  susPickNote();
+  SUS.round = 0; SUS.held = 0;
+  const sc = $('susScore'); if (sc) sc.textContent = '0';
+  susNewRound();
 });
 $('btnSusNote').addEventListener('click', susPickNote);
 $('btnSusHear').addEventListener('click', ()=>{ ensureCtx(); (window.V10 && V10.playRef ? V10.playRef : playPiano)(SUS.target, ctx.currentTime+0.02, 1.4, guideGain, 0.7); });
@@ -3754,7 +3785,8 @@ function susFrame(dt, um){
     $('susResult').textContent = pct+'% steady — '+msg;
     try { if (window.RP && RP.logResult) RP.logResult({ kind: 'sustain',
       label: 'Steady note', pct: pct, seconds: SUS.dur }); } catch (e) {}
-    if(pct>=70) playDing(); else playBuzz();
+    if(pct>=70){ SUS.held = (SUS.held||0)+1; const sc=$('susScore'); if(sc) sc.textContent=SUS.held; playDing(); } else playBuzz();
+    setTimeout(()=>{ if(TRAIN.kind==='sustain' && SUS.round) susNewRound(); }, 1500);
   }
 }
 
@@ -5752,7 +5784,7 @@ function exBar(){
   msg.className = 'notice';
   msg.id = 'exMsg';
   msg.style.margin = '0';
-  msg.textContent = 'Pause to think, Restart to take it from the top, Record to keep the run.';
+  msg.textContent = 'Pause, start again, or record this run.';
 
   bar.innerHTML = '';
   bar.appendChild(r1); bar.appendChild(r2); bar.appendChild(msg);
@@ -5900,7 +5932,7 @@ function kbdBuild(){
   p.innerHTML =
     '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<button class="btn ghost" id="btnKbdBack">&lsaquo; Exercises</button>' +
-      '<div class="pill">Keyboard &mdash; you pick the note</div>' +
+      '<div class="pill">Keyboard</div>' +
     '</div>' +
     '<div class="row kbdread" id="kbdRead">' +
       '<div class="kbdcol">' +
@@ -5919,8 +5951,7 @@ function kbdBuild(){
       '<div id="kbdKeys" class="kbd"></div>' +
       '<button class="btn" id="kbdUp" style="padding:0 12px;font-size:20px;font-weight:900">&rsaquo;</button>' +
     '</div>' +
-    '<div class="notice" id="kbdMsg" style="margin-top:10px">Tap a key, then sing it. A held key goes quiet after a second so the mic hears you, not the key.' +
-      ' Turn the phone sideways for more keys. This is free play &mdash; Note Match and Sustain Hold are the scored versions.</div>';
+    '<div class="notice" id="kbdMsg" style="margin-top:10px">Tap a key, then sing that note. Turn the phone sideways for more keys. Nothing is scored here.</div>';
   host.appendChild(p);
   document.getElementById('btnKbdBack').addEventListener('click', kbdExit);
   document.getElementById('kbdDown').addEventListener('click', () => kbdSlide(-1));
@@ -7330,8 +7361,8 @@ renderJourney();
 
   /* One switch decides what every reference note in the app sounds like.
      Default: voice. Robert can flip it in Profile and hear the difference. */
-  V10.refVoice = true;
-  try { V10.refVoice = localStorage.getItem('rep_refvoice') !== 'piano'; } catch (e) {}
+  V10.refVoice = false;
+  try { V10.refVoice = localStorage.getItem('rep_refvoice') === 'voice'; } catch (e) {}
   function playRef(midi, when, dur, dest, vol) {
     if (V10.refVoice) playVoice(midi, when, dur, dest, vol);
     else playPiano(midi, when, dur, dest, vol);
@@ -8897,6 +8928,29 @@ renderJourney();
   /* routines                                                          */
   /* ---------------------------------------------------------------- */
   const ROUTINE = { on: false, steps: [], i: 0, name: '' };
+  function routineBar() {
+    let b = $('rpSessionBar');
+    if (!ROUTINE.on) { if (b) b.style.display = 'none'; return; }
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'rpSessionBar';
+      b.className = 'row';
+      b.style.cssText = 'align-items:center;gap:10px;margin:0 0 10px';
+      const slot = $('trainSlot') || $('modeTrain');
+      slot.parentElement.insertBefore(b, slot);
+    }
+    b.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
+      esc(ROUTINE.name) + ' · step ' + (ROUTINE.i + 1) + ' of ' + ROUTINE.steps.length + '</div>' +
+      '<button class="btn danger ghost" id="rpSessionEnd" style="padding:7px 12px;font-size:12px">End the session</button>';
+    b.style.display = 'flex';
+    $('rpSessionEnd').addEventListener('click', () => {
+      ROUTINE.on = false;
+      routineBar();
+      const g = $('gQuit'); if (g && g.offsetParent !== null) g.click();
+      const t = $('btnTrainStop'); if (t && t.offsetParent !== null) t.click();
+      renderTrain();
+    });
+  }
   function startRoutine(rt) {
     ROUTINE.on = true; ROUTINE.steps = rt.steps.slice(); ROUTINE.i = -1; ROUTINE.name = rt.name;
     if (rt.honest) exToast(rt.honest);
@@ -8906,12 +8960,14 @@ renderJourney();
     ROUTINE.i++;
     if (ROUTINE.i >= ROUTINE.steps.length) {
       ROUTINE.on = false;
+      routineBar();
       V10.markPractised(ROUTINE.name);
       exToast(ROUTINE.name + ' finished.');
       renderTrain();
       return;
     }
     startEx(ROUTINE.steps[ROUTINE.i]);
+    routineBar();
   }
   V10.routineState = ROUTINE;
   V10.startRoutine = startRoutine;
@@ -14693,7 +14749,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       fmt(elapsed()) + '</span></div>';
 
     if (ST.state === 'idle' && !ST.blob) {
-      h += '<div class="notice" style="margin:8px 0 10px">Sing. Nothing is saved until you say so.</div>' +
+      h += '<div class="notice" style="margin:8px 0 10px">Sing. Nothing is saved until you press Keep.</div>' +
         '<button class="btn primary" id="rpStRec" style="width:100%;padding:12px">' +
         '<svg class="ic"><use href="#i-mic"/></svg> Record</button>';
     } else if (ST.state === 'rec' || ST.state === 'paused') {
@@ -15152,7 +15208,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var box = $('rpTakeList');
     if (!box) return;
     var list = takes().filter(function (s) { return !s.assignId; });
-    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>'; }
+    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">No takes yet. Record one above.</div>'; }
     else if (window.RPTakes) {
       box.innerHTML = '<div class="measured" style="margin:6px 0 4px">Newest</div>' + RPTakes.rowHtml(list[0]) +
         (list.length > 1 ? '<div class="measured" style="margin-top:6px">' + (list.length - 1) + ' more in the Library.</div>' : '');
@@ -15184,6 +15240,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       over = null;
     }
     ST.unfollow();
+    var cv0 = $('rpSeekMap'); if (cv0 && cv0.parentElement) cv0.parentElement.removeChild(cv0);
     playBar();
   }
   ST.stopAll = function () {
@@ -15278,6 +15335,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<input type="range" id="rpTakeVol" min="0" max="100" step="5" value="' + Math.round(ST.takeVol * 100) + '" style="flex:1">' +
         '<output id="rpTakeVolOut">' + Math.round(ST.takeVol * 100) + '%</output></label>' : '');
     bar.style.display = '';
+    seekMap();
     on($('rpTakeVol'), 'input', function (e) {
       ST.takeVol = (+e.target.value) / 100;
       try { localStorage.setItem('rp_take_vol', String(ST.takeVol)); } catch (err) {}
@@ -15303,6 +15361,57 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       playBar();
     });
   }
+  /* Robert, 17 Sep: "when I'm listening to a take I want control of where
+     it plays from." The whole take is drawn under the bar with a line where
+     playback is. Tap anywhere on it to play from there. */
+  function seekDur() {
+    var o = ST.overlay; if (!o) return 1;
+    var d = 0;
+    try { d = o.audio.duration; } catch (e) {}
+    if (!(d > 0) || !isFinite(d)) { var n = o.notes[o.notes.length - 1]; d = (n && n.t) || 1; }
+    return d;
+  }
+  function drawHead(cv) {
+    var o = ST.overlay;
+    if (!cv || !o || !o.notes || !window.RPMaps) return;
+    RPMaps.draw(cv, { notes: o.notes, title: '' }, { height: 96 });
+    var g = cv.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var W = cv.clientWidth || 360, H = 96;
+    var t = 0; try { t = o.audio.currentTime || 0; } catch (e) {}
+    var x = 34 + (Math.max(0, Math.min(1, t / seekDur()))) * (W - 40);
+    g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(x, 4); g.lineTo(x, H - 18); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.92)';
+    g.beginPath(); g.arc(x, 6, 3.5, 0, Math.PI * 2); g.fill();
+  }
+  function seekMap() {
+    var bar = $('rpPlayBar');
+    var o = ST.overlay;
+    if (!bar || !o || !o.notes || !window.RPMaps) return;
+    var cv = $('rpSeekMap');
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.id = 'rpSeekMap';
+      cv.style.cssText = 'display:block;width:100%;height:96px;border-radius:10px;border:1px solid var(--line);margin-top:8px;cursor:pointer;flex:1 1 100%';
+      bar.appendChild(cv);
+      cv.addEventListener('pointerdown', function (e) {
+        var oo = ST.overlay; if (!oo || !oo.audio) return;
+        var r = cv.getBoundingClientRect();
+        var frac = Math.max(0, Math.min(1, (e.clientX - r.left - 34) / Math.max(1, r.width - 40)));
+        try { oo.audio.currentTime = frac * seekDur(); } catch (err) {}
+        try { if (oo.audio.paused && oo.audio.play) { var pr = oo.audio.play(); if (pr && pr.catch) pr.catch(function () {}); } } catch (err) {}
+        setTimeout(playBar, 60);
+      });
+    } else if (cv.parentElement !== bar) { bar.appendChild(cv); }
+    drawHead(cv);
+  }
+  setInterval(function () {
+    var cv = $('rpSeekMap');
+    if (cv && cv.offsetParent !== null && ST.overlay) drawHead(cv);
+  }, 140);
+
   /* Listen (from the take list) sets the overlay too; the bar follows it */
   document.addEventListener('visibilitychange', function () {
     /* Robert, 16 Sep: "my phone is asleep and it's still playing." */
@@ -16150,7 +16259,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       'WORKING ON</div>' +
       '<div style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;' +
       'text-overflow:ellipsis">' + esc(w.title) + '</div></div>' +
-      '<button class="btn" id="rpWkX" style="padding:6px 10px;font-size:11.5px">Leave</button></div>';
+      '<button class="btn" id="rpWkX" style="padding:6px 10px;font-size:11.5px">Stop working on this</button></div>';
 
     if (rec || paused) {
       h += '<div class="row" style="gap:7px;margin-top:9px;flex-wrap:nowrap">' +
@@ -17208,6 +17317,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     } catch (err) { return; }
   }
 
+  /* Robert's audit: the last exercise's card stayed at the top of Train,
+     above whatever you started next. It goes when the exercise does. */
+  setInterval(function () {
+    var f = $('rpFactStrip');
+    if (!f) return;
+    var g = $('v10Guided'), bar = $('trainLadderBar');
+    var running = (g && g.style.display !== 'none') || (bar && bar.style.display !== 'none');
+    if (!running && f.parentElement) f.parentElement.removeChild(f);
+  }, 700);
+
   (function wrapNoteRunning() {
     function attach() {
       if (!window.V10 || !V10.noteRunning || V10.noteRunning.__rp) return false;
@@ -17406,9 +17525,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   B.open = function (openId) {
-    var h = '<b style="font-size:18px">Before the voice</b>' +
-      '<div class="measured" style="margin-top:8px">About ' + mins() + ' minutes, and none of it ' +
-      'makes a sound. Do the lot or pick one.</div>';
+    var h = '<b style="font-size:18px">Body and breath</b>' +
+      '<div class="measured" style="margin-top:8px">About ' + Math.round(mins()) + ' minutes, and no singing. ' +
+      'Do all of it, or pick one.</div>';
 
     /* The safety panel is not small print and is not at the bottom. */
     h += '<div class="rp-card" style="margin-top:14px;padding:13px;border-left:3px solid var(--miss)">' +
@@ -17466,7 +17585,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn" id="rpBodyGo" style="padding:7px 12px;font-size:12px">Open</button>' +
       '</div>' +
       '<div class="exsyl" style="margin-top:6px;font-weight:600">Posture, jaw, tongue, shoulders. ' +
-      'About ' + mins() + ' minutes, no sound.</div>' +
+      'About ' + Math.round(mins()) + ' minutes, no singing.</div>' +
       '<div class="measured">The body first. Nothing here goes near your throat, and one of them ' +
       'says plainly that it is not evidenced.</div>';
     host.insertBefore(d, host.firstChild);
@@ -18761,9 +18880,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   ];
   var LEVELS = [[0, 'Any level'], [1, 'Beginner'], [2, 'Intermediate'], [3, 'Advanced']];
   var TOOLS = [
-    ['btnMatch',   'Note Match',   'A note plays, you sing it back and hold it. Ten rounds.'],
-    ['btnKbd',     'Keyboard',     'Free play: press a note, sing it back. Not scored — Note Match and Sustain Hold are.'],
-    ['btnSustain', 'Sustain Hold', 'Hold one note dead steady for five seconds.']
+    ['btnMatch',   'Match the note',  'A note plays. Sing it back and hold it. Ten notes.'],
+    ['btnKbd',     'Keyboard',        'Press a note and sing it back. Nothing is scored here.'],
+    ['btnSustain', 'Hold a note',     'Hold one note steady for five seconds. Ten notes.'],
+    ['rpIntervalGo', 'Hold the interval', 'A note plays. Sing the one a step above it, and hold it.']
   ];
   var DRILLS = [
     ['tonic',   'Sing the home note', 'A short tune plays. Sing the note it sounds finished on.'],
@@ -18918,7 +19038,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       h += '<div class="rp-lab" style="margin-top:14px">' + esc(c.name.toUpperCase()) + '</div>';
       list.forEach(function (e) { h += exCard(e, false); });
     });
-    RPPage.open({ key: 'all', title: 'Every exercise', sub: EX().length + ' of them. Tap a name to read about it.', html: h, backLabel: 'Train',
+    RPPage.open({ key: 'all', title: 'Every exercise', sub: 'Tap a name to read what it is.', html: h, backLabel: 'Train',
       wire: function (root) { wireEx(root, { label: 'Every exercise', go: TR.all }); } });
   };
 
@@ -18941,11 +19061,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       top.id = 'rpTrainTop';
       mode.insertBefore(top, mode.firstChild);
     }
+    /* Robert, 17 Sep: the seven categories were on the screen twice — pills
+       at the top and a list below, doing two different jobs. The pills are
+       gone; the buttons in the body are the way in. The level chips stay:
+       they say which level the one below came from. */
     var h = '<div class="segrow" style="margin-top:2px">';
-    CATS.forEach(function (c) {
-      h += '<button class="seg' + (sel.cat === c.id ? ' on' : '') + '" data-cat="' + c.id + '">' + esc(c.name) + '</button>';
-    });
-    h += '</div><div class="segrow">';
     var eff = effectiveLevel(sel.cat, sel.level);
     levelsIn(sel.cat).forEach(function (l) {
       h += '<button class="seg' + (eff === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '">' + l[1] + '</button>';
@@ -18959,11 +19079,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
         '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px">' + esc(dr[1]) + '</div><div class="rp-sub">' + esc(dr[2]) + '</div></div>' +
         '<button class="btn primary" data-drill="' + dr[0] + '" style="padding:10px 16px;font-size:13px">Play</button></div>' +
-        '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See all ear drills</button></div>';
+        '<button class="btn" data-more="ear" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">All ear exercises</button></div>';
     } else {
       var one = pickOne(sel.cat, effectiveLevel(sel.cat, sel.level));
       if (one) {
-        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">QUICK ONE · ' + esc(c.name.toUpperCase()) +
+        h += '<div class="rp-card hot" style="padding:13px;margin-top:8px"><div class="rp-lab">ONE TO DO NOW · ' + esc(c.name.toUpperCase()) +
           ' · ' + esc(lvlName(one.level).toUpperCase()) + '</div>' +
           '<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-top:6px">' +
           '<div style="flex:1;min-width:0"><div class="rp-ttl" style="font-size:15px" data-exopen="' + esc(one.id) + '">' + esc(one.name) +
@@ -18971,8 +19091,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           '<div class="rp-sub">' + esc(strip(one.what)) + '</div></div>' +
           '<button class="btn primary" data-exstart="' + esc(one.id) + '" style="padding:10px 16px;font-size:13px">Start</button></div>' +
           (window.RPExample ? '<div style="margin-top:8px">' + RPExample.button(one.id, true) + '</div>' : '') +
-          '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">See more ' +
-          esc(c.name.toLowerCase()) + '</button></div>';
+          '<button class="btn" data-more="' + esc(sel.cat) + '" style="width:100%;padding:9px;margin-top:10px;font-size:12.5px">All ' +
+          esc(c.name.toLowerCase()) + ' exercises</button></div>';
       }
     }
 
@@ -18983,13 +19103,19 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 17 Sep: the seven categories were on the screen twice — the
        chips at the top and a tile for each below. The chips choose; See
        more opens the list. The tiles went. */
-    h += '<h3 style="margin:18px 4px 2px">Also</h3>';
+    h += '<h3 style="margin:18px 4px 2px">Tools</h3>';
     h += RPPage.tiles([
-      { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, drawn live. Record a take.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'I want to be able to…', sub: 'Say what you want. It picks the exercises.', id: 'rpTileGoals' },
-      { icon: 'i-user',     title: 'Before the voice', sub: 'Posture, jaw, tongue, shoulders. No sound.', id: 'rpTileBody' }
+      { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
+      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Say what you want to sing better. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
-    h += '<button class="btn" id="rpTrainAll" style="width:100%;padding:11px;margin-top:14px;font-size:12.5px">Every exercise, all at once</button>';
+    /* Robert, 17 Sep: the pillars as their own buttons with icons, in the
+       body of the screen, under the tools and above the browse link. */
+    h += '<h3 style="margin:18px 4px 2px">What do you want to work on?</h3>';
+    h += RPPage.tiles(CATS.map(function (c) {
+      return { icon: c.icon, title: c.name, sub: c.sub, data: 'data-more="' + c.id + '"' };
+    }));
+    h += '<button class="btn" id="rpTrainAll" style="width:100%;padding:11px;margin-top:14px;font-size:12.5px">Browse every exercise</button>';
 
     top.innerHTML = h;
     wireEx(top);
@@ -19037,7 +19163,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.style.cursor = 'pointer';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
       '<div><div class="rp-ttl">Every exercise, explained</div>' +
-      '<div class="rp-sub">What each one is and how to do it.</div></div>' +
+      '<div class="rp-sub">What each one is, and how to do it.</div></div>' +
       '<div style="color:var(--ink-faint);font-size:20px">›</div></div>';
     on(d, 'click', function () {
       try { window.switchMode('train'); } catch (e) {}
@@ -19050,8 +19176,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   setTimeout(helpRow, 800);
 
   TR.running = function () { return running(); };
+  TR.redraw = function () { try { draw(); } catch (e) {} };
   function running() {
-    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox'];
+    var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox', 'rpIntervalPanel'];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
       if (el && el.offsetParent !== null) return true;
@@ -19366,17 +19493,17 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   var PR = window.RPProfile = {};
 
   var GROUPS = [
-    { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Who you are signed in as.',
+    { key: 'account', icon: 'i-user',      title: 'Account',           sub: 'Your name, your email and your password.',
       folds: ['Account'], cards: [] },
-    { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and where you are.',
+    { key: 'voice',   icon: 'i-mic',       title: 'Your voice',        sub: 'Your range, and how hard the exercises are.',
       folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
-    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your level.',
+    { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and your points.',
       folds: ['Practice'], cards: ['rpLevelRow'] },
-    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Testing, troubleshooting, the mic.',
+    { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
-    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much extra.',
+    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
-    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'The tour, the guide, and about.',
+    { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A walk round the app, and a guide with pictures.',
       folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
   ];
 
@@ -19463,6 +19590,20 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try { if (window.RPPage && RPPage.isOpen() && document.querySelector('#youSlots details.pfold')) gather(); } catch (e) {}
   }, 600);
 
+  /* Robert's audit: the Help page said "About" twice — the fold's summary
+     and the heading inside it — and showed a version string. */
+  function tidyAbout(f) {
+    var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
+    f.querySelectorAll('b').forEach(function (b) {
+      if ((b.textContent || '').trim() === 'About') b.style.display = 'none';
+    });
+    var v = f.querySelector('#youVer');
+    if (v && v.parentElement) {
+      var n = v.parentElement;
+      n.innerHTML = n.innerHTML.replace(/Version\s*<b[^>]*id="youVer"[^>]*>[^<]*<\/b><br>\s*/i, '');
+    }
+  }
+
   PR.open = function (key) {
     var g = GROUPS.filter(function (x) { return x.key === key; })[0];
     if (!g || !window.RPPage) return;
@@ -19473,6 +19614,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     box.querySelectorAll('details.pfold').forEach(function (d) { d.open = true; });
     var rp = $('rangePanel'); if (rp && key === 'voice') rp.style.display = 'block';
     if (key === 'voice') { var f = foldNamed('Your voice'); if (f) tidyVoice(f); }
+    if (key === 'help') { var fa = foldNamed('About'); if (fa) { fa.open = true; tidyAbout(fa); } }
     RPPage.open({ key: 'profile:' + key, title: g.title, sub: g.sub, node: box, backLabel: 'Profile' });
   };
 
@@ -19754,7 +19896,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       if (chip === 'all') {
         body += row({ title: 'All songs', sub: 'Everything you own · ' + owned().length, icon: 'i-music', data: 'data-pin="all"' });
         body += row({ title: 'Takes', sub: 'Everything you have recorded · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
-        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Kept on their own · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
+        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Saved from a take · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
       }
       plists().forEach(function (p) {
         var ss = plSongs(p);
@@ -19845,9 +19987,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<b>Record something</b><div class="rp-sub" style="margin:2px 0 0">Straight into your recordings.</div></button>' +
       '<button class="btn" id="rpAddPl" style="width:100%;padding:13px;margin-top:8px;text-align:left">' +
       '<b>New playlist</b><div class="rp-sub" style="margin:2px 0 0">Group songs however you like.</div></button>' +
-      '<button class="btn" id="rpAddBuy" style="width:100%;padding:13px;margin-top:8px;text-align:left">' +
-      '<b>Get songs</b><div class="rp-sub" style="margin:2px 0 0">About $1.29 each — buy once, own forever.</div></button>' +
-      '<button class="btn" id="rpAddX" style="width:100%;padding:12px;margin-top:14px">Close</button></div>';
+            '<button class="btn" id="rpAddX" style="width:100%;padding:12px;margin-top:14px">Close</button></div>';
     o.style.display = 'flex';
     function shut() { o.style.display = 'none'; o.innerHTML = ''; }
     on($('rpAddX'), 'click', shut);
@@ -20303,28 +20443,28 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
        out of it, how to use it." The first and last cards answer the first
        two; everything between is the third. */
     { mode: 'home', find: null,
-      text: 'Repertoire is a singing coach in your pocket: fifteen minutes a day, and your real coach\u2019s work when you have one.' },
+      text: 'Fifteen minutes a day. Repertoire sets it, or your coach does when you have one.' },
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first — through the speaker the app squeals. Sound check is on Home if you are not sure they work.' },
+      text: 'Put headphones in first. Through the speaker the app squeals.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
                           : 'Make an account here so a coach can find you.';
       } },
     { mode: 'home', find: function () { return $('rpTodayGo') || $('btnJourney'); },
-      text: 'Every day, press this — fifteen minutes, from whoever is coaching you.' },
+      text: 'Press this every day. Fifteen minutes, set by whoever is coaching you.' },
     { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
-      text: 'Want one thing? Pick what to work on up top, then Start.' },
+      text: 'One thing to do now, at your level. Press Start.' },
     /* Briar, 14 Sep: did not know what a lip trill was, and did not know
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
-      text: 'Tap any exercise to read what it is and how to do it, and tap any word with an ⓘ for what it means.' },
+      text: 'Further down, pick what to work on. Tap any exercise to read what it is.' },
     { mode: 'train', find: function () { return $('rpTileTracker'); },
-      text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
+      text: 'The Pitch Tracker draws the notes you sing, as you sing them.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
-      text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
+      text: 'Free Sing is for fun. A bit of echo, nothing measured.' },
     /* Robert, 13 Sep: "need a card to teach about the live microphone
        feedback." It lives on Free Sing, so the tour goes there for it. */
     { mode: 'voice', find: function () { return $('rpVMon'); },
@@ -20337,11 +20477,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         return 'Got a coach? Their code goes in here, and what they set you shows up here.';
       } },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="voice"]'); },
-      text: 'Your range lives here. Sing it once and every exercise fits your voice.' },
+      text: 'Sing your range once here, and every exercise fits your voice.' },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="help"]'); },
-      text: 'Lost? This tour and a guide with pictures live here.' },
+      text: 'Lost? This walk-round and a guide with pictures are here.' },
     { mode: 'home', find: null,
-      text: 'What you get: do the fifteen minutes most days and the app keeps count — of the days, and of what you can do now that you could not.' }
+      text: 'Do the fifteen minutes most days. The app counts the days, and what you can do now.' }
   ];
 
   var COACH = [
@@ -20564,13 +20704,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   var TIPS = {
     tracker: { host: 'modeFree', anchor: 'rpStudio', steps: [
       { find: function () { return $('freeCanvas'); },
-        text: 'Sing. The blue line is your voice; the gold lines are the notes. Hold a note and keep the line flat on one.' },
+        text: 'Sing. The blue line is your voice. Hold it flat on one of the note lines.' },
       { find: function () { return $('rpStRec'); },
-        text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
+        text: 'Record a take. The notes are kept with it, so you can hear it and see it.' },
       { find: function () { return $('rpTakeList') || $('rpTakes'); },
-        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' },
+        text: 'Your takes live here. Play one and its notes appear in gold, so you can sing over it.' },
       { find: function () { return $('freeCanvas'); },
-        text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
+        text: 'Not seeing your voice? Profile, Sound and microphone, turn “Ignore background noise” down.' }
     ] },
     guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
       { find: function () { return $('gBig'); },
@@ -20578,17 +20718,17 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     ] },
     ladder: { host: 'trainLadderBar', anchor: 'ladderTitle', steps: [
       { find: function () { return $('gameCanvas'); },
-        text: 'The gold bars are the notes to sing. Your voice is the blue line. Fill a bar to score it.' },
+        text: 'Sing the gold bars. Your voice is the blue line. Fill a bar to score it.' },
       { find: function () { return $('btnExPause'); },
-        text: 'Pause to think, Restart to take it from the top, Record to keep the run.' },
+        text: 'Pause, start again, or record this run.' },
       { find: function () { return $('gameCanvas'); },
-        text: 'Paused or finished, drag the chart to the right to see what you sang.' }
+        text: 'Paused or finished, drag the chart right to see what you sang.' }
     ] },
     match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
       { find: function () { return $('matchTarget'); },
         text: 'This is the note to sing. Replay plays it again.' },
       { find: function () { return $('matchHold'); },
-        text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
+        text: 'Sing it and hold. The bar fills while you are on the note.' }
     ] },
     voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
       { find: function () { return $('rpVis'); },
@@ -20600,15 +20740,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     ] },
     sustain: { host: 'susPanel', anchor: 'btnSusStart', steps: [
       { find: function () { return $('rpSusKeys'); },
-        text: 'The lit key is the note to hold. Your voice is the dot — green when it is on the note.' },
+        text: 'Gold is the note to hold. The key you are singing lights up.' },
       { find: function () { return $('btnSusStart'); },
-        text: 'Start hold, then keep the note dead steady for five seconds. New note picks another.' }
+        text: 'Press Start the hold and keep the note steady for five seconds. Ten notes in all.' }
     ] },
     keys: { host: 'kbdPanel', anchor: 'kbdUp', steps: [
       { find: function () { return $('kbdKeys'); },
-        text: 'Tap a key, then sing it. The key you are singing lights up.' },
+        text: 'Tap a key, then sing that note. The key you are singing lights up.' },
       { find: function () { return $('kbdMsg'); },
-        text: 'A held key goes quiet after a second so the mic hears you, not the key. Sideways gives more keys.' }
+        text: 'Turn the phone sideways for more keys.' }
     ] },
     ear: { host: 'v10Ear', anchor: 'earQuit', steps: [
       { find: function () { return $('earReplay'); },
@@ -21335,16 +21475,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.style.cssText = 'padding:12px;margin-top:10px';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
       '<div style="flex:1;min-width:0"><div class="rp-ttl">Sound check</div>' +
-      '<div class="rp-sub" data-sc-msg>Not sure your headphones work? Play a note.</div></div>' +
+      '<div class="rp-sub" data-sc-msg>Play a note to check your headphones.</div></div>' +
       '<button class="btn primary" data-sc-go style="padding:9px 14px;font-size:12.5px;flex:none">Play a note</button></div>';
     var msg = d.querySelector('[data-sc-msg]');
     d.querySelector('[data-sc-go]').addEventListener('click', function (ev) {
       ev.stopPropagation();
       var ok = SC.check();
       msg.textContent = ok
-        ? 'Heard a note? Your headphones are fine. Nothing? Turn the volume up, then check the plug or the Bluetooth connection.'
+        ? 'Heard it? Your headphones are fine. Nothing? Turn the volume up, then check the plug or the Bluetooth connection.'
         : 'The phone would not play sound. Tap once more, and check the volume.';
-      setTimeout(function () { msg.textContent = 'Not sure your headphones work? Play a note.'; }, 9000);
+      setTimeout(function () { msg.textContent = 'Play a note to check your headphones.'; }, 9000);
     });
     return d;
   }
@@ -21622,8 +21762,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(fmt(map.dur)) +
       (map.from ? ' · from ' + esc(map.from) : '') + ' · kept ' + (d.getMonth() + 1) + '/' + d.getDate() + '</div>' +
       '<canvas id="rpMapCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
-      '<div class="measured" style="margin-top:6px">Blue is what was sung. Gold lines are C. Time runs left to right.</div>' +
-      '<button class="btn primary" id="rpMapGuide" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Play it as a guide on the Pitch Tracker</button>' +
+      '<div class="measured" style="margin-top:6px">The notes that were sung. Gold lines are C. Time runs left to right.</div>' +
+      '<button class="btn primary" id="rpMapGuide" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing over it on the Pitch Tracker</button>' +
       '<div class="row" style="gap:8px;margin-top:8px">' +
       '<button class="btn" id="rpMapImg" style="flex:1;padding:10px;font-size:12.5px">Save as picture</button>' +
       '<button class="btn" id="rpMapName" style="flex:1;padding:10px;font-size:12.5px">Rename</button>' +
@@ -21814,7 +21954,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var h = '<div class="rp-sub" style="margin:-6px 0 10px">' + esc(T.groupOf(s)) + ' · ' + fmt(s.duration) + ' · ' + day(s.addedAt) +
       (s.sentAt ? ' · sent to your coach' : '') + '</div>' +
       (hasNotes ? '<canvas id="rpTakeCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
-        '<div class="measured" style="margin-top:6px">The notes you sang. Blue is you; gold lines are C.</div>' : '') +
+        '<div class="measured" style="margin-top:6px">The notes you sang. Gold lines are C.</div>' : '') +
       (hasNotes ? '<button class="btn primary" id="rpTkOver" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing over it</button>' : '') +
       '<div class="row" style="gap:6px;margin-top:8px">' +
       '<button class="btn" id="rpTkPlay" style="flex:1;padding:10px;font-size:12.5px">Listen</button>' +
@@ -21852,6 +21992,223 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       } });
     setTimeout(function () { var cv = $('rpTakeCv'); if (cv && window.RPMaps) RPMaps.draw(cv, { notes: s.notes, title: '' }, { height: 220 }); }, 60);
   };
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — Hold the interval.
+
+   Robert asked for the keyboard and the hold put together as one
+   exercise about intervals: a note plays, you are told how far to go,
+   you sing that note and hold it. Ten of them, scored like Match the
+   note, so it counts towards the week.
+
+   The reference note is the app's own (piano by default). The keys
+   underneath are the same keys as everywhere else: gold is the note to
+   sing, and the key you are actually singing lights up.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function on(el, ev, fn) { if (el) el.addEventListener(ev, fn); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function name(m) { try { return midiName(m); } catch (e) { return String(m); } }
+
+  var I = window.RPInterval = {};
+  var S = { on: false, round: 0, total: 10, held: 0, from: 60, to: 64, step: 4,
+            holding: 0, need: 2.5, phase: 'listen', raf: null };
+
+  /* the ones worth a singer's time, up only: a whole step, a third, a
+     fourth, a fifth, an octave */
+  var STEPS = [[2, 'a whole step'], [4, 'a third'], [5, 'a fourth'], [7, 'a fifth'], [12, 'an octave']];
+
+  function panel() {
+    var p = $('rpIntervalPanel');
+    if (p) return p;
+    p = document.createElement('div');
+    p.id = 'rpIntervalPanel';
+    p.className = 'panel';
+    p.style.display = 'none';
+    var slot = $('trainSlot') || $('modeTrain');
+    slot.parentElement.insertBefore(p, slot);
+    return p;
+  }
+
+  function draw() {
+    var p = panel();
+    p.innerHTML =
+      '<div class="row" style="justify-content:space-between;align-items:center">' +
+        '<button class="btn ghost" id="rpIvBack">‹ Exercises</button>' +
+        '<div class="pill" id="rpIvRound">Note ' + Math.min(S.round, S.total) + ' of ' + S.total + '</div>' +
+      '</div>' +
+      '<div class="row" style="justify-content:space-between;align-items:center;margin-top:6px">' +
+        '<h3 style="margin:0">Hold the interval</h3>' +
+        '<div class="pill">Held: <b id="rpIvScore" style="color:var(--hit)">' + S.held + '</b></div>' +
+      '</div>' +
+      '<div style="text-align:center;margin-top:10px">' +
+        '<div style="font-size:12px;color:var(--ink-dim);font-weight:700;letter-spacing:1px">SING <span id="rpIvWhat">' + esc(S.stepName || '') + '</span> ABOVE</div>' +
+        '<div id="rpIvFrom" style="font-size:40px;font-weight:900;color:var(--ink-dim)">' + esc(name(S.from)) + '</div>' +
+        '<div id="rpIvFb" style="font-size:16px;font-weight:700;min-height:24px;color:var(--ink-dim)">listen…</div>' +
+        '<div class="micmeter" style="max-width:420px;margin:10px auto;height:14px"><i id="rpIvBar" style="width:0%"></i></div>' +
+      '</div>' +
+      '<div id="rpIvKeys" class="kbd" style="height:120px;margin:6px auto 4px;max-width:460px"></div>' +
+      '<div class="row" style="justify-content:center;margin-top:8px">' +
+        '<button class="btn" id="rpIvHear">Play it again</button>' +
+        '<button class="btn ghost" id="rpIvSkip">Skip this one</button>' +
+      '</div>' +
+      '<div id="rpIvResult" style="font-size:17px;font-weight:800;margin-top:10px;min-height:24px;text-align:center"></div>' +
+      '<div class="notice" style="margin-top:8px">The low note plays, then you sing the higher one and hold it. Gold is the note to sing.</div>';
+    on($('rpIvBack'), 'click', I.quit);
+    on($('rpIvHear'), 'click', playFrom);
+    on($('rpIvSkip'), 'click', next);
+    keys();
+  }
+
+  /* the same keys as the keyboard and the hold */
+  function black(m) { return [1, 3, 6, 8, 10].indexOf(((m % 12) + 12) % 12) >= 0; }
+  var els = {}, lo = null;
+  function keys() {
+    var host = $('rpIvKeys');
+    if (!host) return;
+    lo = S.to - 6;
+    host.innerHTML = ''; els = {};
+    var notes = [];
+    for (var m = lo; m <= S.to + 6; m++) notes.push(m);
+    while (notes.length && black(notes[notes.length - 1])) notes.pop();
+    while (notes.length && black(notes[0])) notes.shift();
+    var whites = notes.filter(function (m) { return !black(m); });
+    var wPct = 100 / whites.length, wi = 0;
+    notes.forEach(function (m) {
+      if (black(m)) return;
+      var el = document.createElement('div');
+      el.className = 'kbdkey white';
+      el.style.left = (wi * wPct) + '%'; el.style.width = wPct + '%';
+      el.innerHTML = '<span>' + esc(name(m)) + '</span>';
+      host.appendChild(el); els[m] = el; wi++;
+    });
+    wi = 0;
+    notes.forEach(function (m) {
+      if (!black(m)) { wi++; return; }
+      var el = document.createElement('div');
+      el.className = 'kbdkey black';
+      el.style.left = 'calc(' + (wi * wPct) + '% - ' + (wPct * 0.30) + '%)';
+      el.style.width = (wPct * 0.60) + '%';
+      host.appendChild(el); els[m] = el;
+    });
+  }
+
+  function playFrom() {
+    try {
+      if (typeof ensureCtx === 'function') ensureCtx();
+      var play = (window.V10 && V10.playRef) ? V10.playRef : window.playPiano;
+      play(S.from, ctx.currentTime + 0.05, 1.3, guideGain, 0.75);
+    } catch (e) {}
+    S.phase = 'sing';
+    var f = $('rpIvFb'); if (f) { f.textContent = 'now sing ' + S.stepName + ' above it'; f.style.color = 'var(--ink-dim)'; }
+  }
+
+  function next() {
+    S.round++;
+    if (S.round > S.total) return done();
+    var r = $('rpIvRound'); if (r) r.textContent = 'Note ' + S.round + ' of ' + S.total;
+    var pick = STEPS[Math.floor(Math.random() * STEPS.length)];
+    S.step = pick[0]; S.stepName = pick[1];
+    var loR = 57, hiR = 69;
+    try { loR = Math.round(RANGE.lo); hiR = Math.round(RANGE.hi); } catch (e) {}
+    var top = Math.max(loR + 1, hiR - S.step);
+    S.from = loR + Math.floor(Math.random() * Math.max(1, top - loR + 1));
+    S.to = S.from + S.step;
+    S.holding = 0;
+    var w = $('rpIvWhat'); if (w) w.textContent = S.stepName;
+    var fr = $('rpIvFrom'); if (fr) fr.textContent = name(S.from);
+    var res = $('rpIvResult'); if (res) res.textContent = '';
+    keys();
+    setTimeout(playFrom, 250);
+  }
+
+  function done() {
+    S.on = false;
+    if (S.raf) { cancelAnimationFrame(S.raf); S.raf = null; }
+    var f = $('rpIvFb'); if (f) f.textContent = '';
+    var r = $('rpIvRound'); if (r) r.textContent = 'Done';
+    var res = $('rpIvResult');
+    if (res) res.textContent = 'Held ' + S.held + ' of ' + S.total + '.' +
+      (S.held >= 8 ? ' Your ear knows the distance.' : S.held >= 5 ? ' Halfway there.' : ' Try the whole steps and fifths first.');
+    try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Hold the interval', score: S.held, out_of: S.total }); } catch (e) {}
+    try { V10.markPractised('Hold the interval'); } catch (e) {}
+  }
+
+  function frame() {
+    if (!S.on) { S.raf = null; return; }
+    var um = null;
+    try { um = (MIC.on && typeof smoothedMidi === 'function') ? smoothedMidi() : null; } catch (e) {}
+    var lit = null;
+    if (um != null) {
+      var d = um - S.to;
+      d = ((d % 12) + 18) % 12 - 6;
+      lit = Math.round(S.to + d);
+      var okNow = Math.abs(d * 100) <= 50;
+      if (S.phase === 'sing' && okNow) S.holding += 1 / 60; else if (!okNow) S.holding = Math.max(0, S.holding - 1 / 90);
+      var f = $('rpIvFb');
+      if (f && S.phase === 'sing') {
+        f.textContent = okNow ? '✓ hold it…' : (d > 0 ? '↓ a bit high · you: ' + name(Math.round(um)) : '↑ a bit low · you: ' + name(Math.round(um)));
+        f.style.color = okNow ? 'var(--hit)' : 'var(--gold)';
+      }
+    }
+    var bar = $('rpIvBar');
+    if (bar) bar.style.width = Math.min(100, S.holding / S.need * 100) + '%';
+    for (var k in els) {
+      var m = +k;
+      els[k].classList.toggle('lit', lit != null && m === lit && m !== S.to);
+      els[k].style.background = (m === S.to) ? (black(m) ? '#b8862c' : 'linear-gradient(180deg,#f5d27a,#e8b34a)') : '';
+    }
+    if (S.phase === 'sing' && S.holding >= S.need) {
+      S.held++;
+      var sc = $('rpIvScore'); if (sc) sc.textContent = S.held;
+      var res = $('rpIvResult'); if (res) res.textContent = '✓ ' + name(S.to) + ' — ' + S.stepName + ' above ' + name(S.from);
+      S.phase = 'listen'; S.holding = 0;
+      try { playDing(); } catch (e) {}
+      setTimeout(function () { if (S.on) next(); }, 1200);
+    }
+    S.raf = requestAnimationFrame(frame);
+  }
+
+  I.start = function () {
+    (async function () {
+      try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {}
+      try { if (typeof ensureCtx === 'function') ensureCtx(); } catch (e) {}
+      try { TRAIN.kind = 'interval'; } catch (e) {}
+      document.querySelectorAll('#v10TrainHost, #rangePanel, #rpTrainTop').forEach(function (el) { el.style.display = 'none'; });
+      S.on = true; S.round = 0; S.held = 0; S.phase = 'listen';
+      draw();
+      panel().style.display = 'block';
+      next();
+      if (!S.raf) S.raf = requestAnimationFrame(frame);
+    })();
+  };
+  I.quit = function () {
+    S.on = false;
+    if (S.raf) { cancelAnimationFrame(S.raf); S.raf = null; }
+    var p = $('rpIntervalPanel'); if (p) p.style.display = 'none';
+    try { TRAIN.kind = null; } catch (e) {}
+    document.querySelectorAll('#v10TrainHost, #rangePanel, #rpTrainTop').forEach(function (el) { el.style.display = ''; });
+    try { if (window.RPTrain && RPTrain.redraw) RPTrain.redraw(); } catch (e) {}
+  };
+  I.running = function () { return !!S.on; };
+
+  /* a hidden button so the Train list can launch it the way it launches
+     the others */
+  function mount() {
+    if ($('rpIntervalGo')) return;
+    var b = document.createElement('button');
+    b.id = 'rpIntervalGo';
+    b.style.display = 'none';
+    b.addEventListener('click', I.start);
+    (document.getElementById('modeTrain') || document.body).appendChild(b);
+  }
+  setInterval(mount, 1200);
+  setTimeout(mount, 600);
 })();
 
 </script>

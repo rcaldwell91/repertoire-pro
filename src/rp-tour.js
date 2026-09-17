@@ -46,28 +46,28 @@
        out of it, how to use it." The first and last cards answer the first
        two; everything between is the third. */
     { mode: 'home', find: null,
-      text: 'Repertoire is a singing coach in your pocket: fifteen minutes a day, and your real coach\u2019s work when you have one.' },
+      text: 'Fifteen minutes a day. Repertoire sets it, or your coach does when you have one.' },
     /* Nothing on the screen to point at for this one — it is about the
        thing in your hand, not a button — so it is a plain card, no ring. */
     { mode: 'home', find: null,
-      text: 'Put headphones in first — through the speaker the app squeals. Sound check is on Home if you are not sure they work.' },
+      text: 'Put headphones in first. Through the speaker the app squeals.' },
     { mode: 'home', find: function () { return $('rpAccount'); },
       text: function () {
         return signedIn() ? 'Your account — your name, and where you sign out.'
                           : 'Make an account here so a coach can find you.';
       } },
     { mode: 'home', find: function () { return $('rpTodayGo') || $('btnJourney'); },
-      text: 'Every day, press this — fifteen minutes, from whoever is coaching you.' },
+      text: 'Press this every day. Fifteen minutes, set by whoever is coaching you.' },
     { mode: 'train', find: function () { return first('#rpTrainTop [data-exstart], #rpTrainTop [data-drill]'); },
-      text: 'Want one thing? Pick what to work on up top, then Start.' },
+      text: 'One thing to do now, at your level. Press Start.' },
     /* Briar, 14 Sep: did not know what a lip trill was, and did not know
        the card would tell her. */
     { mode: 'train', find: function () { return first('#rpTrainTop [data-more]'); },
-      text: 'Tap any exercise to read what it is and how to do it, and tap any word with an ⓘ for what it means.' },
+      text: 'Further down, pick what to work on. Tap any exercise to read what it is.' },
     { mode: 'train', find: function () { return $('rpTileTracker'); },
-      text: 'The Pitch Tracker draws the notes you sing as you sing them — and records a take.' },
+      text: 'The Pitch Tracker draws the notes you sing, as you sing them.' },
     { mode: 'singhub', find: function () { return $('shFree'); },
-      text: 'Free Sing is for fun — a bit of echo, something to watch, nothing measured or sent.' },
+      text: 'Free Sing is for fun. A bit of echo, nothing measured.' },
     /* Robert, 13 Sep: "need a card to teach about the live microphone
        feedback." It lives on Free Sing, so the tour goes there for it. */
     { mode: 'voice', find: function () { return $('rpVMon'); },
@@ -80,11 +80,11 @@
         return 'Got a coach? Their code goes in here, and what they set you shows up here.';
       } },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="voice"]'); },
-      text: 'Your range lives here. Sing it once and every exercise fits your voice.' },
+      text: 'Sing your range once here, and every exercise fits your voice.' },
     { mode: 'you', find: function () { return first('#rpProfileTop [data-pg="help"]'); },
-      text: 'Lost? This tour and a guide with pictures live here.' },
+      text: 'Lost? This walk-round and a guide with pictures are here.' },
     { mode: 'home', find: null,
-      text: 'What you get: do the fifteen minutes most days and the app keeps count — of the days, and of what you can do now that you could not.' }
+      text: 'Do the fifteen minutes most days. The app counts the days, and what you can do now.' }
   ];
 
   var COACH = [
@@ -307,13 +307,13 @@
   var TIPS = {
     tracker: { host: 'modeFree', anchor: 'rpStudio', steps: [
       { find: function () { return $('freeCanvas'); },
-        text: 'Sing. The blue line is your voice; the gold lines are the notes. Hold a note and keep the line flat on one.' },
+        text: 'Sing. The blue line is your voice. Hold it flat on one of the note lines.' },
       { find: function () { return $('rpStRec'); },
-        text: 'Record a take — the notes are kept with it, so you can hear it and see it.' },
+        text: 'Record a take. The notes are kept with it, so you can hear it and see it.' },
       { find: function () { return $('rpTakeList') || $('rpTakes'); },
-        text: 'Your takes live here. Play one and its notes appear in gold on the map, so you can sing over it and see where you land.' },
+        text: 'Your takes live here. Play one and its notes appear in gold, so you can sing over it.' },
       { find: function () { return $('freeCanvas'); },
-        text: 'Not seeing your voice? Profile, then Sound and microphone: turn “Ignore background noise” down, or tap Retry mic.' }
+        text: 'Not seeing your voice? Profile, Sound and microphone, turn “Ignore background noise” down.' }
     ] },
     guided: { host: 'v10Guided', anchor: 'gQuit', steps: [
       { find: function () { return $('gBig'); },
@@ -321,17 +321,17 @@
     ] },
     ladder: { host: 'trainLadderBar', anchor: 'ladderTitle', steps: [
       { find: function () { return $('gameCanvas'); },
-        text: 'The gold bars are the notes to sing. Your voice is the blue line. Fill a bar to score it.' },
+        text: 'Sing the gold bars. Your voice is the blue line. Fill a bar to score it.' },
       { find: function () { return $('btnExPause'); },
-        text: 'Pause to think, Restart to take it from the top, Record to keep the run.' },
+        text: 'Pause, start again, or record this run.' },
       { find: function () { return $('gameCanvas'); },
-        text: 'Paused or finished, drag the chart to the right to see what you sang.' }
+        text: 'Paused or finished, drag the chart right to see what you sang.' }
     ] },
     match: { host: 'matchPanel', anchor: 'btnMatchReplay', steps: [
       { find: function () { return $('matchTarget'); },
         text: 'This is the note to sing. Replay plays it again.' },
       { find: function () { return $('matchHold'); },
-        text: 'Sing it and hold. The bar fills while you are on the note. Any octave counts.' }
+        text: 'Sing it and hold. The bar fills while you are on the note.' }
     ] },
     voice: { host: 'modeVoice', anchor: 'rpVMon', steps: [
       { find: function () { return $('rpVis'); },
@@ -343,15 +343,15 @@
     ] },
     sustain: { host: 'susPanel', anchor: 'btnSusStart', steps: [
       { find: function () { return $('rpSusKeys'); },
-        text: 'The lit key is the note to hold. Your voice is the dot — green when it is on the note.' },
+        text: 'Gold is the note to hold. The key you are singing lights up.' },
       { find: function () { return $('btnSusStart'); },
-        text: 'Start hold, then keep the note dead steady for five seconds. New note picks another.' }
+        text: 'Press Start the hold and keep the note steady for five seconds. Ten notes in all.' }
     ] },
     keys: { host: 'kbdPanel', anchor: 'kbdUp', steps: [
       { find: function () { return $('kbdKeys'); },
-        text: 'Tap a key, then sing it. The key you are singing lights up.' },
+        text: 'Tap a key, then sing that note. The key you are singing lights up.' },
       { find: function () { return $('kbdMsg'); },
-        text: 'A held key goes quiet after a second so the mic hears you, not the key. Sideways gives more keys.' }
+        text: 'Turn the phone sideways for more keys.' }
     ] },
     ear: { host: 'v10Ear', anchor: 'earQuit', steps: [
       { find: function () { return $('earReplay'); },

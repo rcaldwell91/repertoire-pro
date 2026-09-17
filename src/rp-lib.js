@@ -235,7 +235,7 @@
       if (chip === 'all') {
         body += row({ title: 'All songs', sub: 'Everything you own · ' + owned().length, icon: 'i-music', data: 'data-pin="all"' });
         body += row({ title: 'Takes', sub: 'Everything you have recorded · ' + recs().length, icon: 'i-mic', data: 'data-pin="recordings"' });
-        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Kept on their own · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
+        if (window.RPMaps) body += row({ title: 'Note maps', sub: 'Saved from a take · ' + RPMaps.list().length, icon: 'i-activity', data: 'data-pin="maps"' });
       }
       plists().forEach(function (p) {
         var ss = plSongs(p);
@@ -326,9 +326,7 @@
       '<b>Record something</b><div class="rp-sub" style="margin:2px 0 0">Straight into your recordings.</div></button>' +
       '<button class="btn" id="rpAddPl" style="width:100%;padding:13px;margin-top:8px;text-align:left">' +
       '<b>New playlist</b><div class="rp-sub" style="margin:2px 0 0">Group songs however you like.</div></button>' +
-      '<button class="btn" id="rpAddBuy" style="width:100%;padding:13px;margin-top:8px;text-align:left">' +
-      '<b>Get songs</b><div class="rp-sub" style="margin:2px 0 0">About $1.29 each — buy once, own forever.</div></button>' +
-      '<button class="btn" id="rpAddX" style="width:100%;padding:12px;margin-top:14px">Close</button></div>';
+            '<button class="btn" id="rpAddX" style="width:100%;padding:12px;margin-top:14px">Close</button></div>';
     o.style.display = 'flex';
     function shut() { o.style.display = 'none'; o.innerHTML = ''; }
     on($('rpAddX'), 'click', shut);

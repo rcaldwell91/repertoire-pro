@@ -366,6 +366,16 @@
     } catch (err) { return; }
   }
 
+  /* Robert's audit: the last exercise's card stayed at the top of Train,
+     above whatever you started next. It goes when the exercise does. */
+  setInterval(function () {
+    var f = $('rpFactStrip');
+    if (!f) return;
+    var g = $('v10Guided'), bar = $('trainLadderBar');
+    var running = (g && g.style.display !== 'none') || (bar && bar.style.display !== 'none');
+    if (!running && f.parentElement) f.parentElement.removeChild(f);
+  }, 700);
+
   (function wrapNoteRunning() {
     function attach() {
       if (!window.V10 || !V10.noteRunning || V10.noteRunning.__rp) return false;

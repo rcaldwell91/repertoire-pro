@@ -172,9 +172,9 @@
   }
 
   B.open = function (openId) {
-    var h = '<b style="font-size:18px">Before the voice</b>' +
-      '<div class="measured" style="margin-top:8px">About ' + mins() + ' minutes, and none of it ' +
-      'makes a sound. Do the lot or pick one.</div>';
+    var h = '<b style="font-size:18px">Body and breath</b>' +
+      '<div class="measured" style="margin-top:8px">About ' + Math.round(mins()) + ' minutes, and no singing. ' +
+      'Do all of it, or pick one.</div>';
 
     /* The safety panel is not small print and is not at the bottom. */
     h += '<div class="rp-card" style="margin-top:14px;padding:13px;border-left:3px solid var(--miss)">' +
@@ -232,7 +232,7 @@
       '<button class="btn" id="rpBodyGo" style="padding:7px 12px;font-size:12px">Open</button>' +
       '</div>' +
       '<div class="exsyl" style="margin-top:6px;font-weight:600">Posture, jaw, tongue, shoulders. ' +
-      'About ' + mins() + ' minutes, no sound.</div>' +
+      'About ' + Math.round(mins()) + ' minutes, no singing.</div>' +
       '<div class="measured">The body first. Nothing here goes near your throat, and one of them ' +
       'says plainly that it is not evidenced.</div>';
     host.insertBefore(d, host.firstChild);

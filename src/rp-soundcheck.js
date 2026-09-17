@@ -29,16 +29,16 @@
     d.style.cssText = 'padding:12px;margin-top:10px';
     d.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center;gap:10px">' +
       '<div style="flex:1;min-width:0"><div class="rp-ttl">Sound check</div>' +
-      '<div class="rp-sub" data-sc-msg>Not sure your headphones work? Play a note.</div></div>' +
+      '<div class="rp-sub" data-sc-msg>Play a note to check your headphones.</div></div>' +
       '<button class="btn primary" data-sc-go style="padding:9px 14px;font-size:12.5px;flex:none">Play a note</button></div>';
     var msg = d.querySelector('[data-sc-msg]');
     d.querySelector('[data-sc-go]').addEventListener('click', function (ev) {
       ev.stopPropagation();
       var ok = SC.check();
       msg.textContent = ok
-        ? 'Heard a note? Your headphones are fine. Nothing? Turn the volume up, then check the plug or the Bluetooth connection.'
+        ? 'Heard it? Your headphones are fine. Nothing? Turn the volume up, then check the plug or the Bluetooth connection.'
         : 'The phone would not play sound. Tap once more, and check the volume.';
-      setTimeout(function () { msg.textContent = 'Not sure your headphones work? Play a note.'; }, 9000);
+      setTimeout(function () { msg.textContent = 'Play a note to check your headphones.'; }, 9000);
     });
     return d;
   }

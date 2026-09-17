@@ -134,7 +134,7 @@
       'WORKING ON</div>' +
       '<div style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;' +
       'text-overflow:ellipsis">' + esc(w.title) + '</div></div>' +
-      '<button class="btn" id="rpWkX" style="padding:6px 10px;font-size:11.5px">Leave</button></div>';
+      '<button class="btn" id="rpWkX" style="padding:6px 10px;font-size:11.5px">Stop working on this</button></div>';
 
     if (rec || paused) {
       h += '<div class="row" style="gap:7px;margin-top:9px;flex-wrap:nowrap">' +

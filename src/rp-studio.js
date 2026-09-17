@@ -87,7 +87,7 @@
       fmt(elapsed()) + '</span></div>';
 
     if (ST.state === 'idle' && !ST.blob) {
-      h += '<div class="notice" style="margin:8px 0 10px">Sing. Nothing is saved until you say so.</div>' +
+      h += '<div class="notice" style="margin:8px 0 10px">Sing. Nothing is saved until you press Keep.</div>' +
         '<button class="btn primary" id="rpStRec" style="width:100%;padding:12px">' +
         '<svg class="ic"><use href="#i-mic"/></svg> Record</button>';
     } else if (ST.state === 'rec' || ST.state === 'paused') {
@@ -546,7 +546,7 @@
     var box = $('rpTakeList');
     if (!box) return;
     var list = takes().filter(function (s) { return !s.assignId; });
-    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>'; }
+    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">No takes yet. Record one above.</div>'; }
     else if (window.RPTakes) {
       box.innerHTML = '<div class="measured" style="margin:6px 0 4px">Newest</div>' + RPTakes.rowHtml(list[0]) +
         (list.length > 1 ? '<div class="measured" style="margin-top:6px">' + (list.length - 1) + ' more in the Library.</div>' : '');
@@ -578,6 +578,7 @@
       over = null;
     }
     ST.unfollow();
+    var cv0 = $('rpSeekMap'); if (cv0 && cv0.parentElement) cv0.parentElement.removeChild(cv0);
     playBar();
   }
   ST.stopAll = function () {
@@ -672,6 +673,7 @@
         '<input type="range" id="rpTakeVol" min="0" max="100" step="5" value="' + Math.round(ST.takeVol * 100) + '" style="flex:1">' +
         '<output id="rpTakeVolOut">' + Math.round(ST.takeVol * 100) + '%</output></label>' : '');
     bar.style.display = '';
+    seekMap();
     on($('rpTakeVol'), 'input', function (e) {
       ST.takeVol = (+e.target.value) / 100;
       try { localStorage.setItem('rp_take_vol', String(ST.takeVol)); } catch (err) {}
@@ -697,6 +699,57 @@
       playBar();
     });
   }
+  /* Robert, 17 Sep: "when I'm listening to a take I want control of where
+     it plays from." The whole take is drawn under the bar with a line where
+     playback is. Tap anywhere on it to play from there. */
+  function seekDur() {
+    var o = ST.overlay; if (!o) return 1;
+    var d = 0;
+    try { d = o.audio.duration; } catch (e) {}
+    if (!(d > 0) || !isFinite(d)) { var n = o.notes[o.notes.length - 1]; d = (n && n.t) || 1; }
+    return d;
+  }
+  function drawHead(cv) {
+    var o = ST.overlay;
+    if (!cv || !o || !o.notes || !window.RPMaps) return;
+    RPMaps.draw(cv, { notes: o.notes, title: '' }, { height: 96 });
+    var g = cv.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var W = cv.clientWidth || 360, H = 96;
+    var t = 0; try { t = o.audio.currentTime || 0; } catch (e) {}
+    var x = 34 + (Math.max(0, Math.min(1, t / seekDur()))) * (W - 40);
+    g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(x, 4); g.lineTo(x, H - 18); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.92)';
+    g.beginPath(); g.arc(x, 6, 3.5, 0, Math.PI * 2); g.fill();
+  }
+  function seekMap() {
+    var bar = $('rpPlayBar');
+    var o = ST.overlay;
+    if (!bar || !o || !o.notes || !window.RPMaps) return;
+    var cv = $('rpSeekMap');
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.id = 'rpSeekMap';
+      cv.style.cssText = 'display:block;width:100%;height:96px;border-radius:10px;border:1px solid var(--line);margin-top:8px;cursor:pointer;flex:1 1 100%';
+      bar.appendChild(cv);
+      cv.addEventListener('pointerdown', function (e) {
+        var oo = ST.overlay; if (!oo || !oo.audio) return;
+        var r = cv.getBoundingClientRect();
+        var frac = Math.max(0, Math.min(1, (e.clientX - r.left - 34) / Math.max(1, r.width - 40)));
+        try { oo.audio.currentTime = frac * seekDur(); } catch (err) {}
+        try { if (oo.audio.paused && oo.audio.play) { var pr = oo.audio.play(); if (pr && pr.catch) pr.catch(function () {}); } } catch (err) {}
+        setTimeout(playBar, 60);
+      });
+    } else if (cv.parentElement !== bar) { bar.appendChild(cv); }
+    drawHead(cv);
+  }
+  setInterval(function () {
+    var cv = $('rpSeekMap');
+    if (cv && cv.offsetParent !== null && ST.overlay) drawHead(cv);
+  }, 140);
+
   /* Listen (from the take list) sets the overlay too; the bar follows it */
   document.addEventListener('visibilitychange', function () {
     /* Robert, 16 Sep: "my phone is asleep and it's still playing." */
