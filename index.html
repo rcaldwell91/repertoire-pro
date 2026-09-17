@@ -1095,7 +1095,7 @@ function playGuide(midi, when, dur, transpose){
 function playPiano(midi, when, dur, dest, vol){
   dest = dest || guideGain; vol = vol==null? 0.5 : vol;
   if(when < ctx.currentTime) when = ctx.currentTime;
-  /* Robert, 18 Sep: a real recorded piano when the file is there. The
+  /* Robert, 17 Sep: a real recorded piano when the file is there. The
      synth below stays as the fallback, so a dead network is never silence. */
   try { if(window.RPPiano && RPPiano.play(midi, when, dur, dest, vol)) return; } catch(e){}
   const hold = Math.max(0.4, dur);
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build d8d0a6b4';
+const APP_VERSION = '17 Sep 2026 · build ad1fbd99';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -9756,7 +9756,6 @@ renderJourney();
     const voice = fold('Your voice', rangeTxt.trim(), '', false);
     voice.body.innerHTML =
       '<div class="prow" style="border-top:0"><span class="pk">Range</span><span class="pv">' + esc(rangeTxt.trim() || 'not tested') + '</span></div>' +
-      '<div class="notice">Test it on the Train tab and every exercise ladders through it instead of guessing.</div>' +
       '<div style="margin-top:12px"><label style="font-size:13px;font-weight:700">Where are you?</label>' +
       '<div class="dial" style="margin-top:6px">' +
       [1, 2, 3].map(v => '<button data-plevel="' + v + '" class="' + (P.level === v ? 'on' : '') + '">' +
@@ -18291,7 +18290,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return null;
   };
 
-  /* Robert, 18 Sep: "Profile > Your voice reads A2\u2013A4 on an account that
+  /* Robert, 17 Sep: "Profile > Your voice reads A2\u2013A4 on an account that
      has never sung a note." A2\u2013A4 is base.html's built-in default RANGE.
      Nothing is written down until the test runs or a preset is picked, so
      an empty store IS the answer to "has this ever been measured". */
@@ -18493,7 +18492,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       h += '<div class="rp-card" style="margin-top:12px;padding:12px;border-left:3px solid var(--gold)">' +
         '<div style="font-size:13px;line-height:1.55">This one came off the list. It is a fair ' +
         'starting point and the exercises will use it, but it is somebody else’s range with your ' +
-        'name on it. Two minutes of singing gets you your own.</div></div>';
+        'name on it. About a minute of singing gets you your own.</div></div>';
     }
 
     h += '<div class="measured" style="margin-top:12px">Every exercise is built around this, so it is worth getting right. Your coach can see it.</div>';
@@ -18560,41 +18559,19 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function row() {
     var live = $('rpRangeLine');
     if (live) fillLine(live);
+    /* the base rebuilds a "Your voice" fold in some places; keep its two
+       lines honest. The row itself is built by lineNode(), once, above. */
     var d = voiceFold();
     if (!d) return;
     var v = R.get();
     if (!v) return;
     var txt = R.measured() ? name(v.lo) + ' \u2013 ' + name(v.hi) : UNTESTED;
-
     var sub = d.querySelector('summary .psub');
     if (sub && sub.textContent !== txt) sub.textContent = txt;
     var pv = d.querySelector('.prow .pv');
     if (pv && pv.textContent !== txt) pv.textContent = txt;
-
-    var line = d.querySelector('#rpRangeLine');
-    if (!line) {
-      line = document.createElement('div');
-      line.id = 'rpRangeLine';
-      line.className = 'rp-card';
-      line.style.cssText = 'padding:11px;margin-top:10px;cursor:pointer';
-      var body = d.querySelector('.pfoldin');
-      if (!body) return;
-      body.appendChild(line);
-      on(line, 'click', R.open);
-    }
-    /* the notes themselves are already on the two lines above this one, so
-       this row carries the thing they do not: where the number came from */
-    var head = !R.measured() ? UNTESTED
-             : (v.by === 'preset' ? 'Picked from the list, not measured'
-             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
-    var sub = !R.measured()
-      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
-      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
-    line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">' + esc(head) + '</div>' +
-      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
-      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
+
   var orig = null;
   function untestedDisp() {
     var d = $('rangeDisp'), sb = $('rangeSub');
@@ -19189,7 +19166,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     h += '<div class="row" style="gap:8px;margin-top:10px">' +
       '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
       '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>' +
-      /* Robert, 18 Sep: every other button on this screen has a line under
+      /* Robert, 17 Sep: every other button on this screen has a line under
          it saying what it does. These two did not. */
       '<div class="rp-sub" style="margin:5px 4px 0;font-size:12px">Quiet session: ten minutes of hums, ' +
       'hisses and straws, at speaking volume, so nobody hears you. Cool-down: three minutes to finish ' +
@@ -19613,7 +19590,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     return null;
   }
 
-  /* Robert, 18 Sep: "points are never defined anywhere." Here is what
+  /* Robert, 17 Sep: "points are never defined anywhere." Here is what
      earns one, in the same words the level page uses. */
   function pointsRow() {
     var d = document.createElement('div');
@@ -19705,10 +19682,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function tidyVoice(f) {
     var sm = f.querySelector('summary'); if (sm) sm.style.display = 'none';
     var pr = f.querySelector('.prow'); if (pr) pr.style.display = 'none';
-    /* Robert, 18 Sep: this was the third explanation of the same thing on
+    /* Robert, 17 Sep: this was the third explanation of the same thing on
        one page, and the only one that said "ladders through it". The range
-       card above owns the explanation now. */
-    var nt = f.querySelector('.notice'); if (nt) nt.style.display = 'none';
+       card above owns the explanation now, and the sentence is out of the
+       template as well, so there is nothing left here to hide. */
   }
   /* while a Profile page is open, a rebuilt fold is picked up straight away */
   setInterval(function () {
@@ -19771,7 +19748,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var t = top.querySelector('[data-pg="account"] p'); if (t) t.textContent = me ? (me.display_name || me.email) : 'Not signed in — tap to sign in.';
     var rg = null; try { rg = window.RPRange ? RPRange.get() : null; } catch (e) {}
     var v = top.querySelector('[data-pg="voice"] p');
-    /* Robert, 18 Sep: this line said A2–A4 on an account that had never
+    /* Robert, 17 Sep: this line said A2–A4 on an account that had never
        sung a note. A2–A4 is base.html's built-in default, not anybody's
        range, so until it is measured this row has to say so. */
     if (v && rg) {
@@ -20006,7 +19983,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       top.id = 'rpLibTop';
       mode.insertBefore(top, mode.firstChild);
     }
-    /* Robert, 18 Sep: the chips said Songs / Takes / Note maps and then
+    /* Robert, 17 Sep: the chips said Songs / Takes / Note maps and then
        three cards under them said Songs / Takes / Note maps. The chips
        are the navigation, so the cards went and All now shows the songs. */
     var CHIPS = [['all', 'All'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
@@ -20047,7 +20024,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + body + '</div>';
     }
     if (chip === 'maps') {
-      /* Robert, 18 Sep: "note map" is our word and nothing on the screen
+      /* Robert, 17 Sep: "note map" is our word and nothing on the screen
          said what one is, now that the card explaining it has gone. */
       body = '<div class="measured" style="margin-bottom:10px">A note map is the picture of the notes ' +
         'from one of your takes. Open one to see it full size, or play it back as a guide to sing along to.</div>' +
@@ -22356,7 +22333,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 /* ======================================================================
    Repertoire Pro — the Coach tab, split up.
 
-   Robert, 18 Sep: "Coach is one enormous screen holding ten unrelated
+   Robert, 17 Sep: "Coach is one enormous screen holding ten unrelated
    things. Break it up." He approved the layout: the tab is about the
    person who teaches you, and nothing else. What Repertoire decides for
    you — what to work on, how much it chooses, when and where you
@@ -22406,7 +22383,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         if (/plan for you|changes as you do/i.test(text(el))) { el.style.display = 'none'; return; }
         return;
       }
-      /* Robert, 18 Sep: the same five steps and the same Start button were
+      /* Robert, 17 Sep: the same five steps and the same Start button were
          printed on Home and here. Home owns today; this tab is the coach. */
       if (el.classList.contains('plan')) { el.style.display = 'none'; return; }
       if (!el.classList.contains('panel')) return;
@@ -22457,7 +22434,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 /* =====================================================================
    Repertoire Pro — the reference note is a real piano.
 
-   Robert, 18 Sep: "Listen to the new reference note yourself. Piano in
+   Robert, 17 Sep: "Listen to the new reference note yourself. Piano in
    code often means a synth with a piano-ish envelope, which is the exact
    thing I didn't like." It was. Then: "source a real sampled note."
 

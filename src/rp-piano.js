@@ -1,7 +1,7 @@
 /* =====================================================================
    Repertoire Pro — the reference note is a real piano.
 
-   Robert, 18 Sep: "Listen to the new reference note yourself. Piano in
+   Robert, 17 Sep: "Listen to the new reference note yourself. Piano in
    code often means a synth with a piano-ish envelope, which is the exact
    thing I didn't like." It was. Then: "source a real sampled note."
 

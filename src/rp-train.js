@@ -255,7 +255,7 @@
     h += '<div class="row" style="gap:8px;margin-top:10px">' +
       '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
       '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>' +
-      /* Robert, 18 Sep: every other button on this screen has a line under
+      /* Robert, 17 Sep: every other button on this screen has a line under
          it saying what it does. These two did not. */
       '<div class="rp-sub" style="margin:5px 4px 0;font-size:12px">Quiet session: ten minutes of hums, ' +
       'hisses and straws, at speaking volume, so nobody hears you. Cool-down: three minutes to finish ' +

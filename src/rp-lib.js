@@ -206,7 +206,7 @@
       top.id = 'rpLibTop';
       mode.insertBefore(top, mode.firstChild);
     }
-    /* Robert, 18 Sep: the chips said Songs / Takes / Note maps and then
+    /* Robert, 17 Sep: the chips said Songs / Takes / Note maps and then
        three cards under them said Songs / Takes / Note maps. The chips
        are the navigation, so the cards went and All now shows the songs. */
     var CHIPS = [['all', 'All'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
@@ -247,7 +247,7 @@
       body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + body + '</div>';
     }
     if (chip === 'maps') {
-      /* Robert, 18 Sep: "note map" is our word and nothing on the screen
+      /* Robert, 17 Sep: "note map" is our word and nothing on the screen
          said what one is, now that the card explaining it has gone. */
       body = '<div class="measured" style="margin-bottom:10px">A note map is the picture of the notes ' +
         'from one of your takes. Open one to see it full size, or play it back as a guide to sing along to.</div>' +

@@ -517,7 +517,7 @@ PATCHES = [
      """function playPiano(midi, when, dur, dest, vol){
   dest = dest || guideGain; vol = vol==null? 0.5 : vol;
   if(when < ctx.currentTime) when = ctx.currentTime;
-  /* Robert, 18 Sep: a real recorded piano when the file is there. The
+  /* Robert, 17 Sep: a real recorded piano when the file is there. The
      synth below stays as the fallback, so a dead network is never silence. */
   try { if(window.RPPiano && RPPiano.play(midi, when, dur, dest, vol)) return; } catch(e){}
   const hold = Math.max(0.4, dur);
@@ -818,7 +818,7 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
 # ---------------------------------------------------------------------
 WORDS = [
     # ---------------------------------------------------------------
-    # Robert, 18 Sep: the app is a web page. It says "phone" on a laptop.
+    # Robert, 17 Sep: the app is a web page. It says "phone" on a laptop.
     # Every user-facing claim about where something lives now says
     # "device", or drops the word. (The fix landed in the Library only
     # last round; this is the rest of them.)
@@ -853,6 +853,11 @@ WORDS = [
 
     ('Exercises automatically ladder through this range. Test it for a perfect fit.',
      'Every exercise is built to fit between your lowest and highest note.'),
+
+    # the fold's own copy of the range explanation. Hiding it left the
+    # exact sentence in the template for anything that un-hides the fold.
+    ('''      '<div class="notice">Test it on the Train tab and every exercise ladders through it instead of guessing.</div>' +
+''', ''),
 
     # two more that are about the machine, not a phone
     ('Inputs the phone offers', 'Inputs this device offers'),
@@ -911,7 +916,7 @@ WRITING = [
     # Robert, 17 Sep: the four plan panels moved to Profile → Your plan,
     # so the Practice fold can no longer send people to the Coach tab.
     ("Set these on the Coach tab.", "Set these on Your plan, in Profile."),
-    # ROBERT, 18 Sep — PHONE WALK-THROUGH OF 98e321d.
+    # ROBERT, 17 Sep — PHONE WALK-THROUGH OF 98e321d.
 
     #  #4 one feature, four names. The button said "Hear me" / "Hearing you",
     #  the gear said "Live vocals", the tour said "Hear yourself". Picked the
@@ -1080,15 +1085,23 @@ marker = '</body>'
 assert base.count(marker) == 1, 'expected exactly one </body>'
 out = base.replace(marker, block + marker)
 
-# Robert, 18 Sep: the build tag still read "v10.1 - theory games, simpler
+# Robert, 17 Sep: the build tag still read "v10.1 - theory games, simpler
 # lessons", which was true in June. Stamp it with the date and a hash of
 # everything this build was made from, so the tag on the screen and the
 # number printed here are the same thing.
-import hashlib, datetime
+import hashlib, subprocess, datetime
 h = hashlib.md5()
 for f in ['base.html', 'build-next.sh', 'src/rp-skin.css'] + list(MODS):
     h.update(open(f, 'rb').read())
-stamp = datetime.date.today().strftime('%-d %b %Y') + ' \u00b7 build ' + h.hexdigest()[:8]
+# Robert, 17 Sep: take the date from the build, not from a session clock that
+# can sit a day ahead. The last commit is what this build was made from.
+try:
+    iso = subprocess.check_output(['git', 'log', '-1', '--format=%cs'],
+                                  stderr=subprocess.DEVNULL).decode().strip()
+    day = datetime.date(*map(int, iso.split('-')))
+except Exception:
+    day = datetime.date.today()
+stamp = day.strftime('%-d %b %Y') + ' \u00b7 build ' + h.hexdigest()[:8]
 old_ver = "const APP_VERSION = 'v10.1 \u00b7 theory games, simpler lessons';"
 assert out.count(old_ver) == 1, 'version line not found'
 out = out.replace(old_ver, "const APP_VERSION = '" + stamp + "';")

@@ -66,7 +66,7 @@
     return null;
   };
 
-  /* Robert, 18 Sep: "Profile > Your voice reads A2\u2013A4 on an account that
+  /* Robert, 17 Sep: "Profile > Your voice reads A2\u2013A4 on an account that
      has never sung a note." A2\u2013A4 is base.html's built-in default RANGE.
      Nothing is written down until the test runs or a preset is picked, so
      an empty store IS the answer to "has this ever been measured". */
@@ -268,7 +268,7 @@
       h += '<div class="rp-card" style="margin-top:12px;padding:12px;border-left:3px solid var(--gold)">' +
         '<div style="font-size:13px;line-height:1.55">This one came off the list. It is a fair ' +
         'starting point and the exercises will use it, but it is somebody else’s range with your ' +
-        'name on it. Two minutes of singing gets you your own.</div></div>';
+        'name on it. About a minute of singing gets you your own.</div></div>';
     }
 
     h += '<div class="measured" style="margin-top:12px">Every exercise is built around this, so it is worth getting right. Your coach can see it.</div>';
@@ -335,41 +335,19 @@
   function row() {
     var live = $('rpRangeLine');
     if (live) fillLine(live);
+    /* the base rebuilds a "Your voice" fold in some places; keep its two
+       lines honest. The row itself is built by lineNode(), once, above. */
     var d = voiceFold();
     if (!d) return;
     var v = R.get();
     if (!v) return;
     var txt = R.measured() ? name(v.lo) + ' \u2013 ' + name(v.hi) : UNTESTED;
-
     var sub = d.querySelector('summary .psub');
     if (sub && sub.textContent !== txt) sub.textContent = txt;
     var pv = d.querySelector('.prow .pv');
     if (pv && pv.textContent !== txt) pv.textContent = txt;
-
-    var line = d.querySelector('#rpRangeLine');
-    if (!line) {
-      line = document.createElement('div');
-      line.id = 'rpRangeLine';
-      line.className = 'rp-card';
-      line.style.cssText = 'padding:11px;margin-top:10px;cursor:pointer';
-      var body = d.querySelector('.pfoldin');
-      if (!body) return;
-      body.appendChild(line);
-      on(line, 'click', R.open);
-    }
-    /* the notes themselves are already on the two lines above this one, so
-       this row carries the thing they do not: where the number came from */
-    var head = !R.measured() ? UNTESTED
-             : (v.by === 'preset' ? 'Picked from the list, not measured'
-             : (v.at ? 'Sung and measured ' + when(v.at) : 'Measured'));
-    var sub = !R.measured()
-      ? 'Two minutes of singing sets it. Until then the exercises use a starting range.'
-      : (v.hi - v.lo) + ' semitones \u00b7 kept on this device and on your account';
-    line.innerHTML = '<div class="row" style="justify-content:space-between;align-items:center">' +
-      '<div><div class="rp-ttl">' + esc(head) + '</div>' +
-      '<div class="rp-sub">' + esc(sub) + '</div></div>' +
-      '<div style="color:var(--ink-faint);font-size:20px">\u203a</div></div>';
   }
+
   var orig = null;
   function untestedDisp() {
     var d = $('rangeDisp'), sb = $('rangeSub');

@@ -1,7 +1,7 @@
 /* ======================================================================
    Repertoire Pro — the Coach tab, split up.
 
-   Robert, 18 Sep: "Coach is one enormous screen holding ten unrelated
+   Robert, 17 Sep: "Coach is one enormous screen holding ten unrelated
    things. Break it up." He approved the layout: the tab is about the
    person who teaches you, and nothing else. What Repertoire decides for
    you — what to work on, how much it chooses, when and where you
@@ -51,7 +51,7 @@
         if (/plan for you|changes as you do/i.test(text(el))) { el.style.display = 'none'; return; }
         return;
       }
-      /* Robert, 18 Sep: the same five steps and the same Start button were
+      /* Robert, 17 Sep: the same five steps and the same Start button were
          printed on Home and here. Home owns today; this tab is the coach. */
       if (el.classList.contains('plan')) { el.style.display = 'none'; return; }
       if (!el.classList.contains('panel')) return;
