@@ -28,7 +28,14 @@
   function lib() { try { return (typeof LIB !== 'undefined') ? LIB : null; } catch (e) { return null; } }
   function audio() { try { return (typeof libAudio !== 'undefined') ? libAudio : null; } catch (e) { return null; } }
   function tfmt(s) { try { return fmtT(s); } catch (e) { return '–:––'; } }
-  function tap(id) { var b = $(id); if (b) b.click(); }
+  /* Robert, 17 Sep: a guarded click that finds nothing is a dead control
+     nobody hears about. If the target has gone, say so. */
+  function tap(id) {
+    var b = $(id);
+    if (b) { b.click(); return true; }
+    try { console.warn('RP: nothing to tap, #' + id + ' is not in the page'); } catch (e) {}
+    return false;
+  }
 
   var L = window.RPLib = {};
   var chip = 'all';                 /* all | songs | recordings | playlists */

@@ -152,8 +152,10 @@
     try {
       await dbPut('songs', song);
       LIB.songs.push(song);
-      try { libRender(); } catch (e) {}
-      try { fillSongSel(); } catch (e) {}
+      /* no swallowing: if the library will not take it, the message has to
+         say so rather than claim it was added. */
+      libRender();
+      fillSongSel();
       msg('Added. Opening it…');
       setTimeout(function () {
         shut();

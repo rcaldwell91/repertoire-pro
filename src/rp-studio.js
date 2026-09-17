@@ -778,26 +778,14 @@
   /* Robert wants the pitch tracker reachable from Train, where the practising
      happens, while the Sing menu keeps it as Free Sing. Same screen, two ways
      in — not two copies of it. */
-  function mountTrainEntry() {
-    var host = $('modeTrain');
-    if (!host || $('rpTrainPitch')) return;
-    var d = document.createElement('div');
-    d.id = 'rpTrainPitch';
-    d.className = 'exrow';
-    d.style.cursor = 'pointer';
-    d.innerHTML = '<div class="exhead">' +
-      '<div class="exname">Pitch Tracker</div>' +
-      '<button class="btn primary" id="rpTrainPitchGo" style="padding:7px 12px;font-size:12px">Open</button>' +
-      '</div>' +
-      '<div class="exsyl" style="margin-top:6px;font-weight:600">Your voice on the keys, live — and record a take.</div>' +
-      '<div class="measured">Sing anything. Watch the line. Record it, listen back, keep it or bin it.</div>';
-    host.insertBefore(d, host.firstChild);
-    on($('rpTrainPitchGo'), 'click', function (e) {
-      e.stopPropagation();
-      try { switchMode('free'); } catch (err) {}
-    });
-    on(d, 'click', function () { try { switchMode('free'); } catch (err) {} });
-  }
+  /* Robert, 17 Sep: this used to put a Pitch Tracker row at the top of
+     Train. The Train rework replaced the layout it inserted into, so the
+     row stopped appearing — and the Train tile's click handler was still
+     reaching for this row's Open button, which is why that tile went
+     nowhere. The Pitch Tracker is on the Sing tab now, so the row is gone
+     rather than repaired. */
+  function mountTrainEntry() { /* removed with the move to the Sing tab */ }
+
 
   /* Robert, 16 Sep: "Your takes" said nothing kept while the mini player
      was playing a take. The list was drawn once, at boot, before the

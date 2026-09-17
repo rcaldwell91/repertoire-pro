@@ -814,7 +814,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
 
   <!-- ============ FREE SING MODE ============ -->
   <div id="modeFree" class="mode">
-    <button class="pill backpill" id="bsFree">← Train</button>
+    <button class="pill backpill" id="bsFree">← Sing menu</button>
     <div class="panel">
       <h3><svg class="ic"><use href="#i-headphones"/></svg> Sing over your own track</h3>
       <div class="notice" style="margin:0 0 10px">Load any audio file you own (MP3 / WAV / M4A). It plays while the app listens to your voice and shows your pitch live — great for practicing along with a real song, and for checking whether you are sharp or flat on a note you are holding.</div>
@@ -3883,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 0b1cd668';
+const APP_VERSION = '17 Sep 2026 · build 4ee047a9';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -6836,7 +6836,7 @@ $('shFree').addEventListener('click', ()=>switchMode('voice'));
 /* back pills inside sing sub-modes */
 $('bsSong').addEventListener('click', ()=>switchMode('singhub'));
 $('bsYT').addEventListener('click', ()=>switchMode('singhub'));
-$('bsFree').addEventListener('click', ()=>switchMode('train'));
+$('bsFree').addEventListener('click', ()=>switchMode('singhub'));
 
 /* load saved journey state (per device, resets daily) */
 libReady.then(async ()=>{
@@ -15470,26 +15470,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* Robert wants the pitch tracker reachable from Train, where the practising
      happens, while the Sing menu keeps it as Free Sing. Same screen, two ways
      in — not two copies of it. */
-  function mountTrainEntry() {
-    var host = $('modeTrain');
-    if (!host || $('rpTrainPitch')) return;
-    var d = document.createElement('div');
-    d.id = 'rpTrainPitch';
-    d.className = 'exrow';
-    d.style.cursor = 'pointer';
-    d.innerHTML = '<div class="exhead">' +
-      '<div class="exname">Pitch Tracker</div>' +
-      '<button class="btn primary" id="rpTrainPitchGo" style="padding:7px 12px;font-size:12px">Open</button>' +
-      '</div>' +
-      '<div class="exsyl" style="margin-top:6px;font-weight:600">Your voice on the keys, live — and record a take.</div>' +
-      '<div class="measured">Sing anything. Watch the line. Record it, listen back, keep it or bin it.</div>';
-    host.insertBefore(d, host.firstChild);
-    on($('rpTrainPitchGo'), 'click', function (e) {
-      e.stopPropagation();
-      try { switchMode('free'); } catch (err) {}
-    });
-    on(d, 'click', function () { try { switchMode('free'); } catch (err) {} });
-  }
+  /* Robert, 17 Sep: this used to put a Pitch Tracker row at the top of
+     Train. The Train rework replaced the layout it inserted into, so the
+     row stopped appearing — and the Train tile's click handler was still
+     reaching for this row's Open button, which is why that tile went
+     nowhere. The Pitch Tracker is on the Sing tab now, so the row is gone
+     rather than repaired. */
+  function mountTrainEntry() { /* removed with the move to the Sing tab */ }
+
 
   /* Robert, 16 Sep: "Your takes" said nothing kept while the mini player
      was playing a take. The list was drawn once, at boot, before the
@@ -16414,7 +16402,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     { key: 'sustain', name: 'Hold one note steady',
       what: 'Five seconds on one note. It measures how much of the hold stayed on the note.',
       measures: 'breath and steadiness', mode: 'train',
-      go: function () { var b = $('btnSustain'); if (b) b.click(); } },
+      go: function () { var b = $('btnSustain'); if (b) b.click();
+        else try { console.warn('RP: #btnSustain is not in the page'); } catch (e) {} } },
     { key: 'ear', name: 'Hear the note',
       what: 'Two notes play, ten times. Which was higher? It counts how many you got right.',
       measures: 'your ear', mode: 'train',
@@ -16422,7 +16411,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     { key: 'sing', name: 'Sing the note back',
       what: 'A note plays, you sing it and hold it. Ten rounds. It counts how many you matched.',
       measures: 'pitch, with your own voice', mode: 'train',
-      go: function () { var b = $('btnMatch'); if (b) b.click(); } },
+      go: function () { var b = $('btnMatch'); if (b) b.click();
+        else try { console.warn('RP: #btnMatch is not in the page'); } catch (e) {} } },
     { key: 'theory', name: 'Name the interval',
       what: 'Is that a third, a fifth, an octave? Three stars if you have it.',
       /* The theory games render into modeLearn, not modeTrain. Sending
@@ -19034,7 +19024,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   };
   TR.tool = function (btnId) {
     try { window.switchMode('train'); } catch (e) {}
-    setTimeout(function () { var b = $(btnId); if (b) b.click(); }, 90);
+    setTimeout(function () {
+      var b = $(btnId);
+      if (b) b.click();
+      else try { console.warn('RP: #' + btnId + ' is not in the page'); } catch (e) {}
+    }, 90);
   };
   TR.drill = function (kind) {
     try { window.switchMode('train'); } catch (e) {}
@@ -19821,7 +19815,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function lib() { try { return (typeof LIB !== 'undefined') ? LIB : null; } catch (e) { return null; } }
   function audio() { try { return (typeof libAudio !== 'undefined') ? libAudio : null; } catch (e) { return null; } }
   function tfmt(s) { try { return fmtT(s); } catch (e) { return '–:––'; } }
-  function tap(id) { var b = $(id); if (b) b.click(); }
+  /* Robert, 17 Sep: a guarded click that finds nothing is a dead control
+     nobody hears about. If the target has gone, say so. */
+  function tap(id) {
+    var b = $(id);
+    if (b) { b.click(); return true; }
+    try { console.warn('RP: nothing to tap, #' + id + ' is not in the page'); } catch (e) {}
+    return false;
+  }
 
   var L = window.RPLib = {};
   var chip = 'all';                 /* all | songs | recordings | playlists */
@@ -22757,8 +22758,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try {
       await dbPut('songs', song);
       LIB.songs.push(song);
-      try { libRender(); } catch (e) {}
-      try { fillSongSel(); } catch (e) {}
+      /* no swallowing: if the library will not take it, the message has to
+         say so rather than claim it was added. */
+      libRender();
+      fillSongSel();
       msg('Added. Opening it…');
       setTimeout(function () {
         shut();

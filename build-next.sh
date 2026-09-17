@@ -136,10 +136,10 @@ PATCHES = [
      """$('mcFree').addEventListener('click', ()=>switchMode('voice'));"""),
     ("""$('shFree').addEventListener('click', ()=>switchMode('free'));""",
      """$('shFree').addEventListener('click', ()=>switchMode('voice'));"""),
-    ("""$('bsFree').addEventListener('click', ()=>switchMode('singhub'));""",
-     """$('bsFree').addEventListener('click', ()=>switchMode('train'));"""),
-    ('<button class="pill backpill" id="bsFree">\u2190 Sing menu</button>',
-     '<button class="pill backpill" id="bsFree">\u2190 Train</button>'),
+    #  Robert, 17 Sep: the Pitch Tracker moved back to the Sing tab, and
+    #  the two lines that had pointed its back button at Train were deleted
+    #  with the move rather than left to fight the new place. base.html's
+    #  own "Sing menu" wording and switchMode('singhub') are right again.
 
     # 12. TWO THINGS CALLED COACH ON ONE SCREEN. Robert, 13 Sep: the app's own
     #     coach is "From Repertoire" — named after what it is. The human coach's

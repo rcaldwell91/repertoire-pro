@@ -63,7 +63,8 @@
     { key: 'sustain', name: 'Hold one note steady',
       what: 'Five seconds on one note. It measures how much of the hold stayed on the note.',
       measures: 'breath and steadiness', mode: 'train',
-      go: function () { var b = $('btnSustain'); if (b) b.click(); } },
+      go: function () { var b = $('btnSustain'); if (b) b.click();
+        else try { console.warn('RP: #btnSustain is not in the page'); } catch (e) {} } },
     { key: 'ear', name: 'Hear the note',
       what: 'Two notes play, ten times. Which was higher? It counts how many you got right.',
       measures: 'your ear', mode: 'train',
@@ -71,7 +72,8 @@
     { key: 'sing', name: 'Sing the note back',
       what: 'A note plays, you sing it and hold it. Ten rounds. It counts how many you matched.',
       measures: 'pitch, with your own voice', mode: 'train',
-      go: function () { var b = $('btnMatch'); if (b) b.click(); } },
+      go: function () { var b = $('btnMatch'); if (b) b.click();
+        else try { console.warn('RP: #btnMatch is not in the page'); } catch (e) {} } },
     { key: 'theory', name: 'Name the interval',
       what: 'Is that a third, a fifth, an octave? Three stars if you have it.',
       /* The theory games render into modeLearn, not modeTrain. Sending

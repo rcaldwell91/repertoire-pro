@@ -111,7 +111,11 @@
   };
   TR.tool = function (btnId) {
     try { window.switchMode('train'); } catch (e) {}
-    setTimeout(function () { var b = $(btnId); if (b) b.click(); }, 90);
+    setTimeout(function () {
+      var b = $(btnId);
+      if (b) b.click();
+      else try { console.warn('RP: #' + btnId + ' is not in the page'); } catch (e) {}
+    }, 90);
   };
   TR.drill = function (kind) {
     try { window.switchMode('train'); } catch (e) {}
