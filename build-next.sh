@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js; do node --check "$f"; done
+for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js src/rp-piano.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -517,6 +517,9 @@ PATCHES = [
      """function playPiano(midi, when, dur, dest, vol){
   dest = dest || guideGain; vol = vol==null? 0.5 : vol;
   if(when < ctx.currentTime) when = ctx.currentTime;
+  /* Robert, 18 Sep: a real recorded piano when the file is there. The
+     synth below stays as the fallback, so a dead network is never silence. */
+  try { if(window.RPPiano && RPPiano.play(midi, when, dur, dest, vol)) return; } catch(e){}
   const hold = Math.max(0.4, dur);
   const f0 = midiFreq(midi);
   const g = ctx.createGain(); g.gain.value = vol;
@@ -749,7 +752,7 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
     ("'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing it. A held key goes quiet after a second so the mic hears you, not the key.' +\n"
      "      ' Turn the phone sideways for more keys. This is free play &mdash; Note Match and Sustain Hold are the scored versions.</div>'",
      "'<div class=\"notice\" id=\"kbdMsg\" style=\"margin-top:10px\">Tap a key, then sing that note. Turn the phone sideways for more keys. Nothing is scored here.</div>'"),
-    ("<h3 style=\"margin:18px 4px 2px\">Or jump right in</h3>", "<h3 style=\"margin:18px 4px 2px\">Jump straight in</h3>"),
+    ("<h3 style=\"margin:18px 4px 2px\">Or jump right in</h3>", "<h3 style=\"margin:18px 4px 2px\">Or sing something now</h3>"),
 
     # 43. A SESSION SAYS IT IS A SESSION. Robert's audit: Done on the first
     #     step jumped into the next with nothing on screen saying where you
@@ -1019,13 +1022,29 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-for f in ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js'):
+MODS = ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js', 'src/rp-piano.js')
+for f in MODS:
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
         + '\n'.join(mods) + '\n'
 
 marker = '</body>'
 assert base.count(marker) == 1, 'expected exactly one </body>'
-open('next.html', 'w', encoding='utf-8').write(base.replace(marker, block + marker))
-print('next.html written, %d hooks applied' % len(PATCHES))
+out = base.replace(marker, block + marker)
+
+# Robert, 18 Sep: the build tag still read "v10.1 - theory games, simpler
+# lessons", which was true in June. Stamp it with the date and a hash of
+# everything this build was made from, so the tag on the screen and the
+# number printed here are the same thing.
+import hashlib, datetime
+h = hashlib.md5()
+for f in ['base.html', 'build-next.sh', 'src/rp-skin.css'] + list(MODS):
+    h.update(open(f, 'rb').read())
+stamp = datetime.date.today().strftime('%-d %b %Y') + ' \u00b7 build ' + h.hexdigest()[:8]
+old_ver = "const APP_VERSION = 'v10.1 \u00b7 theory games, simpler lessons';"
+assert out.count(old_ver) == 1, 'version line not found'
+out = out.replace(old_ver, "const APP_VERSION = '" + stamp + "';")
+
+open('next.html', 'w', encoding='utf-8').write(out)
+print('next.html written, %d hooks applied, tag %s' % (len(PATCHES), stamp))
 PY

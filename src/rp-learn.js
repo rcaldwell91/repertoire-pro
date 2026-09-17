@@ -28,7 +28,7 @@
                'The major scale and key': 'i-bar-chart', 'Minor and the third': 'i-trending-up',
                'Intervals': 'i-layers', 'Chords and harmony': 'i-music', 'Song form': 'i-file',
                'Your voice': 'i-mic', 'Advanced': 'i-package' };
-  var SUB = { 'Play it': 'Games. Every answer plays, so your ear learns it too.',
+  var SUB = { 'Play it': 'Games you play by ear. Every answer plays the notes, so your ear learns it too.',
               'Sound and pitch': 'What a note is, and what "in tune" means.',
               'Time': 'Beats, bars, and counting in.',
               'The major scale and key': 'Do-re-mi, and what a key is.',

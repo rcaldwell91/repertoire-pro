@@ -28,11 +28,11 @@
       folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and where your points came from.',
       folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
-    { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when.',
+    { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when. Change any of it here.',
       folds: [], cards: ['rpPlanHolder'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
-    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
+    { key: 'look',    icon: 'i-settings',  title: 'How it looks, and how much it explains', sub: 'Light or dark, and long or short wording.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A tour of the app, and a guide with pictures.',
       folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
@@ -201,7 +201,17 @@
     var t = top.querySelector('[data-pg="account"] p'); if (t) t.textContent = me ? (me.display_name || me.email) : 'Not signed in — tap to sign in.';
     var rg = null; try { rg = window.RPRange ? RPRange.get() : null; } catch (e) {}
     var v = top.querySelector('[data-pg="voice"] p');
-    if (v && rg) { try { v.textContent = midiName(rg.lo) + '–' + midiName(rg.hi) + (rg.by === 'preset' ? ' · picked, not sung' : rg.at ? ' · sung and measured' : ''); } catch (e) {} }
+    /* Robert, 18 Sep: this line said A2–A4 on an account that had never
+       sung a note. A2–A4 is base.html's built-in default, not anybody's
+       range, so until it is measured this row has to say so. */
+    if (v && rg) {
+      try {
+        var done = !window.RPRange || RPRange.measured();
+        v.textContent = !done ? 'Not measured yet · tap to sing it'
+          : midiName(rg.lo) + '–' + midiName(rg.hi) +
+            (rg.by === 'preset' ? ' · picked, not sung' : rg.at ? ' · sung and measured' : '');
+      } catch (e) {}
+    }
     var lv = $('rpLevelRow'); var p = top.querySelector('[data-pg="progress"] p');
     if (lv && p) { var tt = lv.querySelector('.rp-ttl'); if (tt) p.textContent = tt.textContent; }
   }

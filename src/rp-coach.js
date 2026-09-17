@@ -1426,7 +1426,7 @@
       var n = document.createElement('div');
       n.className = 'notice';
       n.style.cssText = 'margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px';
-      n.innerHTML = 'Got a coach? <b>Sign in</b> and what they set you shows here. Everything below works without an account.';
+      n.innerHTML = 'Got a coach? <b>Sign in</b>, then put their code in at the top of this tab. What they set you appears below it. Everything else here works without an account.';
       host.insertBefore(n, host.firstChild);
     }
   };

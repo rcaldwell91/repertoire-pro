@@ -107,17 +107,17 @@
     } else {
       var op2 = ownPlan(), plan = op2.plan;
       h = '<div class="kicker">TODAY · FROM REPERTOIRE</div>' +
-        '<h2 style="font-size:21px;margin:5px 0 3px">About fifteen minutes.</h2>' +
+        '<h2 style="font-size:21px;margin:5px 0 3px">Your practice for today</h2>' +
         '<div class="sub" style="font-size:12.5px;color:var(--ink-dim);font-weight:600">' +
         (window.RP && RP.user && !RP.coach
           ? 'Nobody has set you work, so this is Repertoire’s own plan. Join a coach on the Coach tab and theirs goes here instead.'
-          : 'Repertoire’s plan for today. It changes as you do.') + '</div>';
+          : 'Five things to sing, about fifteen minutes. Press Start and it takes you through them one at a time.') + '</div>';
       if (plan) {
         h += '<div style="margin:12px 0 4px">' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
           '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">Today’s one thing</div></div></div></div>' +
+          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
           '</div>';

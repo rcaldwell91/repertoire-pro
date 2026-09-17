@@ -429,7 +429,7 @@ body.light .michelp{background:rgba(60,54,48,.5);}
       </div>
       <button id="btnJourney">Start: Warm up</button>
     </div>
-    <h3 style="margin:18px 4px 2px">Jump straight in</h3>
+    <h3 style="margin:18px 4px 2px">Or sing something now</h3>
     <div class="homegrid">
       <div class="mcard hue1" id="mcTrain"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-activity"/></svg></div><div><h4>Train</h4><p>Exercises that build your voice, a level at a time</p></div><div class="chev">›</div></div>
       <div class="mcard hue2" id="mcSong"><div class="mi"><svg class="ic" style="width:22px;height:22px"><use href="#i-music"/></svg></div><div><h4>Song Trainer</h4><p>Sing a song and see every note you hit</p></div><div class="chev">›</div></div>
@@ -1095,6 +1095,9 @@ function playGuide(midi, when, dur, transpose){
 function playPiano(midi, when, dur, dest, vol){
   dest = dest || guideGain; vol = vol==null? 0.5 : vol;
   if(when < ctx.currentTime) when = ctx.currentTime;
+  /* Robert, 18 Sep: a real recorded piano when the file is there. The
+     synth below stays as the fallback, so a dead network is never silence. */
+  try { if(window.RPPiano && RPPiano.play(midi, when, dur, dest, vol)) return; } catch(e){}
   const hold = Math.max(0.4, dur);
   const f0 = midiFreq(midi);
   const g = ctx.createGain(); g.gain.value = vol;
@@ -3880,7 +3883,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = 'v10.1 · theory games, simpler lessons';
+const APP_VERSION = '17 Sep 2026 · build 1d4f4750';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -13446,7 +13449,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       var n = document.createElement('div');
       n.className = 'notice';
       n.style.cssText = 'margin:0 0 12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px';
-      n.innerHTML = 'Got a coach? <b>Sign in</b> and what they set you shows here. Everything below works without an account.';
+      n.innerHTML = 'Got a coach? <b>Sign in</b>, then put their code in at the top of this tab. What they set you appears below it. Everything else here works without an account.';
       host.insertBefore(n, host.firstChild);
     }
   };
@@ -18703,17 +18706,17 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     } else {
       var op2 = ownPlan(), plan = op2.plan;
       h = '<div class="kicker">TODAY · FROM REPERTOIRE</div>' +
-        '<h2 style="font-size:21px;margin:5px 0 3px">About fifteen minutes.</h2>' +
+        '<h2 style="font-size:21px;margin:5px 0 3px">Your practice for today</h2>' +
         '<div class="sub" style="font-size:12.5px;color:var(--ink-dim);font-weight:600">' +
         (window.RP && RP.user && !RP.coach
           ? 'Nobody has set you work, so this is Repertoire’s own plan. Join a coach on the Coach tab and theirs goes here instead.'
-          : 'Repertoire’s plan for today. It changes as you do.') + '</div>';
+          : 'Five things to sing, about fifteen minutes. Press Start and it takes you through them one at a time.') + '</div>';
       if (plan) {
         h += '<div style="margin:12px 0 4px">' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
           '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) +
-          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">Today’s one thing</div></div></div></div>' +
+          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div></div>' +
           '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
           '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
           '</div>';
@@ -18928,7 +18931,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   var CATS = [
     { id: 'warmup',  name: 'Warm-up',  icon: 'i-zap',         sub: 'Gentle ways to start making sound.' },
     { id: 'breath',  name: 'Breath',   icon: 'i-wind',        sub: 'Letting air out slowly and steadily.' },
-    { id: 'tone',    name: 'Tone',     icon: 'i-volume',      sub: 'The colour of the sound, and the gear change.' },
+    { id: 'tone',    name: 'Tone',     icon: 'i-volume',      sub: 'How your voice sounds, and the place where it changes from low to high.' },
     { id: 'agility', name: 'Agility',  icon: 'i-shuffle',     sub: 'Moving quickly and cleanly between notes.' },
     { id: 'range',   name: 'Range',    icon: 'i-chevrons-up', sub: 'More usable notes, top and bottom.' },
     { id: 'pitch',   name: 'Pitch',    icon: 'i-target',      sub: 'Hitting the note you meant, and holding it.' },
@@ -19154,15 +19157,20 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     h += '<div class="row" style="gap:8px;margin-top:10px">' +
       '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
-      '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>';
+      '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>' +
+      /* Robert, 18 Sep: every other button on this screen has a line under
+         it saying what it does. These two did not. */
+      '<div class="rp-sub" style="margin:5px 4px 0;font-size:12px">Quiet session: ten minutes of hums, ' +
+      'hisses and straws, at speaking volume, so nobody hears you. Cool-down: three minutes to finish ' +
+      'on when you have been singing.</div>';
 
     /* Robert, 17 Sep: the seven categories were on the screen twice — the
        chips at the top and a tile for each below. The chips choose; See
        more opens the list. The tiles went. */
-    h += '<h3 style="margin:18px 4px 2px">More ways to practise</h3>';
+    h += '<h3 style="margin:18px 4px 2px">Pick what to work on</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell Repertoire what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-layers',   title: 'Choose what to get better at', sub: 'Say what you want to sing better and Repertoire picks the exercises for it.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
     /* Robert, 17 Sep: the pillars as their own buttons with icons, in the
@@ -19291,7 +19299,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
                'The major scale and key': 'i-bar-chart', 'Minor and the third': 'i-trending-up',
                'Intervals': 'i-layers', 'Chords and harmony': 'i-music', 'Song form': 'i-file',
                'Your voice': 'i-mic', 'Advanced': 'i-package' };
-  var SUB = { 'Play it': 'Games. Every answer plays, so your ear learns it too.',
+  var SUB = { 'Play it': 'Games you play by ear. Every answer plays the notes, so your ear learns it too.',
               'Sound and pitch': 'What a note is, and what "in tune" means.',
               'Time': 'Beats, bars, and counting in.',
               'The major scale and key': 'Do-re-mi, and what a key is.',
@@ -19555,11 +19563,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       folds: ['Your voice'], cards: ['rpRangePanelHolder', 'rpTestRow', 'rpTalkRow'] },
     { key: 'progress',icon: 'i-bar-chart', title: 'Progress',          sub: 'Days practised, and where your points came from.',
       folds: ['Practice'], cards: ['rpPointsRow', 'rpLevelRow'] },
-    { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when.',
+    { key: 'plan',    icon: 'i-compass',   title: 'Your plan',         sub: 'What Repertoire works on with you, and when. Change any of it here.',
       folds: [], cards: ['rpPlanHolder'] },
     { key: 'sound',   icon: 'i-volume',    title: 'Sound and microphone', sub: 'Volume, headphones and the microphone.',
       folds: ['Sound', 'Reference notes', 'Microphone'], cards: ['rpSoundRow', 'rpTimingRow'] },
-    { key: 'look',    icon: 'i-settings',  title: 'Look and words',    sub: 'Light or dark, and how much the app explains.',
+    { key: 'look',    icon: 'i-settings',  title: 'How it looks, and how much it explains', sub: 'Light or dark, and long or short wording.',
       folds: ['Appearance'], cards: ['rpDoseRow'] },
     { key: 'help',    icon: 'i-book',      title: 'Help',              sub: 'A tour of the app, and a guide with pictures.',
       folds: ['About'], cards: ['rpHelpRow', 'rpGuideRow', 'rpExRow'] }
@@ -19728,7 +19736,17 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var t = top.querySelector('[data-pg="account"] p'); if (t) t.textContent = me ? (me.display_name || me.email) : 'Not signed in — tap to sign in.';
     var rg = null; try { rg = window.RPRange ? RPRange.get() : null; } catch (e) {}
     var v = top.querySelector('[data-pg="voice"] p');
-    if (v && rg) { try { v.textContent = midiName(rg.lo) + '–' + midiName(rg.hi) + (rg.by === 'preset' ? ' · picked, not sung' : rg.at ? ' · sung and measured' : ''); } catch (e) {} }
+    /* Robert, 18 Sep: this line said A2–A4 on an account that had never
+       sung a note. A2–A4 is base.html's built-in default, not anybody's
+       range, so until it is measured this row has to say so. */
+    if (v && rg) {
+      try {
+        var done = !window.RPRange || RPRange.measured();
+        v.textContent = !done ? 'Not measured yet · tap to sing it'
+          : midiName(rg.lo) + '–' + midiName(rg.hi) +
+            (rg.by === 'preset' ? ' · picked, not sung' : rg.at ? ' · sung and measured' : '');
+      } catch (e) {}
+    }
     var lv = $('rpLevelRow'); var p = top.querySelector('[data-pg="progress"] p');
     if (lv && p) { var tt = lv.querySelector('.rp-ttl'); if (tt) p.textContent = tt.textContent; }
   }
@@ -19976,8 +19994,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     h += '<div class="row" style="justify-content:space-between;align-items:center;margin:12px 2px 8px">' +
       '<button class="rp-dots" id="rpLibSort" style="font-size:13px;font-weight:800;color:var(--ink);padding:2px 0">' +
-      '⇅ ' + (sortBy === 'az' ? 'A–Z' : 'Recents') + '</button>' +
-      '<button class="rp-dots" id="rpLibGrid" title="Grid or list">' + (grid ? '☰' : '▦') + '</button></div>';
+      '⇅ ' + (sortBy === 'az' ? 'Sorted A–Z' : 'Newest first') + '</button>' +
+      '<button class="rp-dots" id="rpLibGrid" style="font-size:13px;font-weight:800;color:var(--ink);padding:2px 0" ' +
+      'title="Show as a grid or a list">' + (grid ? '☰ Show as a list' : '▦ Show as a grid') + '</button></div>';
 
     var body = '';
     var cur = (lib() || {}).cur;
@@ -19988,12 +20007,16 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
           art: mosaic(ss, grid ? 120 : 52), data: 'data-pl="' + esc(p.id) + '"' });
       });
       if (chip === 'playlists' && !plists().length) {
-        body += '<div class="measured" style="margin-top:10px">No playlists yet. Make one with the ＋ at the top.</div>';
+        body += '<div class="measured" style="margin-top:10px">No playlists yet. Make one with the + at the top.</div>';
       }
       body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + body + '</div>';
     }
     if (chip === 'maps') {
-      body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + (window.RPMaps ? RPMaps.rowsHtml(row, grid) : '') + '</div>';
+      /* Robert, 18 Sep: "note map" is our word and nothing on the screen
+         said what one is, now that the card explaining it has gone. */
+      body = '<div class="measured" style="margin-bottom:10px">A note map is the picture of the notes ' +
+        'from one of your takes. Open one to see it full size, or play it back as a guide to sing along to.</div>' +
+        '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + (window.RPMaps ? RPMaps.rowsHtml(row, grid) : '') + '</div>';
     }
     /* Robert, 17 Sep: takes get their own list, organised by exercise */
     if (chip === 'recordings' && window.RPTakes) {
@@ -20003,8 +20026,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
     if (chip === 'all') {
       h += '<div class="measured" style="margin-top:14px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
-        ' on this phone. Songs and takes stay on the phone they were made on; a take you send to your coach reaches them.' +
-        (owned().length ? '' : ' Add songs you own with the ＋, or record a take.') + '</div>';
+        ' here. Songs and takes stay on the device they were made on; a take you send to your coach reaches them.' +
+        (owned().length ? '' : ' Add songs you own with the +, or record a take.') + '</div>';
     }
     top.innerHTML = h;
 
@@ -20102,11 +20125,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<button class="btn" id="rpPlShuffle" style="padding:11px 16px;font-size:12.5px">Shuffle</button>' +
       '<button class="btn primary" id="rpPlPlay" style="padding:11px 22px;font-size:14px">Play</button></div>';
     h += '<div class="row" style="gap:7px;margin-bottom:6px;flex-wrap:nowrap">' +
-      '<button class="btn" data-plact="add" style="flex:1;padding:9px;font-size:12px">＋ Add</button>' +
+      '<button class="btn" data-plact="add" style="flex:1;padding:9px;font-size:12px">+ Add</button>' +
       '<button class="btn" data-plact="rename" style="flex:1;padding:9px;font-size:12px">Rename</button>' +
       '<button class="btn" data-plact="sort" style="flex:1;padding:9px;font-size:12px">⇅ Sort</button>' +
       '<button class="btn" data-plact="del" style="flex:1;padding:9px;font-size:12px;color:var(--miss)">Delete</button></div>';
-    if (!ss.length) h += '<div class="measured" style="margin-top:12px">Nothing in this one yet. ＋ Add puts songs in.</div>';
+    if (!ss.length) h += '<div class="measured" style="margin-top:12px">Nothing in this one yet. + Add puts songs in.</div>';
 
     setList(p.id);
     var panel = listPanel();
@@ -20171,7 +20194,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     pool.forEach(function (s) {
       hh += '<div class="rp-lrow" data-add="' + esc(s.id) + '">' + art(s.title, s.kind === 'recording' ? 'i-mic' : 'i-music', 44) +
         '<div class="lm"><div class="lt">' + esc(s.title) + '</div><div class="ls">' + esc(s.artist || '') + '</div></div>' +
-        '<div style="color:var(--accent);font-size:20px">＋</div></div>';
+        '<div style="color:var(--accent);font-size:20px">+</div></div>';
     });
     hh += '</div><button class="btn" id="rpPlAddX" style="width:100%;padding:12px;margin-top:12px">Done</button>';
     o2.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;' +
@@ -22392,6 +22415,135 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   setInterval(tidy, 700);
   setTimeout(tidy, 900);
   window.RPCoachTab = { tidy: tidy };
+})();
+
+</script>
+<script>
+/* =====================================================================
+   Repertoire Pro — the reference note is a real piano.
+
+   Robert, 18 Sep: "Listen to the new reference note yourself. Piano in
+   code often means a synth with a piano-ish envelope, which is the exact
+   thing I didn't like." It was. Then: "source a real sampled note."
+
+   The samples are the Steinway B sustains from the Versilian Community
+   Sample Library (github.com/sgossner/VCSL), CC0 — public domain, no
+   credit required, safe in a commercial app. Sixteen anchors, every four
+   semitones from C2 to C7, because VCSL's piano is whole-tone sampled so
+   a three-semitone grid would have meant resampling every anchor. Each
+   one is trimmed to three seconds, faded, mixed to mono and encoded at
+   96 kbps: 584 KB for the set, in audio/piano/ next to the page.
+
+   Every sample was measured offline and its real pitch is in TUNING
+   below. A grand is stretch-tuned — the bass sits flat and the treble
+   sharp, the Railsback curve, and it is right there in the numbers —
+   so playbackRate corrects each note to equal temperament rather than
+   assuming the file is where the label says.
+
+   If a file has not arrived, or there is no network, playPiano falls
+   back to the synth it already had. Nobody ever gets silence.
+   ===================================================================== */
+(function () {
+  'use strict';
+  var P = {};
+  window.RPPiano = P;
+
+  /* midi -> the frequency that sample actually sounds, measured */
+  var TUNING = {
+    36: 64.911,  40: 81.988,  44: 103.749, 48: 130.506,
+    52: 164.423, 56: 207.258, 60: 261.269, 64: 329.250,
+    68: 414.691, 72: 521.108, 76: 658.776, 80: 830.029,
+    84: 1048.313, 88: 1322.752, 92: 1663.746, 96: 2109.428
+  };
+  var ANCHORS = Object.keys(TUNING).map(Number).sort(function (a, b) { return a - b; });
+  var DIR = 'audio/piano/';
+  var buf = {};       /* midi -> AudioBuffer */
+  var tried = {};     /* midi -> true once a fetch has started */
+  var dead = false;   /* one hard failure and we stop asking */
+
+  function theCtx() { try { return ctx; } catch (e) { return null; } }
+  function hz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function nearest(midi) {
+    var best = ANCHORS[0], d = 1e9;
+    for (var i = 0; i < ANCHORS.length; i++) {
+      var k = Math.abs(ANCHORS[i] - midi);
+      if (k < d) { d = k; best = ANCHORS[i]; }
+    }
+    return best;
+  }
+
+  function load(anchor) {
+    if (dead || tried[anchor]) return;
+    tried[anchor] = true;
+    var c = theCtx();
+    if (!c) { tried[anchor] = false; return; }
+    fetch(DIR + anchor + '.mp3', { cache: 'force-cache' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(function (ab) {
+        return new Promise(function (res, rej) {
+          var out = c.decodeAudioData(ab, res, rej);
+          if (out && out.then) out.then(res, rej);
+        });
+      })
+      .then(function (b) { buf[anchor] = b; })
+      .catch(function () {
+        tried[anchor] = false;
+        /* a 404 means the files are not deployed; stop asking sixteen times */
+        if (anchor === 60) dead = true;
+      });
+  }
+
+  /* Warm the anchors around the singer's range, once there is a context.
+     Nothing blocks on this: the synth covers every note until a file
+     lands, and the swap is silent. */
+  P.warm = function () {
+    if (dead || !theCtx()) return;
+    var lo = 48, hi = 84;
+    try { if (RANGE && isFinite(RANGE.lo)) { lo = RANGE.lo - 4; hi = RANGE.hi + 4; } } catch (e) {}
+    ANCHORS.forEach(function (a) { if (a >= lo - 4 && a <= hi + 4) load(a); });
+  };
+
+  /* Returns true when it has played the note. False means "not ready" and
+     the caller falls back to its synth. */
+  P.play = function (midi, when, dur, dest, vol) {
+    var c = theCtx();
+    if (!c || dead) return false;
+    var a = nearest(midi);
+    if (!buf[a]) { load(a); return false; }
+    if (Math.abs(a - midi) > 3) return false;   /* too far to shift cleanly */
+
+    var hold = Math.max(0.25, dur || 1);
+    var src = c.createBufferSource();
+    src.buffer = buf[a];
+    src.playbackRate.value = hz(midi) / TUNING[a];
+
+    var g = c.createGain();
+    g.gain.setValueAtTime(vol == null ? 0.5 : vol, when);
+    /* the file is three seconds long. If the caller wants less, take the
+       note off with a short fade rather than a click. */
+    var fade = Math.min(0.18, hold * 0.35);
+    g.gain.setValueAtTime(vol == null ? 0.5 : vol, when + Math.max(0.02, hold - fade));
+    g.gain.linearRampToValueAtTime(0.0001, when + hold);
+
+    src.connect(g); g.connect(dest || c.destination);
+    src.start(when);
+    src.stop(when + hold + 0.05);
+    return true;
+  };
+
+  P.ready = function () { return !dead && !!buf[60]; };
+  P.state = function () {
+    return { dead: dead, loaded: Object.keys(buf).map(Number).sort(function (a, b) { return a - b; }) };
+  };
+
+  /* try to warm as soon as there is an audio context, and again when the
+     range changes, because that moves which anchors matter */
+  var n = 0;
+  var iv = setInterval(function () {
+    if (theCtx()) { P.warm(); if (++n > 3) clearInterval(iv); }
+    else if (++n > 200) clearInterval(iv);
+  }, 1000);
 })();
 
 </script>

@@ -28,7 +28,7 @@
   var CATS = [
     { id: 'warmup',  name: 'Warm-up',  icon: 'i-zap',         sub: 'Gentle ways to start making sound.' },
     { id: 'breath',  name: 'Breath',   icon: 'i-wind',        sub: 'Letting air out slowly and steadily.' },
-    { id: 'tone',    name: 'Tone',     icon: 'i-volume',      sub: 'The colour of the sound, and the gear change.' },
+    { id: 'tone',    name: 'Tone',     icon: 'i-volume',      sub: 'How your voice sounds, and the place where it changes from low to high.' },
     { id: 'agility', name: 'Agility',  icon: 'i-shuffle',     sub: 'Moving quickly and cleanly between notes.' },
     { id: 'range',   name: 'Range',    icon: 'i-chevrons-up', sub: 'More usable notes, top and bottom.' },
     { id: 'pitch',   name: 'Pitch',    icon: 'i-target',      sub: 'Hitting the note you meant, and holding it.' },
@@ -254,15 +254,20 @@
 
     h += '<div class="row" style="gap:8px;margin-top:10px">' +
       '<button class="btn" data-routine="quiet" style="flex:1;padding:9px;font-size:12.5px">Quiet session</button>' +
-      '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>';
+      '<button class="btn" data-routine="cool" style="flex:1;padding:9px;font-size:12.5px">Cool-down</button></div>' +
+      /* Robert, 18 Sep: every other button on this screen has a line under
+         it saying what it does. These two did not. */
+      '<div class="rp-sub" style="margin:5px 4px 0;font-size:12px">Quiet session: ten minutes of hums, ' +
+      'hisses and straws, at speaking volume, so nobody hears you. Cool-down: three minutes to finish ' +
+      'on when you have been singing.</div>';
 
     /* Robert, 17 Sep: the seven categories were on the screen twice — the
        chips at the top and a tile for each below. The chips choose; See
        more opens the list. The tiles went. */
-    h += '<h3 style="margin:18px 4px 2px">More ways to practise</h3>';
+    h += '<h3 style="margin:18px 4px 2px">Pick what to work on</h3>';
     h += RPPage.tiles([
       { icon: 'i-activity', title: 'Pitch Tracker', sub: 'See the notes you sing, as you sing them.', id: 'rpTileTracker' },
-      { icon: 'i-layers',   title: 'Work towards a goal', sub: 'Tell Repertoire what you want to get better at. It picks the exercises.', id: 'rpTileGoals' },
+      { icon: 'i-layers',   title: 'Choose what to get better at', sub: 'Say what you want to sing better and Repertoire picks the exercises for it.', id: 'rpTileGoals' },
       { icon: 'i-user',     title: 'Body and breath', sub: 'Posture, jaw, tongue, shoulders. No singing.', id: 'rpTileBody' }
     ]);
     /* Robert, 17 Sep: the pillars as their own buttons with icons, in the

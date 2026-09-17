@@ -229,8 +229,9 @@
 
     h += '<div class="row" style="justify-content:space-between;align-items:center;margin:12px 2px 8px">' +
       '<button class="rp-dots" id="rpLibSort" style="font-size:13px;font-weight:800;color:var(--ink);padding:2px 0">' +
-      '⇅ ' + (sortBy === 'az' ? 'A–Z' : 'Recents') + '</button>' +
-      '<button class="rp-dots" id="rpLibGrid" title="Grid or list">' + (grid ? '☰' : '▦') + '</button></div>';
+      '⇅ ' + (sortBy === 'az' ? 'Sorted A–Z' : 'Newest first') + '</button>' +
+      '<button class="rp-dots" id="rpLibGrid" style="font-size:13px;font-weight:800;color:var(--ink);padding:2px 0" ' +
+      'title="Show as a grid or a list">' + (grid ? '☰ Show as a list' : '▦ Show as a grid') + '</button></div>';
 
     var body = '';
     var cur = (lib() || {}).cur;
@@ -241,12 +242,16 @@
           art: mosaic(ss, grid ? 120 : 52), data: 'data-pl="' + esc(p.id) + '"' });
       });
       if (chip === 'playlists' && !plists().length) {
-        body += '<div class="measured" style="margin-top:10px">No playlists yet. Make one with the ＋ at the top.</div>';
+        body += '<div class="measured" style="margin-top:10px">No playlists yet. Make one with the + at the top.</div>';
       }
       body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + body + '</div>';
     }
     if (chip === 'maps') {
-      body = '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + (window.RPMaps ? RPMaps.rowsHtml(row, grid) : '') + '</div>';
+      /* Robert, 18 Sep: "note map" is our word and nothing on the screen
+         said what one is, now that the card explaining it has gone. */
+      body = '<div class="measured" style="margin-bottom:10px">A note map is the picture of the notes ' +
+        'from one of your takes. Open one to see it full size, or play it back as a guide to sing along to.</div>' +
+        '<div class="' + (grid ? 'rp-lgrid' : '') + '">' + (window.RPMaps ? RPMaps.rowsHtml(row, grid) : '') + '</div>';
     }
     /* Robert, 17 Sep: takes get their own list, organised by exercise */
     if (chip === 'recordings' && window.RPTakes) {
@@ -256,8 +261,8 @@
 
     if (chip === 'all') {
       h += '<div class="measured" style="margin-top:14px">' + songs().length + ' item' + (songs().length === 1 ? '' : 's') +
-        ' on this phone. Songs and takes stay on the phone they were made on; a take you send to your coach reaches them.' +
-        (owned().length ? '' : ' Add songs you own with the ＋, or record a take.') + '</div>';
+        ' here. Songs and takes stay on the device they were made on; a take you send to your coach reaches them.' +
+        (owned().length ? '' : ' Add songs you own with the +, or record a take.') + '</div>';
     }
     top.innerHTML = h;
 
@@ -355,11 +360,11 @@
       '<button class="btn" id="rpPlShuffle" style="padding:11px 16px;font-size:12.5px">Shuffle</button>' +
       '<button class="btn primary" id="rpPlPlay" style="padding:11px 22px;font-size:14px">Play</button></div>';
     h += '<div class="row" style="gap:7px;margin-bottom:6px;flex-wrap:nowrap">' +
-      '<button class="btn" data-plact="add" style="flex:1;padding:9px;font-size:12px">＋ Add</button>' +
+      '<button class="btn" data-plact="add" style="flex:1;padding:9px;font-size:12px">+ Add</button>' +
       '<button class="btn" data-plact="rename" style="flex:1;padding:9px;font-size:12px">Rename</button>' +
       '<button class="btn" data-plact="sort" style="flex:1;padding:9px;font-size:12px">⇅ Sort</button>' +
       '<button class="btn" data-plact="del" style="flex:1;padding:9px;font-size:12px;color:var(--miss)">Delete</button></div>';
-    if (!ss.length) h += '<div class="measured" style="margin-top:12px">Nothing in this one yet. ＋ Add puts songs in.</div>';
+    if (!ss.length) h += '<div class="measured" style="margin-top:12px">Nothing in this one yet. + Add puts songs in.</div>';
 
     setList(p.id);
     var panel = listPanel();
@@ -424,7 +429,7 @@
     pool.forEach(function (s) {
       hh += '<div class="rp-lrow" data-add="' + esc(s.id) + '">' + art(s.title, s.kind === 'recording' ? 'i-mic' : 'i-music', 44) +
         '<div class="lm"><div class="lt">' + esc(s.title) + '</div><div class="ls">' + esc(s.artist || '') + '</div></div>' +
-        '<div style="color:var(--accent);font-size:20px">＋</div></div>';
+        '<div style="color:var(--accent);font-size:20px">+</div></div>';
     });
     hh += '</div><button class="btn" id="rpPlAddX" style="width:100%;padding:12px;margin-top:12px">Done</button>';
     o2.innerHTML = '<div style="background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;' +
