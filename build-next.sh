@@ -459,6 +459,15 @@ PATCHES = [
     ("  if(G.trail.length>600) G.trail.shift();",
      "  if(G.trail.length>9000) G.trail.shift();"),
 
+    # 36. THE GAME'S QUIT. Robert's audit, 17 Sep: a theory game could not be
+    #     quit. Its Quit button had the same id as the guided panel's Done, and
+    #     $('gQuit') found the Done button first, so the game's Quit was never
+    #     wired. Its own id, looked up on its own panel.
+    ("""'<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Quit</button></div>';""",
+     """'<button class="btn danger ghost" id="gameQuit" style="padding:7px 12px;font-size:12px">Quit</button></div>';"""),
+    ("const qb = $('gQuit'); if (qb) qb.addEventListener('click', quit);",
+     "const qb = p.querySelector('#gameQuit'); if (qb) qb.addEventListener('click', quit);"),
+
     # 2a. "101% steady" — SUS.within keeps accumulating on the frame that ends
     #     the hold, so the time spent on the note could come out fractionally
     #     longer than the hold itself. A percentage over 100 is exactly the

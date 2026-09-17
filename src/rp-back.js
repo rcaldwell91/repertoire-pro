@@ -39,7 +39,7 @@
   /* something is running on the Train tab — leave it the way its own
      button would, and stay on the tab */
   function leaveRunning() {
-    var ids = ['gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit', 'btnKbdBack'];
+    var ids = ['gameQuit', 'gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit', 'btnKbdBack', 'earQuit'];
     for (var i = 0; i < ids.length; i++) {
       var b = $(ids[i]);
       if (b && b.offsetParent !== null) { b.click(); return true; }

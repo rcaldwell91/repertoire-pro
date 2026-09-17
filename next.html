@@ -10604,7 +10604,7 @@ renderJourney();
       (feedback === 'right' ? 'Yes. ' : 'Not quite. ') + q.after + '</div>';
 
     h += '<div class="row" style="justify-content:flex-end;margin-top:12px">' +
-      '<button class="btn danger ghost" id="gQuit" style="padding:7px 12px;font-size:12px">Quit</button></div>';
+      '<button class="btn danger ghost" id="gameQuit" style="padding:7px 12px;font-size:12px">Quit</button></div>';
 
     p.innerHTML = h;
 
@@ -10612,7 +10612,7 @@ renderJourney();
     p.querySelectorAll('[data-opt]').forEach(b => b.addEventListener('click', () => tapOpt(+b.dataset.opt)));
     const hb = $('gHear'); if (hb) hb.addEventListener('click', hear);
     const nb = $('gNext'); if (nb) nb.addEventListener('click', next);
-    const qb = $('gQuit'); if (qb) qb.addEventListener('click', quit);
+    const qb = p.querySelector('#gameQuit'); if (qb) qb.addEventListener('click', quit);
   }
 
   function hear() {
@@ -19185,6 +19185,28 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     body.insertBefore(b, body.firstChild);
   }
 
+  /* Robert's audit, 17 Sep: a game followed you onto every tab. The base
+     puts the game panel beside the Learn tab, not inside it, so switching
+     tabs never hid it. Leaving Learn now ends the game the way its own
+     Quit does. */
+  (function () {
+    var n = 0, iv = setInterval(function () {
+      if (typeof window.switchMode !== 'function') { if (++n > 50) clearInterval(iv); return; }
+      clearInterval(iv);
+      var prev = window.switchMode;
+      window.switchMode = function (m) {
+        try {
+          var g = $('v10Game');
+          if (m !== 'learn' && g && g.style.display !== 'none') {
+            var q = g.querySelector('#gameQuit');
+            if (q) q.click(); else { g.style.display = 'none'; var h = $('modeLearn'); if (h) h.style.display = ''; }
+          }
+        } catch (e) {}
+        return prev.apply(this, arguments);
+      };
+    }, 100);
+  })();
+
   function infoButton(row) {
     if (row.querySelector('.rp-info')) return;
     var b = document.createElement('span');
@@ -21177,7 +21199,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* something is running on the Train tab — leave it the way its own
      button would, and stay on the tab */
   function leaveRunning() {
-    var ids = ['gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit', 'btnKbdBack'];
+    var ids = ['gameQuit', 'gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit', 'btnKbdBack', 'earQuit'];
     for (var i = 0; i < ids.length; i++) {
       var b = $(ids[i]);
       if (b && b.offsetParent !== null) { b.click(); return true; }

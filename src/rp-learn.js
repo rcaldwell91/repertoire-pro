@@ -128,6 +128,28 @@
     body.insertBefore(b, body.firstChild);
   }
 
+  /* Robert's audit, 17 Sep: a game followed you onto every tab. The base
+     puts the game panel beside the Learn tab, not inside it, so switching
+     tabs never hid it. Leaving Learn now ends the game the way its own
+     Quit does. */
+  (function () {
+    var n = 0, iv = setInterval(function () {
+      if (typeof window.switchMode !== 'function') { if (++n > 50) clearInterval(iv); return; }
+      clearInterval(iv);
+      var prev = window.switchMode;
+      window.switchMode = function (m) {
+        try {
+          var g = $('v10Game');
+          if (m !== 'learn' && g && g.style.display !== 'none') {
+            var q = g.querySelector('#gameQuit');
+            if (q) q.click(); else { g.style.display = 'none'; var h = $('modeLearn'); if (h) h.style.display = ''; }
+          }
+        } catch (e) {}
+        return prev.apply(this, arguments);
+      };
+    }, 100);
+  })();
+
   function infoButton(row) {
     if (row.querySelector('.rp-info')) return;
     var b = document.createElement('span');
