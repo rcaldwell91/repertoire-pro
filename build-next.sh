@@ -811,6 +811,105 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
      "    $('susResult').textContent = pct+'% steady — '+msg;\n"
      "    try { if (window.RP && RP.logResult) RP.logResult({ kind: 'sustain',\n"
      "      label: 'Steady note', pct: pct, seconds: SUS.dur }); } catch (e) {}"),
+    # 45. THE MAP THAT JUMPS.
+    #     Robert, 17 Sep: "He stops singing and it drops an octave, notes leave
+    #     the screen, then snaps back... The view is decided by THE SONG before
+    #     Start, and does not move for the whole song."
+    #     laneWindow used to recentre itself on the last note heard whenever
+    #     that note came within two semitones of an edge. A voice that stops,
+    #     or one octave misread, moved the whole map. Now a screen can PIN the
+    #     window before anything sounds, and a pinned window is never
+    #     recomputed. His line goes where it goes inside it, off the top or the
+    #     bottom included. Nothing pins by default, so a screen that has not
+    #     been taught to pin behaves exactly as it did.
+    ("""function laneWindow(cnv, center){
+  let w = cnv._pmWin;
+  if(!w || center < w.lo+2 || center > w.hi-2){
+    w = cnv._pmWin = {lo: Math.floor(center-9), hi: Math.ceil(center+9)};
+  }
+  return w;
+}""",
+     """function laneWindow(cnv, center){
+  if(cnv && cnv._pmPin) return cnv._pmPin;
+  let w = cnv._pmWin;
+  if(!w || center < w.lo+2 || center > w.hi-2){
+    w = cnv._pmWin = {lo: Math.floor(center-9), hi: Math.ceil(center+9)};
+  }
+  return w;
+}
+/* Hold this canvas at these notes until something unpins it. */
+window.rpPinLane = function(cnv, lo, hi){
+  if(!cnv) return null;
+  lo = Math.round(lo); hi = Math.round(hi);
+  if(!isFinite(lo) || !isFinite(hi) || hi <= lo){ lo = 48; hi = 72; }
+  while(hi - lo < 14){ lo--; hi++; }            // never so tight the lanes fuse
+  if(hi - lo > 36){                              // never so wide nothing reads
+    const mid = Math.round((lo+hi)/2); lo = mid-18; hi = mid+18;
+  }
+  cnv._pmPin = cnv._pmWin = {lo: lo, hi: hi};
+  return cnv._pmPin;
+};
+window.rpUnpinLane = function(cnv){ if(cnv){ cnv._pmPin = null; cnv._pmWin = null; } };
+/* The window a song asks for: every note in it, with room above and below. */
+window.rpPinLaneToNotes = function(cnv, notes, pad){
+  if(!cnv || !notes || !notes.length) return null;
+  let lo = 127, hi = 0;
+  for(let i=0;i<notes.length;i++){
+    const m = notes[i] && (notes[i].m != null ? notes[i].m : notes[i].pitch);
+    if(m == null || !isFinite(m)) continue;
+    if(m < lo) lo = m;
+    if(m > hi) hi = m;
+  }
+  if(hi < lo) return null;
+  pad = (pad == null) ? 3 : pad;
+  return window.rpPinLane(cnv, lo-pad, hi+pad);
+};
+
+/* ---- the two clocks, both measured 17 Sep ---------------------------
+   On a file whose notes begin at exactly 1.2 s intervals:
+     - the note map reads every onset 0.050 s EARLY (it is built from the
+       audio itself, and lands on its own 0.1 s analysis step);
+     - the live microphone line reads the same onset 0.100 s LATE (capture,
+       buffering and pitch detection). That is the figure the app already
+       carried as state.latencyMs and had only ever spent on scoring.
+   Sixteen notes, the same gap at the end of the file as at the start: a
+   constant offset, not a drift.
+   A TAKE lines up today because BOTH its lines are live ones and carry the
+   same 0.100 s. A FILE does not: gold from the map and blue from the mic sit
+   0.150 s apart. So each line is put back where the sound actually was and
+   they meet there — rather than shoving one across to cover the other, which
+   would quietly teach a singer to come in late. -------------------------- */
+window.rpMicLag = function(){
+  let ms = 100;
+  try{ if(typeof state !== 'undefined' && isFinite(state.latencyMs)) ms = state.latencyMs; }catch(e){}
+  return ms/1000;
+};
+window.RP_MAP_LEAD = 0.05;
+/* seconds to ADD to a stored note's time before it is drawn */
+window.rpNoteLag = function(song){
+  if(!song) return 0;
+  if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
+  if(song.notesFrom === 'live') return -window.rpMicLag();
+  if(song.notesFrom === 'file' || song.mapVer) return window.RP_MAP_LEAD;
+  return -window.rpMicLag();   /* no map version: a take's own live line */
+};"""),
+
+    # 46. The same 0.100 s, taken off the Pitch Tracker's live line, so the blue
+    #     line sits where the sound was rather than where the analysis finished.
+    #     A take's gold line moves by the same amount (rpNoteLag), so a take
+    #     still lands on itself — and a file now lands as well.
+    ("""  FREE.trail.push({t:now, m:userMidi});""",
+     """  FREE.trail.push({t:now - rpMicLag(), m:userMidi});"""),
+
+    # 47. Say where a note map came from, so the drawing knows which of the
+    #     two clocks above it is on. Takes carry notesFrom:'live'.
+    ("""    song.notes = result.notes;
+    song.noteFloor = result.floor;
+    song.mapVer = 3;""",
+     """    song.notes = result.notes;
+    song.noteFloor = result.floor;
+    song.notesFrom = 'file';
+    song.mapVer = 3;"""),
 ]
 # ---------------------------------------------------------------------
 # Home, in plain words with a sense of where you are in the session.

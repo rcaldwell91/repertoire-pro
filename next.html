@@ -2440,12 +2440,69 @@ function drawKeyRail(c2, H, lo, hi, yOf, liveM){
 /* keep the pitch-lane window still until the voice nears an edge, instead of
    drifting with every note — so a key stays in one place on screen */
 function laneWindow(cnv, center){
+  if(cnv && cnv._pmPin) return cnv._pmPin;
   let w = cnv._pmWin;
   if(!w || center < w.lo+2 || center > w.hi-2){
     w = cnv._pmWin = {lo: Math.floor(center-9), hi: Math.ceil(center+9)};
   }
   return w;
 }
+/* Hold this canvas at these notes until something unpins it. */
+window.rpPinLane = function(cnv, lo, hi){
+  if(!cnv) return null;
+  lo = Math.round(lo); hi = Math.round(hi);
+  if(!isFinite(lo) || !isFinite(hi) || hi <= lo){ lo = 48; hi = 72; }
+  while(hi - lo < 14){ lo--; hi++; }            // never so tight the lanes fuse
+  if(hi - lo > 36){                              // never so wide nothing reads
+    const mid = Math.round((lo+hi)/2); lo = mid-18; hi = mid+18;
+  }
+  cnv._pmPin = cnv._pmWin = {lo: lo, hi: hi};
+  return cnv._pmPin;
+};
+window.rpUnpinLane = function(cnv){ if(cnv){ cnv._pmPin = null; cnv._pmWin = null; } };
+/* The window a song asks for: every note in it, with room above and below. */
+window.rpPinLaneToNotes = function(cnv, notes, pad){
+  if(!cnv || !notes || !notes.length) return null;
+  let lo = 127, hi = 0;
+  for(let i=0;i<notes.length;i++){
+    const m = notes[i] && (notes[i].m != null ? notes[i].m : notes[i].pitch);
+    if(m == null || !isFinite(m)) continue;
+    if(m < lo) lo = m;
+    if(m > hi) hi = m;
+  }
+  if(hi < lo) return null;
+  pad = (pad == null) ? 3 : pad;
+  return window.rpPinLane(cnv, lo-pad, hi+pad);
+};
+
+/* ---- the two clocks, both measured 17 Sep ---------------------------
+   On a file whose notes begin at exactly 1.2 s intervals:
+     - the note map reads every onset 0.050 s EARLY (it is built from the
+       audio itself, and lands on its own 0.1 s analysis step);
+     - the live microphone line reads the same onset 0.100 s LATE (capture,
+       buffering and pitch detection). That is the figure the app already
+       carried as state.latencyMs and had only ever spent on scoring.
+   Sixteen notes, the same gap at the end of the file as at the start: a
+   constant offset, not a drift.
+   A TAKE lines up today because BOTH its lines are live ones and carry the
+   same 0.100 s. A FILE does not: gold from the map and blue from the mic sit
+   0.150 s apart. So each line is put back where the sound actually was and
+   they meet there — rather than shoving one across to cover the other, which
+   would quietly teach a singer to come in late. -------------------------- */
+window.rpMicLag = function(){
+  let ms = 100;
+  try{ if(typeof state !== 'undefined' && isFinite(state.latencyMs)) ms = state.latencyMs; }catch(e){}
+  return ms/1000;
+};
+window.RP_MAP_LEAD = 0.05;
+/* seconds to ADD to a stored note's time before it is drawn */
+window.rpNoteLag = function(song){
+  if(!song) return 0;
+  if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
+  if(song.notesFrom === 'live') return -window.rpMicLag();
+  if(song.notesFrom === 'file' || song.mapVer) return window.RP_MAP_LEAD;
+  return -window.rpMicLag();   /* no map version: a take's own live line */
+};
 
 /* ---- one palette for everything drawn on canvas -------------------------
    CSS can't reach inside a <canvas>, so the note map needs its own colours.
@@ -3193,7 +3250,7 @@ $('mp3File').addEventListener('change', e=>{
 function freeFrame(dt){
   const now = (performance.now()-FREE.t0)/1000;
   const userMidi = MIC.on? smoothedMidi() : null;
-  FREE.trail.push({t:now, m:userMidi});
+  FREE.trail.push({t:now - rpMicLag(), m:userMidi});
   while(FREE.trail.length && now-FREE.trail[0].t > 7) FREE.trail.shift();
 
   if(userMidi!==null){
@@ -3883,7 +3940,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 291d715f';
+const APP_VERSION = '17 Sep 2026 · build 863c4bc3';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -5161,6 +5218,7 @@ async function buildNoteMap(song){
     if(result.tried) console.log('floor candidates:', JSON.stringify(result.tried));
     song.notes = result.notes;
     song.noteFloor = result.floor;
+    song.notesFrom = 'file';
     song.mapVer = 3;
     await dbPut('songs', song).catch(()=>{});
     if(SONGLIB.song && SONGLIB.song.id === song.id){
@@ -14626,7 +14684,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         '<div class="row" style="gap:6px;margin-top:8px">' +
         '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>' +
         (kind === 'pitch'
-          ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
+          ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing along with it</button>'
           : '') +
         (hasNotes ? '<button class="btn" data-map="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Note map</button>' : '') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +
@@ -14751,6 +14809,28 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (back && back.parentNode === host) host.insertBefore(t, back.nextSibling);
     else host.insertBefore(t, host.firstChild);
   }
+
+  /* Robert, 17 Sep: "THE MAP STILL JUMPS ... The view is decided by THE SONG
+     before Start, and does not move for the whole song. Work out the song's
+     range from the note map, set the window to fit it with headroom, lock it.
+     His voice goes wherever it goes inside that fixed window, including off
+     the top or bottom."
+
+     So the Pitch Tracker's window is decided by whatever is on it and then
+     held: the take or map being sung over if there is one, otherwise the
+     range he measured in Profile, otherwise C3 to C5. Nothing about what the
+     microphone hears can move it. */
+  function pinTracker() {
+    var cv = $('freeCanvas');
+    if (!cv || !window.rpPinLane) return;
+    var o = ST.overlay;
+    if (o && o.notes && o.notes.length && rpPinLaneToNotes(cv, o.notes, 3)) return;
+    var r = null;
+    try { r = window.RPRange && RPRange.get ? RPRange.get() : null; } catch (e) {}
+    if (r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo) rpPinLane(cv, r.lo - 2, r.hi + 2);
+    else rpPinLane(cv, 48, 72);                 /* C3 to C5 */
+  }
+  ST.pinLane = pinTracker;
 
   function mount() {
     title();
@@ -15047,19 +15127,27 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!o || !o.notes || !o.audio || o.audio.ended) return;
     var t0 = o.audio.currentTime || 0;
     var notes = o.notes;
+    /* where this line's clock sits against the sound. A take's own pitch
+       line was read 0.1s late by the microphone, so it goes back 0.1s; a
+       note map built from a file was read 0.05s early, so it goes forward
+       0.05s. The live blue line has already had the same 0.1s taken off it,
+       which is why both cases now land on each other. Measured, not guessed
+       — see the note beside rpMicLag in the build. */
+    var lag = 0;
+    try { lag = window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0; } catch (e) { lag = 0; }
     c2.save();
     c2.beginPath();
     var pen = false, prev = null, cur = null;
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
       if (n.m == null) { pen = false; prev = null; continue; }
-      var x = W - (t0 - n.t) * pps;
+      var x = W - (t0 - (n.t + lag)) * pps;
       if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
       var y = yOf(n.m);
       var leap = prev && Math.abs(n.m - prev.m) > 6;
       if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
       pen = true; prev = n;
-      if (n.t <= t0) cur = n;
+      if (n.t + lag <= t0) cur = n;
     }
     c2.strokeStyle = 'rgba(232,179,74,.95)';
     c2.lineWidth = 2.5;
@@ -15148,7 +15236,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       title: named || defaultTitle(),
       artist: 'My Recordings', blob: b, addedAt: Date.now(),
       key: null, lrc: null, duration: ST.activeMs / 1000,
-      notes: ST.notes                       // the pitch line, saved with the audio
+      notes: ST.notes,                      // the pitch line, saved with the audio
+      notesFrom: 'live'                     // read by the mic, so it reads late
     };
     if (ST.assign) {                        // this one answers an assignment
       song.assignId = ST.assign.id;
@@ -15271,6 +15360,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     ST.unfollow();
     var cv0 = $('rpSeekMap'); if (cv0 && cv0.parentElement) cv0.parentElement.removeChild(cv0);
+    pinTracker();
     playBar();
   }
   ST.stopAll = function () {
@@ -15282,6 +15372,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!s) return say('Keep a take first.');
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
+    /* one thing in his headphones at a time */
+    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
     (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
     try {
       var url = URL.createObjectURL(s.blob);
@@ -15289,10 +15381,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       a.muted = !ST.hearTake;
       try { a.volume = ST.takeVol; } catch (e) {}
       over = { audio: a, url: url, title: s.title, mode: 'over' };
-      ST.overlay = { notes: s.notes, audio: a };
+      ST.overlay = { notes: s.notes, audio: a, song: s };
+      pinTracker();
       a.onended = function () { if (over && over.audio === a) stopOver(); };
       a.play().catch(function () { say('The phone would not play it.'); });
-      say('Singing over ' + s.title + '. Gold is the take; blue is you now.');
+      say('Singing along with ' + s.title + '. Gold is the take; blue is you now.');
       try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     } catch (e) { say('Could not load that take.'); }
     playBar();
@@ -15328,7 +15421,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var last = notes[notes.length - 1];
     var clock = clockFor(dur || (last && last.t) || 0);
     over = { audio: clock, url: null, title: title || 'the map', mode: 'guide' };
-    ST.overlay = { notes: notes, audio: clock };
+    /* a map played as a guide came out of buildNoteMap, so it reads early */
+    ST.overlay = { notes: notes, audio: clock, from: 'file' };
+    pinTracker();
     say('Guide: ' + (title || 'the map') + '. Gold is the map; blue is you now.');
     try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     playBar();
@@ -15351,7 +15446,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     var title = over ? over.title : 'the take';
     var mode = over && over.mode === 'over';
-    var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing over ' : 'Listening to ');
+    var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing along with ' : 'Listening to ');
     var paused = !!o.audio.paused;
     bar.dataset.paused = paused ? '1' : '0';
     /* Robert, 16 Sep: "still need a pause, restart and end button." */
@@ -15489,8 +15584,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (sig !== takesSig) { takesSig = sig; if ($('rpTakeList')) fillTakes(); }
   }
   function boot() {
-    setInterval(function () { mount(); mountTakes(); refreshTakes(); }, 1200);
-    mount(); mountTakes();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
+    setInterval(function () { mount(); mountTakes(); refreshTakes(); pinTracker(); }, 1200);
+    mount(); mountTakes(); pinTracker();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
     try { if (typeof libReady !== 'undefined' && libReady && libReady.then) libReady.then(function () { setTimeout(refreshTakes, 50); }); } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
@@ -19914,6 +20009,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '#rpMini .mt b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '#rpMini .mt span{display:block;font-size:11.5px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '#rpMini .mp{background:none;border:0;color:var(--ink);font-size:20px;padding:2px 6px;cursor:pointer;flex:none}' +
+      '#rpMini .mx{background:none;border:0;color:var(--ink-faint);font-size:21px;line-height:1;' +
+        'padding:4px 4px 6px;margin-left:-2px;cursor:pointer;flex:none}' +
+      /* Robert, 17 Sep: "IT MUST NOT COVER ANYTHING." While the bar is up,
+         every page gets the bar's own height of extra room underneath, so
+         the last control on a screen can still be reached. */
+      'body.rp-mini-on .wrap{padding-bottom:calc(96px + var(--rp-mini-h,64px))}' +
       '#rpMini .mbar{position:absolute;left:10px;right:10px;bottom:3px;height:2px;background:var(--line);border-radius:2px;overflow:hidden}' +
       '#rpMini .mbar i{display:block;height:100%;background:var(--ink-dim);width:0}' +
       /* now playing */
@@ -20254,25 +20355,53 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var a = audio();
     return !!(a && !a.paused && !a.ended);
   }
+  /* Robert, 17 Sep: "Playing a take in the Library leaves the player bar
+     stuck at the bottom of every screen ... it must be dismissible with a
+     close button that ACTUALLY REMOVES IT." Closing it stops the sound as
+     well — a bar that hides while the take plays on is worse than no bar.
+     It comes back by itself the next time he plays something. */
+  var dismissed = false;
+  function hideMini() {
+    var m = $('rpMini');
+    if (m) m.style.display = 'none';
+    document.body.classList.remove('rp-mini-on');
+  }
+  L.stopPlayer = function () {
+    var a = audio();
+    if (a) { try { a.pause(); } catch (e) {} }
+    dismissed = true;
+    hideMini();
+    try { if (window.RPPage && RPPage.isOpen('np')) RPPage.back(); } catch (e) {}
+  };
+
   function mini() {
     var o = lib();
     var cur = o && o.cur;
     var m = $('rpMini');
     /* not behind the full player — that is the same thing twice */
     var full = !!(window.RPPage && RPPage.isOpen('np'));
-    if (!cur || full) { if (m) m.style.display = 'none'; return; }
+    if (dismissed) { if (playing()) dismissed = false; else { hideMini(); return; } }
+    if (!cur || full) { hideMini(); return; }
     if (!m) {
       m = document.createElement('div');
       m.id = 'rpMini';
       document.body.appendChild(m);
       m.innerHTML = '<div id="rpMiniArt"></div><div class="mt"><b id="rpMiniT"></b><span id="rpMiniA"></span></div>' +
         '<button class="mp" id="rpMiniP"><svg class="ic" style="width:20px;height:20px"><use href="#i-play"/></svg></button>' +
+        '<button class="mx" id="rpMiniX" aria-label="Stop and close the player" title="Stop and close">\u00d7</button>' +
         '<div class="mbar"><i id="rpMiniBar"></i></div>';
-      on(m, 'click', function (ev) { if (ev.target.closest('#rpMiniP')) return; L.nowPlaying(); });
+      on(m, 'click', function (ev) {
+        if (ev.target.closest('#rpMiniP') || ev.target.closest('#rpMiniX')) return;
+        L.nowPlaying();
+      });
       on($('rpMiniP'), 'click', function (ev) { ev.stopPropagation(); tap('pbPlay'); setTimeout(mini, 60); });
+      on($('rpMiniX'), 'click', function (ev) { ev.stopPropagation(); L.stopPlayer(); });
     }
     m.style.display = 'flex';
     m.style.position = 'fixed';
+    document.body.classList.add('rp-mini-on');
+    var mh = m.offsetHeight || 60;
+    document.body.style.setProperty('--rp-mini-h', (mh + 8) + 'px');
     var a = $('rpMiniArt');
     if (a && a.dataset.for !== cur.id) { a.innerHTML = art(cur.title, cur.kind === 'recording' ? 'i-mic' : 'i-music', 40); a.dataset.for = cur.id; }
     var t = $('rpMiniT'), ar = $('rpMiniA');
@@ -20371,7 +20500,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         };
         tray.appendChild(ln);
         var so = document.createElement('button');
-        so.className = 'iconbtn'; so.textContent = 'Sing over it';
+        so.className = 'iconbtn'; so.textContent = 'Sing along with it';
         so.title = 'Open the Pitch Tracker with this playing';
         so.onclick = function (ev) {
           ev.stopPropagation();
@@ -20398,6 +20527,22 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       }
     });
   }
+
+  /* Robert, 17 Sep: "OPENING A SCREEN THAT PLAYS AUDIO STOPS THE LIBRARY
+     PLAYER AND TAKES THE BAR AWAY." Two things in his headphones at once is
+     never what he meant, and on the Pitch Tracker the bar was sitting on the
+     buttons. These are the screens that make sound of their own. */
+  var SINGS = { free: 1, song: 1, voice: 1, yt: 1, train: 1 };
+  (function () {
+    var real = window.switchMode;
+    if (typeof real !== 'function' || real.rpMiniWrapped) return;
+    var wrapped = function (m) {
+      if (SINGS[m]) L.stopPlayer();   /* playing or paused: the bar goes */
+      return real.apply(this, arguments);
+    };
+    wrapped.rpMiniWrapped = true;
+    window.switchMode = wrapped;
+  })();
 
   /* ================================================================== */
   var ticks = 0;
@@ -21921,7 +22066,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       (map.from ? ' · from ' + esc(map.from) : '') + ' · kept ' + (d.getMonth() + 1) + '/' + d.getDate() + '</div>' +
       '<canvas id="rpMapCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
       '<div class="measured" style="margin-top:6px">The notes that were sung. Gold lines are C. Time runs left to right.</div>' +
-      '<button class="btn primary" id="rpMapGuide" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing over it on the Pitch Tracker</button>' +
+      '<button class="btn primary" id="rpMapGuide" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing along with it on the Pitch Tracker</button>' +
       '<div class="row" style="gap:8px;margin-top:8px">' +
       '<button class="btn" id="rpMapImg" style="flex:1;padding:10px;font-size:12.5px">Save as picture</button>' +
       '<button class="btn" id="rpMapName" style="flex:1;padding:10px;font-size:12.5px">Rename</button>' +
@@ -21984,7 +22129,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
    recorded on — Pitch Tracker, Free Sing, Song Trainer, or the exercise
    by name — newest first. A row: name, length, day, a play button; tap
    the row and the take has its own page: the note map if it has one,
-   Sing over it, Listen, Note map, Rename, Send to coach, Download,
+   Sing along with it, Listen, Note map, Rename, Send to coach, Download,
    Delete. Nothing here plays audio itself; it hands to the app's own
    player (libPlayAt) so the mini player and Now playing stay the truth.
    ====================================================================== */
@@ -22049,7 +22194,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '<span>' + fmt(s.duration) + ' · ' + day(s.addedAt) + (s.notes && s.notes.length ? ' · notes' : '') + '</span>' +
       '<span class="rp-doers">' +
         '<button class="rp-do" data-learn="' + esc(s.id) + '">Learn this song</button>' +
-        '<button class="rp-do" data-over="' + esc(s.id) + '">Sing over it</button>' +
+        '<button class="rp-do" data-over="' + esc(s.id) + '">Sing along with it</button>' +
       '</span></div>' +
       '<button class="pl" data-play="' + esc(s.id) + '" title="Play">▶</button>' +
       '<span class="chev">›</span></div>';
@@ -22147,7 +22292,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       (s.sentAt ? ' · sent to your coach' : '') + '</div>' +
       (hasNotes ? '<canvas id="rpTakeCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
         '<div class="measured" style="margin-top:6px">The notes you sang. Gold lines are C.</div>' : '') +
-      (hasNotes ? '<button class="btn primary" id="rpTkOver" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing over it</button>' : '') +
+      (hasNotes ? '<button class="btn primary" id="rpTkOver" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing along with it</button>' : '') +
       '<div class="row" style="gap:6px;margin-top:8px">' +
       '<button class="btn" id="rpTkPlay" style="flex:1;padding:10px;font-size:12.5px">Listen</button>' +
       (hasNotes ? '<button class="btn" id="rpTkMap" style="flex:1;padding:10px;font-size:12.5px">Note map</button>' : '') +
@@ -22832,7 +22977,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         go('song');
         setTimeout(function () {
           RPLearnSong.reset();
-          RPLearnSong.open({ id: 'built_' + b.dataset.built, title: x.title, notes: x.notes, blob: null });
+          /* the app wrote these notes and the app plays them, so their
+             times are exact — no microphone or analyser in between */
+          RPLearnSong.open({ id: 'built_' + b.dataset.built, title: x.title, notes: x.notes,
+                             blob: null, notesFrom: 'exact' });
         }, 260);
       });
     });
@@ -23500,7 +23648,26 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
     cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    pinWindow();
   }
+
+  /* Robert, 17 Sep: "The view is decided by THE SONG before Start, and does
+     not move for the whole song. Work out the song's range from the note map,
+     set the window to fit it with headroom, lock it. His voice goes wherever
+     it goes inside that fixed window, including off the top or bottom."
+     So: every note of the song on screen, three semitones of air above and
+     below, and nothing the microphone hears can move it afterwards. */
+  function pinWindow() {
+    var cv = $('rpLsCv');
+    if (!cv || !window.rpPinLane) return;
+    var ns = S.song && S.song.notes;
+    if (ns && ns.length && rpPinLaneToNotes(cv, ns, 3)) return;
+    var r = null;
+    try { r = window.RPRange && RPRange.get ? RPRange.get() : null; } catch (e) {}
+    if (r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo) rpPinLane(cv, r.lo - 2, r.hi + 2);
+    else rpPinLane(cv, 48, 72);                 /* C3 to C5 */
+  }
+  L.pinWindow = pinWindow;
   window.addEventListener('resize', function () { if (S.open) size(); });
 
   /* ---------------------------------------------------------------- */
@@ -23524,6 +23691,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       clearInterval(iv);
       S.mapping = false;
       if (okNotes) {
+        pinWindow();          /* the song is known now, so the view is settled */
         sub('Press Start. The bubbles are the song. Your line is you.');
         foot('');
       } else {
@@ -23603,6 +23771,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!(s.notes && s.notes.length)) { autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
+    /* one thing in his headphones at a time */
+    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);
@@ -23616,6 +23786,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       S.mus.src = S.musUrl;
     }
     vols();
+    pinWindow();               /* decided here, before a note sounds, and held */
     S.trail = [];
     S.playing = true;
     $('rpLsStart').disabled = true;
@@ -23679,18 +23850,25 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!cv || cv.offsetParent === null) return;
     var t = songTime();
 
-    /* his voice, on the song's own clock, so the same x is the same moment */
+    /* his voice, on the song's own clock, so the same x is the same moment.
+       The microphone reads a note 0.1s after it was sung and the note map
+       reads one 0.05s before it sounded (both measured, 17 Sep — see the
+       note beside rpMicLag in the build), so each line is put back where the
+       sound actually was and they meet there. */
+    var lag = 0;
+    try { lag = window.rpNoteLag ? rpNoteLag(S.song) : 0; } catch (e) { lag = 0; }
+    var tv = t - (window.rpMicLag ? rpMicLag() : 0.1);   /* when he actually sang */
     if (S.playing && t > 0) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
-      S.trail.push({ t: t, m: (m == null ? null : m) });
+      S.trail.push({ t: tv, m: (m == null ? null : m) });
       while (S.trail.length > 4000) S.trail.shift();
       /* how long each bubble has been sung */
       if (m != null && S.song && S.song.notes) {
         var ns = S.song.notes;
         for (var i = 0; i < ns.length; i++) {
           var n = ns[i];
-          if (t >= n.t && t <= n.t + (n.d || 0.4)) {
+          if (tv >= n.t + lag && tv <= n.t + lag + (n.d || 0.4)) {
             var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
             if (off < 1.0) held[i] = (held[i] || 0) + 0.016;
             break;
@@ -23733,10 +23911,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var t = now - LOOK;
     var headX = W - LOOK * pps;
     var ns = s.notes;
+    var lag = 0;
+    try { lag = window.rpNoteLag ? rpNoteLag(s) : 0; } catch (e) { lag = 0; }
 
     /* which bubble is next: the first one that has not started yet */
     var next = -1;
-    for (var i = 0; i < ns.length; i++) { if (ns[i].t > t) { next = i; break; } }
+    for (var i = 0; i < ns.length; i++) { if (ns[i].t + lag > t) { next = i; break; } }
 
     /* as tall as the lane it sits in, so it reads as a bubble on that note
        rather than a hairline */
@@ -23747,13 +23927,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     for (var j = 0; j < ns.length; j++) {
       var n = ns[j];
       var dur = n.d || 0.35;
-      var x = W - (now - n.t) * pps;
+      var x = W - (now - (n.t + lag)) * pps;
       var w = Math.max(14, dur * pps - 3);
       if (x + w < -30 || x > W + 30) continue;
       var y = yOf(n.m);
       var h = bh;
       var ratio = Math.max(0, Math.min(1, (held[j] || 0) / dur));
-      var past = t > n.t + dur;
+      var past = t > n.t + lag + dur;
 
       /* the bubble */
       c2.beginPath();

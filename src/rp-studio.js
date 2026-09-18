@@ -60,6 +60,28 @@
     else host.insertBefore(t, host.firstChild);
   }
 
+  /* Robert, 17 Sep: "THE MAP STILL JUMPS ... The view is decided by THE SONG
+     before Start, and does not move for the whole song. Work out the song's
+     range from the note map, set the window to fit it with headroom, lock it.
+     His voice goes wherever it goes inside that fixed window, including off
+     the top or bottom."
+
+     So the Pitch Tracker's window is decided by whatever is on it and then
+     held: the take or map being sung over if there is one, otherwise the
+     range he measured in Profile, otherwise C3 to C5. Nothing about what the
+     microphone hears can move it. */
+  function pinTracker() {
+    var cv = $('freeCanvas');
+    if (!cv || !window.rpPinLane) return;
+    var o = ST.overlay;
+    if (o && o.notes && o.notes.length && rpPinLaneToNotes(cv, o.notes, 3)) return;
+    var r = null;
+    try { r = window.RPRange && RPRange.get ? RPRange.get() : null; } catch (e) {}
+    if (r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo) rpPinLane(cv, r.lo - 2, r.hi + 2);
+    else rpPinLane(cv, 48, 72);                 /* C3 to C5 */
+  }
+  ST.pinLane = pinTracker;
+
   function mount() {
     title();
     var host = $('modeFree');
@@ -355,19 +377,27 @@
     if (!o || !o.notes || !o.audio || o.audio.ended) return;
     var t0 = o.audio.currentTime || 0;
     var notes = o.notes;
+    /* where this line's clock sits against the sound. A take's own pitch
+       line was read 0.1s late by the microphone, so it goes back 0.1s; a
+       note map built from a file was read 0.05s early, so it goes forward
+       0.05s. The live blue line has already had the same 0.1s taken off it,
+       which is why both cases now land on each other. Measured, not guessed
+       — see the note beside rpMicLag in the build. */
+    var lag = 0;
+    try { lag = window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0; } catch (e) { lag = 0; }
     c2.save();
     c2.beginPath();
     var pen = false, prev = null, cur = null;
     for (var i = 0; i < notes.length; i++) {
       var n = notes[i];
       if (n.m == null) { pen = false; prev = null; continue; }
-      var x = W - (t0 - n.t) * pps;
+      var x = W - (t0 - (n.t + lag)) * pps;
       if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
       var y = yOf(n.m);
       var leap = prev && Math.abs(n.m - prev.m) > 6;
       if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
       pen = true; prev = n;
-      if (n.t <= t0) cur = n;
+      if (n.t + lag <= t0) cur = n;
     }
     c2.strokeStyle = 'rgba(232,179,74,.95)';
     c2.lineWidth = 2.5;
@@ -456,7 +486,8 @@
       title: named || defaultTitle(),
       artist: 'My Recordings', blob: b, addedAt: Date.now(),
       key: null, lrc: null, duration: ST.activeMs / 1000,
-      notes: ST.notes                       // the pitch line, saved with the audio
+      notes: ST.notes,                      // the pitch line, saved with the audio
+      notesFrom: 'live'                     // read by the mic, so it reads late
     };
     if (ST.assign) {                        // this one answers an assignment
       song.assignId = ST.assign.id;
@@ -579,6 +610,7 @@
     }
     ST.unfollow();
     var cv0 = $('rpSeekMap'); if (cv0 && cv0.parentElement) cv0.parentElement.removeChild(cv0);
+    pinTracker();
     playBar();
   }
   ST.stopAll = function () {
@@ -590,6 +622,8 @@
     if (!s) return say('Keep a take first.');
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
+    /* one thing in his headphones at a time */
+    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
     (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
     try {
       var url = URL.createObjectURL(s.blob);
@@ -597,10 +631,11 @@
       a.muted = !ST.hearTake;
       try { a.volume = ST.takeVol; } catch (e) {}
       over = { audio: a, url: url, title: s.title, mode: 'over' };
-      ST.overlay = { notes: s.notes, audio: a };
+      ST.overlay = { notes: s.notes, audio: a, song: s };
+      pinTracker();
       a.onended = function () { if (over && over.audio === a) stopOver(); };
       a.play().catch(function () { say('The phone would not play it.'); });
-      say('Singing over ' + s.title + '. Gold is the take; blue is you now.');
+      say('Singing along with ' + s.title + '. Gold is the take; blue is you now.');
       try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     } catch (e) { say('Could not load that take.'); }
     playBar();
@@ -636,7 +671,9 @@
     var last = notes[notes.length - 1];
     var clock = clockFor(dur || (last && last.t) || 0);
     over = { audio: clock, url: null, title: title || 'the map', mode: 'guide' };
-    ST.overlay = { notes: notes, audio: clock };
+    /* a map played as a guide came out of buildNoteMap, so it reads early */
+    ST.overlay = { notes: notes, audio: clock, from: 'file' };
+    pinTracker();
     say('Guide: ' + (title || 'the map') + '. Gold is the map; blue is you now.');
     try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     playBar();
@@ -659,7 +696,7 @@
     }
     var title = over ? over.title : 'the take';
     var mode = over && over.mode === 'over';
-    var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing over ' : 'Listening to ');
+    var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing along with ' : 'Listening to ');
     var paused = !!o.audio.paused;
     bar.dataset.paused = paused ? '1' : '0';
     /* Robert, 16 Sep: "still need a pause, restart and end button." */
@@ -797,8 +834,8 @@
     if (sig !== takesSig) { takesSig = sig; if ($('rpTakeList')) fillTakes(); }
   }
   function boot() {
-    setInterval(function () { mount(); mountTakes(); refreshTakes(); }, 1200);
-    mount(); mountTakes();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
+    setInterval(function () { mount(); mountTakes(); refreshTakes(); pinTracker(); }, 1200);
+    mount(); mountTakes(); pinTracker();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
     try { if (typeof libReady !== 'undefined' && libReady && libReady.then) libReady.then(function () { setTimeout(refreshTakes, 50); }); } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

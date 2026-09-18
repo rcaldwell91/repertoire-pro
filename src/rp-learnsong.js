@@ -137,7 +137,26 @@
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
     cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+    pinWindow();
   }
+
+  /* Robert, 17 Sep: "The view is decided by THE SONG before Start, and does
+     not move for the whole song. Work out the song's range from the note map,
+     set the window to fit it with headroom, lock it. His voice goes wherever
+     it goes inside that fixed window, including off the top or bottom."
+     So: every note of the song on screen, three semitones of air above and
+     below, and nothing the microphone hears can move it afterwards. */
+  function pinWindow() {
+    var cv = $('rpLsCv');
+    if (!cv || !window.rpPinLane) return;
+    var ns = S.song && S.song.notes;
+    if (ns && ns.length && rpPinLaneToNotes(cv, ns, 3)) return;
+    var r = null;
+    try { r = window.RPRange && RPRange.get ? RPRange.get() : null; } catch (e) {}
+    if (r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo) rpPinLane(cv, r.lo - 2, r.hi + 2);
+    else rpPinLane(cv, 48, 72);                 /* C3 to C5 */
+  }
+  L.pinWindow = pinWindow;
   window.addEventListener('resize', function () { if (S.open) size(); });
 
   /* ---------------------------------------------------------------- */
@@ -161,6 +180,7 @@
       clearInterval(iv);
       S.mapping = false;
       if (okNotes) {
+        pinWindow();          /* the song is known now, so the view is settled */
         sub('Press Start. The bubbles are the song. Your line is you.');
         foot('');
       } else {
@@ -240,6 +260,8 @@
     if (!(s.notes && s.notes.length)) { autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
+    /* one thing in his headphones at a time */
+    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);
@@ -253,6 +275,7 @@
       S.mus.src = S.musUrl;
     }
     vols();
+    pinWindow();               /* decided here, before a note sounds, and held */
     S.trail = [];
     S.playing = true;
     $('rpLsStart').disabled = true;
@@ -316,18 +339,25 @@
     if (!cv || cv.offsetParent === null) return;
     var t = songTime();
 
-    /* his voice, on the song's own clock, so the same x is the same moment */
+    /* his voice, on the song's own clock, so the same x is the same moment.
+       The microphone reads a note 0.1s after it was sung and the note map
+       reads one 0.05s before it sounded (both measured, 17 Sep — see the
+       note beside rpMicLag in the build), so each line is put back where the
+       sound actually was and they meet there. */
+    var lag = 0;
+    try { lag = window.rpNoteLag ? rpNoteLag(S.song) : 0; } catch (e) { lag = 0; }
+    var tv = t - (window.rpMicLag ? rpMicLag() : 0.1);   /* when he actually sang */
     if (S.playing && t > 0) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
-      S.trail.push({ t: t, m: (m == null ? null : m) });
+      S.trail.push({ t: tv, m: (m == null ? null : m) });
       while (S.trail.length > 4000) S.trail.shift();
       /* how long each bubble has been sung */
       if (m != null && S.song && S.song.notes) {
         var ns = S.song.notes;
         for (var i = 0; i < ns.length; i++) {
           var n = ns[i];
-          if (t >= n.t && t <= n.t + (n.d || 0.4)) {
+          if (tv >= n.t + lag && tv <= n.t + lag + (n.d || 0.4)) {
             var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
             if (off < 1.0) held[i] = (held[i] || 0) + 0.016;
             break;
@@ -370,10 +400,12 @@
     var t = now - LOOK;
     var headX = W - LOOK * pps;
     var ns = s.notes;
+    var lag = 0;
+    try { lag = window.rpNoteLag ? rpNoteLag(s) : 0; } catch (e) { lag = 0; }
 
     /* which bubble is next: the first one that has not started yet */
     var next = -1;
-    for (var i = 0; i < ns.length; i++) { if (ns[i].t > t) { next = i; break; } }
+    for (var i = 0; i < ns.length; i++) { if (ns[i].t + lag > t) { next = i; break; } }
 
     /* as tall as the lane it sits in, so it reads as a bubble on that note
        rather than a hairline */
@@ -384,13 +416,13 @@
     for (var j = 0; j < ns.length; j++) {
       var n = ns[j];
       var dur = n.d || 0.35;
-      var x = W - (now - n.t) * pps;
+      var x = W - (now - (n.t + lag)) * pps;
       var w = Math.max(14, dur * pps - 3);
       if (x + w < -30 || x > W + 30) continue;
       var y = yOf(n.m);
       var h = bh;
       var ratio = Math.max(0, Math.min(1, (held[j] || 0) / dur));
-      var past = t > n.t + dur;
+      var past = t > n.t + lag + dur;
 
       /* the bubble */
       c2.beginPath();

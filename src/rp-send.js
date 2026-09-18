@@ -207,7 +207,7 @@
         '<div class="row" style="gap:6px;margin-top:8px">' +
         '<button class="btn" data-hear="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Listen</button>' +
         (kind === 'pitch'
-          ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing over it</button>'
+          ? '<button class="btn" data-load="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Sing along with it</button>'
           : '') +
         (hasNotes ? '<button class="btn" data-map="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Note map</button>' : '') +
         '<button class="btn" data-dl="' + esc(s.id) + '" style="flex:1;padding:9px;font-size:12px">Download</button>' +

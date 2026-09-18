@@ -5,3 +5,4 @@ cd "$(dirname "$0")/.."
 node tests/preflight.js next.html
 node tests/tour.test.js
 node tests/taps.test.js
+node tests/map.test.js

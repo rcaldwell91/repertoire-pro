@@ -172,7 +172,10 @@
         go('song');
         setTimeout(function () {
           RPLearnSong.reset();
-          RPLearnSong.open({ id: 'built_' + b.dataset.built, title: x.title, notes: x.notes, blob: null });
+          /* the app wrote these notes and the app plays them, so their
+             times are exact — no microphone or analyser in between */
+          RPLearnSong.open({ id: 'built_' + b.dataset.built, title: x.title, notes: x.notes,
+                             blob: null, notesFrom: 'exact' });
         }, 260);
       });
     });

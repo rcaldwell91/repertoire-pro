@@ -127,6 +127,12 @@
       '#rpMini .mt b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '#rpMini .mt span{display:block;font-size:11.5px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '#rpMini .mp{background:none;border:0;color:var(--ink);font-size:20px;padding:2px 6px;cursor:pointer;flex:none}' +
+      '#rpMini .mx{background:none;border:0;color:var(--ink-faint);font-size:21px;line-height:1;' +
+        'padding:4px 4px 6px;margin-left:-2px;cursor:pointer;flex:none}' +
+      /* Robert, 17 Sep: "IT MUST NOT COVER ANYTHING." While the bar is up,
+         every page gets the bar's own height of extra room underneath, so
+         the last control on a screen can still be reached. */
+      'body.rp-mini-on .wrap{padding-bottom:calc(96px + var(--rp-mini-h,64px))}' +
       '#rpMini .mbar{position:absolute;left:10px;right:10px;bottom:3px;height:2px;background:var(--line);border-radius:2px;overflow:hidden}' +
       '#rpMini .mbar i{display:block;height:100%;background:var(--ink-dim);width:0}' +
       /* now playing */
@@ -467,25 +473,53 @@
     var a = audio();
     return !!(a && !a.paused && !a.ended);
   }
+  /* Robert, 17 Sep: "Playing a take in the Library leaves the player bar
+     stuck at the bottom of every screen ... it must be dismissible with a
+     close button that ACTUALLY REMOVES IT." Closing it stops the sound as
+     well — a bar that hides while the take plays on is worse than no bar.
+     It comes back by itself the next time he plays something. */
+  var dismissed = false;
+  function hideMini() {
+    var m = $('rpMini');
+    if (m) m.style.display = 'none';
+    document.body.classList.remove('rp-mini-on');
+  }
+  L.stopPlayer = function () {
+    var a = audio();
+    if (a) { try { a.pause(); } catch (e) {} }
+    dismissed = true;
+    hideMini();
+    try { if (window.RPPage && RPPage.isOpen('np')) RPPage.back(); } catch (e) {}
+  };
+
   function mini() {
     var o = lib();
     var cur = o && o.cur;
     var m = $('rpMini');
     /* not behind the full player — that is the same thing twice */
     var full = !!(window.RPPage && RPPage.isOpen('np'));
-    if (!cur || full) { if (m) m.style.display = 'none'; return; }
+    if (dismissed) { if (playing()) dismissed = false; else { hideMini(); return; } }
+    if (!cur || full) { hideMini(); return; }
     if (!m) {
       m = document.createElement('div');
       m.id = 'rpMini';
       document.body.appendChild(m);
       m.innerHTML = '<div id="rpMiniArt"></div><div class="mt"><b id="rpMiniT"></b><span id="rpMiniA"></span></div>' +
         '<button class="mp" id="rpMiniP"><svg class="ic" style="width:20px;height:20px"><use href="#i-play"/></svg></button>' +
+        '<button class="mx" id="rpMiniX" aria-label="Stop and close the player" title="Stop and close">\u00d7</button>' +
         '<div class="mbar"><i id="rpMiniBar"></i></div>';
-      on(m, 'click', function (ev) { if (ev.target.closest('#rpMiniP')) return; L.nowPlaying(); });
+      on(m, 'click', function (ev) {
+        if (ev.target.closest('#rpMiniP') || ev.target.closest('#rpMiniX')) return;
+        L.nowPlaying();
+      });
       on($('rpMiniP'), 'click', function (ev) { ev.stopPropagation(); tap('pbPlay'); setTimeout(mini, 60); });
+      on($('rpMiniX'), 'click', function (ev) { ev.stopPropagation(); L.stopPlayer(); });
     }
     m.style.display = 'flex';
     m.style.position = 'fixed';
+    document.body.classList.add('rp-mini-on');
+    var mh = m.offsetHeight || 60;
+    document.body.style.setProperty('--rp-mini-h', (mh + 8) + 'px');
     var a = $('rpMiniArt');
     if (a && a.dataset.for !== cur.id) { a.innerHTML = art(cur.title, cur.kind === 'recording' ? 'i-mic' : 'i-music', 40); a.dataset.for = cur.id; }
     var t = $('rpMiniT'), ar = $('rpMiniA');
@@ -584,7 +618,7 @@
         };
         tray.appendChild(ln);
         var so = document.createElement('button');
-        so.className = 'iconbtn'; so.textContent = 'Sing over it';
+        so.className = 'iconbtn'; so.textContent = 'Sing along with it';
         so.title = 'Open the Pitch Tracker with this playing';
         so.onclick = function (ev) {
           ev.stopPropagation();
@@ -611,6 +645,22 @@
       }
     });
   }
+
+  /* Robert, 17 Sep: "OPENING A SCREEN THAT PLAYS AUDIO STOPS THE LIBRARY
+     PLAYER AND TAKES THE BAR AWAY." Two things in his headphones at once is
+     never what he meant, and on the Pitch Tracker the bar was sitting on the
+     buttons. These are the screens that make sound of their own. */
+  var SINGS = { free: 1, song: 1, voice: 1, yt: 1, train: 1 };
+  (function () {
+    var real = window.switchMode;
+    if (typeof real !== 'function' || real.rpMiniWrapped) return;
+    var wrapped = function (m) {
+      if (SINGS[m]) L.stopPlayer();   /* playing or paused: the bar goes */
+      return real.apply(this, arguments);
+    };
+    wrapped.rpMiniWrapped = true;
+    window.switchMode = wrapped;
+  })();
 
   /* ================================================================== */
   var ticks = 0;
