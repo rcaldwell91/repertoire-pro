@@ -35,13 +35,19 @@ function ok(cond, what) { console.log((cond ? '  ✓ ' : '  ✗ ') + what); if (
    it, so the app's voice-only path will accept it. Note k starts at exactly
    k * GAP seconds and holds for HOLD. */
 const SR = 44100, GAP = 1.2, HOLD = 0.9;
+/* LEAD is silence before the first note. Every recording of a person has
+   some; and the analyser cannot see a note that begins in the file's first
+   0.05 s, because its first look at the audio is centred at 0.1 s. Starting
+   the tune at sample zero would be measuring that edge rather than the thing
+   this test is for. Note k starts at LEAD + k * GAP. */
+const LEAD = 0.6;
 const TUNE = [62, 64, 65, 67, 69, 67, 65, 64, 62, 64, 65, 67, 69, 71, 72, 69];
 function makeWav() {
-  const n = Math.round(SR * GAP * TUNE.length);
+  const n = Math.round(SR * (LEAD + GAP * TUNE.length));
   const pcm = Buffer.alloc(n * 2);
   TUNE.forEach((midi, k) => {
     const f = 440 * Math.pow(2, (midi - 69) / 12);
-    const a = Math.round(k * GAP * SR), b = a + Math.round(HOLD * SR);
+    const a = Math.round((LEAD + k * GAP) * SR), b = a + Math.round(HOLD * SR);
     for (let i = a; i < b && i < n; i++) {
       const t = (i - a) / SR;
       /* a short fade at each end so the onset is a note, not a click */
@@ -107,7 +113,7 @@ function stats(ds) {
   ok(lags.mic === 0.1, 'the microphone lag comes from the app\'s own setting, 100 ms');
 
   /* ---- 1. the FILE path: the note map against the truth ---------------- */
-  console.log('the note map, against a file whose notes start at exactly 1.2s');
+  console.log('the note map, against a file whose notes start at exactly ' + GAP + 's apart');
   const b64 = wav.toString('base64');
   const mapped = await p.evaluate(async (b64) => {
     const bin = atob(b64), u = new Uint8Array(bin.length);
@@ -122,8 +128,8 @@ function stats(ds) {
   ok(mapped.from === 'file', 'the map says where it came from, so the drawing knows which clock it is on');
   if (mapped.notes && mapped.notes.length === TUNE.length) {
     ok(true, 'all ' + TUNE.length + ' notes found');
-    const raw = mapped.notes.map((n, i) => n.t - i * GAP);
-    const fixed = mapped.notes.map((n, i) => n.t + mapped.lag - i * GAP);
+    const raw = mapped.notes.map((n, i) => n.t - (LEAD + i * GAP));
+    const fixed = mapped.notes.map((n, i) => n.t + mapped.lag - (LEAD + i * GAP));
     const r = stats(raw), f = stats(fixed);
     console.log('    as stored:  mean ' + r.mean.toFixed(3) + 's, worst ' + r.worst.toFixed(3) + 's, drift ' + r.drift.toFixed(3) + 's');
     console.log('    as drawn:   mean ' + f.mean.toFixed(3) + 's, worst ' + f.worst.toFixed(3) + 's, drift ' + f.drift.toFixed(3) + 's');
@@ -151,7 +157,10 @@ function stats(ds) {
     cur = { t0: s.t, last: s.m, first: s.m, n: 1 };
     runs.push(cur);
   }
-  const heard = runs.filter(r => r.n >= 6);
+  /* the fake microphone is already part-way through the file when the trail
+     starts, so the first run it hears is half a note. Drop it: what is being
+     measured is the spacing of the notes after that. */
+  const heard = runs.filter(r => r.n >= 6).slice(1);
   ok(heard.length >= 4, 'the microphone hears the notes (' + heard.length + ' of them)');
   if (heard.length >= 4) {
     const gaps = [];

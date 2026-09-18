@@ -910,6 +910,20 @@ window.rpNoteLag = function(song){
     song.noteFloor = result.floor;
     song.notesFrom = 'file';
     song.mapVer = 3;"""),
+
+    # 48. The Song Trainer's frame read s.notes[i] by index from G.stats, an
+    #     array built when a song was loaded. Change the song under a running
+    #     frame and stats outlives the notes it was counted against, so the
+    #     read is undefined and the frame throws — every frame, on every
+    #     screen but the Pitch Tracker, because gameFrame runs on all of them.
+    #     Its sibling two thousand lines up was already guarded; this one was
+    #     not. Found by the tap test, and live on index.html as well.
+    ("""  G.stats.forEach((st,i)=>{ if(st.done||scoreBeat>s.notes[i].t){ hitT+=st.hit; totT+=Math.min(s.notes[i].d, Math.max(0,scoreBeat-s.notes[i].t)); }});""",
+     """  G.stats.forEach((st,i)=>{
+    const n = s.notes[i];
+    if(!n) return;                      // stats left over from another song
+    if(st.done||scoreBeat>n.t){ hitT+=st.hit; totT+=Math.min(n.d, Math.max(0,scoreBeat-n.t)); }
+  });"""),
 ]
 # ---------------------------------------------------------------------
 # Home, in plain words with a sense of where you are in the session.

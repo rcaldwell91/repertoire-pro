@@ -493,6 +493,10 @@
   };
 
   function mini() {
+    /* the bar can be raised by a take played from outside the Library, and
+       until this runs its stylesheet is not in the page at all — which is
+       how the extra room underneath it went missing the first time */
+    css();
     var o = lib();
     var cur = o && o.cur;
     var m = $('rpMini');

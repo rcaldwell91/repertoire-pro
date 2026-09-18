@@ -3223,7 +3223,11 @@ function gameFrame(){
   $('stScore').textContent = G.score.toLocaleString();
   $('stCombo').textContent = G.combo;
   let hitT=0, totT=0;
-  G.stats.forEach((st,i)=>{ if(st.done||scoreBeat>s.notes[i].t){ hitT+=st.hit; totT+=Math.min(s.notes[i].d, Math.max(0,scoreBeat-s.notes[i].t)); }});
+  G.stats.forEach((st,i)=>{
+    const n = s.notes[i];
+    if(!n) return;                      // stats left over from another song
+    if(st.done||scoreBeat>n.t){ hitT+=st.hit; totT+=Math.min(n.d, Math.max(0,scoreBeat-n.t)); }
+  });
   $('stAcc').textContent = totT>0.5? Math.round(100*Math.min(1,hitT/totT))+'%' : '–';
   $('stNote').textContent = userMidi!==null? midiName(userMidi) : '–';
   $('stTarget').textContent = target? midiName(target.m+state.transpose) : '–';
@@ -3940,7 +3944,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '17 Sep 2026 · build 863c4bc3';
+const APP_VERSION = '18 Sep 2026 · build 1c9a3d40';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -20375,6 +20379,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   };
 
   function mini() {
+    /* the bar can be raised by a take played from outside the Library, and
+       until this runs its stylesheet is not in the page at all — which is
+       how the extra room underneath it went missing the first time */
+    css();
     var o = lib();
     var cur = o && o.cur;
     var m = $('rpMini');
