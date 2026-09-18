@@ -11,7 +11,7 @@
    recorded on — Pitch Tracker, Free Sing, Song Trainer, or the exercise
    by name — newest first. A row: name, length, day, a play button; tap
    the row and the take has its own page: the note map if it has one,
-   Sing along with it, Listen, Note map, Rename, Send to coach, Download,
+   Open in Pitch Tracker, Listen, Note map, Rename, Send to coach, Download,
    Delete. Nothing here plays audio itself; it hands to the app's own
    player (libPlayAt) so the mini player and Now playing stay the truth.
    ====================================================================== */
@@ -76,7 +76,7 @@
       '<span>' + fmt(s.duration) + ' · ' + day(s.addedAt) + (s.notes && s.notes.length ? ' · notes' : '') + '</span>' +
       '<span class="rp-doers">' +
         '<button class="rp-do" data-learn="' + esc(s.id) + '">Learn this song</button>' +
-        '<button class="rp-do" data-over="' + esc(s.id) + '">Sing along with it</button>' +
+        '<button class="rp-do" data-over="' + esc(s.id) + '">Open in Pitch Tracker</button>' +
       '</span></div>' +
       '<button class="pl" data-play="' + esc(s.id) + '" title="Play">▶</button>' +
       '<span class="chev">›</span></div>';
@@ -174,7 +174,7 @@
       (s.sentAt ? ' · sent to your coach' : '') + '</div>' +
       (hasNotes ? '<canvas id="rpTakeCv" style="display:block;width:100%;border-radius:12px;border:1px solid var(--line)"></canvas>' +
         '<div class="measured" style="margin-top:6px">The notes you sang. Gold lines are C.</div>' : '') +
-      (hasNotes ? '<button class="btn primary" id="rpTkOver" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Sing along with it</button>' : '') +
+      (hasNotes ? '<button class="btn primary" id="rpTkOver" style="width:100%;padding:13px;margin-top:12px;font-size:14px">Open in Pitch Tracker</button>' : '') +
       '<div class="row" style="gap:6px;margin-top:8px">' +
       '<button class="btn" id="rpTkPlay" style="flex:1;padding:10px;font-size:12.5px">Listen</button>' +
       (hasNotes ? '<button class="btn" id="rpTkMap" style="flex:1;padding:10px;font-size:12.5px">Note map</button>' : '') +

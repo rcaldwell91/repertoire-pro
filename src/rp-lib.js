@@ -622,7 +622,7 @@
         };
         tray.appendChild(ln);
         var so = document.createElement('button');
-        so.className = 'iconbtn'; so.textContent = 'Sing along with it';
+        so.className = 'iconbtn'; so.textContent = 'Open in Pitch Tracker';
         so.title = 'Open the Pitch Tracker with this playing';
         so.onclick = function (ev) {
           ev.stopPropagation();
