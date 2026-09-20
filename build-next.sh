@@ -936,6 +936,18 @@ window.rpNoteLag = function(song){
     #     screen but the Pitch Tracker, because gameFrame runs on all of them.
     #     Its sibling two thousand lines up was already guarded; this one was
     #     not. Found by the tap test, and live on index.html as well.
+    # 50. THE FAINT INK WAS BELOW THE READABLE FLOOR IN BOTH THEMES.
+    #     Found by the contrast sweep the moment it was written, on secondary
+    #     text all over the app: 2.98:1 on a dark panel2, 2.62:1 on a light
+    #     one, against a 3:1 floor. Nudged until the worst background either
+    #     theme puts it on clears 3:1 with room — dark now 3.57:1 on panel2
+    #     and 3.84:1 on panel, light 3.37:1 and 3.97:1. Nothing else about
+    #     either palette moves.
+    ("""  --ink:#eef1f7; --ink-dim:#8d97ad; --ink-faint:#5d6679;""",
+     """  --ink:#eef1f7; --ink-dim:#8d97ad; --ink-faint:#697286;"""),
+    ("""  --ink:#1e1b17; --ink-dim:#6d655b; --ink-faint:#9a9086;""",
+     """  --ink:#1e1b17; --ink-dim:#6d655b; --ink-faint:#877d73;"""),
+
     # 49. BLACK TEXT ON A DARK CARD. .mcard is used as a <button>, and a
     #     button does not inherit the page's colour — it starts at the
     #     browser's own buttontext, which is black. .mcard h4 set a size and a

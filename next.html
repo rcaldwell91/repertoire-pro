@@ -16,7 +16,7 @@
    =================================================================== */
 :root{
   --bg:#07080d; --bg2:#0b0d14; --panel:#10131c; --panel2:#161b27; --line:#1f2634;
-  --ink:#eef1f7; --ink-dim:#8d97ad; --ink-faint:#5d6679;
+  --ink:#eef1f7; --ink-dim:#8d97ad; --ink-faint:#697286;
   --gold:#ffc94d; --gold-deep:#e0a92e; --hit:#3ddc84; --miss:#ff5d73;
   --accent:#8b6cff; --accent2:#22e0ff; --pink:#ec4899;
   --grad:linear-gradient(135deg,#8b5cf6 0%,#3b82f6 52%,#ec4899 100%);
@@ -26,7 +26,7 @@
 }
 body.light{
   --bg:#f6f1eb; --bg2:#efe8df; --panel:#fffdfa; --panel2:#f0eae2; --line:#e2d9cd;
-  --ink:#1e1b17; --ink-dim:#6d655b; --ink-faint:#9a9086;
+  --ink:#1e1b17; --ink-dim:#6d655b; --ink-faint:#877d73;
   --gold:#b8860b; --gold-deep:#946a08; --hit:#12a35c; --miss:#d63a52;
   --accent:#7c3aed; --accent2:#0b9ec2;
   --glow:0 4px 16px rgba(124,58,237,.25);
@@ -3963,7 +3963,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '18 Sep 2026 · build 5b0b30d2';
+const APP_VERSION = '20 Sep 2026 · build 48c1cc7c';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 

@@ -116,6 +116,7 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   const faint = [];
   let checked = 0;
   let textSeen = 0;
+  let textSkipped = 0;
 
   /* Robert, 20 Sep: two headings rendered in the browser's own black on a
      dark panel, because they sat inside <button>s and nothing set a colour.
@@ -138,11 +139,17 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
         const n = m[1].split(',').map(x => parseFloat(x));
         return { r: n[0], g: n[1], b: n[2], a: n.length > 3 ? n[3] : 1 };
       };
-      /* what this text actually sits on: the first ancestor that paints */
+      /* What this text actually sits on: the first ancestor that paints.
+         A gradient or an image cannot be reduced to one colour here, so
+         rather than guess at it and call white-on-purple a failure - which
+         is what the first run of this did - such text is not measured, and
+         the count below says how many were skipped. */
       const behind = (el) => {
         let n = el;
         while (n && n !== document.documentElement) {
-          const c = parse(getComputedStyle(n).backgroundColor);
+          const cs = getComputedStyle(n);
+          if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+          const c = parse(cs.backgroundColor);
           if (c && c.a > 0.85) return [c.r, c.g, c.b];
           n = n.parentElement;
         }
@@ -150,7 +157,7 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
         return b ? [b.r, b.g, b.b] : [0, 0, 0];
       };
       const out = [];
-      let seen = 0;
+      let seen = 0, skipped = 0;
       document.querySelectorAll('*').forEach(el => {
         if (el.offsetParent === null) return;
         if (el.closest('#rpTourDim')) return;
@@ -163,8 +170,9 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
         if (cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.15) return;
         const fg = parse(cs.color);
         if (!fg || fg.a < 0.15) return;
-        seen++;
         const bg = behind(el);
+        if (!bg) { skipped++; return; }
+        seen++;
         /* a translucent colour is really its blend with what is behind it */
         const mix = [0, 1, 2].map(i => fg.a * [fg.r, fg.g, fg.b][i] + (1 - fg.a) * bg[i]);
         const l1 = lum(mix), l2 = lum(bg);
@@ -173,9 +181,10 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
                                   color: cs.color, tag: el.tagName,
                                   cls: (el.className || '').toString().slice(0, 30) });
       });
-      return { bad: out.slice(0, 8), seen: seen };
+      return { bad: out.slice(0, 8), seen: seen, skipped: skipped };
     });
     textSeen += bad.seen;
+    textSkipped += bad.skipped;
     bad.bad.forEach(b => faint.push(name + ' — "' + b.text + '" ' + b.ratio + ':1  ' +
       b.tag + (b.cls ? '.' + b.cls.split(' ')[0] : '') + '  ' + b.color));
   }
@@ -271,7 +280,8 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
 
   console.log('\nevery word is readable where it sits');
   if (faint.length) { console.log('  under 3:1 —'); faint.forEach(f => console.log('    ✗ ' + f)); }
-  ok(textSeen > 200, 'measured ' + textSeen + ' pieces of text against what they sit on');
+  ok(textSeen > 200, 'measured ' + textSeen + ' pieces of text against what they sit on' +
+     (textSkipped ? ' (' + textSkipped + ' on a gradient, not measurable this way)' : ''));
   ok(faint.length === 0, faint.length ? faint.length + ' below 3:1' : 'all of them at 3:1 or better');
 
   /* Robert, 20 Sep: "the only way I could stop it was the phone's media
