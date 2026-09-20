@@ -222,7 +222,10 @@
     /* Robert, 17 Sep: the chips said Songs / Takes / Note maps and then
        three cards under them said Songs / Takes / Note maps. The chips
        are the navigation, so the cards went and All now shows the songs. */
-    var CHIPS = [['all', 'All'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
+    /* Robert, 20 Sep: Songs comes back. All is everything at once; Songs is
+       the music he owns, with nothing else in the way. */
+    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Takes'],
+                 ['maps', 'Note maps'], ['playlists', 'Playlists']];
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h1 style="margin:0">Your Library</h1>' +
       '<div class="row" style="gap:4px;flex:none">' +
@@ -269,6 +272,9 @@
     /* Robert, 17 Sep: takes get their own list, organised by exercise */
     if (chip === 'recordings' && window.RPTakes) {
       body = RPTakes.listHtml();
+    }
+    if (chip === 'songs' && !owned().length) {
+      body = '<div class="measured">No songs yet. Add music you own with the + at the top.</div>';
     }
     h += '<div id="rpLibBody">' + body + '</div>';
 

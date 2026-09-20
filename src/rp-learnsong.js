@@ -44,6 +44,7 @@
     song: null, open: false, playing: false, raf: null,
     trail: [], t0: 0, vox: null, mus: null, voxUrl: null, musUrl: null,
     countdown: 0, hid: [], mapping: false,
+    asleep: false, heldT: 0,           /* where the song got to before sleep */
     synth: false, clock0: 0, sung: 0   /* a built-in has no file: the app plays it */
   };
 
@@ -66,7 +67,12 @@
     box.style.display = '';
     box.innerHTML =
       '<button class="pill backpill" id="rpLsBack">← Learn a song</button>' +
-      '<h1 style="margin:0 0 2px">' + esc(song.title || 'Your song') + '</h1>' +
+      /* Robert, 20 Sep: a long file name filled the screen as an <h1>. A song
+         title is a card title, not a page heading — same size as one, and it
+         wraps like ordinary text. His file names are his own and are not
+         renamed or trimmed to fit. */
+      '<div style="font-size:18px;font-weight:900;line-height:1.25;margin:0 0 2px;' +
+        'overflow-wrap:anywhere">' + esc(song.title || 'Your song') + '</div>' +
       '<div class="rp-sub" id="rpLsSub" style="margin:0 0 10px"> </div>' +
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px">' +
         '<button class="btn primary" id="rpLsStart" style="padding:11px 18px">Start</button>' +
@@ -107,6 +113,69 @@
     showEngine();
     if (window.RPSong && RPSong.doors) RPSong.doors();
   };
+
+  /* Robert, 20 Sep: leaving by anything other than the screen's own back
+     button — a bottom tab, the phone's back gesture, the app going to the
+     background — left the song playing, and the only way he could stop it
+     was the phone's media notification. Only the back button called close().
+
+     So the sound is tied to the screen being on, not to one button. Leaving
+     stops it for good; the phone going to sleep pauses it, the same way the
+     Pitch Tracker already does. */
+  function leave() {
+    if (!S.open && !S.playing) return;
+    S.asleep = false; S.heldT = 0;
+    stop(true);
+    S.open = false;
+    var box = $('rpLsScreen');
+    if (box) box.style.display = 'none';
+    showEngine();
+  }
+  L.leave = leave;
+
+  (function () {
+    var real = window.switchMode;
+    if (typeof real !== 'function' || real.rpLsWrapped) return;
+    var wrapped = function (m) {
+      /* staying on this tab is how the back button gets here; anything else
+         is a way out of the screen */
+      if (S.open && m !== 'song') leave();
+      return real.apply(this, arguments);
+    };
+    wrapped.rpLsWrapped = true;
+    window.switchMode = wrapped;
+  })();
+
+  /* the phone's own back gesture pops history rather than calling anything */
+  window.addEventListener('popstate', function () { if (S.open) leave(); });
+  window.addEventListener('pagehide', function () { if (S.playing) leave(); });
+
+  /* The phone going to sleep is not leaving — he is coming back to the same
+     place in the same song. So this pauses, the way the Pitch Tracker does,
+     and picks up where it left off. */
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (!S.playing || S.asleep) return;
+      S.heldT = songTime();
+      S.asleep = true;
+      try { if (S.vox) S.vox.pause(); } catch (e) {}
+      try { if (S.mus) S.mus.pause(); } catch (e) {}
+      sub('Paused — the app went to the background.');
+      return;
+    }
+    if (!S.asleep) return;
+    S.asleep = false;
+    if (!S.playing || !S.open) return;
+    if (S.synth) {
+      /* the timer clock has run on while nothing sounded; move its origin
+         back to where the song actually got to */
+      S.clock0 = ((window.performance ? performance.now() : Date.now()) / 1000) - (S.heldT || 0);
+    } else {
+      try { if (S.vox) { var pr = S.vox.play(); if (pr && pr.catch) pr.catch(function () {}); } } catch (e) {}
+      try { if (S.mus) { var pm = S.mus.play(); if (pm && pm.catch) pm.catch(function () {}); } } catch (e) {}
+    }
+    sub('Keep going.');
+  });
 
   /* the old Song Trainer screen stays in the page, because the mapper and
      its progress bar live in it — but he never sees it */
@@ -310,6 +379,7 @@
   function stop(byHand) {
     S.playing = false;
     S.countdown = 0;
+    S.asleep = false; S.heldT = 0;     /* a stop is not a pause: it lets go */
     try { if (S.vox) S.vox.pause(); } catch (e) {}
     try { if (S.mus) S.mus.pause(); } catch (e) {}
     var cd = $('rpLsCount'); if (cd) cd.style.display = 'none';
@@ -321,10 +391,15 @@
   function songTime() {
     if (S.synth) {
       if (!S.playing || !S.clock0) return 0;
+      if (S.asleep) return S.heldT || 0;
       return ((window.performance ? performance.now() : Date.now()) / 1000) - S.clock0;
     }
-    if (!S.vox || S.vox.paused) return 0;
-    return S.vox.currentTime || 0;
+    if (!S.vox) return 0;
+    /* a paused song keeps its place rather than snapping the map back to the
+       start — that is the difference between a pause and a stop */
+    if (S.vox.paused) return S.playing ? (S.heldT || 0) : 0;
+    S.heldT = S.vox.currentTime || 0;
+    return S.heldT;
   }
 
   /* ---------------------------------------------------------------- */
@@ -347,7 +422,7 @@
     var lag = 0;
     try { lag = window.rpNoteLag ? rpNoteLag(S.song) : 0; } catch (e) { lag = 0; }
     var tv = t - (window.rpMicLag ? rpMicLag() : 0.1);   /* when he actually sang */
-    if (S.playing && t > 0) {
+    if (S.playing && t > 0 && !S.asleep) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
       S.trail.push({ t: tv, m: (m == null ? null : m) });
@@ -413,6 +488,38 @@
     var bh = Math.max(12, Math.min(26, laneH * 1.4));
 
     c2.save();
+
+    /* Robert, 20 Sep: "grey blobs." A take's pitch line is twenty points a
+       second with no duration on any of them, so bubbling each one drew
+       twenty overlapping blobs a second. It is a traced line, and it is
+       drawn as one — the same gold line the Pitch Tracker uses. */
+    if ((window.rpNoteShape ? rpNoteShape(ns) : 'bars') === 'line') {
+      c2.strokeStyle = 'rgba(255,209,102,.95)';
+      c2.lineWidth = 2.5;
+      c2.shadowColor = 'rgba(255,209,102,.6)';
+      c2.shadowBlur = 8;
+      c2.beginPath();
+      var pen = false, prev = null;
+      for (var k = 0; k < ns.length; k++) {
+        var p = ns[k];
+        if (!p || p.m == null) { pen = false; prev = null; continue; }
+        var px = W - (now - (p.t + lag)) * pps;
+        if (px < -4 || px > W + 4) { pen = false; prev = null; continue; }
+        var py = yOf(p.m);
+        var jump = prev && Math.abs(p.m - prev.m) > 6;
+        if (!pen || jump) c2.moveTo(px, py); else c2.lineTo(px, py);
+        pen = true; prev = p;
+      }
+      c2.stroke();
+      c2.shadowBlur = 0;
+      c2.lineWidth = 2;
+      c2.strokeStyle = 'rgba(255,255,255,.55)';
+      c2.beginPath(); c2.moveTo(headX, 0); c2.lineTo(headX, H); c2.stroke();
+      c2.lineWidth = 1;
+      c2.restore();
+      return;
+    }
+
     for (var j = 0; j < ns.length; j++) {
       var n = ns[j];
       var dur = n.d || 0.35;
@@ -463,4 +570,12 @@
   /* ---------------------------------------------------------------- */
   L.reset = function () { held = {}; };
   L.isOpen = function () { return !!S.open; };
+  /* the app's own answer to "is a song sounding right now", so a test can
+     ask it rather than guess from a canvas */
+  L.isPlaying = function () {
+    if (S.playing) return true;
+    try { if (S.vox && !S.vox.paused && !S.vox.ended) return true; } catch (e) {}
+    try { if (S.mus && !S.mus.paused && !S.mus.ended) return true; } catch (e) {}
+    return false;
+  };
 })();

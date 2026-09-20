@@ -886,6 +886,24 @@ window.rpMicLag = function(){
 };
 window.RP_MAP_LEAD = 0.05;
 /* seconds to ADD to a stored note's time before it is drawn */
+/* Two different shapes of data go through these drawers, and drawing one as
+   the other is what produced both of Robert's screenshots on 20 Sep: a file
+   map drawn as a take came out as gold diagonals joining note STARTS with d
+   thrown away, and a take drawn as a file map came out as twenty overlapping
+   grey bubbles a second. The data says which it is: a file map's notes carry
+   a duration, a take's twenty-a-second pitch points do not. One answer, both
+   screens. */
+window.rpNoteShape = function(notes){
+  if(!notes || !notes.length) return 'line';
+  var seen = 0;
+  for(var i = 0; i < notes.length && seen < 40; i++){
+    var n = notes[i];
+    if(!n || n.m == null) continue;
+    seen++;
+    if(n.d != null && isFinite(n.d) && n.d > 0) return 'bars';
+  }
+  return 'line';
+};
 window.rpNoteLag = function(song){
   if(!song) return 0;
   if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
@@ -918,6 +936,20 @@ window.rpNoteLag = function(song){
     #     screen but the Pitch Tracker, because gameFrame runs on all of them.
     #     Its sibling two thousand lines up was already guarded; this one was
     #     not. Found by the tap test, and live on index.html as well.
+    # 49. BLACK TEXT ON A DARK CARD. .mcard is used as a <button>, and a
+    #     button does not inherit the page's colour — it starts at the
+    #     browser's own buttontext, which is black. .mcard h4 set a size and a
+    #     margin and no colour, so every heading on the Learn a song front
+    #     door rendered black on a dark panel. Robert could barely read them.
+    #     The colour goes on the card, so anything inside it inherits.
+    ("""  background:var(--panel); border:1px solid var(--line); border-radius:15px; padding:14px;
+  display:flex; align-items:center; gap:12px; cursor:pointer; transition:transform .1s;""",
+     """  background:var(--panel); border:1px solid var(--line); border-radius:15px; padding:14px;
+  display:flex; align-items:center; gap:12px; cursor:pointer; transition:transform .1s;
+  color:var(--ink); font-family:inherit;"""),
+    ("""\n.mcard h4{font-size:15px;margin:0 0 2px;}""",
+     """\n.mcard h4{font-size:15px;margin:0 0 2px;color:var(--ink);}"""),
+
     ("""  G.stats.forEach((st,i)=>{ if(st.done||scoreBeat>s.notes[i].t){ hitT+=st.hit; totT+=Math.min(s.notes[i].d, Math.max(0,scoreBeat-s.notes[i].t)); }});""",
      """  G.stats.forEach((st,i)=>{
     const n = s.notes[i];

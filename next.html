@@ -87,11 +87,12 @@ header{display:flex; align-items:center; justify-content:space-between; gap:10px
 .mcard{
   background:var(--panel); border:1px solid var(--line); border-radius:15px; padding:14px;
   display:flex; align-items:center; gap:12px; cursor:pointer; transition:transform .1s;
+  color:var(--ink); font-family:inherit;
 }
 .mcard:active{transform:scale(.98);}
 .mcard .mi{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;
   justify-content:center;flex:none;background:var(--grad);box-shadow:var(--glow);color:#fff;}
-.mcard h4{font-size:15px;margin:0 0 2px;}
+.mcard h4{font-size:15px;margin:0 0 2px;color:var(--ink);}
 .mcard p{font-size:11.5px;color:var(--ink-faint);margin:0;line-height:1.4;}
 .mcard .chev{margin-left:auto;color:var(--ink-faint);font-size:17px;}
 .hue1 .mi,.hue2 .mi,.hue3 .mi,.hue4 .mi,.hue5 .mi{background:var(--grad);}
@@ -2496,6 +2497,24 @@ window.rpMicLag = function(){
 };
 window.RP_MAP_LEAD = 0.05;
 /* seconds to ADD to a stored note's time before it is drawn */
+/* Two different shapes of data go through these drawers, and drawing one as
+   the other is what produced both of Robert's screenshots on 20 Sep: a file
+   map drawn as a take came out as gold diagonals joining note STARTS with d
+   thrown away, and a take drawn as a file map came out as twenty overlapping
+   grey bubbles a second. The data says which it is: a file map's notes carry
+   a duration, a take's twenty-a-second pitch points do not. One answer, both
+   screens. */
+window.rpNoteShape = function(notes){
+  if(!notes || !notes.length) return 'line';
+  var seen = 0;
+  for(var i = 0; i < notes.length && seen < 40; i++){
+    var n = notes[i];
+    if(!n || n.m == null) continue;
+    seen++;
+    if(n.d != null && isFinite(n.d) && n.d > 0) return 'bars';
+  }
+  return 'line';
+};
 window.rpNoteLag = function(song){
   if(!song) return 0;
   if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
@@ -3944,7 +3963,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '18 Sep 2026 · build b9910624';
+const APP_VERSION = '18 Sep 2026 · build 5b0b30d2';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -12121,10 +12140,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       '.rp-inp:focus{outline:0;border-color:var(--gold);}' +
       '.rp-lab{display:block;font-size:10.5px;font-weight:800;letter-spacing:.6px;' +
       'color:var(--ink-faint);margin:0 0 5px;}' +
+      /* the colour matters: .rp-card is used as a <button> in places, and a
+         button starts at the browser's own black rather than inheriting the
+         page. Without this the titles in "A song you own" render black on a
+         dark panel. */
       '.rp-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;' +
-      'padding:12px;margin-top:9px;}' +
+      'padding:12px;margin-top:9px;color:var(--ink);font-family:inherit;}' +
       '.rp-card.hot{border-left:3px solid var(--gold);}' +
-      '.rp-ttl{font-size:13.5px;font-weight:800;}' +
+      '.rp-ttl{font-size:13.5px;font-weight:800;color:var(--ink);}' +
       '.rp-sub{font-size:11.5px;color:var(--ink-dim);margin-top:3px;line-height:1.45;}' +
       '.rp-seg{display:flex;gap:7px;margin:12px 0 4px;}' +
       '.rp-seg button{flex:1;padding:10px 6px;font-size:12.5px;font-weight:800;border-radius:11px;' +
@@ -15139,26 +15162,51 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
        — see the note beside rpMicLag in the build. */
     var lag = 0;
     try { lag = window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0; } catch (e) { lag = 0; }
+    var shape = window.rpNoteShape ? rpNoteShape(notes) : 'line';
     c2.save();
-    c2.beginPath();
-    var pen = false, prev = null, cur = null;
-    for (var i = 0; i < notes.length; i++) {
-      var n = notes[i];
-      if (n.m == null) { pen = false; prev = null; continue; }
-      var x = W - (t0 - (n.t + lag)) * pps;
-      if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
-      var y = yOf(n.m);
-      var leap = prev && Math.abs(n.m - prev.m) > 6;
-      if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
-      pen = true; prev = n;
-      if (n.t + lag <= t0) cur = n;
-    }
     c2.strokeStyle = 'rgba(232,179,74,.95)';
-    c2.lineWidth = 2.5;
     c2.shadowColor = 'rgba(232,179,74,.7)';
     c2.shadowBlur = 8;
-    c2.stroke();
+    var cur = null, i, n, x, y;
+
+    if (shape === 'bars') {
+      /* Robert, 20 Sep: "gold straight diagonal lines appearing in sections."
+         A note map is a list of held notes, not a traced line. Each one is a
+         flat bar for as long as it is held, and nothing joins one to the
+         next — the silence between two notes is not a slide between them. */
+      var laneH = Math.abs(yOf(60) - yOf(61)) || 12;
+      c2.lineCap = 'round';
+      c2.lineWidth = Math.max(4, Math.min(12, laneH * 0.7));
+      for (i = 0; i < notes.length; i++) {
+        n = notes[i];
+        if (!n || n.m == null) continue;
+        x = W - (t0 - (n.t + lag)) * pps;
+        var x2 = x + Math.max(2, (n.d || 0) * pps);
+        if (x2 < -4 || x > W + 4) continue;
+        y = yOf(n.m);
+        c2.beginPath(); c2.moveTo(x, y); c2.lineTo(x2, y); c2.stroke();
+        if (n.t + lag <= t0) cur = n;
+      }
+      c2.lineCap = 'butt';
+    } else {
+      c2.beginPath();
+      var pen = false, prev = null;
+      for (i = 0; i < notes.length; i++) {
+        n = notes[i];
+        if (n.m == null) { pen = false; prev = null; continue; }
+        x = W - (t0 - (n.t + lag)) * pps;
+        if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+        y = yOf(n.m);
+        var leap = prev && Math.abs(n.m - prev.m) > 6;
+        if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+        pen = true; prev = n;
+        if (n.t + lag <= t0) cur = n;
+      }
+      c2.lineWidth = 2.5;
+      c2.stroke();
+    }
     c2.shadowBlur = 0;
+    c2.lineWidth = 1;
     if (cur && !o.audio.paused) {
       c2.beginPath();
       c2.arc(W - 5, yOf(cur.m), 5, 0, Math.PI * 2);
@@ -20108,7 +20156,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 17 Sep: the chips said Songs / Takes / Note maps and then
        three cards under them said Songs / Takes / Note maps. The chips
        are the navigation, so the cards went and All now shows the songs. */
-    var CHIPS = [['all', 'All'], ['recordings', 'Takes'], ['maps', 'Note maps'], ['playlists', 'Playlists']];
+    /* Robert, 20 Sep: Songs comes back. All is everything at once; Songs is
+       the music he owns, with nothing else in the way. */
+    var CHIPS = [['all', 'All'], ['songs', 'Songs'], ['recordings', 'Takes'],
+                 ['maps', 'Note maps'], ['playlists', 'Playlists']];
     var h = '<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">' +
       '<h1 style="margin:0">Your Library</h1>' +
       '<div class="row" style="gap:4px;flex:none">' +
@@ -20155,6 +20206,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     /* Robert, 17 Sep: takes get their own list, organised by exercise */
     if (chip === 'recordings' && window.RPTakes) {
       body = RPTakes.listHtml();
+    }
+    if (chip === 'songs' && !owned().length) {
+      body = '<div class="measured">No songs yet. Add music you own with the + at the top.</div>';
     }
     h += '<div id="rpLibBody">' + body + '</div>';
 
@@ -23563,6 +23617,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     song: null, open: false, playing: false, raf: null,
     trail: [], t0: 0, vox: null, mus: null, voxUrl: null, musUrl: null,
     countdown: 0, hid: [], mapping: false,
+    asleep: false, heldT: 0,           /* where the song got to before sleep */
     synth: false, clock0: 0, sung: 0   /* a built-in has no file: the app plays it */
   };
 
@@ -23585,7 +23640,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     box.style.display = '';
     box.innerHTML =
       '<button class="pill backpill" id="rpLsBack">← Learn a song</button>' +
-      '<h1 style="margin:0 0 2px">' + esc(song.title || 'Your song') + '</h1>' +
+      /* Robert, 20 Sep: a long file name filled the screen as an <h1>. A song
+         title is a card title, not a page heading — same size as one, and it
+         wraps like ordinary text. His file names are his own and are not
+         renamed or trimmed to fit. */
+      '<div style="font-size:18px;font-weight:900;line-height:1.25;margin:0 0 2px;' +
+        'overflow-wrap:anywhere">' + esc(song.title || 'Your song') + '</div>' +
       '<div class="rp-sub" id="rpLsSub" style="margin:0 0 10px"> </div>' +
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px">' +
         '<button class="btn primary" id="rpLsStart" style="padding:11px 18px">Start</button>' +
@@ -23626,6 +23686,69 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     showEngine();
     if (window.RPSong && RPSong.doors) RPSong.doors();
   };
+
+  /* Robert, 20 Sep: leaving by anything other than the screen's own back
+     button — a bottom tab, the phone's back gesture, the app going to the
+     background — left the song playing, and the only way he could stop it
+     was the phone's media notification. Only the back button called close().
+
+     So the sound is tied to the screen being on, not to one button. Leaving
+     stops it for good; the phone going to sleep pauses it, the same way the
+     Pitch Tracker already does. */
+  function leave() {
+    if (!S.open && !S.playing) return;
+    S.asleep = false; S.heldT = 0;
+    stop(true);
+    S.open = false;
+    var box = $('rpLsScreen');
+    if (box) box.style.display = 'none';
+    showEngine();
+  }
+  L.leave = leave;
+
+  (function () {
+    var real = window.switchMode;
+    if (typeof real !== 'function' || real.rpLsWrapped) return;
+    var wrapped = function (m) {
+      /* staying on this tab is how the back button gets here; anything else
+         is a way out of the screen */
+      if (S.open && m !== 'song') leave();
+      return real.apply(this, arguments);
+    };
+    wrapped.rpLsWrapped = true;
+    window.switchMode = wrapped;
+  })();
+
+  /* the phone's own back gesture pops history rather than calling anything */
+  window.addEventListener('popstate', function () { if (S.open) leave(); });
+  window.addEventListener('pagehide', function () { if (S.playing) leave(); });
+
+  /* The phone going to sleep is not leaving — he is coming back to the same
+     place in the same song. So this pauses, the way the Pitch Tracker does,
+     and picks up where it left off. */
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (!S.playing || S.asleep) return;
+      S.heldT = songTime();
+      S.asleep = true;
+      try { if (S.vox) S.vox.pause(); } catch (e) {}
+      try { if (S.mus) S.mus.pause(); } catch (e) {}
+      sub('Paused — the app went to the background.');
+      return;
+    }
+    if (!S.asleep) return;
+    S.asleep = false;
+    if (!S.playing || !S.open) return;
+    if (S.synth) {
+      /* the timer clock has run on while nothing sounded; move its origin
+         back to where the song actually got to */
+      S.clock0 = ((window.performance ? performance.now() : Date.now()) / 1000) - (S.heldT || 0);
+    } else {
+      try { if (S.vox) { var pr = S.vox.play(); if (pr && pr.catch) pr.catch(function () {}); } } catch (e) {}
+      try { if (S.mus) { var pm = S.mus.play(); if (pm && pm.catch) pm.catch(function () {}); } } catch (e) {}
+    }
+    sub('Keep going.');
+  });
 
   /* the old Song Trainer screen stays in the page, because the mapper and
      its progress bar live in it — but he never sees it */
@@ -23829,6 +23952,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function stop(byHand) {
     S.playing = false;
     S.countdown = 0;
+    S.asleep = false; S.heldT = 0;     /* a stop is not a pause: it lets go */
     try { if (S.vox) S.vox.pause(); } catch (e) {}
     try { if (S.mus) S.mus.pause(); } catch (e) {}
     var cd = $('rpLsCount'); if (cd) cd.style.display = 'none';
@@ -23840,10 +23964,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function songTime() {
     if (S.synth) {
       if (!S.playing || !S.clock0) return 0;
+      if (S.asleep) return S.heldT || 0;
       return ((window.performance ? performance.now() : Date.now()) / 1000) - S.clock0;
     }
-    if (!S.vox || S.vox.paused) return 0;
-    return S.vox.currentTime || 0;
+    if (!S.vox) return 0;
+    /* a paused song keeps its place rather than snapping the map back to the
+       start — that is the difference between a pause and a stop */
+    if (S.vox.paused) return S.playing ? (S.heldT || 0) : 0;
+    S.heldT = S.vox.currentTime || 0;
+    return S.heldT;
   }
 
   /* ---------------------------------------------------------------- */
@@ -23866,7 +23995,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var lag = 0;
     try { lag = window.rpNoteLag ? rpNoteLag(S.song) : 0; } catch (e) { lag = 0; }
     var tv = t - (window.rpMicLag ? rpMicLag() : 0.1);   /* when he actually sang */
-    if (S.playing && t > 0) {
+    if (S.playing && t > 0 && !S.asleep) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
       S.trail.push({ t: tv, m: (m == null ? null : m) });
@@ -23932,6 +24061,38 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var bh = Math.max(12, Math.min(26, laneH * 1.4));
 
     c2.save();
+
+    /* Robert, 20 Sep: "grey blobs." A take's pitch line is twenty points a
+       second with no duration on any of them, so bubbling each one drew
+       twenty overlapping blobs a second. It is a traced line, and it is
+       drawn as one — the same gold line the Pitch Tracker uses. */
+    if ((window.rpNoteShape ? rpNoteShape(ns) : 'bars') === 'line') {
+      c2.strokeStyle = 'rgba(255,209,102,.95)';
+      c2.lineWidth = 2.5;
+      c2.shadowColor = 'rgba(255,209,102,.6)';
+      c2.shadowBlur = 8;
+      c2.beginPath();
+      var pen = false, prev = null;
+      for (var k = 0; k < ns.length; k++) {
+        var p = ns[k];
+        if (!p || p.m == null) { pen = false; prev = null; continue; }
+        var px = W - (now - (p.t + lag)) * pps;
+        if (px < -4 || px > W + 4) { pen = false; prev = null; continue; }
+        var py = yOf(p.m);
+        var jump = prev && Math.abs(p.m - prev.m) > 6;
+        if (!pen || jump) c2.moveTo(px, py); else c2.lineTo(px, py);
+        pen = true; prev = p;
+      }
+      c2.stroke();
+      c2.shadowBlur = 0;
+      c2.lineWidth = 2;
+      c2.strokeStyle = 'rgba(255,255,255,.55)';
+      c2.beginPath(); c2.moveTo(headX, 0); c2.lineTo(headX, H); c2.stroke();
+      c2.lineWidth = 1;
+      c2.restore();
+      return;
+    }
+
     for (var j = 0; j < ns.length; j++) {
       var n = ns[j];
       var dur = n.d || 0.35;
@@ -23982,6 +24143,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* ---------------------------------------------------------------- */
   L.reset = function () { held = {}; };
   L.isOpen = function () { return !!S.open; };
+  /* the app's own answer to "is a song sounding right now", so a test can
+     ask it rather than guess from a canvas */
+  L.isPlaying = function () {
+    if (S.playing) return true;
+    try { if (S.vox && !S.vox.paused && !S.vox.ended) return true; } catch (e) {}
+    try { if (S.mus && !S.mus.paused && !S.mus.ended) return true; } catch (e) {}
+    return false;
+  };
 })();
 
 </script>

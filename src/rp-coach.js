@@ -37,10 +37,14 @@
       '.rp-inp:focus{outline:0;border-color:var(--gold);}' +
       '.rp-lab{display:block;font-size:10.5px;font-weight:800;letter-spacing:.6px;' +
       'color:var(--ink-faint);margin:0 0 5px;}' +
+      /* the colour matters: .rp-card is used as a <button> in places, and a
+         button starts at the browser's own black rather than inheriting the
+         page. Without this the titles in "A song you own" render black on a
+         dark panel. */
       '.rp-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;' +
-      'padding:12px;margin-top:9px;}' +
+      'padding:12px;margin-top:9px;color:var(--ink);font-family:inherit;}' +
       '.rp-card.hot{border-left:3px solid var(--gold);}' +
-      '.rp-ttl{font-size:13.5px;font-weight:800;}' +
+      '.rp-ttl{font-size:13.5px;font-weight:800;color:var(--ink);}' +
       '.rp-sub{font-size:11.5px;color:var(--ink-dim);margin-top:3px;line-height:1.45;}' +
       '.rp-seg{display:flex;gap:7px;margin:12px 0 4px;}' +
       '.rp-seg button{flex:1;padding:10px 6px;font-size:12.5px;font-weight:800;border-radius:11px;' +

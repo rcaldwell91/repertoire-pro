@@ -385,26 +385,51 @@
        — see the note beside rpMicLag in the build. */
     var lag = 0;
     try { lag = window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0; } catch (e) { lag = 0; }
+    var shape = window.rpNoteShape ? rpNoteShape(notes) : 'line';
     c2.save();
-    c2.beginPath();
-    var pen = false, prev = null, cur = null;
-    for (var i = 0; i < notes.length; i++) {
-      var n = notes[i];
-      if (n.m == null) { pen = false; prev = null; continue; }
-      var x = W - (t0 - (n.t + lag)) * pps;
-      if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
-      var y = yOf(n.m);
-      var leap = prev && Math.abs(n.m - prev.m) > 6;
-      if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
-      pen = true; prev = n;
-      if (n.t + lag <= t0) cur = n;
-    }
     c2.strokeStyle = 'rgba(232,179,74,.95)';
-    c2.lineWidth = 2.5;
     c2.shadowColor = 'rgba(232,179,74,.7)';
     c2.shadowBlur = 8;
-    c2.stroke();
+    var cur = null, i, n, x, y;
+
+    if (shape === 'bars') {
+      /* Robert, 20 Sep: "gold straight diagonal lines appearing in sections."
+         A note map is a list of held notes, not a traced line. Each one is a
+         flat bar for as long as it is held, and nothing joins one to the
+         next — the silence between two notes is not a slide between them. */
+      var laneH = Math.abs(yOf(60) - yOf(61)) || 12;
+      c2.lineCap = 'round';
+      c2.lineWidth = Math.max(4, Math.min(12, laneH * 0.7));
+      for (i = 0; i < notes.length; i++) {
+        n = notes[i];
+        if (!n || n.m == null) continue;
+        x = W - (t0 - (n.t + lag)) * pps;
+        var x2 = x + Math.max(2, (n.d || 0) * pps);
+        if (x2 < -4 || x > W + 4) continue;
+        y = yOf(n.m);
+        c2.beginPath(); c2.moveTo(x, y); c2.lineTo(x2, y); c2.stroke();
+        if (n.t + lag <= t0) cur = n;
+      }
+      c2.lineCap = 'butt';
+    } else {
+      c2.beginPath();
+      var pen = false, prev = null;
+      for (i = 0; i < notes.length; i++) {
+        n = notes[i];
+        if (n.m == null) { pen = false; prev = null; continue; }
+        x = W - (t0 - (n.t + lag)) * pps;
+        if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+        y = yOf(n.m);
+        var leap = prev && Math.abs(n.m - prev.m) > 6;
+        if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+        pen = true; prev = n;
+        if (n.t + lag <= t0) cur = n;
+      }
+      c2.lineWidth = 2.5;
+      c2.stroke();
+    }
     c2.shadowBlur = 0;
+    c2.lineWidth = 1;
     if (cur && !o.audio.paused) {
       c2.beginPath();
       c2.arc(W - 5, yOf(cur.m), 5, 0, Math.PI * 2);

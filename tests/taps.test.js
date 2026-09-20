@@ -113,11 +113,77 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
 
   const dead = [];
   const quiet = [];
+  const faint = [];
   let checked = 0;
+  let textSeen = 0;
+
+  /* Robert, 20 Sep: two headings rendered in the browser's own black on a
+     dark panel, because they sat inside <button>s and nothing set a colour.
+     He could barely read them. Reading each screen by eye did not catch it
+     and never will, so the contrast is measured on every screen walked.
+     3:1 is the WCAG floor for large text; anything under it is unreadable
+     rather than merely low. */
+  async function contrastSweep(name) {
+    const bad = await p.evaluate(() => {
+      const lum = (c) => {
+        const a = [c[0], c[1], c[2]].map(v => {
+          v /= 255;
+          return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+      };
+      const parse = (s) => {
+        const m = /rgba?\(([^)]+)\)/.exec(s || '');
+        if (!m) return null;
+        const n = m[1].split(',').map(x => parseFloat(x));
+        return { r: n[0], g: n[1], b: n[2], a: n.length > 3 ? n[3] : 1 };
+      };
+      /* what this text actually sits on: the first ancestor that paints */
+      const behind = (el) => {
+        let n = el;
+        while (n && n !== document.documentElement) {
+          const c = parse(getComputedStyle(n).backgroundColor);
+          if (c && c.a > 0.85) return [c.r, c.g, c.b];
+          n = n.parentElement;
+        }
+        const b = parse(getComputedStyle(document.body).backgroundColor);
+        return b ? [b.r, b.g, b.b] : [0, 0, 0];
+      };
+      const out = [];
+      let seen = 0;
+      document.querySelectorAll('*').forEach(el => {
+        if (el.offsetParent === null) return;
+        if (el.closest('#rpTourDim')) return;
+        /* only elements that paint their own words */
+        let own = '';
+        el.childNodes.forEach(c => { if (c.nodeType === 3) own += c.textContent; });
+        own = own.trim();
+        if (!own) return;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.15) return;
+        const fg = parse(cs.color);
+        if (!fg || fg.a < 0.15) return;
+        seen++;
+        const bg = behind(el);
+        /* a translucent colour is really its blend with what is behind it */
+        const mix = [0, 1, 2].map(i => fg.a * [fg.r, fg.g, fg.b][i] + (1 - fg.a) * bg[i]);
+        const l1 = lum(mix), l2 = lum(bg);
+        const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+        if (ratio < 3) out.push({ text: own.slice(0, 38), ratio: +ratio.toFixed(2),
+                                  color: cs.color, tag: el.tagName,
+                                  cls: (el.className || '').toString().slice(0, 30) });
+      });
+      return { bad: out.slice(0, 8), seen: seen };
+    });
+    textSeen += bad.seen;
+    bad.bad.forEach(b => faint.push(name + ' — "' + b.text + '" ' + b.ratio + ':1  ' +
+      b.tag + (b.cls ? '.' + b.cls.split(' ')[0] : '') + '  ' + b.color));
+  }
 
   for (const sc of SCREENS) {
     try { await p.evaluate(sc.go); } catch (e) { ok(false, sc.name + ' would not open: ' + e.message); continue; }
     await p.waitForTimeout(1100);
+    await contrastSweep(sc.name);
 
     /* everything that says "tap me" on this screen */
     const targets = await p.evaluate((notButtons) => {
@@ -202,6 +268,39 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   if (quiet.length) { console.log('  no screen change, and that is right:'); quiet.forEach(q => console.log('    · ' + q)); }
   if (dead.length) { console.log('  dead controls:'); dead.forEach(d => console.log('    ✗ ' + d)); }
   ok(dead.length === 0, dead.length ? dead.length + ' go nowhere' : 'every one of them changed the screen');
+
+  console.log('\nevery word is readable where it sits');
+  if (faint.length) { console.log('  under 3:1 —'); faint.forEach(f => console.log('    ✗ ' + f)); }
+  ok(textSeen > 200, 'measured ' + textSeen + ' pieces of text against what they sit on');
+  ok(faint.length === 0, faint.length ? faint.length + ' below 3:1' : 'all of them at 3:1 or better');
+
+  /* Robert, 20 Sep: "the only way I could stop it was the phone's media
+     notification." Leaving the screen has to stop the sound, whichever way
+     he leaves. */
+  console.log('\nleaving a song stops it');
+  const left = await p.evaluate(async () => {
+    switchMode('song');
+    await new Promise(r => setTimeout(r, 500));
+    const notes = [];
+    for (let i = 0; i < 40; i++) notes.push({ m: 57 + (i % 5), t: i * 0.6, d: 0.5 });
+    RPLearnSong.open({ id: 'leavetest', title: 'Leave test', notes: notes, blob: null, notesFrom: 'exact' });
+    await new Promise(r => setTimeout(r, 800));
+    const b = document.getElementById('rpLsStart');
+    if (!b) return { err: 'no Start button' };
+    b.click();
+    await new Promise(r => setTimeout(r, 5000));   /* past the 3s count-in */
+    const started = RPLearnSong.isPlaying();
+    switchMode('home');                       /* a bottom tab, not the back button */
+    await new Promise(r => setTimeout(r, 900));
+    return { started: started, playing: RPLearnSong.isPlaying(),
+             open: RPLearnSong.isOpen(), mode: state.mode };
+  });
+  ok(!left.err, 'a song starts on Learn a song' + (left.err ? ' — ' + left.err : ''));
+  ok(left.started === true, 'it really was playing before he left');
+  ok(left.mode === 'home', 'tapping Home leaves the screen');
+  ok(left.playing === false, 'nothing is playing after leaving by a bottom tab');
+  ok(left.open === false, 'and the screen has let go');
+
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs[0] : ''));
 
   await browser.close();

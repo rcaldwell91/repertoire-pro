@@ -3166,7 +3166,11 @@ function gameFrame(){
   $('stScore').textContent = G.score.toLocaleString();
   $('stCombo').textContent = G.combo;
   let hitT=0, totT=0;
-  G.stats.forEach((st,i)=>{ if(st.done||scoreBeat>s.notes[i].t){ hitT+=st.hit; totT+=Math.min(s.notes[i].d, Math.max(0,scoreBeat-s.notes[i].t)); }});
+  G.stats.forEach((st,i)=>{
+    const n = s.notes[i];
+    if(!n) return;                      // stats left over from another song
+    if(st.done||scoreBeat>n.t){ hitT+=st.hit; totT+=Math.min(n.d, Math.max(0,scoreBeat-n.t)); }
+  });
   $('stAcc').textContent = totT>0.5? Math.round(100*Math.min(1,hitT/totT))+'%' : '–';
   $('stNote').textContent = userMidi!==null? midiName(userMidi) : '–';
   $('stTarget').textContent = target? midiName(target.m+state.transpose) : '–';
