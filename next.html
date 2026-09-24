@@ -3976,7 +3976,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '24 Sep 2026 · build ae5fddcc';
+const APP_VERSION = '24 Sep 2026 · build 1af2fa8f';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -5676,7 +5676,7 @@ async function libPlayAt(list, idx){
 }
 async function libLoad(song){
   if(!song) return;
-  try{ if(window.RPSound) RPSound.claim('library', ()=>{
+  try{ if(window.RPOneSound) RPOneSound.claim('library', ()=>{
     try{ libAudio.pause(); }catch(e){}
     try{ if(window.RPLib && RPLib.hideBar) RPLib.hideBar(); }catch(e){}
   }); }catch(e){}
@@ -11064,6 +11064,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 /* ======================================================================
    Repertoire Pro — one thing makes a sound at a time.
 
+   Named RPOneSound, not RPSound: rp-soundcheck.js already owns that name
+   and loads later in the build, so the first version of this file was
+   quietly replaced by it and every call here vanished. Nothing warned. If
+   another global is ever added, grep the BUILT page for the name first.
+
    Robert, 24 Sep: an unsaved take's listen-back kept playing when he went
    to the Library, and a Library song then played on top of it. Two voices
    in his headphones, and no obvious way to stop either.
@@ -11079,7 +11084,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
    ====================================================================== */
 (function () {
   'use strict';
-  var S = window.RPSound = {};
+  var S = window.RPOneSound = {};
   var holder = null;          /* { name, stop } */
   var quiet = false;          /* true while we are the ones doing the stopping */
 
@@ -14923,7 +14928,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   };
 
   function claimSound(name, stop) {
-    try { if (window.RPSound) RPSound.claim(name, stop); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.claim(name, stop); } catch (e) {}
   }
 
   function say(msg) {
@@ -20572,7 +20577,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (a) { try { a.pause(); } catch (e) {} }
     dismissed = true;
     hideMini();
-    try { if (window.RPSound) RPSound.release('library'); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.release('library'); } catch (e) {}
     try { if (window.RPPage && RPPage.isOpen('np')) RPPage.back(); } catch (e) {}
   };
 
@@ -24086,7 +24091,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      stops it for good; the phone going to sleep pauses it, the same way the
      Pitch Tracker already does. */
   function leave() {
-    try { if (window.RPSound) RPSound.release('learn-a-song'); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.release('learn-a-song'); } catch (e) {}
     if (!S.open && !S.playing) return;
     S.asleep = false; S.heldT = 0;
     stop(true);
@@ -24297,7 +24302,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
     /* one thing in his headphones at a time */
-    try { if (window.RPSound) RPSound.claimResumable('learn-a-song', leave); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.claimResumable('learn-a-song', leave); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);

@@ -41,7 +41,7 @@
   };
 
   function claimSound(name, stop) {
-    try { if (window.RPSound) RPSound.claim(name, stop); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.claim(name, stop); } catch (e) {}
   }
 
   function say(msg) {

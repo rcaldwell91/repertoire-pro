@@ -123,7 +123,7 @@
      stops it for good; the phone going to sleep pauses it, the same way the
      Pitch Tracker already does. */
   function leave() {
-    try { if (window.RPSound) RPSound.release('learn-a-song'); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.release('learn-a-song'); } catch (e) {}
     if (!S.open && !S.playing) return;
     S.asleep = false; S.heldT = 0;
     stop(true);
@@ -334,7 +334,7 @@
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
     /* one thing in his headphones at a time */
-    try { if (window.RPSound) RPSound.claimResumable('learn-a-song', leave); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.claimResumable('learn-a-song', leave); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);

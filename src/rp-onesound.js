@@ -1,6 +1,11 @@
 /* ======================================================================
    Repertoire Pro — one thing makes a sound at a time.
 
+   Named RPOneSound, not RPSound: rp-soundcheck.js already owns that name
+   and loads later in the build, so the first version of this file was
+   quietly replaced by it and every call here vanished. Nothing warned. If
+   another global is ever added, grep the BUILT page for the name first.
+
    Robert, 24 Sep: an unsaved take's listen-back kept playing when he went
    to the Library, and a Library song then played on top of it. Two voices
    in his headphones, and no obvious way to stop either.
@@ -16,7 +21,7 @@
    ====================================================================== */
 (function () {
   'use strict';
-  var S = window.RPSound = {};
+  var S = window.RPOneSound = {};
   var holder = null;          /* { name, stop } */
   var quiet = false;          /* true while we are the ones doing the stopping */
 

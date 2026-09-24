@@ -496,7 +496,7 @@
     if (a) { try { a.pause(); } catch (e) {} }
     dismissed = true;
     hideMini();
-    try { if (window.RPSound) RPSound.release('library'); } catch (e) {}
+    try { if (window.RPOneSound) RPOneSound.release('library'); } catch (e) {}
     try { if (window.RPPage && RPPage.isOpen('np')) RPPage.back(); } catch (e) {}
   };
 

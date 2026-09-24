@@ -317,6 +317,16 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   console.log('\none tap arrives ready');
   const oneTap = await p.evaluate(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
+    /* The walk above clicks everything, Record included, so the recorder can
+       be mid-take by now. That is the walk's doing, not the app's: with a
+       take waiting to be kept or thrown away the panel correctly shows Keep
+       and Discard instead of Record. Put it back to idle first, and say what
+       had to be cleared so a real problem here is not mistaken for this. */
+    const dirty = RPStudio.state;
+    try { if (RPStudio.state !== 'idle') RPStudio.api.stop(); } catch (e) {}
+    await wait(700);
+    try { RPStudio.api.bin(); } catch (e) {}
+    await wait(300);
     const sr = 44100, n = sr * 4, pcm = new Int16Array(n);
     for (let i = 0; i < n; i++) pcm[i] = Math.round(Math.sin(2 * Math.PI * 220 * i / sr) * 6000);
     const h = new DataView(new ArrayBuffer(44));
@@ -339,8 +349,9 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
     if (!btn) return { err: 'no Open in Pitch Tracker button on the take row' };
     btn.click();
     await wait(2500);
-    return Object.assign({ mode: state.mode }, RPStudio.ready());
+    return Object.assign({ mode: state.mode, dirty: dirty }, RPStudio.ready());
   });
+  if (oneTap.dirty && oneTap.dirty !== 'idle') console.log('    (the walk left the recorder ' + oneTap.dirty + '; reset first)');
   ok(!oneTap.err, 'a take row offers Open in Pitch Tracker' + (oneTap.err ? ' — ' + oneTap.err : ''));
   ok(oneTap.mode === 'free', 'one tap lands on the Pitch Tracker');
   ok(oneTap.loaded === true, 'and the take is already loaded');
@@ -361,7 +372,7 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
     RPStudio.api.play();                       /* the unsaved take, playing */
     await wait(900);
     const wasPlaying = RPStudio.playing;
-    const heldFirst = RPSound.holder();
+    const heldFirst = RPOneSound.holder();
     switchMode('lib');
     await wait(700);
     await libPlayAt([LIB.songs.find(x => x.id === 'onetap')], 0);
@@ -369,7 +380,7 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
     return { wasPlaying: wasPlaying, heldFirst: heldFirst,
              takeStillPlaying: RPStudio.playing,
              librarySounding: !libAudio.paused && !libAudio.ended,
-             holder: RPSound.holder() };
+             holder: RPOneSound.holder() };
   });
   ok(!snd.err, 'an unsaved take can be recorded and played back' + (snd.err ? ' — ' + snd.err : ''));
   ok(snd.wasPlaying === true, 'the unsaved take really was playing');
