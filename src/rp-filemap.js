@@ -178,12 +178,25 @@
 
      But a singer saying "s" between two vowels has not stopped singing. So
      a gap is closed only when the audio says it is one sound carrying on:
-     short (up to 0.15s), and with a voiced pitch either side of it within a
-     tone and a half. Silence cannot be bridged — there is no pitch at
-     either end to bridge from — and a real leap between two notes is left
-     as the break it is. ------------------------------------------------ */
+     short, and with a voiced pitch either side of it. Silence cannot be
+     bridged — there is no pitch at either end to bridge from.
+
+     How far apart the two sides may be is not a new judgement. The app
+     already has one: the line it draws breaks on a leap of more than six
+     semitones and carries on under that. A consonant between two notes a
+     fourth apart is one sung phrase, not two, and drawing it as one is what
+     the app does everywhere else. Anything wider is a real leap and stays
+     the break it is.
+
+     Measured on Robert's two recordings, 24 Sep: 23s and 13s of loud time
+     went unfollowed, over 243 and 154 separate stretches, and 17s and 11s
+     of that was in stretches under 0.15s. Nothing longer than 0.7s
+     anywhere. No missing section, no passage the tracker cannot hear -
+     hundreds of consonants, which is what a sung line is full of. The
+     length below is set from that: the bucket the time is actually in.
+     ------------------------------------------------------------------ */
   var GAP_MAX = 3;           /* 0.15s at twenty points a second */
-  var GAP_STEP = 1.5;        /* semitones the two sides may differ by */
+  var GAP_STEP = 6;          /* the same leap the drawing breaks the line on */
   function bridge(notes) {
     var n = notes.length, i, j;
     for (i = 0; i < n; i++) {
