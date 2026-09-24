@@ -40,6 +40,10 @@
     assign: null
   };
 
+  function claimSound(name, stop) {
+    try { if (window.RPSound) RPSound.claim(name, stop); } catch (e) {}
+  }
+
   function say(msg) {
     if (window.RP && RP.toast) RP.toast(msg);
     else if (window.libNotice) libNotice(msg);
@@ -458,6 +462,7 @@
     var b = blobNow();
     if (!b) return say('Nothing to listen to yet.');
     stopPlay();
+    claimSound('take-listen', function () { stopPlay(); draw(); });
     ST.url = URL.createObjectURL(b);
     ST.audio = new Audio(ST.url);
     ST.audio.play().catch(function () { say('The phone would not play it back.'); });
@@ -467,6 +472,9 @@
     var b = blobNow();
     if (!b) return say('Nothing to play.');
     stopPlay();
+    /* Robert, 24 Sep: this kept playing when he walked to the Library, and a
+       song there started on top of it. One owner of the sound now. */
+    claimSound('take-listen', function () { stopPlay(); draw(); });
     ST.url = URL.createObjectURL(b);
     ST.audio = new Audio(ST.url);
     ST.audio.onended = function () { ST.playing = false; ST.unfollow(); draw(); };
@@ -647,8 +655,7 @@
     if (!s) return say('Keep a take first.');
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
-    /* one thing in his headphones at a time */
-    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
+    claimSound('sing-along', function () { try { stopOver(); } catch (e) {} });
     (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
     try {
       var url = URL.createObjectURL(s.blob);
@@ -667,6 +674,36 @@
   }
 
   ST.singOver = loadTake;
+
+  /* Robert, 24 Sep: "Open in Pitch Tracker lands on the tracker but not
+     ready - I had to tap the take again from the tracker, then press
+     Record."
+
+     Three places did the same thing: switch screen, then guess at 250ms and
+     hope the panel had drawn and the microphone had opened. Neither was
+     waited for, so on a slower phone he arrived at a screen with no Record
+     button and no microphone. One way in instead, which does it in order
+     and waits for the parts that can be waited for. */
+  ST.openWith = async function (song) {
+    try { switchMode('free'); } catch (e) {}
+    mount(); mountTakes();                 /* Record exists before he looks */
+    try {
+      if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic();
+    } catch (e) {}
+    if (song) loadTake(song);
+    draw();
+    try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+    return ST.ready();
+  };
+  /* what "ready" means, so a test can ask rather than infer */
+  ST.ready = function () {
+    var rec = $('rpStRec');
+    return {
+      mic: !!(typeof MIC !== 'undefined' && MIC.on),
+      loaded: !!(ST.overlay && ST.overlay.notes && ST.overlay.notes.length),
+      canRecord: !!(rec && !rec.disabled && rec.offsetParent !== null)
+    };
+  };
 
   /* Robert, 16 Sep: a note map "played back as a guide". Same overlay as
      Sing over it, but the clock is a timer rather than a recording — an

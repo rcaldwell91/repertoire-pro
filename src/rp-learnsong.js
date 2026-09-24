@@ -123,6 +123,7 @@
      stops it for good; the phone going to sleep pauses it, the same way the
      Pitch Tracker already does. */
   function leave() {
+    try { if (window.RPSound) RPSound.release('learn-a-song'); } catch (e) {}
     if (!S.open && !S.playing) return;
     S.asleep = false; S.heldT = 0;
     stop(true);
@@ -259,7 +260,7 @@
       }
     };
     try {
-      buildNoteMap(S.song).then(function () {
+      RPFileMap.build(S.song).then(function () {
         done(!!(S.song.notes && S.song.notes.length));
       }).catch(function () { done(false); });
     } catch (e) { done(false); }
@@ -326,11 +327,14 @@
   function start() {
     var s = S.song;
     if (!s || S.playing) return;
+    /* Robert, 24 Sep: a song carrying a map from the old analyser is read
+       again with the live tracker the next time it is opened. */
+    if (window.RPFileMap && RPFileMap.needsBuild(s)) { autoMap(); return; }
     if (!(s.notes && s.notes.length)) { autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
     /* one thing in his headphones at a time */
-    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
+    try { if (window.RPSound) RPSound.claimResumable('learn-a-song', leave); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);

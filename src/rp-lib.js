@@ -490,11 +490,13 @@
     if (m) m.style.display = 'none';
     document.body.classList.remove('rp-mini-on');
   }
+  L.hideBar = function () { dismissed = true; hideMini(); };
   L.stopPlayer = function () {
     var a = audio();
     if (a) { try { a.pause(); } catch (e) {} }
     dismissed = true;
     hideMini();
+    try { if (window.RPSound) RPSound.release('library'); } catch (e) {}
     try { if (window.RPPage && RPPage.isOpen('np')) RPPage.back(); } catch (e) {}
   };
 
@@ -632,11 +634,8 @@
         so.title = 'Open the Pitch Tracker with this playing';
         so.onclick = function (ev) {
           ev.stopPropagation();
-          try { switchMode('free'); } catch (e) {}
-          setTimeout(function () {
-            if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s);
-            else try { console.warn('RP: RPStudio.singOver is not there'); } catch (e) {}
-          }, 260);
+          if (window.RPStudio && RPStudio.openWith) RPStudio.openWith(s);
+          else try { console.warn('RP: RPStudio.openWith is not there'); } catch (e) {}
         };
         tray.appendChild(so);
         if (s.notes && s.notes.length) {

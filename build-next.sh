@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js src/rp-piano.js src/rp-song.js src/rp-learnsong.js; do node --check "$f"; done
+for f in src/rp-sound.js src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js src/rp-piano.js src/rp-song.js src/rp-filemap.js src/rp-learnsong.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -936,6 +936,143 @@ window.rpNoteLag = function(song){
     #     screen but the Pitch Tracker, because gameFrame runs on all of them.
     #     Its sibling two thousand lines up was already guarded; this one was
     #     not. Found by the tap test, and live on index.html as well.
+    # 54. EVERY LIBRARY PLAY GOES THROUGH libLoad, so that is where the
+    #     Library takes the sound. Robert, 24 Sep: an unsaved take's
+    #     listen-back kept playing when he walked to the Library, and a song
+    #     there started on top of it.
+    ("""async function libLoad(song){
+  if(!song) return;
+  LIB.cur = song;""",
+     """async function libLoad(song){
+  if(!song) return;
+  try{ if(window.RPSound) RPSound.claim('library', ()=>{
+    try{ libAudio.pause(); }catch(e){}
+    try{ if(window.RPLib && RPLib.hideBar) RPLib.hideBar(); }catch(e){}
+  }); }catch(e){}
+  LIB.cur = song;"""),
+
+    # 53. The one remaining user-facing call into the old analyser. Nothing
+    #     the singer can press reaches it now.
+    ("""$('btnBuildMap').addEventListener('click', ()=>buildNoteMap(SONGLIB.song));""",
+     """$('btnBuildMap').addEventListener('click', ()=>{
+  const s = SONGLIB.song;
+  if(!s) return;
+  $('btnBuildMap').disabled = true;
+  RPFileMap.build(s).catch(err=>{
+    mapStatus('Could not read that file \\u2014 ' + (err && err.message || err), null);
+  }).then(()=>{
+    $('btnBuildMap').disabled = false;
+    try{ updateLibMapPanel(); libRender(); }catch(e){}
+  });
+});"""),
+
+    # 51. THE SAME EAR FOR A FILE AS FOR THE MICROPHONE.
+    #     Robert, 24 Sep: a take he recorded while a track played through the
+    #     speaker draws as a line that follows the singer. The same track
+    #     opened as a FILE drew as bars that miss the words. The live tracker
+    #     works; the file mapper had never been measured against a real voice.
+    #     So the YIN core comes out of detectPitch and becomes a function both
+    #     paths call. Not a copy of it - the same code, so a file cannot drift
+    #     away from what the microphone does.
+    ("""  micModelPoll(buf, sr);
+  // YIN: cumulative mean normalised difference over a 1024-sample window
+  const W = 1024;
+  const tmin = Math.max(2, Math.floor(sr/1400));
+  const tmax = Math.min(SIZE - W - 1, Math.floor(sr/65));
+  const d = new Float32Array(tmax+1);
+  for(let tau=tmin; tau<=tmax; tau++){
+    let s = 0;
+    for(let i=0;i<W;i++){ const df = buf[i] - buf[i+tau]; s += df*df; }
+    d[tau] = s;
+  }
+  let run = 0, best = -1, bestVal = 1;
+  const dp = new Float32Array(tmax+1);
+  for(let tau=tmin; tau<=tmax; tau++){
+    run += d[tau];
+    dp[tau] = run > 1e-12 ? d[tau]*(tau - tmin + 1)/run : 1;
+  }
+  for(let tau=tmin+1; tau<tmax; tau++){
+    if(dp[tau] < 0.15){
+      while(tau+1 < tmax && dp[tau+1] < dp[tau]) tau++;
+      best = tau; bestVal = dp[tau]; break;
+    }
+  }
+  if(best < 0){
+    for(let tau=tmin+1; tau<tmax; tau++)
+      if(dp[tau] < bestVal){ bestVal = dp[tau]; best = tau; }
+  }
+  if(best < tmin+1 || bestVal > NGATE.clarity){ PITCH_CACHE.f = -1; return -1; }
+  const x1 = dp[best-1], x2 = dp[best], x3 = dp[best+1] || x2;
+  const a = (x1 + x3 - 2*x2)/2, bq = (x3 - x1)/2;
+  let T0 = best;
+  if(Math.abs(a) > 1e-12){
+    const sh = -bq/(2*a);
+    if(sh > -1 && sh < 1) T0 = best + sh;
+  }
+  const freq = sr/T0;
+  if(freq < 60 || freq > 1400){ PITCH_CACHE.f = -1; return -1; }
+  PITCH_CACHE.f = freq;
+  return freq;
+}""",
+     """  micModelPoll(buf, sr);
+  const freq = yinHz(buf, sr);
+  PITCH_CACHE.f = freq;
+  return freq;
+}
+
+/* YIN, on one window of samples: cumulative mean normalised difference over
+   a 1024-sample lag search. Returns a frequency in Hz, or -1 for "nothing
+   clear enough here". The microphone calls this every frame; a file being
+   mapped calls the very same function, window by window, so the line the app
+   draws for a file is read by the same ear as the line it draws for a voice.
+   NGATE.clarity is the singer's own noise-gate setting and applies to both. */
+function yinHz(buf, sr){
+  const SIZE = buf.length;
+  const W = 1024;
+  const tmin = Math.max(2, Math.floor(sr/1400));
+  const tmax = Math.min(SIZE - W - 1, Math.floor(sr/65));
+  if(tmax <= tmin + 1) return -1;
+  const d = new Float32Array(tmax+1);
+  for(let tau=tmin; tau<=tmax; tau++){
+    let s = 0;
+    for(let i=0;i<W;i++){ const df = buf[i] - buf[i+tau]; s += df*df; }
+    d[tau] = s;
+  }
+  let run = 0, best = -1, bestVal = 1;
+  const dp = new Float32Array(tmax+1);
+  for(let tau=tmin; tau<=tmax; tau++){
+    run += d[tau];
+    dp[tau] = run > 1e-12 ? d[tau]*(tau - tmin + 1)/run : 1;
+  }
+  for(let tau=tmin+1; tau<tmax; tau++){
+    if(dp[tau] < 0.15){
+      while(tau+1 < tmax && dp[tau+1] < dp[tau]) tau++;
+      best = tau; bestVal = dp[tau]; break;
+    }
+  }
+  if(best < 0){
+    for(let tau=tmin+1; tau<tmax; tau++)
+      if(dp[tau] < bestVal){ bestVal = dp[tau]; best = tau; }
+  }
+  if(best < tmin+1 || bestVal > NGATE.clarity) return -1;
+  const x1 = dp[best-1], x2 = dp[best], x3 = dp[best+1] || x2;
+  const a = (x1 + x3 - 2*x2)/2, bq = (x3 - x1)/2;
+  let T0 = best;
+  if(Math.abs(a) > 1e-12){
+    const sh = -bq/(2*a);
+    if(sh > -1 && sh < 1) T0 = best + sh;
+  }
+  const freq = sr/T0;
+  if(freq < 60 || freq > 1400) return -1;
+  return freq;
+}"""),
+
+    # 52. A trace read off a file carries true file times — no microphone
+    #     between the sound and the reading, so no lag to take back off.
+    ("""  if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */""",
+     """  if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
+  if(song.notesFrom === 'trace') return 0;     /* read straight off the file */"""),
+
     # 50. THE FAINT INK WAS BELOW THE READABLE FLOOR IN BOTH THEMES.
     #     Found by the contrast sweep the moment it was written, on secondary
     #     text all over the app: 2.98:1 on a dark panel2, 2.62:1 on a light
@@ -1307,7 +1444,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-MODS = ('src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js', 'src/rp-piano.js', 'src/rp-song.js', 'src/rp-learnsong.js')
+MODS = ('src/rp-sound.js', 'src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js', 'src/rp-piano.js', 'src/rp-song.js', 'src/rp-filemap.js', 'src/rp-learnsong.js')
 for f in MODS:
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \

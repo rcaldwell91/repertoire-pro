@@ -136,11 +136,8 @@
         ev.stopPropagation();
         var s = T.get(b.dataset.over);
         if (!s) return;
-        try { switchMode('free'); } catch (e) {}
-        setTimeout(function () {
-          if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s);
-          else try { console.warn('RP: RPStudio.singOver is not there'); } catch (e) {}
-        }, 260);
+        if (window.RPStudio && RPStudio.openWith) RPStudio.openWith(s);
+        else try { console.warn('RP: RPStudio.openWith is not there'); } catch (e) {}
       });
     });
     root.querySelectorAll('[data-take]').forEach(function (r) {
@@ -189,8 +186,7 @@
         var cv = root.querySelector('#rpTakeCv');
         if (cv && window.RPMaps) RPMaps.draw(cv, { notes: s.notes, title: '' }, { height: 220 });
         on(root.querySelector('#rpTkOver'), 'click', function () {
-          try { switchMode('free'); } catch (e) {}
-          setTimeout(function () { if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s); }, 250);
+          if (window.RPStudio && RPStudio.openWith) RPStudio.openWith(s);
         });
         on(root.querySelector('#rpTkPlay'), 'click', function () { T.play(s); });
         on(root.querySelector('#rpTkMap'), 'click', function () { if (window.RPMaps) RPMaps.fromTake(s); });

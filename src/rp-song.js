@@ -481,8 +481,8 @@
   }
 
   /* ---- is this a voice on its own? --------------------------------- */
-  /* An acapella is the best case for mapping and nothing told him to say
-     so. A voice with no band under it has very little low end: no kick,
+  /* A voice on its own is the best case for mapping and nothing told him to
+     say so. A voice with no band under it has very little low end: no kick,
      no bass. Measure that rather than ask. */
   var sniffed = {};
   function sniff(s) {
@@ -511,8 +511,9 @@
         var frac = all > 0 ? Math.sqrt(lo / all) : 0;
         sniffed[s.id] = 'done';
         s.lowFrac = frac;
-        /* Only when it is not a close call. I have no real acapella and no
-           real full mix to calibrate against, so this ticks a box on a
+        /* Only when it is not a close call. Calibrated 24 Sep against two
+           voice-only recordings of Robert's, but still with no real full
+           mix to set the other end of the scale, so this ticks a box on a
            clear reading and says why; everything else is left to the
            singer, with the box in front of them rather than buried. */
         if (frac < 0.12 && !s.cleanVox) {
@@ -625,7 +626,7 @@
     var blob = new Blob(chunks, { type: chunks[0].type || 'audio/webm' });
     var tmp = { id: 'room_tmp', title: title, blob: blob, kind: 'recording', cleanVox: false, notes: null };
     try {
-      await buildNoteMap(tmp);
+      await RPFileMap.build(tmp);
       var notes = (tmp.notes || []).map(function (n) { return { t: n.t, m: n.m }; });
       if (!notes.length) throw new Error('no clear tune in what it heard');
       var m = RPMaps.save({ title: title, notes: notes, from: 'heard in the room',

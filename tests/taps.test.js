@@ -311,6 +311,73 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   ok(left.playing === false, 'nothing is playing after leaving by a bottom tab');
   ok(left.open === false, 'and the screen has let go');
 
+  /* Robert, 24 Sep: "Open in Pitch Tracker lands on the tracker but not
+     ready - I had to tap the take again from the tracker, then press
+     Record." One tap has to arrive with all three done. */
+  console.log('\none tap arrives ready');
+  const oneTap = await p.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const sr = 44100, n = sr * 4, pcm = new Int16Array(n);
+    for (let i = 0; i < n; i++) pcm[i] = Math.round(Math.sin(2 * Math.PI * 220 * i / sr) * 6000);
+    const h = new DataView(new ArrayBuffer(44));
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) h.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); h.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 1, true);
+    h.setUint32(24, sr, true); h.setUint32(28, sr * 2, true); h.setUint16(32, 2, true);
+    h.setUint16(34, 16, true); w(36, 'data'); h.setUint32(40, n * 2, true);
+    const notes = [];
+    for (let i = 0; i < 80; i++) notes.push({ t: +(i * 0.05).toFixed(2), m: 57 });
+    const song = { id: 'onetap', kind: 'recording', title: 'One tap', artist: 'My Recordings',
+      blob: new Blob([h.buffer, pcm.buffer], { type: 'audio/wav' }), addedAt: Date.now(),
+      notes: notes, notesFrom: 'live', duration: 4 };
+    await dbPut('songs', song);
+    if (!LIB.songs.some(x => x.id === 'onetap')) LIB.songs.push(song);
+    switchMode('lib');
+    try { RPLib.show('recordings'); } catch (e) {}
+    await wait(1200);
+    const btn = document.querySelector('[data-over="onetap"]');
+    if (!btn) return { err: 'no Open in Pitch Tracker button on the take row' };
+    btn.click();
+    await wait(2500);
+    return Object.assign({ mode: state.mode }, RPStudio.ready());
+  });
+  ok(!oneTap.err, 'a take row offers Open in Pitch Tracker' + (oneTap.err ? ' — ' + oneTap.err : ''));
+  ok(oneTap.mode === 'free', 'one tap lands on the Pitch Tracker');
+  ok(oneTap.loaded === true, 'and the take is already loaded');
+  ok(oneTap.mic === true, 'and the microphone is already on');
+  ok(oneTap.canRecord === true, 'and Record is there, ready to press');
+
+  /* Robert, 24 Sep: an unsaved take's listen-back kept playing when he went
+     to the Library, and a song there played on top of it. */
+  console.log('\none sound at a time');
+  const snd = await p.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    switchMode('free');
+    await wait(800);
+    try { await RPStudio.api.start(); } catch (e) { return { err: 'could not record: ' + e.message }; }
+    await wait(2200);
+    try { RPStudio.api.stop(); } catch (e) {}
+    await wait(1200);
+    RPStudio.api.play();                       /* the unsaved take, playing */
+    await wait(900);
+    const wasPlaying = RPStudio.playing;
+    const heldFirst = RPSound.holder();
+    switchMode('lib');
+    await wait(700);
+    await libPlayAt([LIB.songs.find(x => x.id === 'onetap')], 0);
+    await wait(1200);
+    return { wasPlaying: wasPlaying, heldFirst: heldFirst,
+             takeStillPlaying: RPStudio.playing,
+             librarySounding: !libAudio.paused && !libAudio.ended,
+             holder: RPSound.holder() };
+  });
+  ok(!snd.err, 'an unsaved take can be recorded and played back' + (snd.err ? ' — ' + snd.err : ''));
+  ok(snd.wasPlaying === true, 'the unsaved take really was playing');
+  ok(snd.heldFirst === 'take-listen', 'and it held the sound');
+  ok(snd.librarySounding === true, 'the Library song plays');
+  ok(snd.takeStillPlaying === false, 'and the unsaved take has stopped — not two at once');
+  ok(snd.holder === 'library', 'one owner, and it is the Library now');
+
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs[0] : ''));
 
   await browser.close();

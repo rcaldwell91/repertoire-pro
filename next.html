@@ -1702,10 +1702,23 @@ function detectPitch(){
   MIC.level = rms;
   if(rms < NGATE.level){ PITCH_CACHE.f = -1; return -1; }   // background noise gate
   micModelPoll(buf, sr);
-  // YIN: cumulative mean normalised difference over a 1024-sample window
+  const freq = yinHz(buf, sr);
+  PITCH_CACHE.f = freq;
+  return freq;
+}
+
+/* YIN, on one window of samples: cumulative mean normalised difference over
+   a 1024-sample lag search. Returns a frequency in Hz, or -1 for "nothing
+   clear enough here". The microphone calls this every frame; a file being
+   mapped calls the very same function, window by window, so the line the app
+   draws for a file is read by the same ear as the line it draws for a voice.
+   NGATE.clarity is the singer's own noise-gate setting and applies to both. */
+function yinHz(buf, sr){
+  const SIZE = buf.length;
   const W = 1024;
   const tmin = Math.max(2, Math.floor(sr/1400));
   const tmax = Math.min(SIZE - W - 1, Math.floor(sr/65));
+  if(tmax <= tmin + 1) return -1;
   const d = new Float32Array(tmax+1);
   for(let tau=tmin; tau<=tmax; tau++){
     let s = 0;
@@ -1728,7 +1741,7 @@ function detectPitch(){
     for(let tau=tmin+1; tau<tmax; tau++)
       if(dp[tau] < bestVal){ bestVal = dp[tau]; best = tau; }
   }
-  if(best < tmin+1 || bestVal > NGATE.clarity){ PITCH_CACHE.f = -1; return -1; }
+  if(best < tmin+1 || bestVal > NGATE.clarity) return -1;
   const x1 = dp[best-1], x2 = dp[best], x3 = dp[best+1] || x2;
   const a = (x1 + x3 - 2*x2)/2, bq = (x3 - x1)/2;
   let T0 = best;
@@ -1737,8 +1750,7 @@ function detectPitch(){
     if(sh > -1 && sh < 1) T0 = best + sh;
   }
   const freq = sr/T0;
-  if(freq < 60 || freq > 1400){ PITCH_CACHE.f = -1; return -1; }
-  PITCH_CACHE.f = freq;
+  if(freq < 60 || freq > 1400) return -1;
   return freq;
 }
 
@@ -2518,6 +2530,7 @@ window.rpNoteShape = function(notes){
 window.rpNoteLag = function(song){
   if(!song) return 0;
   if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
+  if(song.notesFrom === 'trace') return 0;     /* read straight off the file */
   if(song.notesFrom === 'live') return -window.rpMicLag();
   if(song.notesFrom === 'file' || song.mapVer) return window.RP_MAP_LEAD;
   return -window.rpMicLag();   /* no map version: a take's own live line */
@@ -3963,7 +3976,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '20 Sep 2026 · build 48c1cc7c';
+const APP_VERSION = '20 Sep 2026 · build 44207283';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -5263,7 +5276,17 @@ async function buildNoteMap(song){
     $('btnBuildMap').disabled = false;
   }
 }
-$('btnBuildMap').addEventListener('click', ()=>buildNoteMap(SONGLIB.song));
+$('btnBuildMap').addEventListener('click', ()=>{
+  const s = SONGLIB.song;
+  if(!s) return;
+  $('btnBuildMap').disabled = true;
+  RPFileMap.build(s).catch(err=>{
+    mapStatus('Could not read that file \u2014 ' + (err && err.message || err), null);
+  }).then(()=>{
+    $('btnBuildMap').disabled = false;
+    try{ updateLibMapPanel(); libRender(); }catch(e){}
+  });
+});
 $('cleanChk').addEventListener('change', ()=>{
   const s = SONGLIB.song;
   if(s && s.kind !== 'recording'){ s.cleanVox = $('cleanChk').checked; dbPut('songs', s).catch(()=>{}); }
@@ -5653,6 +5676,10 @@ async function libPlayAt(list, idx){
 }
 async function libLoad(song){
   if(!song) return;
+  try{ if(window.RPSound) RPSound.claim('library', ()=>{
+    try{ libAudio.pause(); }catch(e){}
+    try{ if(window.RPLib && RPLib.hideBar) RPLib.hideBar(); }catch(e){}
+  }); }catch(e){}
   LIB.cur = song;
   if(LIB.objUrl) URL.revokeObjectURL(LIB.objUrl);
   LIB.objUrl = URL.createObjectURL(song.blob);
@@ -11035,6 +11062,84 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 </style>
 <script>
 /* ======================================================================
+   Repertoire Pro — one thing makes a sound at a time.
+
+   Robert, 24 Sep: an unsaved take's listen-back kept playing when he went
+   to the Library, and a Library song then played on top of it. Two voices
+   in his headphones, and no obvious way to stop either.
+
+   Every part of the app that can make a sound had its own stop, and each
+   one only knew about itself. So there is now one owner. Anything about to
+   make a sound claims it first, and claiming it stops whatever held it
+   before — whoever that was. Nothing has to know about anything else.
+
+   The page going to the background pauses whatever holds it, and a screen
+   that is left lets go of it. Both are the same idea as the claim: the
+   sound belongs to the thing on screen, not to the app.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var S = window.RPSound = {};
+  var holder = null;          /* { name, stop } */
+  var quiet = false;          /* true while we are the ones doing the stopping */
+
+  /* Take the sound. Whoever had it is stopped first. `stop` is how this
+     owner is silenced later; it must be safe to call twice. */
+  S.claim = function (name, stop) {
+    if (holder && holder.name !== name) {
+      var prev = holder;
+      holder = null;
+      quiet = true;
+      try { prev.stop(); } catch (e) {}
+      quiet = false;
+    }
+    holder = { name: name, stop: stop || function () {} };
+    return name;
+  };
+
+  /* Give it up without stopping anything — for an owner that has already
+     stopped itself, or whose sound has ended. */
+  S.release = function (name) {
+    if (holder && holder.name === name) holder = null;
+  };
+
+  S.holder = function () { return holder ? holder.name : null; };
+
+  /* Silence whatever is making a sound, whoever it is. */
+  S.stopAll = function (except) {
+    if (!holder || holder.name === except) return;
+    var prev = holder;
+    holder = null;
+    quiet = true;
+    try { prev.stop(); } catch (e) {}
+    quiet = false;
+  };
+
+  /* true while a stop is being run by this module, so an owner's own stop
+     handler can tell "I was replaced" from "the singer pressed stop" */
+  S.stopping = function () { return quiet; };
+
+  document.addEventListener('visibilitychange', function () {
+    /* Robert's phone going to sleep is not a reason to keep singing at him.
+       Owners that can resume (Learn a song, the Pitch Tracker) handle sleep
+       themselves; this catches everything that cannot. */
+    if (!document.hidden) return;
+    if (!holder || holder.pausesItself) return;
+    S.stopAll();
+  });
+
+  /* An owner that knows how to pause and pick up again says so, and this
+     leaves it alone on sleep. */
+  S.claimResumable = function (name, stop) {
+    S.claim(name, stop);
+    if (holder) holder.pausesItself = true;
+    return name;
+  };
+})();
+
+</script>
+<script>
+/* ======================================================================
    Repertoire Pro — cloud layer (accounts, coach↔student, live assignments)
 
    This sits ON TOP of v10.1. It touches nothing in the build below it.
@@ -14817,6 +14922,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     assign: null
   };
 
+  function claimSound(name, stop) {
+    try { if (window.RPSound) RPSound.claim(name, stop); } catch (e) {}
+  }
+
   function say(msg) {
     if (window.RP && RP.toast) RP.toast(msg);
     else if (window.libNotice) libNotice(msg);
@@ -15235,6 +15344,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var b = blobNow();
     if (!b) return say('Nothing to listen to yet.');
     stopPlay();
+    claimSound('take-listen', function () { stopPlay(); draw(); });
     ST.url = URL.createObjectURL(b);
     ST.audio = new Audio(ST.url);
     ST.audio.play().catch(function () { say('The phone would not play it back.'); });
@@ -15244,6 +15354,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var b = blobNow();
     if (!b) return say('Nothing to play.');
     stopPlay();
+    /* Robert, 24 Sep: this kept playing when he walked to the Library, and a
+       song there started on top of it. One owner of the sound now. */
+    claimSound('take-listen', function () { stopPlay(); draw(); });
     ST.url = URL.createObjectURL(b);
     ST.audio = new Audio(ST.url);
     ST.audio.onended = function () { ST.playing = false; ST.unfollow(); draw(); };
@@ -15424,8 +15537,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!s) return say('Keep a take first.');
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
-    /* one thing in his headphones at a time */
-    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
+    claimSound('sing-along', function () { try { stopOver(); } catch (e) {} });
     (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
     try {
       var url = URL.createObjectURL(s.blob);
@@ -15444,6 +15556,36 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   ST.singOver = loadTake;
+
+  /* Robert, 24 Sep: "Open in Pitch Tracker lands on the tracker but not
+     ready - I had to tap the take again from the tracker, then press
+     Record."
+
+     Three places did the same thing: switch screen, then guess at 250ms and
+     hope the panel had drawn and the microphone had opened. Neither was
+     waited for, so on a slower phone he arrived at a screen with no Record
+     button and no microphone. One way in instead, which does it in order
+     and waits for the parts that can be waited for. */
+  ST.openWith = async function (song) {
+    try { switchMode('free'); } catch (e) {}
+    mount(); mountTakes();                 /* Record exists before he looks */
+    try {
+      if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic();
+    } catch (e) {}
+    if (song) loadTake(song);
+    draw();
+    try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+    return ST.ready();
+  };
+  /* what "ready" means, so a test can ask rather than infer */
+  ST.ready = function () {
+    var rec = $('rpStRec');
+    return {
+      mic: !!(typeof MIC !== 'undefined' && MIC.on),
+      loaded: !!(ST.overlay && ST.overlay.notes && ST.overlay.notes.length),
+      canRecord: !!(rec && !rec.disabled && rec.offsetParent !== null)
+    };
+  };
 
   /* Robert, 16 Sep: a note map "played back as a guide". Same overlay as
      Sing over it, but the clock is a timer rather than a recording — an
@@ -20424,11 +20566,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (m) m.style.display = 'none';
     document.body.classList.remove('rp-mini-on');
   }
+  L.hideBar = function () { dismissed = true; hideMini(); };
   L.stopPlayer = function () {
     var a = audio();
     if (a) { try { a.pause(); } catch (e) {} }
     dismissed = true;
     hideMini();
+    try { if (window.RPSound) RPSound.release('library'); } catch (e) {}
     try { if (window.RPPage && RPPage.isOpen('np')) RPPage.back(); } catch (e) {}
   };
 
@@ -20566,11 +20710,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         so.title = 'Open the Pitch Tracker with this playing';
         so.onclick = function (ev) {
           ev.stopPropagation();
-          try { switchMode('free'); } catch (e) {}
-          setTimeout(function () {
-            if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s);
-            else try { console.warn('RP: RPStudio.singOver is not there'); } catch (e) {}
-          }, 260);
+          if (window.RPStudio && RPStudio.openWith) RPStudio.openWith(s);
+          else try { console.warn('RP: RPStudio.openWith is not there'); } catch (e) {}
         };
         tray.appendChild(so);
         if (s.notes && s.notes.length) {
@@ -22159,8 +22300,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* ---- play as a guide: the Pitch Tracker, gold notes, your voice over ---- */
   M.guide = function (map) {
     if (!window.RPStudio || !RPStudio.guide) return say('The Pitch Tracker is not ready.');
-    try { switchMode('free'); } catch (e) {}
-    setTimeout(function () { RPStudio.guide(map.notes, map.title, map.dur); }, 250);
+    /* the same one way in: the screen, the panel and the microphone, in
+       order, before the map starts - not a 250ms guess at all three */
+    RPStudio.openWith(null).then(function () {
+      RPStudio.guide(map.notes, map.title, map.dur);
+    });
   };
 
   /* ---- the Library: a Maps chip and a row per map (rp-lib asks for these) ---- */
@@ -22316,11 +22460,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         ev.stopPropagation();
         var s = T.get(b.dataset.over);
         if (!s) return;
-        try { switchMode('free'); } catch (e) {}
-        setTimeout(function () {
-          if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s);
-          else try { console.warn('RP: RPStudio.singOver is not there'); } catch (e) {}
-        }, 260);
+        if (window.RPStudio && RPStudio.openWith) RPStudio.openWith(s);
+        else try { console.warn('RP: RPStudio.openWith is not there'); } catch (e) {}
       });
     });
     root.querySelectorAll('[data-take]').forEach(function (r) {
@@ -22369,8 +22510,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         var cv = root.querySelector('#rpTakeCv');
         if (cv && window.RPMaps) RPMaps.draw(cv, { notes: s.notes, title: '' }, { height: 220 });
         on(root.querySelector('#rpTkOver'), 'click', function () {
-          try { switchMode('free'); } catch (e) {}
-          setTimeout(function () { if (window.RPStudio && RPStudio.singOver) RPStudio.singOver(s); }, 250);
+          if (window.RPStudio && RPStudio.openWith) RPStudio.openWith(s);
         });
         on(root.querySelector('#rpTkPlay'), 'click', function () { T.play(s); });
         on(root.querySelector('#rpTkMap'), 'click', function () { if (window.RPMaps) RPMaps.fromTake(s); });
@@ -23348,8 +23488,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   }
 
   /* ---- is this a voice on its own? --------------------------------- */
-  /* An acapella is the best case for mapping and nothing told him to say
-     so. A voice with no band under it has very little low end: no kick,
+  /* A voice on its own is the best case for mapping and nothing told him to
+     say so. A voice with no band under it has very little low end: no kick,
      no bass. Measure that rather than ask. */
   var sniffed = {};
   function sniff(s) {
@@ -23378,8 +23518,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         var frac = all > 0 ? Math.sqrt(lo / all) : 0;
         sniffed[s.id] = 'done';
         s.lowFrac = frac;
-        /* Only when it is not a close call. I have no real acapella and no
-           real full mix to calibrate against, so this ticks a box on a
+        /* Only when it is not a close call. Calibrated 24 Sep against two
+           voice-only recordings of Robert's, but still with no real full
+           mix to set the other end of the scale, so this ticks a box on a
            clear reading and says why; everything else is left to the
            singer, with the box in front of them rather than buried. */
         if (frac < 0.12 && !s.cleanVox) {
@@ -23492,7 +23633,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var blob = new Blob(chunks, { type: chunks[0].type || 'audio/webm' });
     var tmp = { id: 'room_tmp', title: title, blob: blob, kind: 'recording', cleanVox: false, notes: null };
     try {
-      await buildNoteMap(tmp);
+      await RPFileMap.build(tmp);
       var notes = (tmp.notes || []).map(function (n) { return { t: n.t, m: n.m }; });
       if (!notes.length) throw new Error('no clear tune in what it heard');
       var m = RPMaps.save({ title: title, notes: notes, from: 'heard in the room',
@@ -23567,6 +23708,242 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     }
     if (n > 3000) clearInterval(iv);
   }, 500);
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — reading a file with the same ear as the microphone.
+
+   Robert, 24 Sep: "for a file, draw the line the app HEARS, not bars."
+
+   The evidence was his own: a take he recorded while a track played out of
+   a speaker draws as a gold line that follows the singer. The same track
+   opened as a FILE drew as bars that missed the words. The live tracker
+   works. The old file mapper — a different algorithm, written separately —
+   had never once been measured against a real voice, and it was the thing
+   that was wrong.
+
+   So a file is now read the way a microphone is read. Not a similar method:
+   the same yinHz() the live path calls, the same noise gate, the same
+   octave anchor from the pitch model, the same median-of-five smoothing,
+   twenty points a second. What comes out is the same shape of thing a take
+   carries — {t, m} with no duration — so every screen already draws it as a
+   line, because that is how a take is drawn.
+
+   Two differences from the live path, both deliberate:
+
+     - the window is CENTRED on the point's own time rather than trailing
+       behind it. A microphone can only look backwards; a file can be looked
+       at from both sides, and the honest time for a pitch is the middle of
+       the window it was read from. It is why a file's trace needs no lag
+       taken off it and a take's does.
+     - the pitch model runs over the whole file in one batch instead of one
+       frame at a time. Same model, same frames, same 220ms spacing — a
+       worker handed all of them at once rather than pestered live.
+
+   The old analyser is still in the build. Nothing the singer can reach
+   calls it until it passes the singer test.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var F = window.RPFileMap = {};
+
+  var HOP = 0.05;            /* twenty points a second, same as a take     */
+  var WIN = 4096;            /* the analyser's own window, from base.html  */
+  var ANCHOR = 0.22;         /* the pitch model's spacing on the live path */
+  var TRACE_VER = 1;
+
+  /* ---- is this song's map the old kind? ------------------------------ */
+  F.needsBuild = function (song) {
+    if (!song || !song.blob) return false;
+    if (!song.notes || !song.notes.length) return true;
+    if (song.notesFrom === 'trace' && song.traceVer === TRACE_VER) return false;
+    return true;            /* a bar map from the old analyser: read again */
+  };
+
+  function status(msg, frac) {
+    try { if (typeof mapStatus === 'function') mapStatus(msg, frac); } catch (e) {}
+  }
+
+  /* ---- the pitch model, over the whole file at once ------------------- */
+  function anchors(mono, sr, n, onFrac) {
+    /* same 1024-sample, 64ms frame the live poll builds, at the same
+       spacing, handed to the same model in the same worker */
+    return new Promise(function (resolve) {
+      var specs = null, data = null;
+      try { specs = CREPE_SPECS; data = crepeWeights(); } catch (e) {}
+      if (!specs || !data || !data.length) return resolve(null);
+      var frames = new Float32Array(n * 1024);
+      var need = Math.round(0.064 * sr), step = need / 1024;
+      for (var k = 0; k < n; k++) {
+        var mid = k * ANCHOR * sr, off = mid - need / 2;
+        for (var i = 0; i < 1024; i++) {
+          var sp = off + i * step, lo = Math.floor(sp), fr = sp - lo;
+          var a = (lo >= 0 && lo < mono.length) ? mono[lo] : 0;
+          var b = (lo + 1 >= 0 && lo + 1 < mono.length) ? mono[lo + 1] : 0;
+          frames[k * 1024 + i] = a + (b - a) * fr;
+        }
+      }
+      var url = null, w = null, done = false;
+      var give = function (v) { if (done) return; done = true;
+        try { if (w) w.terminate(); } catch (e) {}
+        try { if (url) URL.revokeObjectURL(url); } catch (e) {}
+        resolve(v); };
+      try {
+        url = URL.createObjectURL(new Blob([ANALYZER_SRC], { type: 'text/javascript' }));
+        w = new Worker(url);
+        w.onmessage = function (e) { give({ midi: e.data.midi, conf: e.data.conf }); };
+        w.onerror = function () { give(null); };
+        w.postMessage({ type: 'crepeBatch', specs: specs, data: data, frames: frames },
+                      [data.buffer, frames.buffer]);
+      } catch (e) { give(null); }
+      if (onFrac) onFrac(1);
+    });
+  }
+
+  /* ---- the trace ------------------------------------------------------ */
+  F.build = async function (song) {
+    if (!song || !song.blob) throw new Error('nothing to read');
+    ensureCtx();
+    status('Reading the file…', 0.02);
+    var decoded = await ctx.decodeAudioData((await song.blob.arrayBuffer()).slice(0));
+    var sr = decoded.sampleRate, len = decoded.length;
+    var L = decoded.getChannelData(0);
+    var R = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : L;
+    var mono = new Float32Array(len);
+    for (var i = 0; i < len; i++) mono[i] = (L[i] + R[i]) / 2;
+
+    status('Listening with the pitch model…', 0.06);
+    var nA = Math.max(1, Math.floor(decoded.duration / ANCHOR));
+    var anc = await anchors(mono, sr, nA);
+
+    status('Following the voice…', 0.3);
+    var steps = Math.floor(decoded.duration / HOP);
+    var win = new Float32Array(WIN);
+    var notes = [], hist = [];
+    var gateLevel = 0.004, gateOn = true;
+    try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
+
+    for (var k = 0; k < steps; k++) {
+      var t = k * HOP;
+      /* the window sits centred on t, so the pitch is dated where it sounded */
+      var start = Math.round(t * sr) - (WIN >> 1);
+      var rms = 0, j, sp2;
+      for (j = 0; j < WIN; j++) {
+        sp2 = start + j;
+        var v = (sp2 >= 0 && sp2 < len) ? mono[sp2] : 0;
+        win[j] = v; rms += v * v;
+      }
+      rms = Math.sqrt(rms / WIN);
+
+      var m = null;
+      if (!gateOn || rms >= gateLevel) {
+        var f = yinHz(win, sr);
+        if (f > 0) {
+          m = freqMidi(f);
+          /* the same octave snap the live path makes, from the same model */
+          if (anc) {
+            var ai = Math.round(t / ANCHOR);
+            if (ai >= 0 && ai < anc.midi.length && anc.conf[ai] >= 0.5) {
+              var am = anc.midi[ai], ks = [-24, -12, 12, 24];
+              for (var z = 0; z < 4; z++) {
+                if (Math.abs(m + ks[z] - am) < 1.5 && Math.abs(m - am) > 4) { m += ks[z]; break; }
+              }
+            }
+          }
+        }
+      }
+      if (m == null) { hist.length = 0; }
+      else {
+        hist.push(m);
+        if (hist.length > 5) hist.shift();
+        var s2 = hist.slice().sort(function (a, b) { return a - b; });
+        m = s2[Math.floor(s2.length / 2)];
+      }
+      notes.push({ t: +t.toFixed(2), m: m == null ? null : +m.toFixed(2) });
+      if ((k & 255) === 0) {
+        status('Following the voice…', 0.3 + 0.65 * (k / steps));
+        await new Promise(function (r) { setTimeout(r, 0); });   /* let the page breathe */
+      }
+    }
+
+    notes = bridge(notes);
+    song.notes = notes;
+    song.notesFrom = 'trace';
+    song.traceVer = TRACE_VER;
+    song.noteFloor = null;
+    delete song.mapVer;                  /* it is not a bar map any more */
+    song.bubbles = F.bubbles(notes);
+    try { await dbPut('songs', song); } catch (e) {}
+
+    var voiced = notes.filter(function (p) { return p.m != null; }).length;
+    status('Done — ' + Math.round(voiced * HOP) + 's of singing found. Press Start.', null);
+    return song;
+  };
+
+  /* ---- consonants ----------------------------------------------------
+     Measured 24 Sep on two of Robert's own recordings: where the file is
+     clearly voice, the tracker followed 85.0% and 92.9% of it. The noise
+     gate turned out to be innocent — it stopped 0.1% and 0.0%. Everything
+     else was YIN finding no clear pitch, which is the correct answer for an
+     "s" or a "t": those sounds have no pitch to find, and loosening the
+     clarity gate to cover them would only invent one.
+
+     But a singer saying "s" between two vowels has not stopped singing. So
+     a gap is closed only when the audio says it is one sound carrying on:
+     short (up to 0.15s), and with a voiced pitch either side of it within a
+     tone and a half. Silence cannot be bridged — there is no pitch at
+     either end to bridge from — and a real leap between two notes is left
+     as the break it is. ------------------------------------------------ */
+  var GAP_MAX = 3;           /* 0.15s at twenty points a second */
+  var GAP_STEP = 1.5;        /* semitones the two sides may differ by */
+  function bridge(notes) {
+    var n = notes.length, i, j;
+    for (i = 0; i < n; i++) {
+      if (notes[i].m != null) continue;
+      var a = i - 1;
+      if (a < 0 || notes[a].m == null) continue;
+      j = i;
+      while (j < n && notes[j].m == null) j++;
+      if (j >= n) break;
+      var span = j - i;
+      if (span > GAP_MAX) { i = j - 1; continue; }
+      var m0 = notes[a].m, m1 = notes[j].m;
+      if (Math.abs(m1 - m0) > GAP_STEP) { i = j - 1; continue; }
+      for (var k = i; k < j; k++) {
+        var f = (k - a) / (j - a);
+        notes[k].m = +(m0 + (m1 - m0) * f).toFixed(2);
+        notes[k].bridged = 1;
+      }
+      i = j - 1;
+    }
+    return notes;
+  }
+
+  /* ---- step 2: notes cut from the line, not from the old analyser -----
+     A run where the pitch holds inside one semitone for at least 0.15s is
+     one sung note. Nothing shows these yet: they ship when the singer test
+     says at least 85% of the sung time lands inside one. --------------- */
+  F.bubbles = function (notes) {
+    var out = [], i = 0, n = notes.length;
+    while (i < n) {
+      if (notes[i].m == null) { i++; continue; }
+      var j = i, lo = notes[i].m, hi = notes[i].m, sum = notes[i].m, cnt = 1;
+      while (j + 1 < n && notes[j + 1].m != null) {
+        var m2 = notes[j + 1].m;
+        var nlo = Math.min(lo, m2), nhi = Math.max(hi, m2);
+        if (nhi - nlo > 1) break;            /* it has moved off this note */
+        lo = nlo; hi = nhi; sum += m2; cnt++; j++;
+      }
+      var dur = (j - i + 1) * HOP;
+      if (dur >= 0.15) {
+        out.push({ m: Math.round(sum / cnt), t: +(notes[i].t).toFixed(2), d: +dur.toFixed(2) });
+      }
+      i = j + 1;
+    }
+    return out;
+  };
 })();
 
 </script>
@@ -23696,6 +24073,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      stops it for good; the phone going to sleep pauses it, the same way the
      Pitch Tracker already does. */
   function leave() {
+    try { if (window.RPSound) RPSound.release('learn-a-song'); } catch (e) {}
     if (!S.open && !S.playing) return;
     S.asleep = false; S.heldT = 0;
     stop(true);
@@ -23832,7 +24210,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       }
     };
     try {
-      buildNoteMap(S.song).then(function () {
+      RPFileMap.build(S.song).then(function () {
         done(!!(S.song.notes && S.song.notes.length));
       }).catch(function () { done(false); });
     } catch (e) { done(false); }
@@ -23899,11 +24277,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function start() {
     var s = S.song;
     if (!s || S.playing) return;
+    /* Robert, 24 Sep: a song carrying a map from the old analyser is read
+       again with the live tracker the next time it is opened. */
+    if (window.RPFileMap && RPFileMap.needsBuild(s)) { autoMap(); return; }
     if (!(s.notes && s.notes.length)) { autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
     /* one thing in his headphones at a time */
-    try { if (window.RPLib && RPLib.stopPlayer) RPLib.stopPlayer(); } catch (e) {}
+    try { if (window.RPSound) RPSound.claimResumable('learn-a-song', leave); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);

@@ -197,8 +197,11 @@
   /* ---- play as a guide: the Pitch Tracker, gold notes, your voice over ---- */
   M.guide = function (map) {
     if (!window.RPStudio || !RPStudio.guide) return say('The Pitch Tracker is not ready.');
-    try { switchMode('free'); } catch (e) {}
-    setTimeout(function () { RPStudio.guide(map.notes, map.title, map.dur); }, 250);
+    /* the same one way in: the screen, the panel and the microphone, in
+       order, before the map starts - not a 250ms guess at all three */
+    RPStudio.openWith(null).then(function () {
+      RPStudio.guide(map.notes, map.title, map.dur);
+    });
   };
 
   /* ---- the Library: a Maps chip and a row per map (rp-lib asks for these) ---- */
