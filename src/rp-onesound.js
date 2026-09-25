@@ -25,9 +25,18 @@
   var holder = null;          /* { name, stop } */
   var quiet = false;          /* true while we are the ones doing the stopping */
 
+  /* Robert, 25 Sep: he opened a song, went to another tab while it was
+     being read, and it started playing there when the reading finished.
+     The pause below only fires at the moment the page is hidden, so a sound
+     that STARTS while it is already hidden was never caught. Nothing starts
+     while the page is hidden: a claim is refused (it returns null and the
+     caller does not play), and so is any audio element asked to play. */
+  S.hidden = function () { return !!document.hidden; };
+
   /* Take the sound. Whoever had it is stopped first. `stop` is how this
      owner is silenced later; it must be safe to call twice. */
   S.claim = function (name, stop) {
+    if (document.hidden) return null;
     if (holder && holder.name !== name) {
       var prev = holder;
       holder = null;
@@ -73,8 +82,26 @@
   /* An owner that knows how to pause and pick up again says so, and this
      leaves it alone on sleep. */
   S.claimResumable = function (name, stop) {
-    S.claim(name, stop);
+    if (!S.claim(name, stop)) return null;
     if (holder) holder.pausesItself = true;
     return name;
   };
+
+  (function () {
+    var P = window.HTMLMediaElement && HTMLMediaElement.prototype;
+    if (!P || P.play.rpHiddenGuard) return;
+    var real = P.play;
+    var guarded = function () {
+      if (document.hidden) {
+        try { this.pause(); } catch (e) {}
+        var err;
+        try { err = new DOMException('Nothing starts while the page is hidden.', 'NotAllowedError'); }
+        catch (e) { err = new Error('Nothing starts while the page is hidden.'); }
+        return Promise.reject(err);
+      }
+      return real.apply(this, arguments);
+    };
+    guarded.rpHiddenGuard = true;
+    P.play = guarded;
+  })();
 })();

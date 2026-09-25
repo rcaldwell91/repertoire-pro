@@ -864,6 +864,28 @@ window.rpPinLaneToNotes = function(cnv, notes, pad){
   pad = (pad == null) ? 3 : pad;
   return window.rpPinLane(cnv, lo-pad, hi+pad);
 };
+/* Robert, 25 Sep: a song may start while it is still being read, and the
+   window is still decided before Start and held. Only its first seconds
+   are known then, so the window is those notes and the singer's own range
+   together, with a little more room: what is still to come is sung by the
+   same voice, so it most likely lands inside. */
+window.rpPinLaneToPartial = function(cnv, notes, pad){
+  if(!cnv) return null;
+  let lo = 127, hi = 0;
+  for(let i=0;i<(notes ? notes.length : 0);i++){
+    const m = notes[i] && notes[i].m;
+    if(m == null || !isFinite(m)) continue;
+    if(m < lo) lo = m;
+    if(m > hi) hi = m;
+  }
+  try{
+    const r = window.RPRange && RPRange.get ? RPRange.get() : null;
+    if(r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo){ lo = Math.min(lo, r.lo); hi = Math.max(hi, r.hi); }
+  }catch(e){}
+  if(hi < lo) return null;
+  pad = (pad == null) ? 5 : pad;
+  return window.rpPinLane(cnv, lo-pad, hi+pad);
+};
 
 /* ---- the two clocks, both measured 17 Sep ---------------------------
    On a file whose notes begin at exactly 1.2 s intervals:

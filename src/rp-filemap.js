@@ -74,40 +74,133 @@
     try { if (typeof mapStatus === 'function') mapStatus(msg, frac); } catch (e) {}
   }
 
-  /* ---- the pitch model, over the whole file at once ------------------- */
-  function anchors(mono, sr, n, onFrac) {
-    /* same 1024-sample, 64ms frame the live poll builds, at the same
-       spacing, handed to the same model in the same worker */
-    return new Promise(function (resolve) {
-      var specs = null, data = null;
-      try { specs = CREPE_SPECS; data = crepeWeights(); } catch (e) {}
-      if (!specs || !data || !data.length) return resolve(null);
-      var frames = new Float32Array(n * 1024);
-      var need = Math.round(0.064 * sr), step = need / 1024;
-      for (var k = 0; k < n; k++) {
-        var mid = k * ANCHOR * sr, off = mid - need / 2;
-        for (var i = 0; i < 1024; i++) {
-          var sp = off + i * step, lo = Math.floor(sp), fr = sp - lo;
-          var a = (lo >= 0 && lo < mono.length) ? mono[lo] : 0;
-          var b = (lo + 1 >= 0 && lo + 1 < mono.length) ? mono[lo + 1] : 0;
-          frames[k * 1024 + i] = a + (b - a) * fr;
+  /* ---- the pitch model, a few seconds at a time, on several workers ---
+     Robert, 25 Sep: All of Me sat at "Waiting to be read - 0%" for
+     minutes. Measured that day on the test browser: 109s to read it, 102s
+     of that in the pitch model, run over the whole song in one go on one
+     worker with no progress in between. The trace itself took under 5s.
+
+     The model cannot simply be left out: on his two recordings it corrects
+     4.6% and 5.2% of the sung points, about half of them whole octaves. So
+     it runs the way the reading now needs it - a couple of seconds of the
+     song per batch, on as many workers as the phone has cores to spare -
+     and the conv layer below does the same arithmetic as the one in the
+     analyser, four filters by four positions at a time so each number
+     loaded is used sixteen times. Same weights, same frames, same answers
+     (checked to the last decimal the trace keeps); 74ms a frame became
+     24ms on the test machine. It replaces the analyser's own layer only
+     inside the workers started here; the live microphone path is as it
+     was. */
+  function crepeLayer(x, L, lay) {
+    var K = lay.K, Cin = lay.Cin, Cout = lay.Cout, stride = lay.stride;
+    var outLen = Math.ceil(L / stride);
+    var total = Math.max((outLen - 1) * stride + K - L, 0), pl = total >> 1;
+    var xp = new Float32Array((L + total) * Cin + 3 * stride * Cin);
+    xp.set(x.subarray(0, L * Cin), pl * Cin);
+    var y = new Float32Array(outLen * Cout);
+    var KC = K * Cin, kf = lay.kf, bias = lay.bias, scale = lay.scale, shift = lay.shift;
+    var SC = stride * Cin, acc = new Float64Array(16), p, j, t, q, pp;
+    for (p = 0; p < outLen; p += 4) {
+      var b0 = p * SC, b1 = b0 + SC, b2 = b1 + SC, b3 = b2 + SC;
+      for (j = 0; j < Cout; j += 4) {
+        var r0 = j * KC, r1 = r0 + KC, r2 = r1 + KC, r3 = r2 + KC;
+        var a0 = 0, a1 = 0, a2 = 0, a3 = 0, c0 = 0, c1 = 0, c2 = 0, c3 = 0;
+        var d0 = 0, d1 = 0, d2 = 0, d3 = 0, e0 = 0, e1 = 0, e2 = 0, e3 = 0;
+        for (t = 0; t < KC; t++) {
+          var k0 = kf[r0 + t], k1 = kf[r1 + t], k2 = kf[r2 + t], k3 = kf[r3 + t];
+          var u = xp[b0 + t]; a0 += u * k0; a1 += u * k1; a2 += u * k2; a3 += u * k3;
+          u = xp[b1 + t]; c0 += u * k0; c1 += u * k1; c2 += u * k2; c3 += u * k3;
+          u = xp[b2 + t]; d0 += u * k0; d1 += u * k1; d2 += u * k2; d3 += u * k3;
+          u = xp[b3 + t]; e0 += u * k0; e1 += u * k1; e2 += u * k2; e3 += u * k3;
+        }
+        acc[0] = a0; acc[1] = a1; acc[2] = a2; acc[3] = a3; acc[4] = c0; acc[5] = c1; acc[6] = c2; acc[7] = c3;
+        acc[8] = d0; acc[9] = d1; acc[10] = d2; acc[11] = d3; acc[12] = e0; acc[13] = e1; acc[14] = e2; acc[15] = e3;
+        for (pp = 0; pp < 4 && p + pp < outLen; pp++) {
+          var o = (p + pp) * Cout;
+          for (q = 0; q < 4; q++) {
+            var s = acc[pp * 4 + q] + bias[j + q];
+            if (s < 0) s = 0;                       /* relu, then batch-norm */
+            y[o + j + q] = s * scale[j + q] + shift[j + q];
+          }
         }
       }
-      var url = null, w = null, done = false;
-      var give = function (v) { if (done) return; done = true;
-        try { if (w) w.terminate(); } catch (e) {}
-        try { if (url) URL.revokeObjectURL(url); } catch (e) {}
-        resolve(v); };
+    }
+    var half = outLen >> 1, z = new Float32Array(half * Cout);
+    for (p = 0; p < half; p++)
+      for (j = 0; j < Cout; j++) {
+        var a = y[(2 * p) * Cout + j], b = y[(2 * p + 1) * Cout + j];
+        z[p * Cout + j] = a > b ? a : b;
+      }
+    return { x: z, L: half };
+  }
+
+  var POOL = null;
+  function pool() {
+    if (POOL) return POOL;
+    POOL = { slots: [], url: null };
+    var ok = false;
+    try { ok = !!(CREPE_SPECS && typeof crepeWeights === 'function' && typeof ANALYZER_SRC === 'string'); } catch (e) {}
+    if (!ok) return POOL;
+    /* every layer has a multiple of four filters; if a model ever did not,
+       the analyser's own layer is left in charge */
+    var src = ANALYZER_SRC;
+    try {
+      var fours = CREPE_SPECS.filter(function (s) { return /conv\d\/kernel$/.test(s.name); })
+        .every(function (s) { return s.shape[3] % 4 === 0; });
+      if (fours) src += '\n' + crepeLayer.toString();
+    } catch (e) {}
+    try { POOL.url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' })); } catch (e) { return POOL; }
+    var hc = (navigator && navigator.hardwareConcurrency) || 2;
+    var n = Math.max(1, Math.min(4, hc - 1));
+    for (var i = 0; i < n; i++) POOL.slots.push({ w: null, busy: false, warm: false });
+    return POOL;
+  }
+  /* one batch of 1024-sample frames through the model; resolves null if a
+     worker cannot be had, which means "no anchor here", as before */
+  function ancBatch(slot, frames) {
+    return new Promise(function (resolve) {
+      var P = pool();
+      if (!P.url) return resolve(null);
+      slot.busy = true;
+      var give = function (v) { slot.busy = false; resolve(v); };
       try {
-        url = URL.createObjectURL(new Blob([ANALYZER_SRC], { type: 'text/javascript' }));
-        w = new Worker(url);
-        w.onmessage = function (e) { give({ midi: e.data.midi, conf: e.data.conf }); };
-        w.onerror = function () { give(null); };
-        w.postMessage({ type: 'crepeBatch', specs: specs, data: data, frames: frames },
-                      [data.buffer, frames.buffer]);
+        if (!slot.w) { slot.w = new Worker(P.url); slot.warm = false; }
+        var w = slot.w;
+        w.onmessage = function (e) { slot.warm = true; give({ midi: e.data.midi, conf: e.data.conf }); };
+        w.onerror = function () { try { w.terminate(); } catch (x) {} slot.w = null; give(null); };
+        var data = slot.warm ? null : crepeWeights();
+        w.postMessage({ type: 'crepeBatch', specs: CREPE_SPECS, data: data, frames: frames },
+                      data ? [data.buffer, frames.buffer] : [frames.buffer]);
       } catch (e) { give(null); }
-      if (onFrac) onFrac(1);
     });
+  }
+  /* Starting a worker and building the model in it took 1.8s of the first
+     three at phone speed, before a single note could be read. So the
+     workers are started and the model built in them a few seconds after
+     the app opens, when nothing else is happening; opening a song then
+     goes straight to reading it. */
+  F.warm = function () {
+    var P = pool();
+    P.slots.forEach(function (slot) { if (!slot.w && !slot.busy) ancBatch(slot, new Float32Array(0)); });
+  };
+  setTimeout(function () {
+    try { (window.requestIdleCallback || setTimeout)(function () { F.warm(); }); } catch (e) {}
+  }, 4000);
+
+  /* the same 1024-sample, 64ms frame the live poll builds */
+  function ancFrames(mono, sr, a0, a1) {
+    var need = Math.round(0.064 * sr), step = need / 1024, len = mono.length;
+    var frames = new Float32Array((a1 - a0) * 1024);
+    for (var k = a0; k < a1; k++) {
+      var off = k * ANCHOR * sr - need / 2, base = (k - a0) * 1024;
+      for (var i = 0; i < 1024; i++) {
+        var sp = off + i * step, lo = Math.floor(sp), fr = sp - lo;
+        var a = (lo >= 0 && lo < len) ? mono[lo] : 0;
+        var b = (lo + 1 >= 0 && lo + 1 < len) ? mono[lo + 1] : 0;
+        frames[base + i] = a + (b - a) * fr;
+      }
+    }
+    return frames;
   }
 
   /* ---- the reading itself, as one plain function ----------------------
@@ -157,132 +250,336 @@
       out.push({ t: +t.toFixed(2), m: m == null ? null : +m.toFixed(2) });
     }
   }
-  function workerMain() {
+  /* the voice line is read in order, in one worker that keeps its place:
+     the median-of-five carries from one piece to the next exactly as it
+     does through a whole song, so a song read a piece at a time comes out
+     point for point the same as one read in one go */
+  function traceWorkerMain() {
+    var mono = null, sr = 0, o = null, hist = [], k = 0;
     self.onmessage = function (e) {
       var d = e.data;
-      NGATE.clarity = d.clarity;
-      var out = [], hist = [], CH = 512;
-      for (var k = 0; k < d.steps; k += CH) {
-        traceRange(d.mono, d.sr, d.o, k, Math.min(d.steps, k + CH), hist, out);
-        self.postMessage({ type: 'progress', frac: Math.min(1, (k + CH) / d.steps) });
+      if (d.type === 'init') { NGATE.clarity = d.clarity; o = d.o; return; }
+      if (d.type === 'audio') { mono = d.mono; sr = d.sr; return; }
+      if (d.type === 'run') {
+        o.anc = d.anc;
+        var out = [];
+        traceRange(mono, sr, o, k, Math.max(k, d.k1), hist, out);
+        k = Math.max(k, d.k1);
+        self.postMessage({ type: 'pts', pts: out });
       }
-      self.postMessage({ type: 'done', notes: out });
     };
   }
-  function runTrace(mono, sr, o, steps, onFrac) {
-    var clarity = 0.35;
-    try { clarity = NGATE.clarity; } catch (e) {}
-    return new Promise(function (resolve) {
-      var src = null, url = null, w = null;
-      try {
-        src = 'var NGATE = { level: 0, clarity: ' + clarity + ' };\n' +
-              freqMidi.toString() + '\n' + yinHz.toString() + '\n' +
-              traceRange.toString() + '\n(' + workerMain.toString() + ')();';
-        url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-        w = new Worker(url);
-      } catch (e) { w = null; }
-      var onPage = function () {
-        /* no worker: the same function, a short slice at a time */
-        var out = [], hist = [], k = 0, CH = 24;
-        (function slice() {
-          traceRange(mono, sr, o, k, Math.min(steps, k + CH), hist, out);
-          k += CH;
-          if (onFrac) onFrac(Math.min(1, k / steps));
-          if (k < steps) setTimeout(slice, 0); else resolve(out);
-        })();
-      };
-      if (!w) return onPage();
-      w.onmessage = function (e) {
-        if (e.data.type === 'progress') { if (onFrac) onFrac(e.data.frac); return; }
-        try { w.terminate(); URL.revokeObjectURL(url); } catch (err) {}
-        resolve(e.data.notes);
-      };
-      w.onerror = function () {
-        try { w.terminate(); URL.revokeObjectURL(url); } catch (err) {}
-        onPage();
-      };
-      w.postMessage({ mono: mono, sr: sr, o: o, steps: steps, clarity: clarity }, [mono.buffer]);
-    });
+  function tracer(o, clarity) {
+    var w = null, url = null, pending = null;
+    try {
+      var src = 'var NGATE = { level: 0, clarity: ' + clarity + ' };\n' +
+                freqMidi.toString() + '\n' + yinHz.toString() + '\n' +
+                traceRange.toString() + '\n(' + traceWorkerMain.toString() + ')();';
+      url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      w = new Worker(url);
+      w.onmessage = function (e) { var p = pending; pending = null; if (p) p.res(e.data.pts); };
+      w.onerror = function () { var p = pending; pending = null; if (p) p.rej(new Error('the reader stopped')); };
+      w.postMessage({ type: 'init', o: o, clarity: clarity });
+    } catch (e) { w = null; }
+    /* no worker: the same function on the page, a short slice at a time */
+    var L = { mono: null, sr: 0, hist: [], k: 0 };
+    return {
+      audio: function (mono, sr) {
+        if (w) w.postMessage({ type: 'audio', mono: mono, sr: sr }, [mono.buffer]);
+        else { L.mono = mono; L.sr = sr; }
+      },
+      run: function (k1, anc) {
+        if (w) return new Promise(function (res, rej) {
+          pending = { res: res, rej: rej };
+          w.postMessage({ type: 'run', k1: k1, anc: anc });
+        });
+        return new Promise(function (res) {
+          var out = [];
+          o.anc = anc;
+          (function slice() {
+            var e = Math.min(k1, L.k + 24);
+            traceRange(L.mono, L.sr, o, L.k, e, L.hist, out);
+            L.k = e;
+            if (L.k < k1) setTimeout(slice, 0); else res(out);
+          })();
+        });
+      },
+      end: function () {
+        try { if (w) w.terminate(); } catch (e) {}
+        try { if (url) URL.revokeObjectURL(url); } catch (e) {}
+      }
+    };
   }
 
-  /* ---- the trace ------------------------------------------------------ */
-  F.build = async function (song, onProgress) {
-    if (!song || !song.blob) throw new Error('nothing to read');
-    var say = onProgress || status;
-    ensureCtx();
-    say('Reading the file…', 0.02);
-    var decoded = await ctx.decodeAudioData((await song.blob.arrayBuffer()).slice(0));
-    var sr = decoded.sampleRate, len = decoded.length;
-    var L = decoded.getChannelData(0);
-    var R = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : L;
+  function id3Size(bytes) {
+    var u = new Uint8Array(bytes, 0, Math.min(10, bytes.byteLength));
+    if (u.length < 10 || u[0] !== 0x49 || u[1] !== 0x44 || u[2] !== 0x33) return 0;
+    return 10 + ((u[6] & 127) << 21 | (u[7] & 127) << 14 | (u[8] & 127) << 7 | (u[9] & 127));
+  }
+  function mix(buf) {
+    var len = buf.length, L = buf.getChannelData(0);
+    var R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
     var mono = new Float32Array(len);
     for (var i = 0; i < len; i++) mono[i] = (L[i] + R[i]) / 2;
+    return mono;
+  }
 
-    say('Listening with the pitch model…', 0.06);
-    var nA = Math.max(1, Math.floor(decoded.duration / ANCHOR));
-    var anc = await anchors(mono, sr, nA);
+  /* ---- reading a song, from the start, as it goes ----------------------
+     Robert, 25 Sep: "Read progressively from the start of the file,
+     publishing notes as they are found."
 
-    say('Following the voice…', 0.3);
-    var steps = Math.floor(decoded.duration / HOP);
-    var gateLevel = 0.004, gateOn = true;
-    try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
-    var o = { HOP: HOP, WIN: WIN, ANCHOR: ANCHOR, gate: gateLevel, gateOn: gateOn,
-              yinOff: yinOffset(sr), anc: anc };
-    var notes = await runTrace(mono, sr, o, steps, function (fr) {
-      say('Following the voice…', 0.3 + 0.65 * fr);
-    });
+     The first half-megabyte of the file is decoded on its own - about
+     27 seconds of a typical song, in about 70ms - and reading starts on it
+     at once while the whole file decodes alongside. Measured on both of his
+     recordings: those first seconds decode to exactly the same samples as
+     the whole file does, apart from the last 10ms of the piece, so nothing
+     within a second of its end is read from it. When the whole file
+     arrives the reading carries on from where it was.
 
-    notes = bridge(notes);
-    song.notes = notes;
+     Notes go into the song as they are found. A screen asks how far the
+     reading has got (F.aheadOf) and plays only while it stays ahead. */
+  var PRE_BYTES = 512 * 1024, BATCH = 8;
+  F.LEAD_START = 8;          /* seconds read ahead before the song may play */
+  F.LEAD_MIN = 4;            /* and never less than this while it plays   */
+
+  async function readSong(job) {
+    var song = job.song, s = job.s;
+    /* something happened (a batch came back, the whole file arrived, the
+       song was let go on again); a signal nobody was waiting for is kept */
+    var waiting = null, pending = false;
+    var poke = function () { var w = waiting; waiting = null; if (w) w(); else pending = true; };
+    var nextEvent = function () {
+      if (pending) { pending = false; return Promise.resolve(); }
+      return new Promise(function (r) { waiting = r; });
+    };
+    job.poke = poke;
+    var arr = [], tr = null;
+    song.notes = arr;               /* the old map goes: nothing drawn from it */
     song.notesFrom = 'trace';
-    song.traceVer = TRACE_VER;
+    delete song.traceVer;
+    delete song.mapVer;
+    song.bubbles = [];
     song.noteFloor = null;
-    delete song.mapVer;                  /* it is not a bar map any more */
-    song.bubbles = F.bubbles(notes);
-    try { await dbPut('songs', song); } catch (e) {}
+    var mark = function (x) { if (F.__marks) F.__marks.push([x, Math.round(performance.now())]); };
+    mark('start');
+    try {
+      ensureCtx();
+      var bytes = await song.blob.arrayBuffer();
+      mark('bytes');
+      var full = null, fullErr = null, fullIn = false;
+      ctx.decodeAudioData(bytes.slice(0)).then(function (b) { full = b; fullIn = true; poke(); },
+        function (e) { fullErr = e || new Error('could not decode the file'); fullIn = true; poke(); });
+      var head = id3Size(bytes), preLen = head + PRE_BYTES, pre = null;
+      if (bytes.byteLength > preLen * 1.25) {
+        try { pre = await ctx.decodeAudioData(bytes.slice(0, preLen)); } catch (e) { pre = null; }
+      }
+      mark('prefix decoded');
+      while (!pre && !fullIn) await nextEvent();
+      if (!pre && fullErr) throw fullErr;
 
-    var voiced = notes.filter(function (p) { return p.m != null; }).length;
-    say('Done — ' + Math.round(voiced * HOP) + 's of singing found.', 1);
-    return song;
+      var gateLevel = 0.004, gateOn = true, clarity = 0.35;
+      try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
+      try { clarity = NGATE.clarity; } catch (e) {}
+      var P = pool(), useAnc = !!(P.url && P.slots.length);
+      var sr = (pre || full).sampleRate;
+      tr = tracer({ HOP: HOP, WIN: WIN, ANCHOR: ANCHOR, gate: gateLevel, gateOn: gateOn,
+                    yinOff: yinOffset(sr), anc: null }, clarity);
+
+      var mono = null, final = false, usable = 0, nA = 0, steps = 0, est = 0;
+      var ancM = null, ancC = null, got = null, ancDone = 0, ancNext = 0, k = 0, kB = 0;
+      var need = Math.round(0.064 * sr);
+      var grow = function (n) {
+        var m2 = new Float32Array(n), c2 = new Float32Array(n), g2 = new Uint8Array(n);
+        if (ancM) { var c = Math.min(n, ancM.length); m2.set(ancM.subarray(0, c)); c2.set(ancC.subarray(0, c)); g2.set(got.subarray(0, c)); }
+        ancM = m2; ancC = c2; got = g2;
+      };
+      var use = function (buf, isFull) {
+        mono = mix(buf);
+        final = isFull;
+        usable = isFull ? mono.length : mono.length - sr;       /* a second clear of the cut */
+        tr.audio(mono.slice(0), sr);
+        if (isFull) {
+          nA = Math.max(1, Math.floor(buf.duration / ANCHOR));
+          steps = Math.floor(buf.duration / HOP);
+          s.dur = buf.duration;
+          grow(nA);
+          if (ancNext > nA) ancNext = nA;
+        } else {
+          est = buf.duration * (bytes.byteLength - head) / Math.max(1, preLen - head);
+          grow(Math.ceil(buf.duration / ANCHOR) + 2);
+        }
+      };
+      use(pre || full, !pre);
+
+      while (true) {
+        if (!final && fullIn) {
+          if (full) { use(full, true); full = null; }
+          else if (fullErr && k >= kLimit()) throw fullErr;
+        }
+        await job.gate();
+        /* the pitch model: hand every free worker the next couple of seconds */
+        if (useAnc) {
+          var aMax = final ? nA : Math.min(ancM.length,
+            Math.floor((usable - need / 2 - 2) / (ANCHOR * sr)) + 1);
+          P.slots.forEach(function (slot) {
+            if (slot.busy || ancNext >= aMax) return;
+            /* small first pieces, so the first notes come back quickly */
+            var size = ancNext < 2 ? 2 : ancNext < 12 ? 4 : BATCH;
+            var a0 = ancNext, a1 = Math.min(aMax, a0 + size);
+            ancNext = a1;
+            mark('batch ' + a0 + ' out');
+            ancBatch(slot, ancFrames(mono, sr, a0, a1)).then(function (r) {
+              mark('batch ' + a0 + ' back');
+              for (var i = a0; i < a1 && i < got.length; i++) {
+                ancM[i] = r ? r.midi[i - a0] : 0;
+                ancC[i] = r ? r.conf[i - a0] : 0;      /* no model here: no anchor, as before */
+                got[i] = 1;
+              }
+              poke();
+            });
+          });
+          while (ancDone < got.length && got[ancDone]) ancDone++;
+        }
+        /* the line: as far as both the audio and the anchors reach */
+        var k1 = kLimit();
+        if (useAnc && !(final && ancDone >= nA)) {
+          while (Math.round((kB * HOP) / ANCHOR) < ancDone) kB++;
+          k1 = Math.min(k1, kB);
+        }
+        /* a test can hold the reading here to make it fall behind on purpose */
+        while (F.__hold) await F.__hold;
+        if (k1 > k) {
+          var anc = useAnc ? { midi: ancM.slice(0, ancDone), conf: ancC.slice(0, ancDone) } : null;
+          var pts = await tr.run(k1, anc);
+          mark('traced to ' + k1);
+          for (var q = 0; q < pts.length; q++) arr.push(pts[q]);
+          k = k1;
+          bridge(arr);
+          song.bubbles = F.bubbles(arr);
+          s.readTo = +(k * HOP).toFixed(2);
+          s.frac = Math.min(0.99, s.readTo / Math.max(1, final ? s.dur : est));
+          continue;
+        }
+        if (final && k >= steps) break;
+        await nextEvent();
+      }
+      tr.end(); tr = null;
+
+      bridge(arr);
+      song.traceVer = TRACE_VER;
+      song.bubbles = F.bubbles(arr);
+      try { await dbPut('songs', song); } catch (e) {}
+      var voiced = arr.filter(function (p) { return p.m != null; }).length;
+      s.st = 'done'; s.frac = 1; s.readTo = s.dur;
+      s.msg = 'Done — ' + Math.round(voiced * HOP) + 's of singing found.';
+      job.res(song);
+    } catch (e) {
+      if (tr) tr.end();
+      s.st = 'failed';
+      s.msg = 'Could not read this song — ' + (e && e.message || e);
+      job.rej(e);
+    }
+    delete jobs[job.id];
+    schedule();
+
+    function kLimit() {
+      if (final) return steps;
+      return Math.max(0, Math.floor((usable - (WIN >> 1) - 1) / (HOP * sr)) + 1);
+    }
+  }
+
+  /* ---- which song is being read ---------------------------------------
+     Robert, 25 Sep: "An urgent song interrupts any background read at
+     once; the background read resumes afterwards. The background re-read
+     of old songs never runs while something is playing or an urgent read
+     is waiting."
+
+     Only one song is read at a time. The one the singer opened most
+     recently goes first, straight away - whatever was being read stops
+     where it is (it keeps what it had) and carries on when it is next in
+     line. Songs read in the background, for the Library, wait whenever
+     anything is making a sound. */
+  var jobs = {}, st = {}, seq = 0, urgentSeq = 0;
+  function Job(song) {
+    var j = this;
+    j.song = song; j.id = song.id || ('song' + (++seq)); j.seq = ++seq; j.urgentAt = 0;
+    j.paused = true; j.started = false; j.waiters = []; j.poke = function () {};
+    j.s = st[j.id] = { st: 'queued', frac: 0, msg: 'Waiting to be read…', readTo: 0, dur: 0 };
+    j.promise = new Promise(function (res, rej) { j.res = res; j.rej = rej; });
+    j.promise.catch(function () {});
+  }
+  Job.prototype.gate = function () {
+    var j = this;
+    return j.paused ? new Promise(function (r) { j.waiters.push(r); }) : Promise.resolve();
   };
+  Job.prototype.go = function () {
+    if (this.s.st === 'done' || this.s.st === 'failed') return;
+    this.paused = false;
+    this.s.st = 'reading';
+    this.s.msg = 'Reading the song…';
+    var w = this.waiters; this.waiters = [];
+    w.forEach(function (f) { f(); });
+    this.poke();
+    if (!this.started) { this.started = true; readSong(this); }
+  };
+  Job.prototype.hold = function () {
+    if (this.paused || this.s.st === 'done' || this.s.st === 'failed') return;
+    this.paused = true;
+    this.s.st = 'queued';
+    this.s.msg = 'Waiting to be read…';
+  };
+  function soundOn() {
+    try { return !!(window.RPOneSound && RPOneSound.holder()); } catch (e) { return false; }
+  }
+  function schedule() {
+    var live = Object.keys(jobs).map(function (k) { return jobs[k]; });
+    var urgent = live.filter(function (j) { return j.urgentAt; })
+      .sort(function (a, b) { return b.urgentAt - a.urgentAt; })[0] || null;
+    var want = urgent || (soundOn() ? null :
+      live.sort(function (a, b) { return a.seq - b.seq; })[0] || null);
+    live.forEach(function (j) { if (j !== want) j.hold(); });
+    if (want) want.go();
+  }
+  setInterval(schedule, 500);
 
-  /* ---- one at a time, in the background ------------------------------
-     Robert, 25 Sep: "A song is read by the live listener ONCE, when it is
-     added, in the background ... Start never blocks and nothing asks the
-     singer to wait or reload."
-
-     A song is read the moment it is added, and songs carrying an old map
-     are read again the first time the Library opens. Only one reading runs
-     at a time. A song the singer opens jumps to the front, and any screen
-     can ask how far along it is rather than showing an empty board. */
-  var Q = [], busy = false, st = {};
   F.stateOf = function (id) { return st[id] || null; };
-  F.busy = function () { return busy || Q.length > 0; };
+  /* the figure a screen shows: once anything at all has been read it says
+     so, rather than rounding a real start down to 0% */
+  F.pct = function (s) {
+    if (!s) return 0;
+    var f = s.frac || 0;
+    return f > 0 ? Math.max(1, Math.round(f * 100)) : 0;
+  };
+  F.busy = function () { return Object.keys(jobs).length > 0; };
   F.ensure = function (song, urgent) {
     if (!song) return Promise.reject(new Error('no song'));
-    if (!F.needsBuild(song)) return Promise.resolve(song);
-    var s = st[song.id];
-    if (!s || s.st === 'failed' || s.st === 'done') {
-      s = st[song.id] = { st: 'queued', frac: 0, msg: 'Waiting to be read…' };
-      s.promise = new Promise(function (res, rej) { s.res = res; s.rej = rej; });
-      Q.push(song);
-    }
-    if (urgent && s.st === 'queued') {
-      Q = Q.filter(function (x) { return x !== song; });
-      Q.unshift(song);
-    }
-    pump();
-    return s.promise;
+    var id = song.id;
+    var j = id ? jobs[id] : null;
+    if (!j && !F.needsBuild(song)) return Promise.resolve(song);
+    if (!j) { j = new Job(song); jobs[j.id] = j; }
+    if (urgent) j.urgentAt = ++urgentSeq;
+    schedule();
+    return j.promise;
   };
-  function pump() {
-    if (busy || !Q.length) return;
-    var song = Q.shift(), s = st[song.id];
-    busy = true; s.st = 'reading';
-    F.build(song, function (msg, frac) { s.msg = msg; if (frac != null) s.frac = frac; })
-      .then(function () { s.st = 'done'; s.frac = 1; s.res(song); },
-            function (e) { s.st = 'failed'; s.msg = 'Could not read this song — ' + (e && e.message || e); s.rej(e); })
-      .then(function () { busy = false; pump(); });
-  }
+  /* how far the reading has got, for a screen about to play or playing */
+  F.aheadOf = function (song, t) {
+    if (!song || !F.needsBuild(song)) return { done: true, ok: true, canStart: true, readTo: Infinity };
+    var s = song.id ? st[song.id] : null;             /* none yet: nothing read */
+    var readTo = (s && s.readTo) || 0;
+    return { done: false, readTo: readTo, ok: readTo - (t || 0) >= F.LEAD_MIN,
+             canStart: readTo - (t || 0) >= F.LEAD_START };
+  };
+  /* read it now, first in line, and say how it is going */
+  F.build = function (song, onProgress) {
+    if (!song || !song.blob) return Promise.reject(new Error('nothing to read'));
+    var say = onProgress || status;
+    if (!F.needsBuild(song) && !(song.id && jobs[song.id])) delete song.traceVer;   /* asked for again */
+    var p = F.ensure(song, true);
+    var s = function () { return song.id ? st[song.id] : null; };
+    var iv = setInterval(function () { var x = s(); if (x) say(x.msg, x.frac); }, 250);
+    return p.then(function (v) { clearInterval(iv); var x = s(); if (x) say(x.msg, 1); return v; },
+                  function (e) { clearInterval(iv); throw e; });
+  };
   /* songs that carry a map from before the live listener, re-read quietly */
   F.scanLibrary = function () {
     var list = [];

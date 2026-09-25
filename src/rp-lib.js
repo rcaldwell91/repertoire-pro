@@ -620,7 +620,7 @@
       }
       if (tag) {
         if (busy) tag.textContent = st.st === 'reading'
-          ? 'updating\u2026 ' + Math.round((st.frac || 0) * 100) + '%' : 'updating\u2026';
+          ? 'updating\u2026 ' + RPFileMap.pct(st) + '%' : 'updating\u2026';
         else tag.parentNode.removeChild(tag);
       }
       if (!r.querySelector('.rp-art')) {

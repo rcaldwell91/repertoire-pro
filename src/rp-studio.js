@@ -40,8 +40,10 @@
     assign: null
   };
 
+  /* false when the sound may not start - the page is hidden */
   function claimSound(name, stop) {
-    try { if (window.RPOneSound) RPOneSound.claim(name, stop); } catch (e) {}
+    try { if (window.RPOneSound) return !!RPOneSound.claim(name, stop); } catch (e) {}
+    return !document.hidden;
   }
 
   function say(msg) {
@@ -78,7 +80,9 @@
     var cv = $('freeCanvas');
     if (!cv || !window.rpPinLane) return;
     var o = ST.overlay;
-    if (o && o.notes && o.notes.length && rpPinLaneToNotes(cv, o.notes, 3)) return;
+    if (o && o.notes && o.notes.length && o.song && window.RPFileMap && RPFileMap.needsBuild(o.song)) {
+      if (window.rpPinLaneToPartial && rpPinLaneToPartial(cv, o.notes, 5)) return;
+    } else if (o && o.notes && o.notes.length && rpPinLaneToNotes(cv, o.notes, 3)) return;
     var r = null;
     try { r = window.RPRange && RPRange.get ? RPRange.get() : null; } catch (e) {}
     if (r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo) rpPinLane(cv, r.lo - 2, r.hi + 2);
@@ -379,9 +383,8 @@
   window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
     if (ST.reading && window.RPFileMap && window.rpBoardNote) {
       var rs = RPFileMap.stateOf(ST.reading.id);
-      rpBoardNote(c2, W, H, (rs ? rs.msg.replace(/\u2026$/, '') : 'Working out the tune') + ' \u2014 ' +
-                  Math.round(((rs && rs.frac) || 0) * 100) + '%',
-                  'The song starts by itself when this is done');
+      rpBoardNote(c2, W, H, 'Reading the song \u2014 ' + RPFileMap.pct(rs) + '%',
+                  'It starts by itself in a moment');
       return;
     }
     var o = ST.overlay;
@@ -471,6 +474,7 @@
       c2.fill();
     }
     c2.restore();
+    if (ST.catching && window.rpBoardNote) rpBoardNote(c2, W, H, 'Catching up\u2026', 'The song carries on in a moment');
   };
 
   /* ---------------------------------------------------------------- */
@@ -683,28 +687,71 @@
   };
   /* Robert, 25 Sep: "Robert's screenshot of All of Me still shows flat bars:
      that is the old-analyser map, not re-read." A song file is drawn as the
-     line the app hears, never as the old bars. If its reading is not done,
-     this shows how far along it is and starts the song by itself when the
-     line is ready - no empty board, no bars in the meantime, nothing to
-     press twice. */
+     line the app hears, never as the old bars. While it is being read the
+     board says how far along it is, and the song starts by itself once the
+     reading is eight seconds ahead of where the song begins.
+
+     Robert, 25 Sep, later: he opened All of Me, left for another tab while
+     it read, and it started playing in the background when the read
+     finished. So a finished read only starts the song if the Pitch Tracker
+     is still the screen showing AND the page is visible. Otherwise the song
+     is simply ready: opening it again starts it at once. */
+  function trackerShowing() {
+    var m = $('modeFree');
+    return !!(m && m.classList.contains('active')) && !document.hidden;
+  }
+  ST.showing = trackerShowing;
   function readThenLoad(song) {
     ST.stopAll();
     ST.reading = song;
-    return RPFileMap.ensure(song, true).then(function () {
-      if (ST.reading === song) ST.reading = null;
-      loadTake(song);
-    }, function () {
-      if (ST.reading === song) ST.reading = null;
+    RPFileMap.ensure(song, true).catch(function () {
+      if (ST.reading !== song) return;
+      ST.reading = null;
       say('Could not read this song.');
     });
+    var iv = setInterval(function () {
+      if (ST.reading !== song) { clearInterval(iv); return; }
+      var a = RPFileMap.aheadOf(song, 0);
+      if (!(a.done || a.canStart)) return;
+      clearInterval(iv);
+      ST.reading = null;
+      if (trackerShowing()) loadTake(song);
+      else draw();
+    }, 200);
   }
+  /* Robert, 25 Sep: "Playback may start once the read is 8 seconds ahead of
+     the playhead, and must stay at least 4 seconds ahead; if it falls
+     behind, pause with 'Catching up…' rather than drawing nothing." It picks
+     up again once the reading is 8 seconds ahead of where it stopped. */
+  ST.catching = false;
+  function catchUp() {
+    var o = ST.overlay;
+    if (!o || !o.song || !o.audio || o.audio.ended || !window.RPFileMap) { ST.catching = false; return; }
+    var a = RPFileMap.aheadOf(o.song, o.audio.currentTime || 0);
+    if (!ST.catching) {
+      if (!a.done && !a.ok && !o.audio.paused) {
+        ST.catching = true;
+        try { o.audio.pause(); } catch (e) {}
+        playBar();
+      }
+    } else if ((a.done || a.canStart) && !document.hidden) {
+      ST.catching = false;
+      try { var pr = o.audio.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+      playBar();
+    }
+  }
+  setInterval(catchUp, 50);
 
   function loadTake(s) {
     if (!s) return say('Keep a take first.');
-    if (s.kind !== 'recording' && window.RPFileMap && RPFileMap.needsBuild(s)) return readThenLoad(s);
+    if (s.kind !== 'recording' && window.RPFileMap && RPFileMap.needsBuild(s)) {
+      var ah = RPFileMap.aheadOf(s, 0);
+      if (!(ah.done || ah.canStart)) return readThenLoad(s);
+    }
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
-    claimSound('sing-along', function () { try { stopOver(); } catch (e) {} });
+    /* nothing starts while the page is hidden */
+    if (!claimSound('sing-along', function () { try { stopOver(); } catch (e) {} })) return;
     (async function () { try { if (typeof MIC !== 'undefined' && !MIC.on && typeof enableMic === 'function') await enableMic(); } catch (e) {} })();
     try {
       var url = URL.createObjectURL(s.blob);
@@ -831,6 +878,7 @@
     on($('rpStopOver'), 'click', function () { ST.stopAll(); say('Stopped.'); });
     on($('rpPauseOver'), 'click', function () {
       var a = ST.overlay && ST.overlay.audio; if (!a) return;
+      ST.catching = false;              /* his own pause is his; catching up resumes only its own */
       if (a.paused) { try { var pr = a.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {} }
       else { try { a.pause(); } catch (e) {} }
       setTimeout(playBar, 60);

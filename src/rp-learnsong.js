@@ -171,7 +171,7 @@
     if (!S.asleep) return;
     S.asleep = false;
     S.lastFrame = 0;                 /* do not credit the time it was asleep */
-    if (!S.playing || !S.open) return;
+    if (!S.playing || !S.open || S.catching) return;
     if (S.synth) {
       /* the timer clock has run on while nothing sounded; move its origin
          back to where the song actually got to */
@@ -225,7 +225,9 @@
     var cv = $('rpLsCv');
     if (!cv || !window.rpPinLane) return;
     var ns = S.song && S.song.notes;
-    if (ns && ns.length && rpPinLaneToNotes(cv, ns, 3)) return;
+    if (ns && ns.length && window.RPFileMap && RPFileMap.needsBuild(S.song)) {
+      if (window.rpPinLaneToPartial && rpPinLaneToPartial(cv, ns, 5)) return;
+    } else if (ns && ns.length && rpPinLaneToNotes(cv, ns, 3)) return;
     var r = null;
     try { r = window.RPRange && RPRange.get ? RPRange.get() : null; } catch (e) {}
     if (r && isFinite(r.lo) && isFinite(r.hi) && r.hi > r.lo) rpPinLane(cv, r.lo - 2, r.hi + 2);
@@ -237,44 +239,48 @@
   /* ---------------------------------------------------------------- */
   /* THE APP WORKS THE NOTES OUT ITSELF                                 */
   /* ---------------------------------------------------------------- */
+  /* Robert, 25 Sep: a finished read may only start the song if this screen
+     is still the one showing AND the page is visible; otherwise the song is
+     just ready. The same rule as the Pitch Tracker. */
+  function here() {
+    var m = $('modeSong');
+    return !!(S.open && m && m.classList.contains('active')) && !document.hidden;
+  }
+  L.here = here;
+
   function autoMap() {
     var song = S.song;
     if (!song || S.mapping === song.id) return;
     S.mapping = song.id;
-    foot('The app listens to the file once, to find the notes. Each song only needs it once.');
     /* Robert, 25 Sep: "Opening a song from any screen while its read is
-       still running shows progress, not an empty board", and "Start never
-       blocks". The reading runs in the background whatever this screen
-       does; this only shows how far along it is. Start pressed meanwhile is
-       remembered, and the song begins the moment the notes are ready. */
-    /* the figure is on the board, where the eye already is; this line
-       only says in words what is happening */
-    var show = function () {
-      if (!S.open || S.song !== song) return;
-      sub('Reading the song once to find its notes.');
-    };
-    show();
-    var iv = setInterval(show, 400);
-    var finish = function (ok) {
-      clearInterval(iv);
-      if (S.mapping === song.id) S.mapping = false;
-      if (!S.open || S.song !== song) return;
-      if (ok) {
-        S.cut = null;             /* the notes have just changed */
-        pinWindow();
-        foot('');
-        if (S.startWhenReady) { S.startWhenReady = false; start(); return; }
-        sub('Press Start. The bubbles are the song. Your line is you.');
-      } else {
+       still running shows progress, not an empty board", "Start never
+       blocks", and now: the song may play once the reading is eight seconds
+       ahead of where it begins. The reading carries on while he sings. */
+    var failed = false;
+    RPFileMap.ensure(song, true).catch(function () { failed = true; });
+    var iv = setInterval(function () {
+      if (S.song !== song) { clearInterval(iv); if (S.mapping === song.id) S.mapping = false; return; }
+      if (failed) {
+        clearInterval(iv);
+        S.mapping = false;
         S.startWhenReady = false;
+        if (!S.open) return;
         sub('Could not find a clear tune in that file.');
         foot('It works best on a recording of one voice with no band behind it. ' +
              'Go back and try another file.');
+        return;
       }
-    };
-    RPFileMap.ensure(song, true).then(function () {
-      finish(!!(song.notes && song.notes.length));
-    }, function () { finish(false); });
+      var a = RPFileMap.aheadOf(song, 0);
+      if (!(a.done || a.canStart)) { if (S.open) sub('Reading the song.'); return; }
+      clearInterval(iv);
+      S.mapping = false;
+      S.cut = null;             /* the notes have just changed */
+      pinWindow();
+      foot('');
+      if (S.startWhenReady && here()) { S.startWhenReady = false; start(); return; }
+      S.startWhenReady = false;
+      if (S.open && !S.playing) sub('Press Start.');
+    }, 200);
   }
 
   /* ---------------------------------------------------------------- */
@@ -340,12 +346,16 @@
     if (!s || S.playing) return;
     /* Robert, 24 Sep: a song carrying a map from the old analyser is read
        again with the live tracker the next time it is opened. */
-    if (window.RPFileMap && RPFileMap.needsBuild(s)) { S.startWhenReady = true; autoMap(); return; }
+    if (window.RPFileMap && RPFileMap.needsBuild(s)) {
+      var ah = RPFileMap.aheadOf(s, 0);
+      if (!(ah.done || ah.canStart)) { S.startWhenReady = true; autoMap(); return; }
+    }
     if (!(s.notes && s.notes.length)) { S.startWhenReady = true; autoMap(); return; }
+    /* one thing in his headphones at a time, and nothing while the page is
+       hidden */
+    try { if (window.RPOneSound && !RPOneSound.claimResumable('learn-a-song', leave)) return; } catch (e) {}
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
-    /* one thing in his headphones at a time */
-    try { if (window.RPOneSound) RPOneSound.claimResumable('learn-a-song', leave); } catch (e) {}
     if (!S.synth) {
       if (!S.vox) { S.vox = new Audio(); S.vox.preload = 'auto'; }
       if (S.voxUrl) URL.revokeObjectURL(S.voxUrl);
@@ -396,6 +406,7 @@
 
   function stop(byHand) {
     S.playing = false;
+    S.catching = false;
     S.countdown = 0;
     S.asleep = false; S.heldT = 0;     /* a stop is not a pause: it lets go */
     try { if (S.vox) S.vox.pause(); } catch (e) {}
@@ -522,7 +533,11 @@
     if (!S.song) return [];
     /* a song still to be read has no notes worth showing: the old ones are
        about to be replaced, and showing them would change under the singer */
-    if (window.RPFileMap && RPFileMap.needsBuild(S.song)) return [];
+    if (window.RPFileMap && RPFileMap.needsBuild(S.song)) {
+      /* being read: the notes found so far, and they grow as it reads */
+      var rs = RPFileMap.stateOf(S.song.id);
+      return (rs && rs.readTo > 0 && S.song.bubbles) ? S.song.bubbles : [];
+    }
     if (S.cut && S.cutFor === S.song.id) return S.cut;
     var b = [];
     try { b = window.RPFileMap ? RPFileMap.notesOf(S.song) : (S.song.notes || []); } catch (e) { b = []; }
@@ -558,7 +573,7 @@
     /* when he actually sang, on the ear's clock: the notes carry the output
        delay, so the voice takes back only the microphone's own part */
     var tv = t - (window.rpVoiceLag ? rpVoiceLag() : 0.1);
-    if (S.playing && t > 0 && !S.asleep) {
+    if (S.playing && t > 0 && !S.asleep && !S.catching) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
       S.trail.push({ t: tv, m: (m == null ? null : m) });
@@ -601,10 +616,9 @@
     if (!s) return;
     if (S.mapping === s.id && window.RPFileMap && window.rpBoardNote) {
       var rs = RPFileMap.stateOf(s.id);
-      rpBoardNote(c2, W, H, (rs ? rs.msg.replace(/\u2026$/, '') : 'Working out the tune') + ' \u2014 ' +
-                  Math.round(((rs && rs.frac) || 0) * 100) + '%',
-                  S.startWhenReady ? 'The song starts by itself when this is done'
-                                   : 'The notes appear here when this is done');
+      rpBoardNote(c2, W, H, 'Reading the song \u2014 ' + RPFileMap.pct(rs) + '%',
+                  S.startWhenReady ? 'It starts by itself in a moment'
+                                   : 'The notes appear here in a moment');
       return;
     }
     var ns = notes();
@@ -701,7 +715,34 @@
     c2.beginPath(); c2.moveTo(headX, 0); c2.lineTo(headX, H); c2.stroke();
     c2.lineWidth = 1;
     c2.restore();
+    if (S.catching && window.rpBoardNote) rpBoardNote(c2, W, H, 'Catching up\u2026', 'The song carries on in a moment');
   };
+
+  /* Robert, 25 Sep: "Playback may start once the read is 8 seconds ahead of
+     the playhead, and must stay at least 4 seconds ahead; if it falls
+     behind, pause with 'Catching up…' rather than drawing nothing." It picks
+     up once the reading is 8 seconds ahead of where it stopped. */
+  S.catching = false;
+  setInterval(function () {
+    if (!S.playing || S.synth || !S.song || !S.vox || S.asleep || !window.RPFileMap) return;
+    var t = songTime();
+    var a = RPFileMap.aheadOf(S.song, t);
+    if (!S.catching) {
+      if (a.done || a.ok || S.vox.paused) return;
+      S.catching = true;
+      S.heldT = t;
+      try { S.vox.pause(); } catch (e) {}
+      try { if (S.mus) S.mus.pause(); } catch (e) {}
+      sub('Catching up\u2026');
+    } else if ((a.done || a.canStart) && !document.hidden) {
+      S.catching = false;
+      S.lastFrame = 0;                 /* do not credit the time it stood still */
+      try { var pr = S.vox.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+      try { if (S.mus) { var pm = S.mus.play(); if (pm && pm.catch) pm.catch(function () {}); } } catch (e) {}
+      sub('Keep going.');
+    }
+  }, 50);
+  L.catching = function () { return !!S.catching; };
 
   /* ---------------------------------------------------------------- */
   L.reset = function () { held = {}; hideScore(); };
