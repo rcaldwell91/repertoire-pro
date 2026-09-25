@@ -12,3 +12,4 @@ node tests/singer.test.js
 node tests/learnsong.test.js
 node tests/score.test.js
 node tests/placement.test.js
+node tests/reading.test.js

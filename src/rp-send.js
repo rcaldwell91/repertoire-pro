@@ -191,7 +191,7 @@
        to send the same thing. A screen may hand over its own list. */
     var list = only || takes().filter(function (s) { return !s.assignId; });
     if (!list.length) {
-      return '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>';
+      return '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet.</div>';
     }
     var h = '';
     list.slice(0, 12).forEach(function (s) {

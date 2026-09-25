@@ -1473,7 +1473,7 @@ WRITING = [
     ("Pick your stage.", "Pick one."),
     ("Settings for this device. Everything here is remembered.", "Your account, your voice, and how the app works."),
     ("The horizontal lines are notes (C in gold). Hold a note and try to keep your blue line flat and centered on a note line. Steadiness scores how level you hold your pitch.",
-     "The lines are notes, C in gold. The blue line is your voice. Hold it flat on a line."),
+     "The blue line is your voice. Hold it flat on a line."),
     ("<b>Sound not working? Plug your headphones in first</b> — that is when it breaks, so that is when to test it. Then press <b>1</b> and <b>2</b>, in that order. Each one prints an answer, and between them they say whether it is the app, the microphone, or the phone itself.",
      "<b>No sound?</b> Plug your headphones in first, then press <b>1</b> and <b>2</b> in that order. Each one says what it found."),
     ("Everything you record and every note map you build is stored on this device only. Nothing is uploaded anywhere.",

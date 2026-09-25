@@ -112,10 +112,7 @@
     S.cut = null;
     if (!song.blob && !S.synth) { sub('There is no sound on this one.'); foot(''); }
     else if (window.RPFileMap && RPFileMap.needsBuild(song)) autoMap();
-    else {
-      sub('Press Start. The bubbles are the song. Your line is you.');
-      foot(S.synth ? 'This one is built in, so the app plays the tune itself.' : '');
-    }
+    else { sub(''); foot(''); }
     loop();
   };
 
@@ -209,8 +206,9 @@
     S.hid = [];
   }
 
-  function sub(t) { var e = $('rpLsSub'); if (e) e.innerHTML = t || '&nbsp;'; }
-  function foot(t) { var e = $('rpLsFoot'); if (e) e.innerHTML = t || '&nbsp;'; }
+  /* a line with nothing to say takes no room */
+  function sub(t) { var e = $('rpLsSub'); if (e) { e.innerHTML = t || ''; e.style.display = t ? '' : 'none'; } }
+  function foot(t) { var e = $('rpLsFoot'); if (e) { e.innerHTML = t || ''; e.style.display = t ? '' : 'none'; } }
 
   function size() {
     var cv = $('rpLsCv');
@@ -276,8 +274,7 @@
         S.startWhenReady = false;
         if (!S.open) return;
         sub('Could not find a clear tune in that file.');
-        foot('It works best on a recording of one voice with no band behind it. ' +
-             'Go back and try another file.');
+        foot('Try a recording of one voice with no band behind it.');
         return;
       }
       var a = RPFileMap.aheadOf(song, 0);
@@ -289,7 +286,7 @@
       foot('');
       if (S.startWhenReady && here()) { S.startWhenReady = false; start(); return; }
       S.startWhenReady = false;
-      if (S.open && !S.playing) sub('Press Start.');
+      if (S.open && !S.playing) sub('');
     }, 200);
   }
 
@@ -424,7 +421,7 @@
     if ($('rpLsStart')) $('rpLsStart').disabled = false;
     if ($('rpLsStop')) $('rpLsStop').disabled = true;
     if (!byHand) showScore();         /* it reached the end: how did it go */
-    if (byHand && S.song && S.song.notes) sub('Press Start. The bubbles are the song. Your line is you.');
+    if (byHand && S.song && S.song.notes) sub('');
   }
 
   /* Robert, 24 Sep: at the end of the song, in plain words — how many

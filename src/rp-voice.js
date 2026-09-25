@@ -179,14 +179,17 @@
      under them. Eleven audio terms at once, for somebody who is not an
      engineer. The labels say what they do now; the real names stay in
      here, where they can be learnt rather than guessed. */
+  /* Robert, 25 Sep: "Labels: Compressor, EQ, Echo, Reverb. Each keeps its
+     (i), which opens one plain line." The real names are back on the
+     screen, and the line under each says what it does, once. */
   var ABOUT = {
-    comp: 'An engineer calls this a compressor. It evens out your loud and quiet bits, so a whisper and a belt sit closer together. Radio voices are compressed.',
-    eq:   'An engineer calls this EQ. It turns parts of the sound up or down: warmer adds body, brighter adds air, and Like a phone strips both away.',
-    echo: 'Repeats of your voice, fading out. Quick is one fast slap back, Bouncy repeats in time, Long is the canyon.',
-    verb: 'An engineer calls this reverb: the room you sound like you are in. Off is a cupboard, Big hall is a church. It hides small wobbles — which is why singers like it, and why it is off on the Pitch Tracker.'
+    comp: 'Evens out your loud and quiet parts.',
+    eq:   'Makes your voice warmer or brighter.',
+    echo: 'Repeats your voice, fading away.',
+    verb: 'Makes you sound like you are in a bigger room.'
   };
   function seg(group, map, cur, label) {
-    var h = '<div class="row" style="align-items:center;gap:8px' + (label !== 'EVEN OUT LOUD AND QUIET' ? ';margin-top:12px' : '') + '">' +
+    var h = '<div class="row" style="align-items:center;gap:8px' + (group !== 'comp' ? ';margin-top:12px' : '') + '">' +
       '<div class="rp-lab" style="margin:0">' + label + '</div>' +
       '<span class="rp-info" data-about="' + group + '" title="What is this?">i</span></div>' +
       '<div class="rp-about measured" id="rpAbout_' + group + '" style="display:none;margin:2px 0 8px">' + esc(ABOUT[group] || '') + '</div>' +
@@ -202,9 +205,7 @@
     var host = $('modeVoice');
     if (!host) return;
     var h = '<button class="pill backpill" id="rpVoiceBack">← Sing menu</button>';
-    h += '<h1 style="margin:0 0 2px">Free Sing</h1>';
-    h += '<div class="rp-sub" style="margin:0 0 12px">Just sing. Nothing here is measured, scored, or ' +
-      'sent anywhere. Put some colour on your voice and enjoy it.</div>';
+    h += '<h1 style="margin:0 0 12px">Free Sing</h1>';
     /* Robert, 13 Sep: "it needs some type of visual that interacts as you
        sing." Not the keyboard map — that is the Pitch Tracker's job — just
        something to watch. Loudness is the size, the shape of the sound is
@@ -218,22 +219,19 @@
       '<b style="font-size:13px">Hear yourself</b>' +
       '<button class="btn' + (V.monitor ? ' primary' : '') + '" id="rpVMon" style="padding:8px 13px;font-size:12.5px">' +
       (V.monitor ? 'On' : 'Off') + '</button></div>' +
-      '<div class="notice" style="margin-top:7px">Headphones only — on the speaker this will howl.</div>' +
-      '<div class="measured" style="margin-top:6px">There is a delay between your mouth and your ears on every phone — ' +
-      'the app cannot remove it. Wired headphones are quickest; Bluetooth adds most of it. Effects off adds nothing.</div></div>';
+      '<div class="notice" style="margin-top:7px">Headphones only.</div></div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
-      seg('comp', COMP, V.fx.comp, 'EVEN OUT LOUD AND QUIET') +
-      seg('eq', EQ, V.fx.eq, 'WARMER OR BRIGHTER') +
-      seg('echo', ECHO, V.fx.echo, 'ECHO') +
-      seg('verb', VERB, V.fx.verb, 'WHAT ROOM IT SOUNDS LIKE') +
+      seg('comp', COMP, V.fx.comp, 'Compressor') +
+      seg('eq', EQ, V.fx.eq, 'EQ') +
+      seg('echo', ECHO, V.fx.echo, 'Echo') +
+      seg('verb', VERB, V.fx.verb, 'Reverb') +
       '</div>';
 
     h += '<div class="panel" style="margin-top:10px;padding:12px" id="rpVRecBox">' + recHtml() + '</div>';
     h += '<div class="panel" style="margin-top:10px;padding:12px">' +
       '<b style="font-size:13px">Your takes</b>' +
-      '<div class="notice" style="margin:8px 0 9px">Listen back, keep one on this device, or send it to ' +
-      'your coach.</div><div id="rpVList"></div></div>';
+      '<div id="rpVList" style="margin-top:9px"></div></div>';
 
     host.innerHTML = h;
     on($('rpVoiceBack'), 'click', function () { try { switchMode('singhub'); } catch (e) {} });
@@ -283,9 +281,7 @@
       '<b style="font-size:13px">Record</b>' +
       '<span id="rpVTime" style="font-size:12px;font-weight:800;color:var(--ink-dim)">' + fmt(elapsed()) + '</span></div>';
     if (V.state === 'idle' && !V.blob) {
-      h += '<div class="notice" style="margin:7px 0 10px">Your voice is kept as you sang it. The effects ' +
-        'stay adjustable afterwards.</div>' +
-        '<button class="btn primary" id="rpVRec" style="width:100%;padding:12px">' +
+      h += '<button class="btn primary" id="rpVRec" style="width:100%;padding:12px;margin-top:10px">' +
         '<svg class="ic"><use href="#i-mic"/></svg> Record</button>';
     } else if (V.state === 'rec' || V.state === 'paused') {
       h += '<div class="notice" style="margin:7px 0 10px">' +
@@ -295,8 +291,7 @@
         (V.state === 'rec' ? 'Pause' : 'Keep going') + '</button>' +
         '<button class="btn" id="rpVStop" style="flex:1;padding:11px">Stop</button></div>';
     } else {
-      h += '<div class="notice" style="margin:7px 0 10px">' + fmt(V.activeMs) +
-        ' recorded. Playing it back runs it through the effects above — change them and play it again.</div>' +
+      h += '<div class="notice" style="margin:7px 0 10px">' + fmt(V.activeMs) + ' recorded.</div>' +
         '<div class="row" style="gap:7px">' +
         '<button class="btn" id="rpVPlay" style="flex:1;padding:11px">' + (V.playing ? 'Stop' : 'Play it back') + '</button>' +
         '<button class="btn primary" id="rpVKeep" style="flex:1;padding:11px">Keep</button></div>' +

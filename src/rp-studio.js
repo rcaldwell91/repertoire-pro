@@ -60,8 +60,7 @@
     var back = host.querySelector('.backpill');
     var t = document.createElement('div');
     t.id = 'rpPitchTitle';
-    t.innerHTML = '<h1 style="margin:0 0 2px">Pitch Tracker</h1>' +
-      '<div class="rp-sub" style="margin:0 0 12px">See the notes you sing, as you sing them. Record a take and the notes are kept with it.</div>';
+    t.innerHTML = '<h1 style="margin:0 0 10px">Pitch Tracker</h1>';
     if (back && back.parentNode === host) host.insertBefore(t, back.nextSibling);
     else host.insertBefore(t, host.firstChild);
   }
@@ -224,13 +223,11 @@
       fmt(elapsed()) + '</span></div>';
 
     if (ST.state === 'idle' && !ST.blob) {
-      h += '<div class="notice" style="margin:8px 0 10px">Sing. Nothing is saved until you press Keep.</div>' +
-        '<button class="btn primary" id="rpStRec" style="width:100%;padding:12px">' +
+      h += '<button class="btn primary" id="rpStRec" style="width:100%;padding:12px;margin-top:10px">' +
         '<svg class="ic"><use href="#i-mic"/></svg> Record</button>';
     } else if (ST.state === 'rec' || ST.state === 'paused') {
       h += '<div class="notice" style="margin:8px 0 10px">' +
-        (ST.state === 'rec' ? 'Recording. Pause any time — it stays one take.'
-                            : 'Paused. Listen back, keep going, or stop and decide.') + '</div>';
+        (ST.state === 'rec' ? 'Recording.' : 'Paused.') + '</div>';
       h += '<div class="row" style="gap:7px">' +
         '<button class="btn' + (ST.state === 'rec' ? '' : ' primary') + '" id="rpStPause" style="flex:1;padding:11px">' +
         (ST.state === 'rec' ? 'Pause' : 'Keep going') + '</button>' +
@@ -241,13 +238,11 @@
       }
     } else {
       var n = ST.notes.filter(function (x) { return x.m != null; }).length;
-      h += '<div class="notice" style="margin:8px 0 10px">' + fmt(ST.activeMs) +
-        ' recorded' + (n ? ', with the pitch line' : '') + '. Keep it or throw it away.</div>';
+      h += '<div class="notice" style="margin:8px 0 10px">' + fmt(ST.activeMs) + ' recorded.</div>';
       /* The line goes in BEFORE the buttons, because deciding whether to keep
          a take is a question about where you were, not only how it sounded. */
       var svg = ST.lineHtml(ST.notes, 'pending');
-      if (svg) h += svg + '<div class="measured" style="margin-top:6px;font-size:11.5px">' +
-        'Where you actually were. Press play and the marker follows.</div>';
+      if (svg) h += svg;
       h += '<input id="rpStName" class="rp-inp" maxlength="60" placeholder="Name it (or leave it as ' + esc(defaultTitle()) + ')" style="width:100%;margin-top:9px" value="' + esc(ST.nameDraft || '') + '">';
       h += '<div class="row" style="gap:7px;margin-top:9px">' +
         '<button class="btn" id="rpStPlay" style="flex:1;padding:11px">' +
@@ -755,7 +750,7 @@
     var list = takes().filter(function (s) {
       return !s.assignId && (!window.RPTakes || RPTakes.originOf(s) === 'tracker');
     });
-    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">No takes yet. Record one above.</div>'; }
+    if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">No takes yet.</div>'; }
     else if (window.RPTakes) {
       box.innerHTML = '<div class="measured" style="margin:6px 0 4px">Newest</div>' + RPTakes.rowHtml(list[0]) +
         (list.length > 1 ? '<div class="measured" style="margin-top:6px">' + (list.length - 1) + ' more in the Library.</div>' : '');
