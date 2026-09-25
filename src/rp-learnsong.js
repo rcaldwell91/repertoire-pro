@@ -247,12 +247,11 @@
        blocks". The reading runs in the background whatever this screen
        does; this only shows how far along it is. Start pressed meanwhile is
        remembered, and the song begins the moment the notes are ready. */
+    /* the figure is on the board, where the eye already is; this line
+       only says in words what is happening */
     var show = function () {
       if (!S.open || S.song !== song) return;
-      var st = window.RPFileMap ? RPFileMap.stateOf(song.id) : null;
-      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
-      sub(esc(st ? st.msg : 'Working out the tune…') + ' — ' + pct + '%' +
-          (S.startWhenReady ? ' · it starts by itself when this is done' : ''));
+      sub('Reading the song once to find its notes.');
     };
     show();
     var iv = setInterval(show, 400);
@@ -521,6 +520,9 @@
      bubbles, which is what the caption has always promised. */
   function notes() {
     if (!S.song) return [];
+    /* a song still to be read has no notes worth showing: the old ones are
+       about to be replaced, and showing them would change under the singer */
+    if (window.RPFileMap && RPFileMap.needsBuild(S.song)) return [];
     if (S.cut && S.cutFor === S.song.id) return S.cut;
     var b = [];
     try { b = window.RPFileMap ? RPFileMap.notesOf(S.song) : (S.song.notes || []); } catch (e) { b = []; }
@@ -597,6 +599,14 @@
     if (!mine) { if (theirs) theirs(c2, W, H, now, pps, yOf); return; }
     var s = S.song;
     if (!s) return;
+    if (S.mapping === s.id && window.RPFileMap && window.rpBoardNote) {
+      var rs = RPFileMap.stateOf(s.id);
+      rpBoardNote(c2, W, H, (rs ? rs.msg.replace(/\u2026$/, '') : 'Working out the tune') + ' \u2014 ' +
+                  Math.round(((rs && rs.frac) || 0) * 100) + '%',
+                  S.startWhenReady ? 'The song starts by itself when this is done'
+                                   : 'The notes appear here when this is done');
+      return;
+    }
     var ns = notes();
     if (!ns.length) return;
     var t = now - LOOK;

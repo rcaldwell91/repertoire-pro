@@ -899,6 +899,37 @@ window.rpEarLag = function(){
     return (o > 0 && o < 0.5) ? o : 0;   /* a reading past half a second is not believable */
   }catch(e){ return 0; }
 };
+/* Robert, 25 Sep: "Opening a song from any screen while its read is still
+   running shows progress, not an empty board." One way to write that on a
+   board, so both screens say it the same way and in the same place. */
+window.rpBoardNote = function(c2, W, H, line1, line2){
+  /* the key rail is drawn over the left of the board afterwards, so the
+     note sits in the part you can see, and a phone-width board gets
+     smaller letters rather than words cut off at the edge */
+  const left = (typeof KEYW === 'number' ? KEYW : 46), room = W - left - 20;
+  c2.save();
+  c2.textAlign = 'center'; c2.textBaseline = 'middle';
+  c2.font = '800 15px system-ui, -apple-system, sans-serif';
+  const w1 = c2.measureText(line1).width;
+  c2.font = '600 12.5px system-ui, -apple-system, sans-serif';
+  const w2 = line2 ? c2.measureText(line2).width : 0;
+  const k = Math.min(1, (room - 28) / Math.max(1, w1, w2));
+  const bw = Math.min(room, Math.max(w1, w2) * k + 28), bh = line2 ? 64 : 42;
+  const x = left + (W - left) / 2, y = H / 2;
+  c2.fillStyle = 'rgba(8,10,16,.82)';
+  c2.beginPath();
+  if(c2.roundRect) c2.roundRect(x - bw/2, y - bh/2, bw, bh, 12); else c2.rect(x - bw/2, y - bh/2, bw, bh);
+  c2.fill();
+  c2.fillStyle = '#eef1f7';
+  c2.font = '800 ' + (15 * k).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
+  c2.fillText(line1, x, line2 ? y - 11 : y);
+  if(line2){
+    c2.fillStyle = 'rgba(238,241,247,.72)';
+    c2.font = '600 ' + (12.5 * k).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
+    c2.fillText(line2, x, y + 13);
+  }
+  c2.restore();
+};
 /* The microphone's own part of the delay. Mic timing offset (state.latencyMs)
    is the WHOLE trip - out through the headphones, into the singer, back in
    through the microphone - and has been since 13 Sep. Now the notes carry the

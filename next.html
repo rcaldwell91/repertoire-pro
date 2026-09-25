@@ -2522,6 +2522,37 @@ window.rpEarLag = function(){
     return (o > 0 && o < 0.5) ? o : 0;   /* a reading past half a second is not believable */
   }catch(e){ return 0; }
 };
+/* Robert, 25 Sep: "Opening a song from any screen while its read is still
+   running shows progress, not an empty board." One way to write that on a
+   board, so both screens say it the same way and in the same place. */
+window.rpBoardNote = function(c2, W, H, line1, line2){
+  /* the key rail is drawn over the left of the board afterwards, so the
+     note sits in the part you can see, and a phone-width board gets
+     smaller letters rather than words cut off at the edge */
+  const left = (typeof KEYW === 'number' ? KEYW : 46), room = W - left - 20;
+  c2.save();
+  c2.textAlign = 'center'; c2.textBaseline = 'middle';
+  c2.font = '800 15px system-ui, -apple-system, sans-serif';
+  const w1 = c2.measureText(line1).width;
+  c2.font = '600 12.5px system-ui, -apple-system, sans-serif';
+  const w2 = line2 ? c2.measureText(line2).width : 0;
+  const k = Math.min(1, (room - 28) / Math.max(1, w1, w2));
+  const bw = Math.min(room, Math.max(w1, w2) * k + 28), bh = line2 ? 64 : 42;
+  const x = left + (W - left) / 2, y = H / 2;
+  c2.fillStyle = 'rgba(8,10,16,.82)';
+  c2.beginPath();
+  if(c2.roundRect) c2.roundRect(x - bw/2, y - bh/2, bw, bh, 12); else c2.rect(x - bw/2, y - bh/2, bw, bh);
+  c2.fill();
+  c2.fillStyle = '#eef1f7';
+  c2.font = '800 ' + (15 * k).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
+  c2.fillText(line1, x, line2 ? y - 11 : y);
+  if(line2){
+    c2.fillStyle = 'rgba(238,241,247,.72)';
+    c2.font = '600 ' + (12.5 * k).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
+    c2.fillText(line2, x, y + 13);
+  }
+  c2.restore();
+};
 /* The microphone's own part of the delay. Mic timing offset (state.latencyMs)
    is the WHOLE trip - out through the headphones, into the singer, back in
    through the microphone - and has been since 13 Sep. Now the notes carry the
@@ -3998,7 +4029,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '25 Sep 2026 · build 446713ce';
+const APP_VERSION = '25 Sep 2026 · build 9d453283';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -15286,6 +15317,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      instant. Gold for the take, blue for you. A dot at the edge marks the
      take's note right now, which is the one to aim at. */
   window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
+    if (ST.reading && window.RPFileMap && window.rpBoardNote) {
+      var rs = RPFileMap.stateOf(ST.reading.id);
+      rpBoardNote(c2, W, H, (rs ? rs.msg.replace(/\u2026$/, '') : 'Working out the tune') + ' \u2014 ' +
+                  Math.round(((rs && rs.frac) || 0) * 100) + '%',
+                  'The song starts by itself when this is done');
+      return;
+    }
     var o = ST.overlay;
     if (!o || !o.notes || !o.audio || o.audio.ended) return;
     var t0 = o.audio.currentTime || 0;
@@ -15591,32 +15629,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      press twice. */
   function readThenLoad(song) {
     ST.stopAll();
-    var cv = $('freeCanvas');
-    var el = $('rpPtReading');
-    if (!el && cv && cv.parentElement) {
-      el = document.createElement('div');
-      el.id = 'rpPtReading';
-      el.className = 'measured';
-      el.style.cssText = 'margin:8px 0 2px;font-size:12.5px;font-weight:700';
-      cv.parentElement.insertBefore(el, cv.nextSibling);
-    }
-    var show = function () {
-      if (!el) return;
-      var st = RPFileMap.stateOf(song.id);
-      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
-      el.style.display = '';
-      el.textContent = (st ? st.msg : 'Working out the tune\u2026') + ' \u2014 ' + pct +
-                       '% \u00b7 the song starts by itself when this is done';
-    };
-    show();
-    var iv = setInterval(show, 400);
+    ST.reading = song;
     return RPFileMap.ensure(song, true).then(function () {
-      clearInterval(iv);
-      if (el) el.style.display = 'none';
+      if (ST.reading === song) ST.reading = null;
       loadTake(song);
     }, function () {
-      clearInterval(iv);
-      if (el) el.textContent = 'Could not read this song.';
+      if (ST.reading === song) ST.reading = null;
+      say('Could not read this song.');
     });
   }
 
@@ -24525,12 +24544,11 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
        blocks". The reading runs in the background whatever this screen
        does; this only shows how far along it is. Start pressed meanwhile is
        remembered, and the song begins the moment the notes are ready. */
+    /* the figure is on the board, where the eye already is; this line
+       only says in words what is happening */
     var show = function () {
       if (!S.open || S.song !== song) return;
-      var st = window.RPFileMap ? RPFileMap.stateOf(song.id) : null;
-      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
-      sub(esc(st ? st.msg : 'Working out the tune…') + ' — ' + pct + '%' +
-          (S.startWhenReady ? ' · it starts by itself when this is done' : ''));
+      sub('Reading the song once to find its notes.');
     };
     show();
     var iv = setInterval(show, 400);
@@ -24799,6 +24817,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      bubbles, which is what the caption has always promised. */
   function notes() {
     if (!S.song) return [];
+    /* a song still to be read has no notes worth showing: the old ones are
+       about to be replaced, and showing them would change under the singer */
+    if (window.RPFileMap && RPFileMap.needsBuild(S.song)) return [];
     if (S.cut && S.cutFor === S.song.id) return S.cut;
     var b = [];
     try { b = window.RPFileMap ? RPFileMap.notesOf(S.song) : (S.song.notes || []); } catch (e) { b = []; }
@@ -24875,6 +24896,14 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!mine) { if (theirs) theirs(c2, W, H, now, pps, yOf); return; }
     var s = S.song;
     if (!s) return;
+    if (S.mapping === s.id && window.RPFileMap && window.rpBoardNote) {
+      var rs = RPFileMap.stateOf(s.id);
+      rpBoardNote(c2, W, H, (rs ? rs.msg.replace(/\u2026$/, '') : 'Working out the tune') + ' \u2014 ' +
+                  Math.round(((rs && rs.frac) || 0) * 100) + '%',
+                  S.startWhenReady ? 'The song starts by itself when this is done'
+                                   : 'The notes appear here when this is done');
+      return;
+    }
     var ns = notes();
     if (!ns.length) return;
     var t = now - LOOK;

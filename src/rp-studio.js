@@ -377,6 +377,13 @@
      instant. Gold for the take, blue for you. A dot at the edge marks the
      take's note right now, which is the one to aim at. */
   window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
+    if (ST.reading && window.RPFileMap && window.rpBoardNote) {
+      var rs = RPFileMap.stateOf(ST.reading.id);
+      rpBoardNote(c2, W, H, (rs ? rs.msg.replace(/\u2026$/, '') : 'Working out the tune') + ' \u2014 ' +
+                  Math.round(((rs && rs.frac) || 0) * 100) + '%',
+                  'The song starts by itself when this is done');
+      return;
+    }
     var o = ST.overlay;
     if (!o || !o.notes || !o.audio || o.audio.ended) return;
     var t0 = o.audio.currentTime || 0;
@@ -682,32 +689,13 @@
      press twice. */
   function readThenLoad(song) {
     ST.stopAll();
-    var cv = $('freeCanvas');
-    var el = $('rpPtReading');
-    if (!el && cv && cv.parentElement) {
-      el = document.createElement('div');
-      el.id = 'rpPtReading';
-      el.className = 'measured';
-      el.style.cssText = 'margin:8px 0 2px;font-size:12.5px;font-weight:700';
-      cv.parentElement.insertBefore(el, cv.nextSibling);
-    }
-    var show = function () {
-      if (!el) return;
-      var st = RPFileMap.stateOf(song.id);
-      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
-      el.style.display = '';
-      el.textContent = (st ? st.msg : 'Working out the tune\u2026') + ' \u2014 ' + pct +
-                       '% \u00b7 the song starts by itself when this is done';
-    };
-    show();
-    var iv = setInterval(show, 400);
+    ST.reading = song;
     return RPFileMap.ensure(song, true).then(function () {
-      clearInterval(iv);
-      if (el) el.style.display = 'none';
+      if (ST.reading === song) ST.reading = null;
       loadTake(song);
     }, function () {
-      clearInterval(iv);
-      if (el) el.textContent = 'Could not read this song.';
+      if (ST.reading === song) ST.reading = null;
+      say('Could not read this song.');
     });
   }
 
