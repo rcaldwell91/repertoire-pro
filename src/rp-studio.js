@@ -387,8 +387,9 @@
        0.05s. The live blue line has already had the same 0.1s taken off it,
        which is why both cases now land on each other. Measured, not guessed
        — see the note beside rpMicLag in the build. */
-    var lag = 0;
-    try { lag = window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0; } catch (e) { lag = 0; }
+    var lag = 0, ear = 0;
+    try { ear = window.rpEarLag ? rpEarLag() : 0; } catch (e) { ear = 0; }
+    try { lag = (window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0) + ear; } catch (e) { lag = ear; }
     var shape = window.rpNoteShape ? rpNoteShape(notes) : 'line';
     c2.save();
     c2.strokeStyle = 'rgba(232,179,74,.95)';
@@ -416,21 +417,43 @@
       }
       c2.lineCap = 'butt';
     } else {
+      /* measurement only, when a test asks: where each phrase's first point
+         was drawn this frame, against the recording's own clock */
+      var rec = window.__rpMeasure, near = rec ? [] : null;
+      /* A point taken twenty times a second stands for the 50ms around it,
+         so a phrase is drawn from half a step before its first point to
+         half a step after its last - where the voice began and ended, not
+         where the first sample happened to land. Measured 25 Sep: drawing
+         from the first point put every phrase on average 25ms late. */
+      var half = 0.025;
+      if (notes.length > 1 && notes[1].t > notes[0].t) half = (notes[1].t - notes[0].t) / 2;
       c2.beginPath();
       var pen = false, prev = null;
       for (i = 0; i < notes.length; i++) {
         n = notes[i];
         if (n.m == null) { pen = false; prev = null; continue; }
         x = W - (t0 - (n.t + lag)) * pps;
-        if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+        var runStart = (i === 0 || notes[i - 1].m == null);
+        var runEnd = (i + 1 >= notes.length || notes[i + 1].m == null);
+        if (near && runStart && Math.abs(x - W) < 80) {
+          near.push([i, +(x - half * pps).toFixed(2)]);
+        }
+        if (x < -4 - half * pps || x > W + 4 + half * pps) { pen = false; prev = null; continue; }
         y = yOf(n.m);
         var leap = prev && Math.abs(n.m - prev.m) > 6;
-        if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+        if (!pen || leap) {
+          if (runStart) { c2.moveTo(x - half * pps, y); c2.lineTo(x, y); }
+          else c2.moveTo(x, y);
+        } else c2.lineTo(x, y);
+        if (runEnd) c2.lineTo(x + half * pps, y);
         pen = true; prev = n;
         if (n.t + lag <= t0) cur = n;
       }
       c2.lineWidth = 2.5;
       c2.stroke();
+      if (rec && rec.length < 40000) {
+        rec.push({ s: 'pt', a: t0, p: performance.now(), edge: W, lag: lag, ear: ear, r: near });
+      }
     }
     c2.shadowBlur = 0;
     c2.lineWidth = 1;
@@ -651,8 +674,46 @@
     try { if (window.RPSend && RPSend.stopListen) RPSend.stopListen(); } catch (e) {}
     playBar();
   };
+  /* Robert, 25 Sep: "Robert's screenshot of All of Me still shows flat bars:
+     that is the old-analyser map, not re-read." A song file is drawn as the
+     line the app hears, never as the old bars. If its reading is not done,
+     this shows how far along it is and starts the song by itself when the
+     line is ready - no empty board, no bars in the meantime, nothing to
+     press twice. */
+  function readThenLoad(song) {
+    ST.stopAll();
+    var cv = $('freeCanvas');
+    var el = $('rpPtReading');
+    if (!el && cv && cv.parentElement) {
+      el = document.createElement('div');
+      el.id = 'rpPtReading';
+      el.className = 'measured';
+      el.style.cssText = 'margin:8px 0 2px;font-size:12.5px;font-weight:700';
+      cv.parentElement.insertBefore(el, cv.nextSibling);
+    }
+    var show = function () {
+      if (!el) return;
+      var st = RPFileMap.stateOf(song.id);
+      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
+      el.style.display = '';
+      el.textContent = (st ? st.msg : 'Working out the tune\u2026') + ' \u2014 ' + pct +
+                       '% \u00b7 the song starts by itself when this is done';
+    };
+    show();
+    var iv = setInterval(show, 400);
+    return RPFileMap.ensure(song, true).then(function () {
+      clearInterval(iv);
+      if (el) el.style.display = 'none';
+      loadTake(song);
+    }, function () {
+      clearInterval(iv);
+      if (el) el.textContent = 'Could not read this song.';
+    });
+  }
+
   function loadTake(s) {
     if (!s) return say('Keep a take first.');
+    if (s.kind !== 'recording' && window.RPFileMap && RPFileMap.needsBuild(s)) return readThenLoad(s);
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
     claimSound('sing-along', function () { try { stopOver(); } catch (e) {} });

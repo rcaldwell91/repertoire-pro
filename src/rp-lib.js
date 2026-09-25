@@ -606,6 +606,23 @@
     Array.prototype.slice.call(box.children).forEach(function (r, i) {
       var s = list[i];
       if (!s) return;
+      /* Robert, 25 Sep: a song being read again carries a small note on its
+         card until it is done, and loses it the moment it is */
+      var st = window.RPFileMap ? RPFileMap.stateOf(s.id) : null;
+      var busy = !!(st && (st.st === 'queued' || st.st === 'reading'));
+      var tag = r.querySelector('.rp-upd');
+      if (busy && !tag) {
+        var meta = r.querySelector('.meta') || r;
+        tag = document.createElement('span');
+        tag.className = 'rp-upd';
+        tag.style.cssText = 'display:block;font-size:11px;font-weight:800;color:var(--ink-faint);margin-top:2px';
+        meta.appendChild(tag);
+      }
+      if (tag) {
+        if (busy) tag.textContent = st.st === 'reading'
+          ? 'updating\u2026 ' + Math.round((st.frac || 0) * 100) + '%' : 'updating\u2026';
+        else tag.parentNode.removeChild(tag);
+      }
       if (!r.querySelector('.rp-art')) {
         var d = document.createElement('div');
         d.innerHTML = art(s.title, s.kind === 'recording' ? 'i-mic' : 'i-music', 52);
@@ -672,13 +689,17 @@
   })();
 
   /* ================================================================== */
-  var ticks = 0;
+  var ticks = 0, scanned = false;
   setInterval(function () {
     ticks++;
     if (!lib() || !$('modeLib') || !window.RPPage) return;
     mini();
     npTick();
     var on_ = $('modeLib').classList.contains('active');
+    if (on_ && !scanned && window.RPFileMap && RPFileMap.scanLibrary) {
+      scanned = true;
+      try { RPFileMap.scanLibrary(); } catch (e) {}
+    }
     if (on_) {
       if (!$('rpLibTop')) L.draw();
       else hideBaseChrome();

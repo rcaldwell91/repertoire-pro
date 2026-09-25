@@ -1326,7 +1326,7 @@ try{ if(localStorage.getItem('rep_monitor') === '1') MONITOR.on = true; }catch(e
    singer listening, not a broken input. Whatever mode is in use is shown on
    screen, and the other modes are a button press away — never automatic. */
 const MIC_PROFILES = [
-  {name:'raw', c:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}},
+  {name:'raw', c:{echoCancellation:false, noiseSuppression:false, autoGainControl:false, latency:{ideal:0}}},
   {name:'default', c:true},
   {name:'processed', c:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}},
   {name:'basic', c:{echoCancellation:false}}
@@ -2508,6 +2508,28 @@ window.rpMicLag = function(){
   return ms/1000;
 };
 window.RP_MAP_LEAD = 0.05;
+/* Robert, 25 Sep: "shift the drawn notes on both screens so a note reaches
+   the bar when the sound reaches the ears." Sound leaves the app, then sits
+   in the phone's own output buffers before it is heard - the browser reports
+   how long that is. A note is drawn that much later, so it reaches the bar
+   when it is heard rather than when it was sent. Mic timing offset stays as
+   the manual adjustment on top. */
+window.rpEarLag = function(){
+  try{
+    if(typeof ctx === 'undefined' || !ctx) return 0;
+    let o = (typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0) ? ctx.outputLatency
+          : (typeof ctx.baseLatency === 'number' ? ctx.baseLatency : 0);
+    return (o > 0 && o < 0.5) ? o : 0;   /* a reading past half a second is not believable */
+  }catch(e){ return 0; }
+};
+/* The microphone's own part of the delay. Mic timing offset (state.latencyMs)
+   is the WHOLE trip - out through the headphones, into the singer, back in
+   through the microphone - and has been since 13 Sep. Now the notes carry the
+   out part themselves, the voice line takes back only what is left. Counting
+   the output delay on both sides would put the line early by exactly it. */
+window.rpVoiceLag = function(){
+  return Math.max(0, window.rpMicLag() - window.rpEarLag());
+};
 /* seconds to ADD to a stored note's time before it is drawn */
 /* Two different shapes of data go through these drawers, and drawing one as
    the other is what produced both of Robert's screenshots on 20 Sep: a file
@@ -2531,9 +2553,9 @@ window.rpNoteLag = function(song){
   if(!song) return 0;
   if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
   if(song.notesFrom === 'trace') return 0;     /* read straight off the file */
-  if(song.notesFrom === 'live') return -window.rpMicLag();
+  if(song.notesFrom === 'live') return -window.rpVoiceLag();   /* a take never went out through the headphones */
   if(song.notesFrom === 'file' || song.mapVer) return window.RP_MAP_LEAD;
-  return -window.rpMicLag();   /* no map version: a take's own live line */
+  return -window.rpVoiceLag();   /* no map version: a take's own live line */
 };
 
 /* ---- one palette for everything drawn on canvas -------------------------
@@ -3286,7 +3308,7 @@ $('mp3File').addEventListener('change', e=>{
 function freeFrame(dt){
   const now = (performance.now()-FREE.t0)/1000;
   const userMidi = MIC.on? smoothedMidi() : null;
-  FREE.trail.push({t:now - rpMicLag(), m:userMidi});
+  FREE.trail.push({t:now - rpVoiceLag(), m:userMidi});
   while(FREE.trail.length && now-FREE.trail[0].t > 7) FREE.trail.shift();
 
   if(userMidi!==null){
@@ -3976,7 +3998,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '25 Sep 2026 · build f771a1a5';
+const APP_VERSION = '25 Sep 2026 · build 446713ce';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -15274,8 +15296,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
        0.05s. The live blue line has already had the same 0.1s taken off it,
        which is why both cases now land on each other. Measured, not guessed
        — see the note beside rpMicLag in the build. */
-    var lag = 0;
-    try { lag = window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0; } catch (e) { lag = 0; }
+    var lag = 0, ear = 0;
+    try { ear = window.rpEarLag ? rpEarLag() : 0; } catch (e) { ear = 0; }
+    try { lag = (window.rpNoteLag ? rpNoteLag(o.song || { notesFrom: o.from }) : 0) + ear; } catch (e) { lag = ear; }
     var shape = window.rpNoteShape ? rpNoteShape(notes) : 'line';
     c2.save();
     c2.strokeStyle = 'rgba(232,179,74,.95)';
@@ -15303,21 +15326,43 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       }
       c2.lineCap = 'butt';
     } else {
+      /* measurement only, when a test asks: where each phrase's first point
+         was drawn this frame, against the recording's own clock */
+      var rec = window.__rpMeasure, near = rec ? [] : null;
+      /* A point taken twenty times a second stands for the 50ms around it,
+         so a phrase is drawn from half a step before its first point to
+         half a step after its last - where the voice began and ended, not
+         where the first sample happened to land. Measured 25 Sep: drawing
+         from the first point put every phrase on average 25ms late. */
+      var half = 0.025;
+      if (notes.length > 1 && notes[1].t > notes[0].t) half = (notes[1].t - notes[0].t) / 2;
       c2.beginPath();
       var pen = false, prev = null;
       for (i = 0; i < notes.length; i++) {
         n = notes[i];
         if (n.m == null) { pen = false; prev = null; continue; }
         x = W - (t0 - (n.t + lag)) * pps;
-        if (x < -4 || x > W + 4) { pen = false; prev = null; continue; }
+        var runStart = (i === 0 || notes[i - 1].m == null);
+        var runEnd = (i + 1 >= notes.length || notes[i + 1].m == null);
+        if (near && runStart && Math.abs(x - W) < 80) {
+          near.push([i, +(x - half * pps).toFixed(2)]);
+        }
+        if (x < -4 - half * pps || x > W + 4 + half * pps) { pen = false; prev = null; continue; }
         y = yOf(n.m);
         var leap = prev && Math.abs(n.m - prev.m) > 6;
-        if (!pen || leap) c2.moveTo(x, y); else c2.lineTo(x, y);
+        if (!pen || leap) {
+          if (runStart) { c2.moveTo(x - half * pps, y); c2.lineTo(x, y); }
+          else c2.moveTo(x, y);
+        } else c2.lineTo(x, y);
+        if (runEnd) c2.lineTo(x + half * pps, y);
         pen = true; prev = n;
         if (n.t + lag <= t0) cur = n;
       }
       c2.lineWidth = 2.5;
       c2.stroke();
+      if (rec && rec.length < 40000) {
+        rec.push({ s: 'pt', a: t0, p: performance.now(), edge: W, lag: lag, ear: ear, r: near });
+      }
     }
     c2.shadowBlur = 0;
     c2.lineWidth = 1;
@@ -15538,8 +15583,46 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try { if (window.RPSend && RPSend.stopListen) RPSend.stopListen(); } catch (e) {}
     playBar();
   };
+  /* Robert, 25 Sep: "Robert's screenshot of All of Me still shows flat bars:
+     that is the old-analyser map, not re-read." A song file is drawn as the
+     line the app hears, never as the old bars. If its reading is not done,
+     this shows how far along it is and starts the song by itself when the
+     line is ready - no empty board, no bars in the meantime, nothing to
+     press twice. */
+  function readThenLoad(song) {
+    ST.stopAll();
+    var cv = $('freeCanvas');
+    var el = $('rpPtReading');
+    if (!el && cv && cv.parentElement) {
+      el = document.createElement('div');
+      el.id = 'rpPtReading';
+      el.className = 'measured';
+      el.style.cssText = 'margin:8px 0 2px;font-size:12.5px;font-weight:700';
+      cv.parentElement.insertBefore(el, cv.nextSibling);
+    }
+    var show = function () {
+      if (!el) return;
+      var st = RPFileMap.stateOf(song.id);
+      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
+      el.style.display = '';
+      el.textContent = (st ? st.msg : 'Working out the tune\u2026') + ' \u2014 ' + pct +
+                       '% \u00b7 the song starts by itself when this is done';
+    };
+    show();
+    var iv = setInterval(show, 400);
+    return RPFileMap.ensure(song, true).then(function () {
+      clearInterval(iv);
+      if (el) el.style.display = 'none';
+      loadTake(song);
+    }, function () {
+      clearInterval(iv);
+      if (el) el.textContent = 'Could not read this song.';
+    });
+  }
+
   function loadTake(s) {
     if (!s) return say('Keep a take first.');
+    if (s.kind !== 'recording' && window.RPFileMap && RPFileMap.needsBuild(s)) return readThenLoad(s);
     if (!s.notes || !s.notes.length) return say('That take has no notes with it, so there is nothing to sing over.');
     ST.stopAll();
     claimSound('sing-along', function () { try { stopOver(); } catch (e) {} });
@@ -20687,6 +20770,23 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     Array.prototype.slice.call(box.children).forEach(function (r, i) {
       var s = list[i];
       if (!s) return;
+      /* Robert, 25 Sep: a song being read again carries a small note on its
+         card until it is done, and loses it the moment it is */
+      var st = window.RPFileMap ? RPFileMap.stateOf(s.id) : null;
+      var busy = !!(st && (st.st === 'queued' || st.st === 'reading'));
+      var tag = r.querySelector('.rp-upd');
+      if (busy && !tag) {
+        var meta = r.querySelector('.meta') || r;
+        tag = document.createElement('span');
+        tag.className = 'rp-upd';
+        tag.style.cssText = 'display:block;font-size:11px;font-weight:800;color:var(--ink-faint);margin-top:2px';
+        meta.appendChild(tag);
+      }
+      if (tag) {
+        if (busy) tag.textContent = st.st === 'reading'
+          ? 'updating\u2026 ' + Math.round((st.frac || 0) * 100) + '%' : 'updating\u2026';
+        else tag.parentNode.removeChild(tag);
+      }
       if (!r.querySelector('.rp-art')) {
         var d = document.createElement('div');
         d.innerHTML = art(s.title, s.kind === 'recording' ? 'i-mic' : 'i-music', 52);
@@ -20753,13 +20853,17 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   })();
 
   /* ================================================================== */
-  var ticks = 0;
+  var ticks = 0, scanned = false;
   setInterval(function () {
     ticks++;
     if (!lib() || !$('modeLib') || !window.RPPage) return;
     mini();
     npTick();
     var on_ = $('modeLib').classList.contains('active');
+    if (on_ && !scanned && window.RPFileMap && RPFileMap.scanLibrary) {
+      scanned = true;
+      try { RPFileMap.scanLibrary(); } catch (e) {}
+    }
     if (on_) {
       if (!$('rpLibTop')) L.draw();
       else hideBaseChrome();
@@ -21654,12 +21758,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   window.__rpHeardS = 0;
 
   function outLat() {
-    try {
-      if (typeof ctx === 'undefined' || !ctx) return 0;
-      var o = ctx.outputLatency;
-      if (!(o > 0)) o = ctx.baseLatency;
-      return (o > 0 && o < 1) ? o : 0;
-    } catch (e) { return 0; }
+    try { return window.rpEarLag ? rpEarLag() : 0; } catch (e) { return 0; }
   }
   function apply(ms) {
     try { state.latencyMs = ms; } catch (e) {}
@@ -21684,8 +21783,20 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     apply(autoMs);
   };
 
+  /* Robert, 25 Sep: show the output delay "in plain words in the Sound
+     panel". It is what the phone reports, so it says so. */
+  function hearLine(out) {
+    var el = $('rpHearLine');
+    if (!el) return;
+    var ms = Math.round(out * 1000);
+    el.textContent = ms > 0
+      ? 'Your phone says it plays sound ' + ms + ' ms after the app sends it. Notes are drawn ' + ms +
+        ' ms later to match, so they reach the bar when you hear them.'
+      : 'Your phone has not said how long it takes to play sound, so notes are drawn as sent.';
+  }
   function tick() {
     var out = outLat();
+    hearLine(out);
     window.__rpHeardS = out;
     var a = Math.round((out * 1000 + 100) / 10) * 10;
     if (a !== autoMs) { autoMs = a; if (saved == null) apply(autoMs); }
@@ -21712,6 +21823,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     d.innerHTML =
       '<div class="rp-ttl">Timing</div>' +
       '<div class="rp-sub" style="margin-bottom:8px">If your voice shows up late on the note map, move this right. Early, move it left.</div>' +
+      '<div class="rp-sub" id="rpHearLine" style="margin-bottom:8px"></div>' +
       '<label style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--ink-faint)">' +
         '<span>Mic delay</span><output id="rpTimingOut">100 ms</output></label>' +
       '<input type="range" id="rpTimingRange" min="0" max="400" value="100" step="10" style="width:100%">' +
@@ -23757,7 +23869,29 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   var HOP = 0.05;            /* twenty points a second, same as a take     */
   var WIN = 4096;            /* the analyser's own window, from base.html  */
   var ANCHOR = 0.22;         /* the pitch model's spacing on the live path */
-  var TRACE_VER = 1;
+  var TRACE_VER = 2;
+
+  /* WHERE IN THE WINDOW THE PITCH IS READ FROM. Measured 25 Sep, before
+     this change: on Robert's two recordings a phrase's first note reached
+     the playhead 60ms and 50ms after the sound on the Pitch Tracker.
+
+     The cause is geometry, not tuning. yinHz does not read the whole 4096
+     samples it is handed: it compares sample i with sample i+lag for the
+     first 1024 values of i, so everything it uses sits in the first
+     1024 + lag samples - about 39ms at the front. The window used to be
+     centred on the point's own time, which put the part yinHz actually
+     reads 33ms EARLIER than the time the point was given. Every pitch in a
+     file was dated a third of a tenth of a second late.
+
+     So the window now starts where it has to for the region yinHz reads to
+     be centred on the point's time: half of 1024, plus half a typical sung
+     period (4ms, about 250Hz), before it. Across the singing range that
+     centre moves by about 2ms, not 33. The loudness gate still looks at the
+     whole window. Version 2, so every song read the old way is read again.
+
+     The microphone path is left alone on purpose: its buffer ends at "now"
+     and always has, and its delay is what Mic timing offset takes back. */
+  function yinOffset(sr) { return (WIN >> 1) - Math.round(512 + 0.002 * sr); }
 
   /* ---- is this song's map the old kind? ------------------------------ */
   F.needsBuild = function (song) {
@@ -23807,51 +23941,36 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     });
   }
 
-  /* ---- the trace ------------------------------------------------------ */
-  F.build = async function (song) {
-    if (!song || !song.blob) throw new Error('nothing to read');
-    ensureCtx();
-    status('Reading the file…', 0.02);
-    var decoded = await ctx.decodeAudioData((await song.blob.arrayBuffer()).slice(0));
-    var sr = decoded.sampleRate, len = decoded.length;
-    var L = decoded.getChannelData(0);
-    var R = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : L;
-    var mono = new Float32Array(len);
-    for (var i = 0; i < len; i++) mono[i] = (L[i] + R[i]) / 2;
-
-    status('Listening with the pitch model…', 0.06);
-    var nA = Math.max(1, Math.floor(decoded.duration / ANCHOR));
-    var anc = await anchors(mono, sr, nA);
-
-    status('Following the voice…', 0.3);
-    var steps = Math.floor(decoded.duration / HOP);
-    var win = new Float32Array(WIN);
-    var notes = [], hist = [];
-    var gateLevel = 0.004, gateOn = true;
-    try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
-
-    for (var k = 0; k < steps; k++) {
-      var t = k * HOP;
-      /* the window sits centred on t, so the pitch is dated where it sounded */
-      var start = Math.round(t * sr) - (WIN >> 1);
-      var rms = 0, j, sp2;
-      for (j = 0; j < WIN; j++) {
-        sp2 = start + j;
-        var v = (sp2 >= 0 && sp2 < len) ? mono[sp2] : 0;
+  /* ---- the reading itself, as one plain function ----------------------
+     Robert, 25 Sep: "Start never blocks." A four-minute song is thousands of
+     pitch readings, and on the page they froze the phone in slices for a
+     minute or more. So the per-reading work is one function with nothing
+     outside it except yinHz and freqMidi, and it runs in a worker. The
+     worker is handed THE PAGE'S OWN SOURCE for those two functions, not a
+     copy kept here, so a file and a microphone cannot drift apart. If a
+     worker cannot start, the same function runs on the page in short
+     slices instead. */
+  function traceRange(mono, sr, o, k0, k1, hist, out) {
+    var len = mono.length, win = new Float32Array(o.WIN);
+    for (var k = k0; k < k1; k++) {
+      var t = k * o.HOP;
+      var start = Math.round(t * sr) - (o.WIN >> 1);
+      var rms = 0, j, sp, v;
+      for (j = 0; j < o.WIN; j++) {
+        sp = start + j;
+        v = (sp >= 0 && sp < len) ? mono[sp] : 0;
         win[j] = v; rms += v * v;
       }
-      rms = Math.sqrt(rms / WIN);
-
+      rms = Math.sqrt(rms / o.WIN);
       var m = null;
-      if (!gateOn || rms >= gateLevel) {
-        var f = yinHz(win, sr);
+      if (!o.gateOn || rms >= o.gate) {
+        var f = yinHz(o.yinOff ? win.subarray(o.yinOff) : win, sr);
         if (f > 0) {
           m = freqMidi(f);
-          /* the same octave snap the live path makes, from the same model */
-          if (anc) {
-            var ai = Math.round(t / ANCHOR);
-            if (ai >= 0 && ai < anc.midi.length && anc.conf[ai] >= 0.5) {
-              var am = anc.midi[ai], ks = [-24, -12, 12, 24];
+          if (o.anc) {
+            var ai = Math.round(t / o.ANCHOR);
+            if (ai >= 0 && ai < o.anc.midi.length && o.anc.conf[ai] >= 0.5) {
+              var am = o.anc.midi[ai], ks = [-24, -12, 12, 24];
               for (var z = 0; z < 4; z++) {
                 if (Math.abs(m + ks[z] - am) < 1.5 && Math.abs(m - am) > 4) { m += ks[z]; break; }
               }
@@ -23866,12 +23985,83 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         var s2 = hist.slice().sort(function (a, b) { return a - b; });
         m = s2[Math.floor(s2.length / 2)];
       }
-      notes.push({ t: +t.toFixed(2), m: m == null ? null : +m.toFixed(2) });
-      if ((k & 255) === 0) {
-        status('Following the voice…', 0.3 + 0.65 * (k / steps));
-        await new Promise(function (r) { setTimeout(r, 0); });   /* let the page breathe */
-      }
+      out.push({ t: +t.toFixed(2), m: m == null ? null : +m.toFixed(2) });
     }
+  }
+  function workerMain() {
+    self.onmessage = function (e) {
+      var d = e.data;
+      NGATE.clarity = d.clarity;
+      var out = [], hist = [], CH = 512;
+      for (var k = 0; k < d.steps; k += CH) {
+        traceRange(d.mono, d.sr, d.o, k, Math.min(d.steps, k + CH), hist, out);
+        self.postMessage({ type: 'progress', frac: Math.min(1, (k + CH) / d.steps) });
+      }
+      self.postMessage({ type: 'done', notes: out });
+    };
+  }
+  function runTrace(mono, sr, o, steps, onFrac) {
+    var clarity = 0.35;
+    try { clarity = NGATE.clarity; } catch (e) {}
+    return new Promise(function (resolve) {
+      var src = null, url = null, w = null;
+      try {
+        src = 'var NGATE = { level: 0, clarity: ' + clarity + ' };\n' +
+              freqMidi.toString() + '\n' + yinHz.toString() + '\n' +
+              traceRange.toString() + '\n(' + workerMain.toString() + ')();';
+        url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      var onPage = function () {
+        /* no worker: the same function, a short slice at a time */
+        var out = [], hist = [], k = 0, CH = 24;
+        (function slice() {
+          traceRange(mono, sr, o, k, Math.min(steps, k + CH), hist, out);
+          k += CH;
+          if (onFrac) onFrac(Math.min(1, k / steps));
+          if (k < steps) setTimeout(slice, 0); else resolve(out);
+        })();
+      };
+      if (!w) return onPage();
+      w.onmessage = function (e) {
+        if (e.data.type === 'progress') { if (onFrac) onFrac(e.data.frac); return; }
+        try { w.terminate(); URL.revokeObjectURL(url); } catch (err) {}
+        resolve(e.data.notes);
+      };
+      w.onerror = function () {
+        try { w.terminate(); URL.revokeObjectURL(url); } catch (err) {}
+        onPage();
+      };
+      w.postMessage({ mono: mono, sr: sr, o: o, steps: steps, clarity: clarity }, [mono.buffer]);
+    });
+  }
+
+  /* ---- the trace ------------------------------------------------------ */
+  F.build = async function (song, onProgress) {
+    if (!song || !song.blob) throw new Error('nothing to read');
+    var say = onProgress || status;
+    ensureCtx();
+    say('Reading the file…', 0.02);
+    var decoded = await ctx.decodeAudioData((await song.blob.arrayBuffer()).slice(0));
+    var sr = decoded.sampleRate, len = decoded.length;
+    var L = decoded.getChannelData(0);
+    var R = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : L;
+    var mono = new Float32Array(len);
+    for (var i = 0; i < len; i++) mono[i] = (L[i] + R[i]) / 2;
+
+    say('Listening with the pitch model…', 0.06);
+    var nA = Math.max(1, Math.floor(decoded.duration / ANCHOR));
+    var anc = await anchors(mono, sr, nA);
+
+    say('Following the voice…', 0.3);
+    var steps = Math.floor(decoded.duration / HOP);
+    var gateLevel = 0.004, gateOn = true;
+    try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
+    var o = { HOP: HOP, WIN: WIN, ANCHOR: ANCHOR, gate: gateLevel, gateOn: gateOn,
+              yinOff: yinOffset(sr), anc: anc };
+    var notes = await runTrace(mono, sr, o, steps, function (fr) {
+      say('Following the voice…', 0.3 + 0.65 * fr);
+    });
 
     notes = bridge(notes);
     song.notes = notes;
@@ -23883,9 +24073,73 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try { await dbPut('songs', song); } catch (e) {}
 
     var voiced = notes.filter(function (p) { return p.m != null; }).length;
-    status('Done — ' + Math.round(voiced * HOP) + 's of singing found. Press Start.', null);
+    say('Done — ' + Math.round(voiced * HOP) + 's of singing found.', 1);
     return song;
   };
+
+  /* ---- one at a time, in the background ------------------------------
+     Robert, 25 Sep: "A song is read by the live listener ONCE, when it is
+     added, in the background ... Start never blocks and nothing asks the
+     singer to wait or reload."
+
+     A song is read the moment it is added, and songs carrying an old map
+     are read again the first time the Library opens. Only one reading runs
+     at a time. A song the singer opens jumps to the front, and any screen
+     can ask how far along it is rather than showing an empty board. */
+  var Q = [], busy = false, st = {};
+  F.stateOf = function (id) { return st[id] || null; };
+  F.busy = function () { return busy || Q.length > 0; };
+  F.ensure = function (song, urgent) {
+    if (!song) return Promise.reject(new Error('no song'));
+    if (!F.needsBuild(song)) return Promise.resolve(song);
+    var s = st[song.id];
+    if (!s || s.st === 'failed' || s.st === 'done') {
+      s = st[song.id] = { st: 'queued', frac: 0, msg: 'Waiting to be read…' };
+      s.promise = new Promise(function (res, rej) { s.res = res; s.rej = rej; });
+      Q.push(song);
+    }
+    if (urgent && s.st === 'queued') {
+      Q = Q.filter(function (x) { return x !== song; });
+      Q.unshift(song);
+    }
+    pump();
+    return s.promise;
+  };
+  function pump() {
+    if (busy || !Q.length) return;
+    var song = Q.shift(), s = st[song.id];
+    busy = true; s.st = 'reading';
+    F.build(song, function (msg, frac) { s.msg = msg; if (frac != null) s.frac = frac; })
+      .then(function () { s.st = 'done'; s.frac = 1; s.res(song); },
+            function (e) { s.st = 'failed'; s.msg = 'Could not read this song — ' + (e && e.message || e); s.rej(e); })
+      .then(function () { busy = false; pump(); });
+  }
+  /* songs that carry a map from before the live listener, re-read quietly */
+  F.scanLibrary = function () {
+    var list = [];
+    try { list = (LIB.songs || []); } catch (e) {}
+    list.forEach(function (s) {
+      if (s.kind === 'recording') return;
+      if (s.notes && s.notes.length && F.needsBuild(s)) F.ensure(s).catch(function () {});
+    });
+  };
+  /* a song is read the moment it is added */
+  (function () {
+    var real = window.dbPut;
+    if (typeof real !== 'function' || real.rpReadWrapped) return;
+    var wrapped = function (store, obj) {
+      var r = real.apply(this, arguments);
+      try {
+        if (store === 'songs' && obj && obj.kind !== 'recording' && obj.blob &&
+            !(obj.notes && obj.notes.length) && !st[obj.id]) {
+          Promise.resolve(r).then(function () { F.ensure(obj).catch(function () {}); });
+        }
+      } catch (e) {}
+      return r;
+    };
+    wrapped.rpReadWrapped = true;
+    window.dbPut = wrapped;
+  })();
 
   /* ---- consonants ----------------------------------------------------
      Measured 24 Sep on two of Robert's own recordings: where the file is
@@ -23962,7 +24216,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     gaps.sort(function (a, b) { return a - b; });
     var step = gaps.length ? +gaps[gaps.length >> 1].toFixed(3) : HOP;
     if (!(step > 0)) step = HOP;
-    var out = [], i = 0, n = notes.length;
+    /* A phrase's first note starts where the VOICE starts. Measured 25 Sep:
+       on both of Robert's recordings a phrase's first bubble began 20-30ms
+       after the traced line did, because a singer scoops into the first
+       note of a phrase and a bubble only began once the pitch had settled
+       inside a semitone. So the note began after the singer had. When the
+       stretch before a bubble is that approach - voiced, straight after
+       silence, not long enough to be a note of its own - the bubble starts
+       there instead, and keeps the pitch it settled on. No further back
+       than the shortest note a bubble can be, so a long slide stays its
+       own gesture. */
+    var AHEAD = Math.round(0.15 / step);
+    var out = [], i = 0, n = notes.length, lastEnd = 0;
     while (i < n) {
       if (notes[i].m == null) { i++; continue; }
       var j = i, lo = notes[i].m, hi = notes[i].m, sum = notes[i].m, cnt = 1;
@@ -23974,7 +24239,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       }
       var dur = +(((j - i + 1) * step).toFixed(2));
       if (dur >= 0.15) {
-        out.push({ m: Math.round(sum / cnt), t: +(notes[i].t).toFixed(2), d: dur });
+        var k = i;
+        while (k - 1 >= lastEnd && notes[k - 1].m != null && i - (k - 1) <= AHEAD) k--;
+        if (k < i && (k === 0 || notes[k - 1].m == null)) {
+          dur = +(((j - k + 1) * step).toFixed(2));
+        } else k = i;                        /* not a phrase start: leave it */
+        /* a point taken twenty times a second stands for the 50ms around
+           it, so a run of them covers half a step either side. Starting the
+           bubble at the first point instead put every note on average 25ms
+           after the voice began - measured 25 Sep, with the pitch itself
+           locking on 5ms after the sound. The length is unchanged. */
+        out.push({ m: Math.round(sum / cnt), t: +(notes[k].t - step / 2).toFixed(3), d: dur });
+        lastEnd = j + 1;
       }
       i = j + 1;
     }
@@ -24100,8 +24376,10 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     mix();
     phones();
     S.synth = !song.blob && !!(song.notes && song.notes.length);
+    S.startWhenReady = false;
+    S.cut = null;
     if (!song.blob && !S.synth) { sub('There is no sound on this one.'); foot(''); }
-    else if (!(song.notes && song.notes.length)) autoMap();
+    else if (window.RPFileMap && RPFileMap.needsBuild(song)) autoMap();
     else {
       sub('Press Start. The bubbles are the song. Your line is you.');
       foot(S.synth ? 'This one is built in, so the app plays the tune itself.' : '');
@@ -24238,37 +24516,44 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* THE APP WORKS THE NOTES OUT ITSELF                                 */
   /* ---------------------------------------------------------------- */
   function autoMap() {
-    if (S.mapping) return;
-    S.mapping = true;
-    sub('Working out the tune…');
-    foot('The app is listening to the file once, to find the notes. It only has to do this the first time.');
-    var t0 = Date.now();
-    var iv = setInterval(function () {
-      var m = $('libMapMsg');
-      var stage = m ? (m.textContent || '').split(' · ')[0] : '';
-      var bar = $('libMapBar');
-      var pct = bar ? (bar.style.width || '0%') : '';
-      sub(esc(stage || 'Working out the tune') + ' — ' + pct +
-          ' · ' + Math.round((Date.now() - t0) / 1000) + 's');
-    }, 700);
-    var done = function (okNotes) {
+    var song = S.song;
+    if (!song || S.mapping === song.id) return;
+    S.mapping = song.id;
+    foot('The app listens to the file once, to find the notes. Each song only needs it once.');
+    /* Robert, 25 Sep: "Opening a song from any screen while its read is
+       still running shows progress, not an empty board", and "Start never
+       blocks". The reading runs in the background whatever this screen
+       does; this only shows how far along it is. Start pressed meanwhile is
+       remembered, and the song begins the moment the notes are ready. */
+    var show = function () {
+      if (!S.open || S.song !== song) return;
+      var st = window.RPFileMap ? RPFileMap.stateOf(song.id) : null;
+      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
+      sub(esc(st ? st.msg : 'Working out the tune…') + ' — ' + pct + '%' +
+          (S.startWhenReady ? ' · it starts by itself when this is done' : ''));
+    };
+    show();
+    var iv = setInterval(show, 400);
+    var finish = function (ok) {
       clearInterval(iv);
-      S.mapping = false;
-      if (okNotes) {
-        pinWindow();          /* the song is known now, so the view is settled */
-        sub('Press Start. The bubbles are the song. Your line is you.');
+      if (S.mapping === song.id) S.mapping = false;
+      if (!S.open || S.song !== song) return;
+      if (ok) {
+        S.cut = null;             /* the notes have just changed */
+        pinWindow();
         foot('');
+        if (S.startWhenReady) { S.startWhenReady = false; start(); return; }
+        sub('Press Start. The bubbles are the song. Your line is you.');
       } else {
+        S.startWhenReady = false;
         sub('Could not find a clear tune in that file.');
         foot('It works best on a recording of one voice with no band behind it. ' +
              'Go back and try another file.');
       }
     };
-    try {
-      RPFileMap.build(S.song).then(function () {
-        done(!!(S.song.notes && S.song.notes.length));
-      }).catch(function () { done(false); });
-    } catch (e) { done(false); }
+    RPFileMap.ensure(song, true).then(function () {
+      finish(!!(song.notes && song.notes.length));
+    }, function () { finish(false); });
   }
 
   /* ---------------------------------------------------------------- */
@@ -24334,8 +24619,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!s || S.playing) return;
     /* Robert, 24 Sep: a song carrying a map from the old analyser is read
        again with the live tracker the next time it is opened. */
-    if (window.RPFileMap && RPFileMap.needsBuild(s)) { autoMap(); return; }
-    if (!(s.notes && s.notes.length)) { autoMap(); return; }
+    if (window.RPFileMap && RPFileMap.needsBuild(s)) { S.startWhenReady = true; autoMap(); return; }
+    if (!(s.notes && s.notes.length)) { S.startWhenReady = true; autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
     /* one thing in his headphones at a time */
@@ -24407,13 +24692,28 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
      at least half its length, which is the same fill that has been drawing
      inside each bubble all the way through. Nothing else on the screen
      changes. */
-  function scoreNow() {
-    var ns = notes();
+  /* Robert, 25 Sep: "A STEADY SCORE TEST ... the same code path the screen
+     uses, no microphone, no clock." So crediting a note is one function.
+     The screen calls it every frame with the singer's reading; the test
+     calls it on a recording's own traced line. tNote is the singer's time
+     on the notes' own clock, so neither caller has to know about lags. */
+  function credit(held, ns, tNote, m, dt) {
+    for (var i = 0; i < ns.length; i++) {
+      var n = ns[i];
+      if (tNote >= n.t && tNote <= n.t + (n.d || 0.4)) {
+        var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
+        if (off < 1.0) held[i] = (held[i] || 0) + dt;
+        return i;
+      }
+    }
+    return -1;
+  }
+  function tally(ns, h) {
     if (!ns.length) return null;
     var hit = 0, sum = 0, rows = [];
     for (var i = 0; i < ns.length; i++) {
       var d = ns[i].d || 0.4;
-      var frac = Math.max(0, Math.min(1, (held[i] || 0) / d));
+      var frac = Math.max(0, Math.min(1, (h[i] || 0) / d));
       sum += frac;
       if (frac >= 0.5) hit++;
       rows.push({ m: ns[i].m, frac: frac });
@@ -24421,6 +24721,25 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     rows.sort(function (a, b) { return a.frac - b.frac; });
     return { total: ns.length, hit: hit, pct: Math.round(100 * hit / ns.length),
              avg: Math.round(100 * sum / ns.length), worst: rows.slice(0, 3) };
+  }
+  /* a whole line at once: every voiced point counts for the step it covers */
+  L.scoreTrace = function (ns, trace) {
+    var h = {}, step = 0.05;
+    if (trace && trace.length > 1) {
+      var g = trace[1].t - trace[0].t;
+      if (g > 0) step = +g.toFixed(3);
+    }
+    for (var i = 0; i < (trace || []).length; i++) {
+      var p = trace[i];
+      if (p && p.m != null) credit(h, ns, p.t, p.m, step);
+    }
+    return tally(ns, h);
+  };
+
+  function scoreNow() {
+    var ns = notes();
+    if (!ns.length) return null;
+    return tally(ns, held);
   }
   L.score = scoreNow;
 
@@ -24511,25 +24830,18 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
        note beside rpMicLag in the build), so each line is put back where the
        sound actually was and they meet there. */
     var lag = 0;
-    try { lag = window.rpNoteLag ? rpNoteLag(S.song) : 0; } catch (e) { lag = 0; }
-    var tv = t - (window.rpMicLag ? rpMicLag() : 0.1);   /* when he actually sang */
+    try { lag = (window.rpNoteLag ? rpNoteLag(S.song) : 0) + (window.rpEarLag ? rpEarLag() : 0); } catch (e) { lag = 0; }
+    /* when he actually sang, on the ear's clock: the notes carry the output
+       delay, so the voice takes back only the microphone's own part */
+    var tv = t - (window.rpVoiceLag ? rpVoiceLag() : 0.1);
     if (S.playing && t > 0 && !S.asleep) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
       S.trail.push({ t: tv, m: (m == null ? null : m) });
       while (S.trail.length > 4000) S.trail.shift();
-      /* how long each bubble has been sung */
-      if (m != null && S.song) {
-        var ns = notes();
-        for (var i = 0; i < ns.length; i++) {
-          var n = ns[i];
-          if (tv >= n.t + lag && tv <= n.t + lag + (n.d || 0.4)) {
-            var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
-            if (off < 1.0) held[i] = (held[i] || 0) + dt;
-            break;
-          }
-        }
-      }
+      /* how long each bubble has been sung - by the one rule below, which
+         the steady score test also runs, so the two cannot disagree */
+      if (m != null && S.song) credit(held, notes(), tv - lag, m, dt);
       var cl = $('rpLsClock');
       if (cl) cl.textContent = Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2);
       if (S.synth) {
@@ -24567,8 +24879,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (!ns.length) return;
     var t = now - LOOK;
     var headX = W - LOOK * pps;
-    var lag = 0;
-    try { lag = window.rpNoteLag ? rpNoteLag(s) : 0; } catch (e) { lag = 0; }
+    var ear = 0, lag = 0;
+    try { ear = window.rpEarLag ? rpEarLag() : 0; } catch (e) { ear = 0; }
+    try { lag = (window.rpNoteLag ? rpNoteLag(s) : 0) + ear; } catch (e) { lag = ear; }
 
     /* which bubble is next: the first one that has not started yet */
     var next = -1;
@@ -24580,6 +24893,13 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var bh = Math.max(12, Math.min(26, laneH * 1.4));
 
     c2.save();
+
+    /* Measurement only, and only when a test asks: for every bubble near the
+       bar, where this frame drew its left edge and where its fill ends,
+       against the song's own clock. Robert, 25 Sep: "measured with numbers,
+       not searches" - so the numbers come from the drawing itself, not from
+       a formula written again somewhere else. Nothing is recorded otherwise. */
+    var rec = window.__rpMeasure, near = rec ? [] : null, nxX = null;
 
     /* 20 Sep this screen drew a take's twenty-a-second line as twenty
        overlapping bubbles a second, which is where the grey blobs came
@@ -24603,19 +24923,31 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       c2.fillStyle = past ? (ratio >= 0.5 ? 'rgba(76,201,240,.55)' : 'rgba(120,130,150,.30)')
                           : 'rgba(255,255,255,.16)';
       c2.fill();
+      /* Robert, 25 Sep: "a bubble may only start filling once its left edge
+         has passed the bar." The fill is how much has been held, laid from
+         the left edge - and it stops at the bar, so it can never run ahead
+         of it, however short the note or however wide it is drawn. */
+      var fillW = ratio > 0 ? Math.min(Math.max(3, w * ratio), headX - x) : 0;
+      if (near && Math.abs(x - headX) < 80) {
+        near.push([j, +x.toFixed(2), fillW > 0 ? +(x + fillW).toFixed(2) : null]);
+      }
       /* how much of it he has held */
-      if (ratio > 0) {
+      if (fillW > 0) {
         c2.save();
         c2.beginPath();
-        if (c2.roundRect) c2.roundRect(x, y - h / 2, Math.max(3, w * ratio), h, h / 2);
-        else c2.rect(x, y - h / 2, Math.max(3, w * ratio), h);
+        if (c2.roundRect) c2.roundRect(x, y - h / 2, fillW, h, Math.min(h / 2, fillW / 2));
+        else c2.rect(x, y - h / 2, fillW, h);
         c2.fillStyle = 'rgba(255,209,102,.85)';
         c2.fill();
         c2.restore();
       }
-      /* the one he is coming to, lit up ahead of the playhead */
+      /* the one he is coming to, ringed ahead of the playhead - in white.
+         It was gold, the same gold as a filled bubble, so every note coming
+         up looked sung before it reached the bar. Gold now means one thing:
+         you held it. */
       if (j === next) {
-        c2.strokeStyle = 'rgba(255,209,102,.95)';
+        nxX = x;
+        c2.strokeStyle = 'rgba(255,255,255,.9)';
         c2.lineWidth = 2;
         c2.beginPath();
         if (c2.roundRect) c2.roundRect(x - 2, y - h / 2 - 2, w + 4, h + 4, (h + 4) / 2);
@@ -24623,6 +24955,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
         c2.stroke();
         c2.lineWidth = 1;
       }
+    }
+
+    if (rec && rec.length < 40000) {
+      rec.push({ s: 'ls', a: (S.vox && !S.synth) ? S.vox.currentTime : t,
+                 p: performance.now(), head: +headX.toFixed(2), lag: lag, ear: ear,
+                 nx: nxX, b: near });
     }
 
     /* where you are now */

@@ -885,6 +885,28 @@ window.rpMicLag = function(){
   return ms/1000;
 };
 window.RP_MAP_LEAD = 0.05;
+/* Robert, 25 Sep: "shift the drawn notes on both screens so a note reaches
+   the bar when the sound reaches the ears." Sound leaves the app, then sits
+   in the phone's own output buffers before it is heard - the browser reports
+   how long that is. A note is drawn that much later, so it reaches the bar
+   when it is heard rather than when it was sent. Mic timing offset stays as
+   the manual adjustment on top. */
+window.rpEarLag = function(){
+  try{
+    if(typeof ctx === 'undefined' || !ctx) return 0;
+    let o = (typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0) ? ctx.outputLatency
+          : (typeof ctx.baseLatency === 'number' ? ctx.baseLatency : 0);
+    return (o > 0 && o < 0.5) ? o : 0;   /* a reading past half a second is not believable */
+  }catch(e){ return 0; }
+};
+/* The microphone's own part of the delay. Mic timing offset (state.latencyMs)
+   is the WHOLE trip - out through the headphones, into the singer, back in
+   through the microphone - and has been since 13 Sep. Now the notes carry the
+   out part themselves, the voice line takes back only what is left. Counting
+   the output delay on both sides would put the line early by exactly it. */
+window.rpVoiceLag = function(){
+  return Math.max(0, window.rpMicLag() - window.rpEarLag());
+};
 /* seconds to ADD to a stored note's time before it is drawn */
 /* Two different shapes of data go through these drawers, and drawing one as
    the other is what produced both of Robert's screenshots on 20 Sep: a file
@@ -907,9 +929,9 @@ window.rpNoteShape = function(notes){
 window.rpNoteLag = function(song){
   if(!song) return 0;
   if(song.notesFrom === 'exact') return 0;     /* the app wrote these notes */
-  if(song.notesFrom === 'live') return -window.rpMicLag();
+  if(song.notesFrom === 'live') return -window.rpVoiceLag();   /* a take never went out through the headphones */
   if(song.notesFrom === 'file' || song.mapVer) return window.RP_MAP_LEAD;
-  return -window.rpMicLag();   /* no map version: a take's own live line */
+  return -window.rpVoiceLag();   /* no map version: a take's own live line */
 };"""),
 
     # 46. The same 0.100 s, taken off the Pitch Tracker's live line, so the blue
@@ -917,7 +939,7 @@ window.rpNoteLag = function(song){
     #     A take's gold line moves by the same amount (rpNoteLag), so a take
     #     still lands on itself — and a file now lands as well.
     ("""  FREE.trail.push({t:now, m:userMidi});""",
-     """  FREE.trail.push({t:now - rpMicLag(), m:userMidi});"""),
+     """  FREE.trail.push({t:now - rpVoiceLag(), m:userMidi});"""),
 
     # 47. Say where a note map came from, so the drawing knows which of the
     #     two clocks above it is on. Takes carry notesFrom:'live'.
@@ -965,6 +987,17 @@ window.rpNoteLag = function(song){
     try{ updateLibMapPanel(); libRender(); }catch(e){}
   });
 });"""),
+
+    # 56. THE SHORTEST WAY FROM THE MICROPHONE TO THE HEADPHONES.
+    #     Robert, 25 Sep: hearing yourself late. The monitor was already the
+    #     shortest graph there is - the microphone straight into one volume
+    #     control and out, no ScriptProcessor anywhere in the app - and the
+    #     context already asks for 'interactive' (patch further up). The one
+    #     thing left for the page to ask for is the smallest input buffer the
+    #     phone will give. It is a request; a phone that cannot do better
+    #     simply does not.
+    ("""  {name:'raw', c:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}},""",
+     """  {name:'raw', c:{echoCancellation:false, noiseSuppression:false, autoGainControl:false, latency:{ideal:0}}},"""),
 
     # 51. THE SAME EAR FOR A FILE AS FOR THE MICROPHONE.
     #     Robert, 24 Sep: a take he recorded while a track played through the

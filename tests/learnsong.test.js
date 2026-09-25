@@ -35,7 +35,6 @@ const path = require('path');
 const URL_ = process.env.RP_URL || 'https://rcaldwell91.github.io/repertoire-pro/next.html';
 const LOCAL = process.env.RP_LOCAL || path.join(__dirname, '..', 'next.html');
 const SPEC = process.env.RP_RECORDINGS || '';
-const HIT_PCT = 80;          /* a perfect performance must reach this */
 const PLAY_SECS = 75;        /* the stretch measured, after alignment */
 const MIC_SR = 16000;
 
@@ -262,8 +261,12 @@ async function toWav(rec) {
     ok(scored.fillingLate > scored.fillingEarly,
        rec.label + ': the bubbles fill as the song runs (' + scored.fillingEarly + ' → ' + scored.fillingLate + ' touched)');
     ok(scored.played > 20, rec.label + ': enough notes came round to judge it (' + scored.played + ')');
-    ok(scored.pct >= HIT_PCT, rec.label + ': the singer singing their own song hits ' +
-       scored.pct + '% of the notes (needs ' + HIT_PCT + ')');
+    /* Robert, 25 Sep: the hit rate moved ten points between runs of an
+       unchanged build - a live capture sampled on a jittering clock - so it
+       is printed here but no longer decides anything. tests/score.test.js
+       gives a steady one. This test proves the parts only a live
+       microphone can: the bubbles are on screen and they fill. */
+    console.log('    (live hit rate this run ' + scored.pct + '% - for information only)');
     ok(errs.length === 0, rec.label + ': no page errors' + (errs.length ? ': ' + errs[0] : ''));
     await browser.close();
   }

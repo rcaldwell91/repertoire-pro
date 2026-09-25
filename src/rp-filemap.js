@@ -38,7 +38,29 @@
   var HOP = 0.05;            /* twenty points a second, same as a take     */
   var WIN = 4096;            /* the analyser's own window, from base.html  */
   var ANCHOR = 0.22;         /* the pitch model's spacing on the live path */
-  var TRACE_VER = 1;
+  var TRACE_VER = 2;
+
+  /* WHERE IN THE WINDOW THE PITCH IS READ FROM. Measured 25 Sep, before
+     this change: on Robert's two recordings a phrase's first note reached
+     the playhead 60ms and 50ms after the sound on the Pitch Tracker.
+
+     The cause is geometry, not tuning. yinHz does not read the whole 4096
+     samples it is handed: it compares sample i with sample i+lag for the
+     first 1024 values of i, so everything it uses sits in the first
+     1024 + lag samples - about 39ms at the front. The window used to be
+     centred on the point's own time, which put the part yinHz actually
+     reads 33ms EARLIER than the time the point was given. Every pitch in a
+     file was dated a third of a tenth of a second late.
+
+     So the window now starts where it has to for the region yinHz reads to
+     be centred on the point's time: half of 1024, plus half a typical sung
+     period (4ms, about 250Hz), before it. Across the singing range that
+     centre moves by about 2ms, not 33. The loudness gate still looks at the
+     whole window. Version 2, so every song read the old way is read again.
+
+     The microphone path is left alone on purpose: its buffer ends at "now"
+     and always has, and its delay is what Mic timing offset takes back. */
+  function yinOffset(sr) { return (WIN >> 1) - Math.round(512 + 0.002 * sr); }
 
   /* ---- is this song's map the old kind? ------------------------------ */
   F.needsBuild = function (song) {
@@ -88,51 +110,36 @@
     });
   }
 
-  /* ---- the trace ------------------------------------------------------ */
-  F.build = async function (song) {
-    if (!song || !song.blob) throw new Error('nothing to read');
-    ensureCtx();
-    status('Reading the file…', 0.02);
-    var decoded = await ctx.decodeAudioData((await song.blob.arrayBuffer()).slice(0));
-    var sr = decoded.sampleRate, len = decoded.length;
-    var L = decoded.getChannelData(0);
-    var R = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : L;
-    var mono = new Float32Array(len);
-    for (var i = 0; i < len; i++) mono[i] = (L[i] + R[i]) / 2;
-
-    status('Listening with the pitch model…', 0.06);
-    var nA = Math.max(1, Math.floor(decoded.duration / ANCHOR));
-    var anc = await anchors(mono, sr, nA);
-
-    status('Following the voice…', 0.3);
-    var steps = Math.floor(decoded.duration / HOP);
-    var win = new Float32Array(WIN);
-    var notes = [], hist = [];
-    var gateLevel = 0.004, gateOn = true;
-    try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
-
-    for (var k = 0; k < steps; k++) {
-      var t = k * HOP;
-      /* the window sits centred on t, so the pitch is dated where it sounded */
-      var start = Math.round(t * sr) - (WIN >> 1);
-      var rms = 0, j, sp2;
-      for (j = 0; j < WIN; j++) {
-        sp2 = start + j;
-        var v = (sp2 >= 0 && sp2 < len) ? mono[sp2] : 0;
+  /* ---- the reading itself, as one plain function ----------------------
+     Robert, 25 Sep: "Start never blocks." A four-minute song is thousands of
+     pitch readings, and on the page they froze the phone in slices for a
+     minute or more. So the per-reading work is one function with nothing
+     outside it except yinHz and freqMidi, and it runs in a worker. The
+     worker is handed THE PAGE'S OWN SOURCE for those two functions, not a
+     copy kept here, so a file and a microphone cannot drift apart. If a
+     worker cannot start, the same function runs on the page in short
+     slices instead. */
+  function traceRange(mono, sr, o, k0, k1, hist, out) {
+    var len = mono.length, win = new Float32Array(o.WIN);
+    for (var k = k0; k < k1; k++) {
+      var t = k * o.HOP;
+      var start = Math.round(t * sr) - (o.WIN >> 1);
+      var rms = 0, j, sp, v;
+      for (j = 0; j < o.WIN; j++) {
+        sp = start + j;
+        v = (sp >= 0 && sp < len) ? mono[sp] : 0;
         win[j] = v; rms += v * v;
       }
-      rms = Math.sqrt(rms / WIN);
-
+      rms = Math.sqrt(rms / o.WIN);
       var m = null;
-      if (!gateOn || rms >= gateLevel) {
-        var f = yinHz(win, sr);
+      if (!o.gateOn || rms >= o.gate) {
+        var f = yinHz(o.yinOff ? win.subarray(o.yinOff) : win, sr);
         if (f > 0) {
           m = freqMidi(f);
-          /* the same octave snap the live path makes, from the same model */
-          if (anc) {
-            var ai = Math.round(t / ANCHOR);
-            if (ai >= 0 && ai < anc.midi.length && anc.conf[ai] >= 0.5) {
-              var am = anc.midi[ai], ks = [-24, -12, 12, 24];
+          if (o.anc) {
+            var ai = Math.round(t / o.ANCHOR);
+            if (ai >= 0 && ai < o.anc.midi.length && o.anc.conf[ai] >= 0.5) {
+              var am = o.anc.midi[ai], ks = [-24, -12, 12, 24];
               for (var z = 0; z < 4; z++) {
                 if (Math.abs(m + ks[z] - am) < 1.5 && Math.abs(m - am) > 4) { m += ks[z]; break; }
               }
@@ -147,12 +154,83 @@
         var s2 = hist.slice().sort(function (a, b) { return a - b; });
         m = s2[Math.floor(s2.length / 2)];
       }
-      notes.push({ t: +t.toFixed(2), m: m == null ? null : +m.toFixed(2) });
-      if ((k & 255) === 0) {
-        status('Following the voice…', 0.3 + 0.65 * (k / steps));
-        await new Promise(function (r) { setTimeout(r, 0); });   /* let the page breathe */
-      }
+      out.push({ t: +t.toFixed(2), m: m == null ? null : +m.toFixed(2) });
     }
+  }
+  function workerMain() {
+    self.onmessage = function (e) {
+      var d = e.data;
+      NGATE.clarity = d.clarity;
+      var out = [], hist = [], CH = 512;
+      for (var k = 0; k < d.steps; k += CH) {
+        traceRange(d.mono, d.sr, d.o, k, Math.min(d.steps, k + CH), hist, out);
+        self.postMessage({ type: 'progress', frac: Math.min(1, (k + CH) / d.steps) });
+      }
+      self.postMessage({ type: 'done', notes: out });
+    };
+  }
+  function runTrace(mono, sr, o, steps, onFrac) {
+    var clarity = 0.35;
+    try { clarity = NGATE.clarity; } catch (e) {}
+    return new Promise(function (resolve) {
+      var src = null, url = null, w = null;
+      try {
+        src = 'var NGATE = { level: 0, clarity: ' + clarity + ' };\n' +
+              freqMidi.toString() + '\n' + yinHz.toString() + '\n' +
+              traceRange.toString() + '\n(' + workerMain.toString() + ')();';
+        url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      var onPage = function () {
+        /* no worker: the same function, a short slice at a time */
+        var out = [], hist = [], k = 0, CH = 24;
+        (function slice() {
+          traceRange(mono, sr, o, k, Math.min(steps, k + CH), hist, out);
+          k += CH;
+          if (onFrac) onFrac(Math.min(1, k / steps));
+          if (k < steps) setTimeout(slice, 0); else resolve(out);
+        })();
+      };
+      if (!w) return onPage();
+      w.onmessage = function (e) {
+        if (e.data.type === 'progress') { if (onFrac) onFrac(e.data.frac); return; }
+        try { w.terminate(); URL.revokeObjectURL(url); } catch (err) {}
+        resolve(e.data.notes);
+      };
+      w.onerror = function () {
+        try { w.terminate(); URL.revokeObjectURL(url); } catch (err) {}
+        onPage();
+      };
+      w.postMessage({ mono: mono, sr: sr, o: o, steps: steps, clarity: clarity }, [mono.buffer]);
+    });
+  }
+
+  /* ---- the trace ------------------------------------------------------ */
+  F.build = async function (song, onProgress) {
+    if (!song || !song.blob) throw new Error('nothing to read');
+    var say = onProgress || status;
+    ensureCtx();
+    say('Reading the file…', 0.02);
+    var decoded = await ctx.decodeAudioData((await song.blob.arrayBuffer()).slice(0));
+    var sr = decoded.sampleRate, len = decoded.length;
+    var L = decoded.getChannelData(0);
+    var R = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : L;
+    var mono = new Float32Array(len);
+    for (var i = 0; i < len; i++) mono[i] = (L[i] + R[i]) / 2;
+
+    say('Listening with the pitch model…', 0.06);
+    var nA = Math.max(1, Math.floor(decoded.duration / ANCHOR));
+    var anc = await anchors(mono, sr, nA);
+
+    say('Following the voice…', 0.3);
+    var steps = Math.floor(decoded.duration / HOP);
+    var gateLevel = 0.004, gateOn = true;
+    try { gateLevel = NGATE.level; } catch (e) { gateOn = false; }
+    var o = { HOP: HOP, WIN: WIN, ANCHOR: ANCHOR, gate: gateLevel, gateOn: gateOn,
+              yinOff: yinOffset(sr), anc: anc };
+    var notes = await runTrace(mono, sr, o, steps, function (fr) {
+      say('Following the voice…', 0.3 + 0.65 * fr);
+    });
 
     notes = bridge(notes);
     song.notes = notes;
@@ -164,9 +242,73 @@
     try { await dbPut('songs', song); } catch (e) {}
 
     var voiced = notes.filter(function (p) { return p.m != null; }).length;
-    status('Done — ' + Math.round(voiced * HOP) + 's of singing found. Press Start.', null);
+    say('Done — ' + Math.round(voiced * HOP) + 's of singing found.', 1);
     return song;
   };
+
+  /* ---- one at a time, in the background ------------------------------
+     Robert, 25 Sep: "A song is read by the live listener ONCE, when it is
+     added, in the background ... Start never blocks and nothing asks the
+     singer to wait or reload."
+
+     A song is read the moment it is added, and songs carrying an old map
+     are read again the first time the Library opens. Only one reading runs
+     at a time. A song the singer opens jumps to the front, and any screen
+     can ask how far along it is rather than showing an empty board. */
+  var Q = [], busy = false, st = {};
+  F.stateOf = function (id) { return st[id] || null; };
+  F.busy = function () { return busy || Q.length > 0; };
+  F.ensure = function (song, urgent) {
+    if (!song) return Promise.reject(new Error('no song'));
+    if (!F.needsBuild(song)) return Promise.resolve(song);
+    var s = st[song.id];
+    if (!s || s.st === 'failed' || s.st === 'done') {
+      s = st[song.id] = { st: 'queued', frac: 0, msg: 'Waiting to be read…' };
+      s.promise = new Promise(function (res, rej) { s.res = res; s.rej = rej; });
+      Q.push(song);
+    }
+    if (urgent && s.st === 'queued') {
+      Q = Q.filter(function (x) { return x !== song; });
+      Q.unshift(song);
+    }
+    pump();
+    return s.promise;
+  };
+  function pump() {
+    if (busy || !Q.length) return;
+    var song = Q.shift(), s = st[song.id];
+    busy = true; s.st = 'reading';
+    F.build(song, function (msg, frac) { s.msg = msg; if (frac != null) s.frac = frac; })
+      .then(function () { s.st = 'done'; s.frac = 1; s.res(song); },
+            function (e) { s.st = 'failed'; s.msg = 'Could not read this song — ' + (e && e.message || e); s.rej(e); })
+      .then(function () { busy = false; pump(); });
+  }
+  /* songs that carry a map from before the live listener, re-read quietly */
+  F.scanLibrary = function () {
+    var list = [];
+    try { list = (LIB.songs || []); } catch (e) {}
+    list.forEach(function (s) {
+      if (s.kind === 'recording') return;
+      if (s.notes && s.notes.length && F.needsBuild(s)) F.ensure(s).catch(function () {});
+    });
+  };
+  /* a song is read the moment it is added */
+  (function () {
+    var real = window.dbPut;
+    if (typeof real !== 'function' || real.rpReadWrapped) return;
+    var wrapped = function (store, obj) {
+      var r = real.apply(this, arguments);
+      try {
+        if (store === 'songs' && obj && obj.kind !== 'recording' && obj.blob &&
+            !(obj.notes && obj.notes.length) && !st[obj.id]) {
+          Promise.resolve(r).then(function () { F.ensure(obj).catch(function () {}); });
+        }
+      } catch (e) {}
+      return r;
+    };
+    wrapped.rpReadWrapped = true;
+    window.dbPut = wrapped;
+  })();
 
   /* ---- consonants ----------------------------------------------------
      Measured 24 Sep on two of Robert's own recordings: where the file is
@@ -243,7 +385,18 @@
     gaps.sort(function (a, b) { return a - b; });
     var step = gaps.length ? +gaps[gaps.length >> 1].toFixed(3) : HOP;
     if (!(step > 0)) step = HOP;
-    var out = [], i = 0, n = notes.length;
+    /* A phrase's first note starts where the VOICE starts. Measured 25 Sep:
+       on both of Robert's recordings a phrase's first bubble began 20-30ms
+       after the traced line did, because a singer scoops into the first
+       note of a phrase and a bubble only began once the pitch had settled
+       inside a semitone. So the note began after the singer had. When the
+       stretch before a bubble is that approach - voiced, straight after
+       silence, not long enough to be a note of its own - the bubble starts
+       there instead, and keeps the pitch it settled on. No further back
+       than the shortest note a bubble can be, so a long slide stays its
+       own gesture. */
+    var AHEAD = Math.round(0.15 / step);
+    var out = [], i = 0, n = notes.length, lastEnd = 0;
     while (i < n) {
       if (notes[i].m == null) { i++; continue; }
       var j = i, lo = notes[i].m, hi = notes[i].m, sum = notes[i].m, cnt = 1;
@@ -255,7 +408,18 @@
       }
       var dur = +(((j - i + 1) * step).toFixed(2));
       if (dur >= 0.15) {
-        out.push({ m: Math.round(sum / cnt), t: +(notes[i].t).toFixed(2), d: dur });
+        var k = i;
+        while (k - 1 >= lastEnd && notes[k - 1].m != null && i - (k - 1) <= AHEAD) k--;
+        if (k < i && (k === 0 || notes[k - 1].m == null)) {
+          dur = +(((j - k + 1) * step).toFixed(2));
+        } else k = i;                        /* not a phrase start: leave it */
+        /* a point taken twenty times a second stands for the 50ms around
+           it, so a run of them covers half a step either side. Starting the
+           bubble at the first point instead put every note on average 25ms
+           after the voice began - measured 25 Sep, with the pitch itself
+           locking on 5ms after the sound. The length is unchanged. */
+        out.push({ m: Math.round(sum / cnt), t: +(notes[k].t - step / 2).toFixed(3), d: dur });
+        lastEnd = j + 1;
       }
       i = j + 1;
     }

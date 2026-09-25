@@ -31,12 +31,7 @@
   window.__rpHeardS = 0;
 
   function outLat() {
-    try {
-      if (typeof ctx === 'undefined' || !ctx) return 0;
-      var o = ctx.outputLatency;
-      if (!(o > 0)) o = ctx.baseLatency;
-      return (o > 0 && o < 1) ? o : 0;
-    } catch (e) { return 0; }
+    try { return window.rpEarLag ? rpEarLag() : 0; } catch (e) { return 0; }
   }
   function apply(ms) {
     try { state.latencyMs = ms; } catch (e) {}
@@ -61,8 +56,20 @@
     apply(autoMs);
   };
 
+  /* Robert, 25 Sep: show the output delay "in plain words in the Sound
+     panel". It is what the phone reports, so it says so. */
+  function hearLine(out) {
+    var el = $('rpHearLine');
+    if (!el) return;
+    var ms = Math.round(out * 1000);
+    el.textContent = ms > 0
+      ? 'Your phone says it plays sound ' + ms + ' ms after the app sends it. Notes are drawn ' + ms +
+        ' ms later to match, so they reach the bar when you hear them.'
+      : 'Your phone has not said how long it takes to play sound, so notes are drawn as sent.';
+  }
   function tick() {
     var out = outLat();
+    hearLine(out);
     window.__rpHeardS = out;
     var a = Math.round((out * 1000 + 100) / 10) * 10;
     if (a !== autoMs) { autoMs = a; if (saved == null) apply(autoMs); }
@@ -89,6 +96,7 @@
     d.innerHTML =
       '<div class="rp-ttl">Timing</div>' +
       '<div class="rp-sub" style="margin-bottom:8px">If your voice shows up late on the note map, move this right. Early, move it left.</div>' +
+      '<div class="rp-sub" id="rpHearLine" style="margin-bottom:8px"></div>' +
       '<label style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--ink-faint)">' +
         '<span>Mic delay</span><output id="rpTimingOut">100 ms</output></label>' +
       '<input type="range" id="rpTimingRange" min="0" max="400" value="100" step="10" style="width:100%">' +

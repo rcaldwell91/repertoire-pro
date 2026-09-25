@@ -98,8 +98,10 @@
     mix();
     phones();
     S.synth = !song.blob && !!(song.notes && song.notes.length);
+    S.startWhenReady = false;
+    S.cut = null;
     if (!song.blob && !S.synth) { sub('There is no sound on this one.'); foot(''); }
-    else if (!(song.notes && song.notes.length)) autoMap();
+    else if (window.RPFileMap && RPFileMap.needsBuild(song)) autoMap();
     else {
       sub('Press Start. The bubbles are the song. Your line is you.');
       foot(S.synth ? 'This one is built in, so the app plays the tune itself.' : '');
@@ -236,37 +238,44 @@
   /* THE APP WORKS THE NOTES OUT ITSELF                                 */
   /* ---------------------------------------------------------------- */
   function autoMap() {
-    if (S.mapping) return;
-    S.mapping = true;
-    sub('Working out the tune…');
-    foot('The app is listening to the file once, to find the notes. It only has to do this the first time.');
-    var t0 = Date.now();
-    var iv = setInterval(function () {
-      var m = $('libMapMsg');
-      var stage = m ? (m.textContent || '').split(' · ')[0] : '';
-      var bar = $('libMapBar');
-      var pct = bar ? (bar.style.width || '0%') : '';
-      sub(esc(stage || 'Working out the tune') + ' — ' + pct +
-          ' · ' + Math.round((Date.now() - t0) / 1000) + 's');
-    }, 700);
-    var done = function (okNotes) {
+    var song = S.song;
+    if (!song || S.mapping === song.id) return;
+    S.mapping = song.id;
+    foot('The app listens to the file once, to find the notes. Each song only needs it once.');
+    /* Robert, 25 Sep: "Opening a song from any screen while its read is
+       still running shows progress, not an empty board", and "Start never
+       blocks". The reading runs in the background whatever this screen
+       does; this only shows how far along it is. Start pressed meanwhile is
+       remembered, and the song begins the moment the notes are ready. */
+    var show = function () {
+      if (!S.open || S.song !== song) return;
+      var st = window.RPFileMap ? RPFileMap.stateOf(song.id) : null;
+      var pct = st ? Math.round((st.frac || 0) * 100) : 0;
+      sub(esc(st ? st.msg : 'Working out the tune…') + ' — ' + pct + '%' +
+          (S.startWhenReady ? ' · it starts by itself when this is done' : ''));
+    };
+    show();
+    var iv = setInterval(show, 400);
+    var finish = function (ok) {
       clearInterval(iv);
-      S.mapping = false;
-      if (okNotes) {
-        pinWindow();          /* the song is known now, so the view is settled */
-        sub('Press Start. The bubbles are the song. Your line is you.');
+      if (S.mapping === song.id) S.mapping = false;
+      if (!S.open || S.song !== song) return;
+      if (ok) {
+        S.cut = null;             /* the notes have just changed */
+        pinWindow();
         foot('');
+        if (S.startWhenReady) { S.startWhenReady = false; start(); return; }
+        sub('Press Start. The bubbles are the song. Your line is you.');
       } else {
+        S.startWhenReady = false;
         sub('Could not find a clear tune in that file.');
         foot('It works best on a recording of one voice with no band behind it. ' +
              'Go back and try another file.');
       }
     };
-    try {
-      RPFileMap.build(S.song).then(function () {
-        done(!!(S.song.notes && S.song.notes.length));
-      }).catch(function () { done(false); });
-    } catch (e) { done(false); }
+    RPFileMap.ensure(song, true).then(function () {
+      finish(!!(song.notes && song.notes.length));
+    }, function () { finish(false); });
   }
 
   /* ---------------------------------------------------------------- */
@@ -332,8 +341,8 @@
     if (!s || S.playing) return;
     /* Robert, 24 Sep: a song carrying a map from the old analyser is read
        again with the live tracker the next time it is opened. */
-    if (window.RPFileMap && RPFileMap.needsBuild(s)) { autoMap(); return; }
-    if (!(s.notes && s.notes.length)) { autoMap(); return; }
+    if (window.RPFileMap && RPFileMap.needsBuild(s)) { S.startWhenReady = true; autoMap(); return; }
+    if (!(s.notes && s.notes.length)) { S.startWhenReady = true; autoMap(); return; }
     try { ensureCtx(); } catch (e) {}
     try { enableMic(); } catch (e) {}
     /* one thing in his headphones at a time */
@@ -405,13 +414,28 @@
      at least half its length, which is the same fill that has been drawing
      inside each bubble all the way through. Nothing else on the screen
      changes. */
-  function scoreNow() {
-    var ns = notes();
+  /* Robert, 25 Sep: "A STEADY SCORE TEST ... the same code path the screen
+     uses, no microphone, no clock." So crediting a note is one function.
+     The screen calls it every frame with the singer's reading; the test
+     calls it on a recording's own traced line. tNote is the singer's time
+     on the notes' own clock, so neither caller has to know about lags. */
+  function credit(held, ns, tNote, m, dt) {
+    for (var i = 0; i < ns.length; i++) {
+      var n = ns[i];
+      if (tNote >= n.t && tNote <= n.t + (n.d || 0.4)) {
+        var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
+        if (off < 1.0) held[i] = (held[i] || 0) + dt;
+        return i;
+      }
+    }
+    return -1;
+  }
+  function tally(ns, h) {
     if (!ns.length) return null;
     var hit = 0, sum = 0, rows = [];
     for (var i = 0; i < ns.length; i++) {
       var d = ns[i].d || 0.4;
-      var frac = Math.max(0, Math.min(1, (held[i] || 0) / d));
+      var frac = Math.max(0, Math.min(1, (h[i] || 0) / d));
       sum += frac;
       if (frac >= 0.5) hit++;
       rows.push({ m: ns[i].m, frac: frac });
@@ -419,6 +443,25 @@
     rows.sort(function (a, b) { return a.frac - b.frac; });
     return { total: ns.length, hit: hit, pct: Math.round(100 * hit / ns.length),
              avg: Math.round(100 * sum / ns.length), worst: rows.slice(0, 3) };
+  }
+  /* a whole line at once: every voiced point counts for the step it covers */
+  L.scoreTrace = function (ns, trace) {
+    var h = {}, step = 0.05;
+    if (trace && trace.length > 1) {
+      var g = trace[1].t - trace[0].t;
+      if (g > 0) step = +g.toFixed(3);
+    }
+    for (var i = 0; i < (trace || []).length; i++) {
+      var p = trace[i];
+      if (p && p.m != null) credit(h, ns, p.t, p.m, step);
+    }
+    return tally(ns, h);
+  };
+
+  function scoreNow() {
+    var ns = notes();
+    if (!ns.length) return null;
+    return tally(ns, held);
   }
   L.score = scoreNow;
 
@@ -509,25 +552,18 @@
        note beside rpMicLag in the build), so each line is put back where the
        sound actually was and they meet there. */
     var lag = 0;
-    try { lag = window.rpNoteLag ? rpNoteLag(S.song) : 0; } catch (e) { lag = 0; }
-    var tv = t - (window.rpMicLag ? rpMicLag() : 0.1);   /* when he actually sang */
+    try { lag = (window.rpNoteLag ? rpNoteLag(S.song) : 0) + (window.rpEarLag ? rpEarLag() : 0); } catch (e) { lag = 0; }
+    /* when he actually sang, on the ear's clock: the notes carry the output
+       delay, so the voice takes back only the microphone's own part */
+    var tv = t - (window.rpVoiceLag ? rpVoiceLag() : 0.1);
     if (S.playing && t > 0 && !S.asleep) {
       var m = null;
       try { m = (MIC && MIC.on) ? smoothedMidi() : null; } catch (e) { m = null; }
       S.trail.push({ t: tv, m: (m == null ? null : m) });
       while (S.trail.length > 4000) S.trail.shift();
-      /* how long each bubble has been sung */
-      if (m != null && S.song) {
-        var ns = notes();
-        for (var i = 0; i < ns.length; i++) {
-          var n = ns[i];
-          if (tv >= n.t + lag && tv <= n.t + lag + (n.d || 0.4)) {
-            var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
-            if (off < 1.0) held[i] = (held[i] || 0) + dt;
-            break;
-          }
-        }
-      }
+      /* how long each bubble has been sung - by the one rule below, which
+         the steady score test also runs, so the two cannot disagree */
+      if (m != null && S.song) credit(held, notes(), tv - lag, m, dt);
       var cl = $('rpLsClock');
       if (cl) cl.textContent = Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2);
       if (S.synth) {
@@ -565,8 +601,9 @@
     if (!ns.length) return;
     var t = now - LOOK;
     var headX = W - LOOK * pps;
-    var lag = 0;
-    try { lag = window.rpNoteLag ? rpNoteLag(s) : 0; } catch (e) { lag = 0; }
+    var ear = 0, lag = 0;
+    try { ear = window.rpEarLag ? rpEarLag() : 0; } catch (e) { ear = 0; }
+    try { lag = (window.rpNoteLag ? rpNoteLag(s) : 0) + ear; } catch (e) { lag = ear; }
 
     /* which bubble is next: the first one that has not started yet */
     var next = -1;
@@ -578,6 +615,13 @@
     var bh = Math.max(12, Math.min(26, laneH * 1.4));
 
     c2.save();
+
+    /* Measurement only, and only when a test asks: for every bubble near the
+       bar, where this frame drew its left edge and where its fill ends,
+       against the song's own clock. Robert, 25 Sep: "measured with numbers,
+       not searches" - so the numbers come from the drawing itself, not from
+       a formula written again somewhere else. Nothing is recorded otherwise. */
+    var rec = window.__rpMeasure, near = rec ? [] : null, nxX = null;
 
     /* 20 Sep this screen drew a take's twenty-a-second line as twenty
        overlapping bubbles a second, which is where the grey blobs came
@@ -601,19 +645,31 @@
       c2.fillStyle = past ? (ratio >= 0.5 ? 'rgba(76,201,240,.55)' : 'rgba(120,130,150,.30)')
                           : 'rgba(255,255,255,.16)';
       c2.fill();
+      /* Robert, 25 Sep: "a bubble may only start filling once its left edge
+         has passed the bar." The fill is how much has been held, laid from
+         the left edge - and it stops at the bar, so it can never run ahead
+         of it, however short the note or however wide it is drawn. */
+      var fillW = ratio > 0 ? Math.min(Math.max(3, w * ratio), headX - x) : 0;
+      if (near && Math.abs(x - headX) < 80) {
+        near.push([j, +x.toFixed(2), fillW > 0 ? +(x + fillW).toFixed(2) : null]);
+      }
       /* how much of it he has held */
-      if (ratio > 0) {
+      if (fillW > 0) {
         c2.save();
         c2.beginPath();
-        if (c2.roundRect) c2.roundRect(x, y - h / 2, Math.max(3, w * ratio), h, h / 2);
-        else c2.rect(x, y - h / 2, Math.max(3, w * ratio), h);
+        if (c2.roundRect) c2.roundRect(x, y - h / 2, fillW, h, Math.min(h / 2, fillW / 2));
+        else c2.rect(x, y - h / 2, fillW, h);
         c2.fillStyle = 'rgba(255,209,102,.85)';
         c2.fill();
         c2.restore();
       }
-      /* the one he is coming to, lit up ahead of the playhead */
+      /* the one he is coming to, ringed ahead of the playhead - in white.
+         It was gold, the same gold as a filled bubble, so every note coming
+         up looked sung before it reached the bar. Gold now means one thing:
+         you held it. */
       if (j === next) {
-        c2.strokeStyle = 'rgba(255,209,102,.95)';
+        nxX = x;
+        c2.strokeStyle = 'rgba(255,255,255,.9)';
         c2.lineWidth = 2;
         c2.beginPath();
         if (c2.roundRect) c2.roundRect(x - 2, y - h / 2 - 2, w + 4, h + 4, (h + 4) / 2);
@@ -621,6 +677,12 @@
         c2.stroke();
         c2.lineWidth = 1;
       }
+    }
+
+    if (rec && rec.length < 40000) {
+      rec.push({ s: 'ls', a: (S.vox && !S.synth) ? S.vox.currentTime : t,
+                 p: performance.now(), head: +headX.toFixed(2), lag: lag, ear: ear,
+                 nx: nxX, b: near });
     }
 
     /* where you are now */
