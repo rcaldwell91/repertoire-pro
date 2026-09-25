@@ -225,6 +225,16 @@
      one sung note. Nothing shows these yet: they ship when the singer test
      says at least 85% of the sung time lands inside one. --------------- */
   F.bubbles = function (notes) {
+    if (!notes || notes.length < 2) return [];
+    /* the step comes from the data rather than from this file's own HOP, so
+       a take's live line groups the same way a file's trace does */
+    var gaps = [], q;
+    for (q = 1; q < notes.length && gaps.length < 40; q++) {
+      var g = notes[q].t - notes[q - 1].t;
+      if (g > 0) gaps.push(g);
+    }
+    gaps.sort(function (a, b) { return a - b; });
+    var step = gaps.length ? gaps[gaps.length >> 1] : HOP;
     var out = [], i = 0, n = notes.length;
     while (i < n) {
       if (notes[i].m == null) { i++; continue; }
@@ -235,12 +245,28 @@
         if (nhi - nlo > 1) break;            /* it has moved off this note */
         lo = nlo; hi = nhi; sum += m2; cnt++; j++;
       }
-      var dur = (j - i + 1) * HOP;
+      var dur = notes[j].t - notes[i].t + step;
       if (dur >= 0.15) {
         out.push({ m: Math.round(sum / cnt), t: +(notes[i].t).toFixed(2), d: +dur.toFixed(2) });
       }
       i = j + 1;
     }
     return out;
+  };
+
+  /* The notes for a song, whatever it came from. A file carries them from
+     the read above; a take is a live line and is cut the same way; a
+     built-in was written as notes already. Robert, 24 Sep: Learn a song
+     shows these for every source it can open. */
+  F.notesOf = function (song) {
+    if (!song) return [];
+    if (song.bubbles && song.bubbles.length) return song.bubbles;
+    var ns = song.notes || [];
+    if (!ns.length) return [];
+    if (window.rpNoteShape && rpNoteShape(ns) === 'bars') return ns;
+    var b = F.bubbles(ns);
+    song.bubbles = b;
+    if (song.id && song.blob) { try { dbPut('songs', song); } catch (e) {} }
+    return b;
   };
 })();

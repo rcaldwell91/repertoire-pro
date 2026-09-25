@@ -87,6 +87,7 @@
           'justify-content:center;font-size:74px;font-weight:900;color:var(--gold);' +
           'text-shadow:0 2px 18px rgba(0,0,0,.6);pointer-events:none"></div>' +
       '</div>' +
+      '<div id="rpLsScore" style="display:none;margin-top:12px"></div>' +
       '<div id="rpLsMix" style="margin-top:10px"></div>' +
       '<div class="measured" id="rpLsFoot" style="margin-top:10px"> </div>';
     on($('rpLsBack'), 'click', L.close);
@@ -349,6 +350,8 @@
     }
     vols();
     pinWindow();               /* decided here, before a note sounds, and held */
+    held = {};
+    hideScore();
     S.trail = [];
     S.playing = true;
     $('rpLsStart').disabled = true;
@@ -389,8 +392,57 @@
     var cd = $('rpLsCount'); if (cd) cd.style.display = 'none';
     if ($('rpLsStart')) $('rpLsStart').disabled = false;
     if ($('rpLsStop')) $('rpLsStop').disabled = true;
+    if (!byHand) showScore();         /* it reached the end: how did it go */
     if (byHand && S.song && S.song.notes) sub('Press Start. The bubbles are the song. Your line is you.');
   }
+
+  /* Robert, 24 Sep: at the end of the song, in plain words — how many
+     notes were hit, how long they were held on average, and the three that
+     went worst. A note counts as hit when it was sung within a semitone for
+     at least half its length, which is the same fill that has been drawing
+     inside each bubble all the way through. Nothing else on the screen
+     changes. */
+  function scoreNow() {
+    var ns = notes();
+    if (!ns.length) return null;
+    var hit = 0, sum = 0, rows = [];
+    for (var i = 0; i < ns.length; i++) {
+      var d = ns[i].d || 0.4;
+      var frac = Math.max(0, Math.min(1, (held[i] || 0) / d));
+      sum += frac;
+      if (frac >= 0.5) hit++;
+      rows.push({ m: ns[i].m, frac: frac });
+    }
+    rows.sort(function (a, b) { return a.frac - b.frac; });
+    return { total: ns.length, hit: hit, pct: Math.round(100 * hit / ns.length),
+             avg: Math.round(100 * sum / ns.length), worst: rows.slice(0, 3) };
+  }
+  L.score = scoreNow;
+
+  function noteName(m) { try { return midiName(m); } catch (e) { return String(m); } }
+
+  function showScore() {
+    var el = $('rpLsScore');
+    if (!el) return;
+    var r = scoreNow();
+    if (!r) { el.style.display = 'none'; return; }
+    var worst = r.worst.map(function (w) {
+      return esc(noteName(w.m)) + ' <span style="color:var(--ink-faint)">' +
+             Math.round(w.frac * 100) + '%</span>';
+    }).join(' &nbsp; ');
+    el.innerHTML = '<div class="panel" style="padding:12px">' +
+      '<div style="font-size:15px;font-weight:900;margin-bottom:6px">' +
+        'You hit ' + r.hit + ' of ' + r.total + ' notes.</div>' +
+      '<div class="measured" style="margin-bottom:8px">On average you held each one ' +
+        r.avg + '% of the way. A note counts as hit when you were within a semitone ' +
+        'of it for at least half its length.</div>' +
+      (r.worst.length ? '<div style="font-size:12.5px;font-weight:800;color:var(--ink-dim);' +
+        'margin-bottom:3px">Held least well</div><div style="font-size:14px;font-weight:800">' +
+        worst + '</div>' : '') +
+      '</div>';
+    el.style.display = '';
+  }
+  function hideScore() { var el = $('rpLsScore'); if (el) el.style.display = 'none'; }
 
   function songTime() {
     if (S.synth) {
@@ -410,6 +462,26 @@
   /* THE MAP: drawPitchLane draws it, the overlay puts the song on it   */
   /* ---------------------------------------------------------------- */
   var held = {};                                  /* note index -> seconds held */
+
+  /* Robert, 24 Sep: "Learn a song SHOWS the bubbles. They are for judging
+     pitch and how long a note is held, and for the game on top of that. The
+     Pitch Tracker sing-along stays a plain line — that screen is 'draw it
+     wherever you can hear it'. Learn a song is 'hit these notes'."
+
+     So this screen works from notes, not from the traced line, whatever the
+     song came from: a file's trace and a take's live line are both cut into
+     notes the same way, and a built-in was written as notes to begin with.
+     The line itself is not drawn here — his own blue line goes over the
+     bubbles, which is what the caption has always promised. */
+  function notes() {
+    if (!S.song) return [];
+    if (S.cut && S.cutFor === S.song.id) return S.cut;
+    var b = [];
+    try { b = window.RPFileMap ? RPFileMap.notesOf(S.song) : (S.song.notes || []); } catch (e) { b = []; }
+    S.cut = b; S.cutFor = S.song.id;
+    return b;
+  }
+  L.notes = notes;
 
   function loop() {
     if (!S.open) { S.raf = null; return; }
@@ -432,8 +504,8 @@
       S.trail.push({ t: tv, m: (m == null ? null : m) });
       while (S.trail.length > 4000) S.trail.shift();
       /* how long each bubble has been sung */
-      if (m != null && S.song && S.song.notes) {
-        var ns = S.song.notes;
+      if (m != null && S.song) {
+        var ns = notes();
         for (var i = 0; i < ns.length; i++) {
           var n = ns[i];
           if (tv >= n.t + lag && tv <= n.t + lag + (n.d || 0.4)) {
@@ -475,10 +547,11 @@
   window.__rpOverlay = function (c2, W, H, now, pps, yOf) {
     if (!mine) { if (theirs) theirs(c2, W, H, now, pps, yOf); return; }
     var s = S.song;
-    if (!s || !s.notes || !s.notes.length) return;
+    if (!s) return;
+    var ns = notes();
+    if (!ns.length) return;
     var t = now - LOOK;
     var headX = W - LOOK * pps;
-    var ns = s.notes;
     var lag = 0;
     try { lag = window.rpNoteLag ? rpNoteLag(s) : 0; } catch (e) { lag = 0; }
 
@@ -493,36 +566,10 @@
 
     c2.save();
 
-    /* Robert, 20 Sep: "grey blobs." A take's pitch line is twenty points a
-       second with no duration on any of them, so bubbling each one drew
-       twenty overlapping blobs a second. It is a traced line, and it is
-       drawn as one — the same gold line the Pitch Tracker uses. */
-    if ((window.rpNoteShape ? rpNoteShape(ns) : 'bars') === 'line') {
-      c2.strokeStyle = 'rgba(255,209,102,.95)';
-      c2.lineWidth = 2.5;
-      c2.shadowColor = 'rgba(255,209,102,.6)';
-      c2.shadowBlur = 8;
-      c2.beginPath();
-      var pen = false, prev = null;
-      for (var k = 0; k < ns.length; k++) {
-        var p = ns[k];
-        if (!p || p.m == null) { pen = false; prev = null; continue; }
-        var px = W - (now - (p.t + lag)) * pps;
-        if (px < -4 || px > W + 4) { pen = false; prev = null; continue; }
-        var py = yOf(p.m);
-        var jump = prev && Math.abs(p.m - prev.m) > 6;
-        if (!pen || jump) c2.moveTo(px, py); else c2.lineTo(px, py);
-        pen = true; prev = p;
-      }
-      c2.stroke();
-      c2.shadowBlur = 0;
-      c2.lineWidth = 2;
-      c2.strokeStyle = 'rgba(255,255,255,.55)';
-      c2.beginPath(); c2.moveTo(headX, 0); c2.lineTo(headX, H); c2.stroke();
-      c2.lineWidth = 1;
-      c2.restore();
-      return;
-    }
+    /* 20 Sep this screen drew a take's twenty-a-second line as twenty
+       overlapping bubbles a second, which is where the grey blobs came
+       from. The answer was never to draw a line here — it was to cut the
+       line into notes first, which is what notes() above does. */
 
     for (var j = 0; j < ns.length; j++) {
       var n = ns[j];
@@ -572,7 +619,20 @@
   };
 
   /* ---------------------------------------------------------------- */
-  L.reset = function () { held = {}; };
+  L.reset = function () { held = {}; hideScore(); };
+  /* one way in for a measurement to see what this screen is working from,
+     rather than a handful of accessors bolted on one at a time */
+  L.inspect = function () {
+    return { notes: notes(), held: held, trail: S.trail, t: songTime(),
+             playing: S.playing, lag: (window.rpNoteLag ? rpNoteLag(S.song) : 0) };
+  };
+  L.seek = function (by) {
+    if (S.synth) { S.clock0 -= by; return true; }
+    if (!S.vox) return false;
+    try { S.vox.currentTime = Math.max(0, S.vox.currentTime + by); } catch (e) { return false; }
+    if (S.mus) { try { S.mus.currentTime = S.vox.currentTime; } catch (e) {} }
+    return true;
+  };
   L.isOpen = function () { return !!S.open; };
   /* the app's own answer to "is a song sounding right now", so a test can
      ask it rather than guess from a canvas */
