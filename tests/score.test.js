@@ -71,7 +71,12 @@ function loud(lines) {
       try { await RPFileMap.build(song); } catch (e) { return { err: String(e && e.message || e) }; }
       const a = RPLearnSong.scoreTrace(song.bubbles, song.notes);
       const b = RPLearnSong.scoreTrace(song.bubbles, song.notes);
-      return { a, b, bubbles: song.bubbles.length, points: song.notes.length };
+      /* the same line an octave down, the way a man sings along with a man */
+      const down = song.notes.map(q => ({ t: q.t, m: q.m == null ? null : q.m - 12 }));
+      const exact = RPLearnSong.scoreTrace(song.bubbles, down);
+      const any = RPLearnSong.scoreTrace(song.bubbles, down, true);
+      const anyUp = RPLearnSong.scoreTrace(song.bubbles, song.notes, true);
+      return { a, b, exact, any, anyUp, bubbles: song.bubbles.length, points: song.notes.length };
     }, fs.readFileSync(rec.file).toString('base64'));
     if (r.err) { ok(false, rec.label + ': ' + r.err); continue; }
     console.log('    ' + r.a.hit + ' of ' + r.a.total + ' notes hit (' + r.a.pct + '%), held ' + r.a.avg +
@@ -79,6 +84,11 @@ function loud(lines) {
     ok(JSON.stringify(r.a) === JSON.stringify(r.b), rec.label + ': the same number both times');
     ok(r.a.total === r.bubbles, rec.label + ': every bubble was scored');
     ok(r.a.pct >= HIT_PCT, rec.label + ': the recording singing its own line hits ' + r.a.pct + '% (needs ' + HIT_PCT + ')');
+    /* Robert, 25 Sep: a note counts only in its own octave unless Any
+       octave is on */
+    ok(r.exact.hit === 0, rec.label + ': the same line an octave down scores ' + r.exact.hit + ' notes with Any octave off');
+    ok(JSON.stringify(r.any) === JSON.stringify(r.anyUp) && r.any.pct >= HIT_PCT,
+       rec.label + ': with Any octave on it scores exactly what the line itself does (' + r.any.pct + '%)');
   }
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs[0] : ''));
   await browser.close();

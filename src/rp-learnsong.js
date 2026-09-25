@@ -46,8 +46,10 @@
     countdown: 0, hid: [], mapping: false,
     asleep: false, heldT: 0,           /* where the song got to before sleep */
     lastFrame: 0,                      /* for real elapsed time, not 60fps */
-    synth: false, clock0: 0, sung: 0   /* a built-in has no file: the app plays it */
+    synth: false, clock0: 0, sung: 0,  /* a built-in has no file: the app plays it */
+    anyOct: false                      /* a note counts in its own octave unless he says */
   };
+  try { S.anyOct = localStorage.getItem('rp_any_octave') === '1'; } catch (e) {}
 
   /* ---------------------------------------------------------------- */
   /* THE SCREEN                                                        */
@@ -79,6 +81,8 @@
         '<button class="btn primary" id="rpLsStart" style="padding:11px 18px">Start</button>' +
         '<button class="btn" id="rpLsStop" style="padding:11px 16px" disabled>Stop</button>' +
         '<span class="pill" id="rpLsClock" style="flex:none">0:00</span>' +
+        '<button class="btn' + (S.anyOct ? ' primary' : '') + '" id="rpLsOct" style="padding:11px 12px;margin-left:auto">' +
+          'Any octave: ' + (S.anyOct ? 'on' : 'off') + '</button>' +
       '</div>' +
       '<div class="notice" id="rpLsPhones" style="display:none;margin-bottom:8px"></div>' +
       '<div style="position:relative">' +
@@ -94,6 +98,12 @@
     on($('rpLsBack'), 'click', L.close);
     on($('rpLsStart'), 'click', start);
     on($('rpLsStop'), 'click', function () { stop(true); });
+    on($('rpLsOct'), 'click', function () {
+      S.anyOct = !S.anyOct;
+      try { localStorage.setItem('rp_any_octave', S.anyOct ? '1' : '0'); } catch (e) {}
+      var b = $('rpLsOct');
+      if (b) { b.textContent = 'Any octave: ' + (S.anyOct ? 'on' : 'off'); b.classList.toggle('primary', S.anyOct); }
+    });
     size();
     mix();
     phones();
@@ -295,8 +305,7 @@
     var show = function (yes) {
       if (yes) { el.style.display = 'none'; return; }
       el.style.display = '';
-      el.innerHTML = '<b>Headphones in?</b> The song plays to you and the microphone is open. ' +
-        'Through a speaker the app hears the song as well as you, and draws it as if you sang it.';
+      el.innerHTML = 'Use headphones.';
     };
     try {
       navigator.mediaDevices.enumerateDevices().then(function (list) {
@@ -429,11 +438,16 @@
      The screen calls it every frame with the singer's reading; the test
      calls it on a recording's own traced line. tNote is the singer's time
      on the notes' own clock, so neither caller has to know about lags. */
-  function credit(held, ns, tNote, m, dt) {
+  /* Robert, 25 Sep: "A note counts only in the exact octave by default. Add
+     an 'Any octave' switch on the screen, off by default." It used to count
+     any octave, always. With the switch on, a man singing along with a man
+     an octave down - which is where most men sing John Legend - still gets
+     the note. */
+  function credit(held, ns, tNote, m, dt, anyOct) {
     for (var i = 0; i < ns.length; i++) {
       var n = ns[i];
       if (tNote >= n.t && tNote <= n.t + (n.d || 0.4)) {
-        var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
+        var off = anyOct ? Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6) : Math.abs(m - n.m);
         if (off < 1.0) held[i] = (held[i] || 0) + dt;
         return i;
       }
@@ -455,7 +469,7 @@
              avg: Math.round(100 * sum / ns.length), worst: rows.slice(0, 3) };
   }
   /* a whole line at once: every voiced point counts for the step it covers */
-  L.scoreTrace = function (ns, trace) {
+  L.scoreTrace = function (ns, trace, anyOct) {
     var h = {}, step = 0.05;
     if (trace && trace.length > 1) {
       var g = trace[1].t - trace[0].t;
@@ -463,7 +477,7 @@
     }
     for (var i = 0; i < (trace || []).length; i++) {
       var p = trace[i];
-      if (p && p.m != null) credit(h, ns, p.t, p.m, step);
+      if (p && p.m != null) credit(h, ns, p.t, p.m, step, !!anyOct);
     }
     return tally(ns, h);
   };
@@ -580,7 +594,7 @@
       while (S.trail.length > 4000) S.trail.shift();
       /* how long each bubble has been sung - by the one rule below, which
          the steady score test also runs, so the two cannot disagree */
-      if (m != null && S.song) credit(held, notes(), tv - lag, m, dt);
+      if (m != null && S.song) credit(held, notes(), tv - lag, m, dt, S.anyOct);
       var cl = $('rpLsClock');
       if (cl) cl.textContent = Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2);
       if (S.synth) {
