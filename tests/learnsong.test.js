@@ -176,9 +176,7 @@ async function toWav(rec) {
       trace.forEach(p2 => { if (p2.m != null) at.set(Math.round(p2.t * 20), p2.m); });
       const live = ins.trail.filter(x => x.m != null);
       const span = trace.length ? trace[trace.length - 1].t : 0;
-      let best = { d: 0, score: -1 };
-      for (let k = 0; k <= Math.round(span * 20); k++) {
-        const D = k / 20;
+      const tryD = (D) => {
         let good = 0, seen = 0;
         for (const x of live) {
           const m2 = at.get(Math.round((x.t + D) * 20));
@@ -187,10 +185,23 @@ async function toWav(rec) {
           const off = Math.abs(((x.m - m2 + 6) % 12 + 12) % 12 - 6);
           if (off <= 1) good++;
         }
-        if (seen > 40) {
-          const sc = good / seen;
-          if (sc > best.score) best = { d: D, score: sc, seen: seen };
-        }
+        return seen > 40 ? good / seen : -1;
+      };
+      /* coarse pass over the whole recording, then fine around the winner.
+         A twentieth of a second is a coarse step next to a note that only
+         lasts three of them: the same build scored 69% and 61% on two runs
+         purely because the alignment landed on a different step. That noise
+         belongs to this rig, not to the app, so the second pass takes it
+         down to a hundredth. The measure is still the pitch match, never
+         the score, or the rig would just be tuning itself to pass. */
+      let best = { d: 0, score: -1 };
+      for (let k = 0; k <= Math.round(span * 20); k++) {
+        const D = k / 20, sc = tryD(D);
+        if (sc > best.score) best = { d: D, score: sc };
+      }
+      for (let k = -5; k <= 5; k++) {
+        const D = Math.max(0, best.d + k / 100), sc = tryD(D);
+        if (sc > best.score) best = { d: D, score: sc };
       }
       return best;
     });
