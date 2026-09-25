@@ -725,6 +725,7 @@
   S.catching = false;
   setInterval(function () {
     if (!S.playing || S.synth || !S.song || !S.vox || S.asleep || !window.RPFileMap) return;
+    if (!S.catching && !RPFileMap.reading(S.song)) return;     /* only a song still being read */
     var t = songTime();
     var a = RPFileMap.aheadOf(S.song, t);
     if (!S.catching) {

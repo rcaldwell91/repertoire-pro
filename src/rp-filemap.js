@@ -561,10 +561,16 @@
     schedule();
     return j.promise;
   };
+  /* is this song being read right now (or waiting its turn)? */
+  F.reading = function (song) {
+    var s = song && song.id ? st[song.id] : null;
+    return !!(s && (s.st === 'reading' || s.st === 'queued'));
+  };
   /* how far the reading has got, for a screen about to play or playing */
   F.aheadOf = function (song, t) {
     if (!song || !F.needsBuild(song)) return { done: true, ok: true, canStart: true, readTo: Infinity };
     var s = song.id ? st[song.id] : null;             /* none yet: nothing read */
+    if (s && s.st === 'failed') return { done: true, failed: true, ok: true, canStart: false, readTo: s.readTo || 0 };
     var readTo = (s && s.readTo) || 0;
     return { done: false, readTo: readTo, ok: readTo - (t || 0) >= F.LEAD_MIN,
              canStart: readTo - (t || 0) >= F.LEAD_START };

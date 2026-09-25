@@ -104,7 +104,9 @@
     g.textBaseline = 'middle';
     for (var m = b.lo; m <= b.hi; m++) {
       var isC = ((m % 12) + 12) % 12 === 0;
-      if ((m - b.lo) % step && !isC) continue;
+      /* an octave apart is the Cs themselves: counting twelve from the
+         lowest note as well put a second label on top of each C */
+      if (step === 12 ? !isC : ((m - b.lo) % step && !isC)) continue;
       g.strokeStyle = isC ? 'rgba(232,179,74,.55)' : (dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.10)');
       g.lineWidth = 1;
       g.beginPath(); g.moveTo(PAD, y(m)); g.lineTo(W, y(m)); g.stroke();

@@ -260,12 +260,23 @@
     fillList();
   }
 
+  /* Robert, 25 Sep: "Only takes recorded in Free Sing show in Free Sing.
+     Show the latest one, with 'See all' beneath." */
   function fillList() {
     var box = $('rpVList');
     if (!box || !window.RPSend) return;
-    box.innerHTML = RPSend.listHtml('song');
+    var mine = (window.RPTakes ? RPTakes.all() : []).filter(function (s) {
+      return !s.assignId && RPTakes.originOf(s) === 'freesing';
+    });
+    box.innerHTML = RPSend.listHtml('song', mine.slice(0, 1)) +
+      (mine.length ? '<button class="btn" id="rpVSeeAll" style="width:100%;margin-top:8px;padding:10px;font-size:12.5px">See all</button>' : '');
     RPSend.wireList(box, 'song');
+    on($('rpVSeeAll'), 'click', function () {
+      try { switchMode('lib'); } catch (e) {}
+      setTimeout(function () { if (window.RPLib && RPLib.show) RPLib.show('recordings'); }, 150);
+    });
   }
+  V.fillList = fillList;
 
   function recHtml() {
     var h = '<div class="row" style="justify-content:space-between;align-items:center">' +
@@ -438,7 +449,8 @@
              String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')),
       artist: 'My Recordings', blob: V.blob, addedAt: Date.now(),
       key: null, lrc: null, duration: V.activeMs / 1000,
-      fx: JSON.parse(JSON.stringify(V.fx))     // what it sounded like, kept beside it
+      fx: JSON.parse(JSON.stringify(V.fx)),    // what it sounded like, kept beside it
+      origin: 'freesing'                       // where it was recorded
     };
     try { await dbPut('songs', song); }
     catch (e) { return say('Could not save it — storage may be full.'); }

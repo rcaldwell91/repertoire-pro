@@ -159,9 +159,12 @@
   S.redraw = function () {
     try { if (window.RPStudio && RPStudio.fillTakes) RPStudio.fillTakes(); } catch (e) {}
     try { if (window.RPWork) RPWork.refresh(); } catch (e) {}
+    try { if (window.RPVoice && RPVoice.fillList) RPVoice.fillList(); } catch (e) {}
     ['rpTakeList', 'rpVList'].forEach(function (id) {
       var box = document.getElementById(id);
       if (!box) return;
+      if (id === 'rpVList' && window.RPVoice && RPVoice.fillList) return;   /* its own list, above */
+      if (id === 'rpTakeList' && window.RPStudio && RPStudio.fillTakes) return;
       var kind = id === 'rpTakeList' ? 'pitch' : 'song';
       box.innerHTML = S.listHtml(kind);
       S.wireList(box, kind, box._rpOnLoad || null);
@@ -181,12 +184,12 @@
   /* ---------------------------------------------------------------- */
   /* the list of your takes, with what you can do with each            */
   /* ---------------------------------------------------------------- */
-  S.listHtml = function (kind) {
+  S.listHtml = function (kind, only) {
     /* Takes recorded against an assignment are NOT loose takes. They live on
        their own assignment card and are submitted from there, so they are
        kept out of this list rather than offering a second, contextless way
-       to send the same thing. */
-    var list = takes().filter(function (s) { return !s.assignId; });
+       to send the same thing. A screen may hand over its own list. */
+    var list = only || takes().filter(function (s) { return !s.assignId; });
     if (!list.length) {
       return '<div class="rp-empty" style="padding:8px 2px">Nothing kept yet. Record something above.</div>';
     }

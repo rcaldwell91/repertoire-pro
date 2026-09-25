@@ -36,12 +36,22 @@
   T.all = all;
   T.get = function (id) { return all().filter(function (s) { return s.id === id; })[0] || null; };
 
+  /* Robert, 25 Sep: "tag new takes by where they were recorded; untagged
+     older takes that carry a pitch line belong to the Pitch Tracker." */
+  T.originOf = function (s) {
+    if (s.origin) return s.origin;
+    if (s.assignId || s.exTitle || s.assignTitle) return 'exercise';
+    if (s.notes && s.notes.length) return 'tracker';
+    if (s.fx || /^sing/.test(s.id || '')) return 'freesing';
+    return 'song';
+  };
   /* where it was recorded: the exercise by name, or the screen */
   T.groupOf = function (s) {
     if (s.exTitle) return s.exTitle;
     if (s.assignTitle) return s.assignTitle;
-    if (s.notes && s.notes.length) return 'Pitch Tracker';
-    if (s.fx || /^sing/.test(s.id || '')) return 'Free Sing';
+    var o = T.originOf(s);
+    if (o === 'tracker') return 'Pitch Tracker';
+    if (o === 'freesing') return 'Free Sing';
     return 'Learn a song';
   };
   T.groups = function () {
@@ -67,6 +77,11 @@
   T.fmt = fmt; T.day = day;
 
   T.rowHtml = function (s) {
+    /* Robert, 25 Sep: on the Pitch Tracker the row's buttons came out as the
+       browser's own grey buttons and the title ran into the length
+       ("9-243:39"), because this style was only put on the page by the
+       Library's list. It goes on wherever a row is drawn. */
+    css();
     /* Robert, 17 Sep: "a take he can't sing over" is a bug, not a
        nice-to-have. The two things he would want to do with it live on the
        row, in plain words. */

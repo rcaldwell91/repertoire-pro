@@ -40,7 +40,7 @@
     row.parentElement.insertBefore(d, row);
     var note = document.createElement('div');
     note.className = 'measured'; note.style.marginTop = '4px';
-    note.textContent = 'The take you sing over has its own volume, on the bar under the Pitch Tracker.';
+    note.textContent = 'The take you sing along to has its own volume, under Sound on the Pitch Tracker.';
     row.parentElement.insertBefore(note, row);
     d.querySelector('#qMonVol').addEventListener('input', function (e) {
       var f = (+e.target.value) / 100;

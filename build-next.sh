@@ -1191,6 +1191,42 @@ function yinHz(buf, sr){
     if(!n) return;                      // stats left over from another song
     if(st.done||scoreBeat>n.t){ hitT+=st.hit; totT+=Math.min(n.d, Math.max(0,scoreBeat-n.t)); }
   });"""),
+
+    # 117. EVERY KEY NAMED. Robert, 25 Sep: note names on the Pitch Tracker's
+    #      keys. The rail only named a white key other than C when its row
+    #      was 9px or taller, and never named a black one, and the Pitch
+    #      Tracker's wider range makes its rows shorter than Learn a song's.
+    #      Now every white key is named at any zoom - the type gets smaller
+    #      rather than the name going - and a black key is named C\u266f and
+    #      so on wherever its row is at least 7px, which is where the name
+    #      still fits on it.
+    ("""      if(black){
+        c2.fillStyle = live ? (isLight() ? '#7c3aed' : '#f2c14e') : PAL.keyB;
+        c2.fillRect(0, y-kh/2, KEYW*0.58, kh);
+      } else {
+        c2.fillStyle = live ? (isLight() ? '#7c3aed' : '#f2c14e') : PAL.keyW;
+        c2.fillRect(0, y-kh/2, KEYW-2, kh);
+        const pc = ((m%12)+12)%12;
+        if(rowH >= 9 || pc===0){
+          c2.fillStyle = live ? PAL.keyLitInk : (pc===0 ? PAL.keyWC : PAL.keyWInk);
+          c2.font = (pc===0 ? 'bold ' : '') + '9px sans-serif';""",
+     """      if(black){
+        c2.fillStyle = live ? (isLight() ? '#7c3aed' : '#f2c14e') : PAL.keyB;
+        c2.fillRect(0, y-kh/2, KEYW*0.58, kh);
+        if(rowH >= 7){
+          c2.fillStyle = live ? PAL.keyLitInk : '#eef1f7';
+          c2.font = Math.min(8.5, rowH - 0.5).toFixed(1) + 'px sans-serif';
+          c2.textAlign = 'right'; c2.textBaseline = 'middle';
+          c2.fillText(midiName(m).replace('#', '\u266f'), KEYW*0.58 - 2, y);
+          c2.textAlign = 'left'; c2.textBaseline = 'alphabetic';
+        }
+      } else {
+        c2.fillStyle = live ? (isLight() ? '#7c3aed' : '#f2c14e') : PAL.keyW;
+        c2.fillRect(0, y-kh/2, KEYW-2, kh);
+        const pc = ((m%12)+12)%12;
+        {
+          c2.fillStyle = live ? PAL.keyLitInk : (pc===0 ? PAL.keyWC : PAL.keyWInk);
+          c2.font = (pc===0 ? 'bold ' : '') + Math.max(5, Math.min(9, rowH)).toFixed(1) + 'px sans-serif';"""),
 ]
 # ---------------------------------------------------------------------
 # Home, in plain words with a sense of where you are in the session.

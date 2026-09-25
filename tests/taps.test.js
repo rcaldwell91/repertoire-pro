@@ -95,6 +95,31 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   });
   await p.waitForTimeout(600);
 
+  /* Robert, 25 Sep: on the Pitch Tracker a take row's buttons came out as
+     the browser's own grey buttons, because the list's style was only put
+     on the page by the Library. A fresh profile has no takes, so nothing
+     showed it. One take from each screen that lists them - a short quiet
+     recording with a pitch line - so the lists are drawn and checked. */
+  await p.evaluate(async () => {
+    const sr = 8000, n = sr, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    const blob = new Blob([buf], { type: 'audio/wav' });
+    const line = []; for (let i = 0; i < 20; i++) line.push({ t: +(i * 0.05).toFixed(2), m: 60 });
+    const now = Date.now();
+    const takes = [
+      { id: 'rec' + now, kind: 'recording', title: 'Tracker take', artist: 'My Recordings', blob, addedAt: now,
+        duration: 1, notes: line, notesFrom: 'live', origin: 'tracker' },
+      { id: 'sing' + now, kind: 'recording', title: 'Free Sing take', artist: 'My Recordings', blob, addedAt: now - 1,
+        duration: 1, fx: { comp: 'off', eq: 'flat', echo: 'off', verb: 'off' }, origin: 'freesing' }
+    ];
+    for (const t of takes) { LIB.songs.push(t); try { await dbPut('songs', t); } catch (e) {} }
+    try { libRender(); } catch (e) {}
+  });
+  await p.waitForTimeout(1500);
+
   /* a fingerprint of everything the app is showing: the mode, the open
      page, any sheet, and a checksum of the live markup so a class flipping
      to "on" counts as having gone somewhere. */
@@ -114,6 +139,22 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   const dead = [];
   const quiet = [];
   const faint = [];
+  const raw = [];
+  /* a button the page never styled: the browser draws it with a raised
+     ("outset") border on its own light grey */
+  async function rawSweep(name) {
+    const found = await p.evaluate(() => {
+      const out = [];
+      document.querySelectorAll('button, input[type=button], input[type=submit]').forEach(b => {
+        if (b.offsetParent === null) return;
+        const cs = getComputedStyle(b);
+        const grey = ['rgb(239, 239, 239)', 'rgb(240, 240, 240)', 'rgb(107, 107, 107)'].indexOf(cs.backgroundColor) >= 0;
+        if (cs.borderTopStyle === 'outset' || grey) out.push((b.id ? '#' + b.id + ' ' : '') + '"' + (b.innerText || b.value || '').trim().slice(0, 30) + '"');
+      });
+      return out;
+    });
+    found.forEach(f => raw.push(name + ' — ' + f));
+  }
   let checked = 0;
   let textSeen = 0;
   let textSkipped = 0;
@@ -193,6 +234,7 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
     try { await p.evaluate(sc.go); } catch (e) { ok(false, sc.name + ' would not open: ' + e.message); continue; }
     await p.waitForTimeout(1100);
     await contrastSweep(sc.name);
+    await rawSweep(sc.name);
 
     /* everything that says "tap me" on this screen */
     const targets = await p.evaluate((notButtons) => {
@@ -283,6 +325,9 @@ const QUIET_TEXT = { 'warm-up': 'glossary term; opens its definition \u2014 veri
   ok(textSeen > 200, 'measured ' + textSeen + ' pieces of text against what they sit on' +
      (textSkipped ? ' (' + textSkipped + ' on a gradient, not measurable this way)' : ''));
   ok(faint.length === 0, faint.length ? faint.length + ' below 3:1' : 'all of them at 3:1 or better');
+  raw.slice(0, 12).forEach(f => console.log('    · ' + f));
+  ok(raw.length === 0, raw.length ? raw.length + ' buttons drawn in the browser\'s own default style'
+                                  : 'no button anywhere is drawn in the browser\'s own default style');
 
   /* Robert, 20 Sep: "the only way I could stop it was the phone's media
      notification." Leaving the screen has to stop the sound, whichever way

@@ -103,6 +103,113 @@
     draw();
   }
 
+  /* Robert, 25 Sep, the Pitch Tracker:
+       - "The three cards stay - note, Hz, steadiness - with the cents line
+         removed, all in one compact row about a third of the current
+         height."
+       - "Hear yourself (on/off), Hear the take (on/off) and Take volume
+         move into one small drop-down right under the map, labelled
+         Sound. Hear yourself stays in the gear panel too; it is the same
+         switch in both places."
+       - "Remove the 'Play a track & settings' section. Singing along to a
+         song already happens from takes and the Library. Put a small (i)
+         where it was with one line saying how."
+     The old section is hidden rather than taken out of the page: the
+     microphone button and the audio element inside it are still used. */
+  function tidy() {
+    var host = $('modeFree');
+    if (!host) return;
+    var hud = host.querySelector('.hud');
+    if (hud && !hud.classList.contains('rp-hud-compact')) hud.classList.add('rp-hud-compact');
+    var cv = $('freeCanvas'), wrap = cv ? cv.parentElement : null;
+    if (wrap && wrap.style.position !== 'relative') wrap.style.position = 'relative';
+    var dd = $('rpSoundDD');
+    if (dd && wrap && dd.previousSibling !== wrap) host.insertBefore(dd, wrap.nextSibling);   /* kept right under the map */
+    if (wrap && wrap.parentNode === host && !dd) {
+      var d = document.createElement('details');
+      d.id = 'rpSoundDD';
+      d.className = 'rp-sound';
+      d.innerHTML = '<summary>Sound</summary><div class="rp-sound-in">' +
+        '<button class="btn" id="rpSdSelf"></button>' +
+        '<button class="btn" id="rpSdTake"></button>' +
+        '<label class="rp-sd-vol"><span>Take volume</span>' +
+          '<input type="range" id="rpSdVol" min="0" max="100" step="5">' +
+          '<output id="rpSdVolOut"></output></label></div>';
+      host.insertBefore(d, wrap.nextSibling);
+      on($('rpSdSelf'), 'click', function () {
+        /* the gear's own switch, pressed: one switch, two places */
+        var q = $('qMonitor');
+        if (q) q.click();
+        else try { MONITOR.on = !MONITOR.on; if (typeof monitorWire === 'function') monitorWire(); } catch (e) {}
+        setTimeout(soundDD, 80);
+      });
+      on($('rpSdTake'), 'click', function () {
+        ST.hearTake = !ST.hearTake;
+        try { localStorage.setItem('rp_hear_take', ST.hearTake ? '1' : '0'); } catch (e) {}
+        if (over && over.audio) over.audio.muted = !ST.hearTake;
+        soundDD();
+      });
+      on($('rpSdVol'), 'input', function (e) {
+        ST.takeVol = (+e.target.value) / 100;
+        try { localStorage.setItem('rp_take_vol', String(ST.takeVol)); } catch (err) {}
+        if (over && over.audio && 'volume' in over.audio) { try { over.audio.volume = ST.takeVol; } catch (err) {} }
+        soundDD();
+      });
+    }
+    soundDD();
+    var fs = $('freeSettings');
+    if (fs && fs.style.display !== 'none') fs.style.display = 'none';
+    if (fs && !$('rpAlongInfo')) {
+      var i = document.createElement('div');
+      i.id = 'rpAlongInfo';
+      i.className = 'rp-along';
+      i.innerHTML = '<span class="rp-i" aria-hidden="true">i</span>' +
+        'To sing along to a song, open it from the Library, or tap Open in Pitch Tracker on a take.';
+      fs.parentNode.insertBefore(i, fs);
+    }
+  }
+  function soundDD() {
+    var self = $('rpSdSelf'), take = $('rpSdTake'), vol = $('rpSdVol'), out = $('rpSdVolOut');
+    if (!self) return;
+    var mon = false;
+    try { mon = !!(typeof MONITOR !== 'undefined' && MONITOR.on); } catch (e) {}
+    self.textContent = 'Hear yourself: ' + (mon ? 'on' : 'off');
+    self.classList.toggle('primary', mon);
+    take.textContent = 'Hear the take: ' + (ST.hearTake ? 'on' : 'off');
+    take.classList.toggle('primary', !!ST.hearTake);
+    if (document.activeElement !== vol) vol.value = String(Math.round(ST.takeVol * 100));
+    out.textContent = Math.round(ST.takeVol * 100) + '%';
+  }
+  ST.soundDD = soundDD;
+  (function css() {
+    var st = document.createElement('style');
+    st.textContent =
+      '#modeFree .hud.rp-hud-compact{margin:8px 0 6px;gap:6px;align-items:stretch}' +
+      '#modeFree .hud.rp-hud-compact .stat{padding:3px 6px;display:flex;flex-direction:column;justify-content:center}' +
+      '#modeFree .hud.rp-hud-compact #bigNote{font-size:22px;line-height:1.1;min-width:0}' +
+      '#modeFree .hud.rp-hud-compact #bigCents{display:none}' +
+      '#modeFree .hud.rp-hud-compact .v{font-size:15px;line-height:1.15}' +
+      '#modeFree .hud.rp-hud-compact .l{margin-top:0;font-size:7.5px}' +
+      '.rp-sound{margin:8px 0 0}' +
+      '.rp-sound>summary{display:inline-flex;align-items:center;gap:6px;list-style:none;cursor:pointer;' +
+        'padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);' +
+        'font-size:12.5px;font-weight:800;color:var(--ink)}' +
+      '.rp-sound>summary::-webkit-details-marker{display:none}' +
+      '.rp-sound>summary::after{content:"\u25be";font-size:11px;color:var(--ink-dim)}' +
+      '.rp-sound[open]>summary::after{content:"\u25b4"}' +
+      '.rp-sound-in{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;padding:10px;' +
+        'border:1px solid var(--line);border-radius:12px;background:var(--panel)}' +
+      '.rp-sound-in .btn{padding:7px 11px;font-size:12px}' +
+      '.rp-sd-vol{flex:1 1 100%;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-dim)}' +
+      '.rp-sd-vol input{flex:1;min-width:0}' +
+      '.rp-along{display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12.5px;color:var(--ink-dim);line-height:1.4}' +
+      '.rp-i{flex:none;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--ink-dim);display:inline-flex;' +
+        'align-items:center;justify-content:center;font-size:10.5px;font-weight:900;font-style:normal;margin-top:1px}' +
+      '#rpPtCount{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:74px;' +
+        'font-weight:900;color:var(--gold);text-shadow:0 2px 18px rgba(0,0,0,.6);pointer-events:none}';
+    document.head.appendChild(st);
+  })();
+
   function fmt(ms) {
     var s = Math.round(ms / 1000);
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -554,7 +661,8 @@
       artist: 'My Recordings', blob: b, addedAt: Date.now(),
       key: null, lrc: null, duration: ST.activeMs / 1000,
       notes: ST.notes,                      // the pitch line, saved with the audio
-      notesFrom: 'live'                     // read by the mic, so it reads late
+      notesFrom: 'live',                    // read by the mic, so it reads late
+      origin: ST.assign ? 'exercise' : 'tracker'   // where it was recorded
     };
     if (ST.assign) {                        // this one answers an assignment
       song.assignId = ST.assign.id;
@@ -643,7 +751,10 @@
   function fillTakes() {
     var box = $('rpTakeList');
     if (!box) return;
-    var list = takes().filter(function (s) { return !s.assignId; });
+    /* Robert, 25 Sep: each screen shows the takes recorded on it */
+    var list = takes().filter(function (s) {
+      return !s.assignId && (!window.RPTakes || RPTakes.originOf(s) === 'tracker');
+    });
     if (!list.length) { box.innerHTML = '<div class="rp-empty" style="padding:8px 2px">No takes yet. Record one above.</div>'; }
     else if (window.RPTakes) {
       box.innerHTML = '<div class="measured" style="margin:6px 0 4px">Newest</div>' + RPTakes.rowHtml(list[0]) +
@@ -670,6 +781,7 @@
   try { var tv = localStorage.getItem('rp_take_vol'); if (tv != null && isFinite(+tv)) ST.takeVol = Math.max(0, Math.min(1, +tv)); } catch (e) {}
   var over = null;   /* { audio, url, title, mode } */
   function stopOver() {
+    cancelCount();
     if (over) {
       try { if (over.audio.end) over.audio.end(); else over.audio.pause(); } catch (e) {}
       if (over.url) { try { URL.revokeObjectURL(over.url); } catch (e) {} }
@@ -726,7 +838,9 @@
   ST.catching = false;
   function catchUp() {
     var o = ST.overlay;
-    if (!o || !o.song || !o.audio || o.audio.ended || !window.RPFileMap) { ST.catching = false; return; }
+    /* only a song whose reading is under way can fall behind it */
+    if (!o || !o.song || !o.audio || o.audio.ended || !window.RPFileMap ||
+        !(ST.catching || RPFileMap.reading(o.song))) { ST.catching = false; return; }
     var a = RPFileMap.aheadOf(o.song, o.audio.currentTime || 0);
     if (!ST.catching) {
       if (!a.done && !a.ok && !o.audio.paused) {
@@ -762,14 +876,49 @@
       ST.overlay = { notes: s.notes, audio: a, song: s };
       pinTracker();
       a.onended = function () { if (over && over.audio === a) stopOver(); };
-      a.play().catch(function () { say('The phone would not play it.'); });
-      say('Singing along with ' + s.title + '. Gold is the take; blue is you now.');
+      /* Robert, 25 Sep: "A 3-2-1 countdown before a sing-along starts, the
+         same as Learn a song." */
+      countIn(function () {
+        if (!over || over.audio !== a) return;
+        a.play().catch(function () { if (!document.hidden) say('The phone would not play it.'); });
+        playBar();
+      });
       try { $('freeCanvas').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
     } catch (e) { say('Could not load that take.'); }
     playBar();
   }
 
   ST.singOver = loadTake;
+
+  ST.counting = false;
+  var countTok = 0;
+  function countIn(then) {
+    var tok = ++countTok, cv = $('freeCanvas'), el = $('rpPtCount');
+    if (!el && cv && cv.parentElement) {
+      el = document.createElement('div');
+      el.id = 'rpPtCount';
+      cv.parentElement.appendChild(el);
+    }
+    var n = 3;
+    ST.counting = true;
+    (function tick() {
+      if (tok !== countTok) return;
+      if (n > 0) {
+        if (el) { el.style.display = 'flex'; el.textContent = String(n); }
+        n--;
+        setTimeout(tick, 1000);
+        return;
+      }
+      if (el) el.style.display = 'none';
+      ST.counting = false;
+      then();
+    })();
+  }
+  function cancelCount() {
+    countTok++;
+    ST.counting = false;
+    var el = $('rpPtCount'); if (el) el.style.display = 'none';
+  }
 
   /* Robert, 24 Sep: "Open in Pitch Tracker lands on the tracker but not
      ready - I had to tap the take again from the tracker, then press
@@ -855,44 +1004,30 @@
     var title = over ? over.title : 'the take';
     var mode = over && over.mode === 'over';
     var lead = over && over.mode === 'guide' ? 'Guide: ' : (mode ? 'Singing along with ' : 'Listening to ');
-    var paused = !!o.audio.paused;
+    var paused = !!o.audio.paused && !ST.counting;
     bar.dataset.paused = paused ? '1' : '0';
     /* Robert, 16 Sep: "still need a pause, restart and end button." */
     bar.innerHTML = '<div style="flex:1 1 100%;min-width:0;font-size:12.5px;font-weight:700">' +
         lead + '<span style="color:var(--gold)">' + esc(title) + '</span>' + (paused ? ' · paused' : '') + '</div>' +
       '<button class="btn' + (paused ? ' primary' : '') + '" id="rpPauseOver" style="padding:7px 12px;font-size:12px">' + (paused ? 'Resume' : 'Pause') + '</button>' +
       '<button class="btn" id="rpRestartOver" style="padding:7px 12px;font-size:12px">Restart</button>' +
-      '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>' +
-      (mode ? '<button class="btn" id="rpHearTake" style="padding:7px 11px;font-size:12px">Hear the take: ' + (ST.hearTake ? 'on' : 'off') + '</button>' : '') +
-      (mode && ST.hearTake ? '<label style="flex:1 1 100%;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink-dim)">Take volume' +
-        '<input type="range" id="rpTakeVol" min="0" max="100" step="5" value="' + Math.round(ST.takeVol * 100) + '" style="flex:1">' +
-        '<output id="rpTakeVolOut">' + Math.round(ST.takeVol * 100) + '%</output></label>' : '');
+      '<button class="btn danger" id="rpStopOver" style="padding:7px 12px;font-size:12px">Stop</button>';
     bar.style.display = '';
     seekMap();
-    on($('rpTakeVol'), 'input', function (e) {
-      ST.takeVol = (+e.target.value) / 100;
-      try { localStorage.setItem('rp_take_vol', String(ST.takeVol)); } catch (err) {}
-      if (over && over.audio && 'volume' in over.audio) { try { over.audio.volume = ST.takeVol; } catch (err) {} }
-      var o = $('rpTakeVolOut'); if (o) o.textContent = Math.round(ST.takeVol * 100) + '%';
-    });
     on($('rpStopOver'), 'click', function () { ST.stopAll(); say('Stopped.'); });
     on($('rpPauseOver'), 'click', function () {
       var a = ST.overlay && ST.overlay.audio; if (!a) return;
       ST.catching = false;              /* his own pause is his; catching up resumes only its own */
+      if (ST.counting) { cancelCount(); setTimeout(playBar, 60); return; }
       if (a.paused) { try { var pr = a.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {} }
       else { try { a.pause(); } catch (e) {} }
       setTimeout(playBar, 60);
     });
     on($('rpRestartOver'), 'click', function () {
       var a = ST.overlay && ST.overlay.audio; if (!a) return;
+      cancelCount();
       try { a.currentTime = 0; var pr = a.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
       setTimeout(playBar, 60);
-    });
-    on($('rpHearTake'), 'click', function () {
-      ST.hearTake = !ST.hearTake;
-      try { localStorage.setItem('rp_hear_take', ST.hearTake ? '1' : '0'); } catch (e) {}
-      if (over && over.audio) over.audio.muted = !ST.hearTake;
-      playBar();
     });
   }
   /* Robert, 17 Sep: "when I'm listening to a take I want control of where
@@ -993,8 +1128,8 @@
     if (sig !== takesSig) { takesSig = sig; if ($('rpTakeList')) fillTakes(); }
   }
   function boot() {
-    setInterval(function () { mount(); mountTakes(); refreshTakes(); pinTracker(); }, 1200);
-    mount(); mountTakes(); pinTracker();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
+    setInterval(function () { mount(); mountTakes(); refreshTakes(); pinTracker(); tidy(); }, 1200);
+    mount(); mountTakes(); pinTracker(); tidy();   /* the old Train-tab entry row is gone: the Pitch Tracker tile is the way in */
     try { if (typeof libReady !== 'undefined' && libReady && libReady.then) libReady.then(function () { setTimeout(refreshTakes, 50); }); } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
