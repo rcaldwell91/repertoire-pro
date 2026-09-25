@@ -226,15 +226,23 @@
      says at least 85% of the sung time lands inside one. --------------- */
   F.bubbles = function (notes) {
     if (!notes || notes.length < 2) return [];
-    /* the step comes from the data rather than from this file's own HOP, so
-       a take's live line groups the same way a file's trace does */
+    /* The step comes from the data rather than from this file's own HOP, so
+       a take's live line groups the same way a file's trace does.
+
+       It is rounded, and so is every length below, because the times in a
+       trace are stored to two decimals and subtracting them does not land
+       exactly: the step measured 0.049999999999999996, a three-frame note
+       came to 0.14999999999999997, and every one of them failed the 0.15
+       test by a hair. That quietly threw away 63 of 488 notes on one of
+       Robert's recordings and took five points off the score with them. */
     var gaps = [], q;
     for (q = 1; q < notes.length && gaps.length < 40; q++) {
       var g = notes[q].t - notes[q - 1].t;
       if (g > 0) gaps.push(g);
     }
     gaps.sort(function (a, b) { return a - b; });
-    var step = gaps.length ? gaps[gaps.length >> 1] : HOP;
+    var step = gaps.length ? +gaps[gaps.length >> 1].toFixed(3) : HOP;
+    if (!(step > 0)) step = HOP;
     var out = [], i = 0, n = notes.length;
     while (i < n) {
       if (notes[i].m == null) { i++; continue; }
@@ -245,9 +253,9 @@
         if (nhi - nlo > 1) break;            /* it has moved off this note */
         lo = nlo; hi = nhi; sum += m2; cnt++; j++;
       }
-      var dur = notes[j].t - notes[i].t + step;
+      var dur = +(((j - i + 1) * step).toFixed(2));
       if (dur >= 0.15) {
-        out.push({ m: Math.round(sum / cnt), t: +(notes[i].t).toFixed(2), d: +dur.toFixed(2) });
+        out.push({ m: Math.round(sum / cnt), t: +(notes[i].t).toFixed(2), d: dur });
       }
       i = j + 1;
     }
