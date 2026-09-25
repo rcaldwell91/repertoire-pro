@@ -144,6 +144,11 @@ async function toWav(rec) {
     /* open it, start it, and let both clocks run */
     const opened = await p.evaluate(async () => {
       const wait = ms => new Promise(r => setTimeout(r, ms));
+      /* the screen has to be the one on show: Learn a song's draw loop does
+         nothing at all while its canvas is hidden, which is correct on a
+         phone and silent in a test - no error, just zeroes everywhere */
+      switchMode('song');
+      await wait(600);
       RPLearnSong.open(window.__song);
       await wait(900);
       const b = document.getElementById('rpLsStart');
@@ -151,13 +156,17 @@ async function toWav(rec) {
       b.click();
       await wait(16000);                    /* 3s count-in, then 13s running */
       const ins = RPLearnSong.inspect();
+      const cv = document.getElementById('rpLsCv');
       return { notes: ins.notes.length, playing: ins.playing, t: ins.t,
-               trail: ins.trail.length };
+               trail: ins.trail.length, heard: ins.trail.filter(x => x.m != null).length,
+               onScreen: !!(cv && cv.offsetParent !== null) };
     });
     if (opened.err) { ok(false, rec.label + ': ' + opened.err); await browser.close(); continue; }
     ok(opened.notes > 0, rec.label + ': ' + opened.notes + ' notes to hit, drawn from the recording');
     ok(opened.notes === built.bubbles, rec.label + ': the notes on screen are the ones stored with the song');
     ok(opened.playing === true, rec.label + ': the song is playing');
+    ok(opened.onScreen === true, rec.label + ': the screen is the one on show, so it is drawing');
+    ok(opened.heard > 40, rec.label + ': the microphone is hearing the singer (' + opened.heard + ' of ' + opened.trail + ' reads)');
 
     /* line the microphone's copy up with the song */
     const align = await p.evaluate(() => {
