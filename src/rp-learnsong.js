@@ -45,6 +45,7 @@
     trail: [], t0: 0, vox: null, mus: null, voxUrl: null, musUrl: null,
     countdown: 0, hid: [], mapping: false,
     asleep: false, heldT: 0,           /* where the song got to before sleep */
+    lastFrame: 0,                      /* for real elapsed time, not 60fps */
     synth: false, clock0: 0, sung: 0   /* a built-in has no file: the app plays it */
   };
 
@@ -167,6 +168,7 @@
     }
     if (!S.asleep) return;
     S.asleep = false;
+    S.lastFrame = 0;                 /* do not credit the time it was asleep */
     if (!S.playing || !S.open) return;
     if (S.synth) {
       /* the timer clock has run on while nothing sounded; move its origin
@@ -352,6 +354,7 @@
     pinWindow();               /* decided here, before a note sounds, and held */
     held = {};
     hideScore();
+    S.lastFrame = 0;
     S.trail = [];
     S.playing = true;
     $('rpLsStart').disabled = true;
@@ -490,6 +493,16 @@
     if (!cv || cv.offsetParent === null) return;
     var t = songTime();
 
+    /* How long this frame actually lasted. It used to credit a flat 0.016s
+       to a note per frame, which is only true at exactly 60 frames a
+       second: on a phone that is throttling, or on a tired battery, every
+       score read short and every bubble drew part-filled for a note that
+       was sung perfectly. Clamped, so a stall cannot hand one note a whole
+       second at once. */
+    var nowMs = (window.performance ? performance.now() : Date.now());
+    var dt = S.lastFrame ? Math.min(0.1, (nowMs - S.lastFrame) / 1000) : 0;
+    S.lastFrame = nowMs;
+
     /* his voice, on the song's own clock, so the same x is the same moment.
        The microphone reads a note 0.1s after it was sung and the note map
        reads one 0.05s before it sounded (both measured, 17 Sep — see the
@@ -510,7 +523,7 @@
           var n = ns[i];
           if (tv >= n.t + lag && tv <= n.t + lag + (n.d || 0.4)) {
             var off = Math.abs(((m - n.m + 6) % 12 + 12) % 12 - 6);
-            if (off < 1.0) held[i] = (held[i] || 0) + 0.016;
+            if (off < 1.0) held[i] = (held[i] || 0) + dt;
             break;
           }
         }

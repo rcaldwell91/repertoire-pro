@@ -220,6 +220,15 @@ async function toWav(rec) {
       });
       const hit = rows.filter(r => r.frac >= 0.5).length;
       const avg = rows.length ? rows.reduce((a, b) => a + b.frac, 0) / rows.length : 0;
+      /* how fast the draw loop actually ran, because hold time is real
+         elapsed time now and a slow loop is worth knowing about */
+      let fps = 0;
+      await new Promise(res => {
+        let n = 0; const t0 = performance.now();
+        const tick = () => { if (++n < 30) requestAnimationFrame(tick);
+          else { fps = Math.round(n / ((performance.now() - t0) / 1000)); res(); } };
+        requestAnimationFrame(tick);
+      });
       /* is anything gold actually on the canvas */
       let gold = 0;
       try {
@@ -229,14 +238,15 @@ async function toWav(rec) {
           if (d[i] > 170 && d[i + 1] > 140 && d[i + 1] < 235 && d[i + 2] < 150) gold++;
         }
       } catch (e) {}
-      return { from: from, to: to, played: rows.length, hit: hit,
+      return { fps: fps, from: from, to: to, played: rows.length, hit: hit,
                pct: rows.length ? Math.round(100 * hit / rows.length) : 0,
                avg: Math.round(100 * avg), fillingEarly: filling,
                fillingLate: Object.keys(ins.held).length, gold: gold };
     }, [align.d, PLAY_SECS]);
 
     console.log('    sang from ' + scored.from.toFixed(0) + 's to ' + scored.to.toFixed(0) + 's — ' +
-                scored.played + ' notes came round, ' + scored.hit + ' hit, held ' + scored.avg + '% on average');
+                scored.played + ' notes came round, ' + scored.hit + ' hit, held ' + scored.avg +
+                '% on average (screen drawing at ' + scored.fps + 'fps)');
     ok(scored.gold > 50, rec.label + ': the bubbles are on the screen (' + scored.gold + ' gold pixels)');
     ok(scored.fillingLate > scored.fillingEarly,
        rec.label + ': the bubbles fill as the song runs (' + scored.fillingEarly + ' → ' + scored.fillingLate + ' touched)');
