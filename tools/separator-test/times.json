@@ -1,0 +1,36 @@
+{
+ "model": "vocals_mel_band_roformer.ckpt",
+ "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+ "load_seconds": 7.0,
+ "cpu_threads": 4,
+ "songs": {
+  "All of Me": {
+   "song_seconds": 269.74,
+   "separate_seconds": 1050.0,
+   "x_real_time": 0.26,
+   "files": {
+    "music": "All of Me \u2014 music.mp3",
+    "voice": "All of Me \u2014 voice.mp3"
+   }
+  },
+  "Ride": {
+   "song_seconds": 231.16,
+   "separate_seconds": 836.7,
+   "x_real_time": 0.28,
+   "files": {
+    "music": "Ride \u2014 music.mp3",
+    "voice": "Ride \u2014 voice.mp3"
+   }
+  },
+  "If I Ain't Got You": {
+   "song_seconds": 279.22,
+   "separate_seconds": 965.5,
+   "x_real_time": 0.29,
+   "files": {
+    "music": "If I Ain't Got You \u2014 music.mp3",
+    "voice": "If I Ain't Got You \u2014 voice.mp3"
+   }
+  }
+ },
+ "note": "stems named and encoded afterwards by finish(): the run itself matched the stem names case-sensitively and left them unnamed"
+}

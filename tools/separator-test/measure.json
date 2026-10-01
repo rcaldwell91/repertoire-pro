@@ -1,0 +1,306 @@
+[
+ {
+  "song": "All of Me",
+  "offset_s": 8.5008,
+  "peak": 0.984,
+  "stretches": [
+   {
+    "at": 8.5,
+    "offset_ms": 0.0,
+    "peak": 0.977
+   },
+   {
+    "at": 18.5,
+    "offset_ms": 0.0,
+    "peak": 0.912
+   },
+   {
+    "at": 28.5,
+    "offset_ms": 0.0,
+    "peak": 0.936
+   },
+   {
+    "at": 38.5,
+    "offset_ms": 0.0,
+    "peak": 0.931
+   },
+   {
+    "at": 48.5,
+    "offset_ms": 0.0,
+    "peak": 0.897
+   },
+   {
+    "at": 58.5,
+    "offset_ms": 0.0,
+    "peak": 0.896
+   },
+   {
+    "at": 68.5,
+    "offset_ms": 0.0,
+    "peak": 0.962
+   },
+   {
+    "at": 78.5,
+    "offset_ms": 0.0,
+    "peak": 0.968
+   },
+   {
+    "at": 88.5,
+    "offset_ms": 0.0,
+    "peak": 0.967
+   },
+   {
+    "at": 98.5,
+    "offset_ms": 0.0,
+    "peak": 0.955
+   },
+   {
+    "at": 108.5,
+    "offset_ms": 0.0,
+    "peak": 0.938
+   },
+   {
+    "at": 118.5,
+    "offset_ms": 0.0,
+    "peak": 0.935
+   },
+   {
+    "at": 128.5,
+    "offset_ms": 0.0,
+    "peak": 0.968
+   },
+   {
+    "at": 138.5,
+    "offset_ms": 0.0,
+    "peak": 0.961
+   },
+   {
+    "at": 148.5,
+    "offset_ms": 0.0,
+    "peak": 0.922
+   },
+   {
+    "at": 158.5,
+    "offset_ms": 0.0,
+    "peak": 0.939
+   },
+   {
+    "at": 168.5,
+    "offset_ms": 0.0,
+    "peak": 0.956
+   },
+   {
+    "at": 178.5,
+    "offset_ms": 0.0,
+    "peak": 0.922
+   },
+   {
+    "at": 188.5,
+    "offset_ms": 0.0,
+    "peak": 0.954
+   },
+   {
+    "at": 198.5,
+    "offset_ms": 0.0,
+    "peak": 0.947
+   },
+   {
+    "at": 208.5,
+    "offset_ms": 0.0,
+    "peak": 0.955
+   },
+   {
+    "at": 218.5,
+    "offset_ms": 0.0,
+    "peak": 0.926
+   },
+   {
+    "at": 228.5,
+    "offset_ms": 0.0,
+    "peak": 0.933
+   },
+   {
+    "at": 238.5,
+    "offset_ms": 0.0,
+    "peak": 0.939
+   },
+   {
+    "at": 248.5,
+    "offset_ms": 0.0,
+    "peak": 0.904
+   },
+   {
+    "at": 258.5,
+    "offset_ms": 0.0,
+    "peak": 0.982
+   }
+  ],
+  "versions_match": true,
+  "worst_stretch_offset_ms": 0.0,
+  "sdr_db": 12.35,
+  "sdr_level_matched_db": 14.12,
+  "gain": 0.876,
+  "quiet_line_db": {
+   "voice_only": -32.8,
+   "separated": -34.9
+  },
+  "music_in_voice": [
+   {
+    "from": 118.75,
+    "to": 119.25,
+    "separated_db": -26.8
+   }
+  ],
+  "voice_drops_out": [],
+  "weakest_while_singing": [
+   {
+    "at": 240.5,
+    "local_sdr_db": 7.9
+   },
+   {
+    "at": 129.5,
+    "local_sdr_db": 9.3
+   },
+   {
+    "at": 239.5,
+    "local_sdr_db": 9.4
+   },
+   {
+    "at": 248.5,
+    "local_sdr_db": 9.4
+   },
+   {
+    "at": 168.5,
+    "local_sdr_db": 9.8
+   },
+   {
+    "at": 152.5,
+    "local_sdr_db": 10.0
+   }
+  ],
+  "local_sdr_while_singing": {
+   "median": 14.7,
+   "p10": 11.7,
+   "p90": 17.7
+  }
+ },
+ {
+  "song": "Ride",
+  "offset_s": 0.76,
+  "peak": 0.345,
+  "stretches": [
+   {
+    "at": 0.8,
+    "offset_ms": -1.41,
+    "peak": 0.574
+   },
+   {
+    "at": 10.8,
+    "offset_ms": 0.25,
+    "peak": 0.498
+   },
+   {
+    "at": 20.8,
+    "offset_ms": 0.25,
+    "peak": 0.393
+   },
+   {
+    "at": 30.8,
+    "offset_ms": -1.25,
+    "peak": 0.383
+   },
+   {
+    "at": 40.8,
+    "offset_ms": 0.25,
+    "peak": 0.399
+   },
+   {
+    "at": 50.8,
+    "offset_ms": -0.16,
+    "peak": 0.42
+   },
+   {
+    "at": 60.8,
+    "offset_ms": 0.16,
+    "peak": 0.38
+   },
+   {
+    "at": 70.8,
+    "offset_ms": -0.16,
+    "peak": 0.38
+   },
+   {
+    "at": 80.8,
+    "offset_ms": 0.23,
+    "peak": 0.476
+   },
+   {
+    "at": 90.8,
+    "offset_ms": 0.27,
+    "peak": 0.479
+   },
+   {
+    "at": 100.8,
+    "offset_ms": -1.25,
+    "peak": 0.361
+   },
+   {
+    "at": 110.8,
+    "offset_ms": 0.18,
+    "peak": 0.479
+   },
+   {
+    "at": 120.8,
+    "offset_ms": -0.18,
+    "peak": 0.366
+   },
+   {
+    "at": 130.8,
+    "offset_ms": -0.14,
+    "peak": 0.37
+   },
+   {
+    "at": 140.8,
+    "offset_ms": -0.11,
+    "peak": 0.37
+   },
+   {
+    "at": 150.8,
+    "offset_ms": 0.34,
+    "peak": 0.576
+   },
+   {
+    "at": 160.8,
+    "offset_ms": 0.14,
+    "peak": 0.498
+   },
+   {
+    "at": 170.8,
+    "offset_ms": -1.43,
+    "peak": 0.311
+   },
+   {
+    "at": 180.8,
+    "offset_ms": 0.0,
+    "peak": 0.386
+   },
+   {
+    "at": 190.8,
+    "offset_ms": -0.07,
+    "peak": 0.273
+   },
+   {
+    "at": 200.8,
+    "offset_ms": -0.09,
+    "peak": 0.368
+   },
+   {
+    "at": 210.8,
+    "offset_ms": 0.02,
+    "peak": 0.342
+   }
+  ],
+  "versions_match": false,
+  "worst_stretch_offset_ms": 1.43
+ }
+]
