@@ -3943,6 +3943,29 @@ function susDone(){
   try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Hold a note', score: held, out_of: 10 }); } catch(e){}
   try { V10.markPractised('Hold a note'); } catch(e){}
   SUS.round = 0; SUS.held = 0;
+  try { if (window.RPFlow && RPFlow.inRoutine()) RPFlow.ended($('susResult').textContent); } catch(e){}
+}
+/* Robert, 1 Oct: "Hold a note: remove the 1.5-second auto-advance. Show a
+   Next button instead." After each hold the next note waits for Next. */
+function susShowNext(){
+  const st = $('btnSusStart');
+  if (!st) return;
+  let nx = $('btnSusNext');
+  if (!nx) {
+    nx = document.createElement('button');
+    nx.id = 'btnSusNext'; nx.className = 'btn primary'; nx.textContent = 'Next';
+    nx.addEventListener('click', ()=>{
+      nx.style.display = 'none'; st.style.display = '';
+      if (TRAIN.kind==='sustain' && SUS.round) susNewRound();
+    });
+    st.parentElement.insertBefore(nx, st);
+  }
+  st.style.display = 'none';
+  nx.style.display = '';
+}
+function susHideNext(){
+  const nx = $('btnSusNext'); if (nx) nx.style.display = 'none';
+  const st = $('btnSusStart'); if (st) st.style.display = '';
 }
 $('btnSustain').addEventListener('click', async ()=>{
   if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
@@ -3951,6 +3974,7 @@ $('btnSustain').addEventListener('click', async ()=>{
   trainView('sustain');
   SUS.round = 0; SUS.held = 0;
   const sc = $('susScore'); if (sc) sc.textContent = '0';
+  susHideNext();
   susNewRound();
 });
 $('btnSusNote').addEventListener('click', susPickNote);
@@ -3992,7 +4016,7 @@ function susFrame(dt, um){
     try { if (window.RP && RP.logResult) RP.logResult({ kind: 'sustain',
       label: 'Steady note', pct: pct, seconds: SUS.dur }); } catch (e) {}
     if(pct>=70){ SUS.held = (SUS.held||0)+1; const sc=$('susScore'); if(sc) sc.textContent=SUS.held; playDing(); } else playBuzz();
-    setTimeout(()=>{ if(TRAIN.kind==='sustain' && SUS.round) susNewRound(); }, 1500);
+    susShowNext();
   }
 }
 
@@ -4058,7 +4082,7 @@ requestAnimationFrame(gameFrame);
    runs the melody analyser on a library track, right here on the device, and
    stores the result so it plays with full bubbles like a processed pack.      */
 const ANALYZE = { busy:false, worker:null };
-const APP_VERSION = '25 Sep 2026 · build 4c3e5042';
+const APP_VERSION = '25 Sep 2026 · build d5c46330';
 try{ console.log('Repertoire build', APP_VERSION); }catch(e){}
 window.addEventListener('DOMContentLoaded', ()=>{ const bt=document.getElementById('buildTag'); if(bt) bt.textContent = APP_VERSION; });
 
@@ -8965,9 +8989,15 @@ renderJourney();
   /* ---------------------------------------------------------------- */
   /* running an exercise                                               */
   /* ---------------------------------------------------------------- */
-  function startEx(id) {
+  function startEx(id, now) {
     const e = V10.exById(id);
     if (!e) return;
+    if (!now && window.RPFlow) {
+      const k = (e.engine || {}).kind;
+      return RPFlow.gate({ kind: 'ex', key: e.id, title: e.name, what: e.what,
+        tip: k === 'ladder' ? 'ladder' : k === 'hold' ? 'sustain' : 'guided',
+        start: function () { startEx(id, true); } });
+    }
     const eng = e.engine || {};
     if (eng.kind === 'ladder') return startPatternLadder(e);
     if (eng.kind === 'hold') return startHold(e);
@@ -9092,7 +9122,13 @@ renderJourney();
           (GUIDE.target ? (held >= GUIDE.target ? ', past the ' + GUIDE.target + ' you were aiming for.' : ' of the ' + GUIDE.target + ' you were aiming for.') : '.');
         try { if (window.RP && RP.logResult) RP.logResult({ kind: 'practice', label: GUIDE.ex ? GUIDE.ex.name : 'Timed', score: Math.round(held), out_of: GUIDE.target || null }); } catch (e) {}
         GUIDE.heard = false; GUIDE.quietSince = 0; GUIDE.finished = true;
-        setTimeout(endGuided, 1400);
+        /* Robert, 1 Oct: "after 1 second of quiet, stop the clock and show
+           the result. Never launch anything after." It used to close itself
+           1.4s later and, in a routine, start the next step. Now the clock
+           stops where you did and the result stays; in a routine the next
+           step waits behind its own Start, with this result on it. */
+        if (GUIDE.tick) { clearInterval(GUIDE.tick); GUIDE.tick = null; }
+        if (ROUTINE.on) { if (window.RPFlow) RPFlow.lastResult = sub.textContent; endGuided(); }
         return;
       }
       if (!GUIDE.heard) { el.textContent = '0.0s'; sub.textContent = 'Start when you are ready — it times itself from the first sound.'; return; }
@@ -9116,7 +9152,8 @@ renderJourney();
     if (GUIDE.tick) { clearInterval(GUIDE.tick); GUIDE.tick = null; }
     const p = $('v10Guided'); if (p) p.style.display = 'none';
     document.querySelectorAll('#v10TrainHost, #rangePanel').forEach(el => el.style.display = '');
-    if (ROUTINE.on) nextRoutineStep();
+    if (window.RPFlow) RPFlow.ended();
+    else if (ROUTINE.on) nextRoutineStep();
   }
 
   function playGlide() {
@@ -9157,14 +9194,16 @@ renderJourney();
       b.id = 'rpSessionBar';
       b.className = 'row';
       b.style.cssText = 'align-items:center;gap:10px;margin:0 0 10px';
-      const slot = $('trainSlot') || $('modeTrain');
+      const slot = $('rpGate') || $('trainSlot') || $('modeTrain');   /* above the step's own card */
       slot.parentElement.insertBefore(b, slot);
     }
     b.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
       esc(ROUTINE.name) + ' · step ' + (ROUTINE.i + 1) + ' of ' + ROUTINE.steps.length + '</div>' +
-      '<button class="btn danger ghost" id="rpSessionEnd" style="padding:7px 12px;font-size:12px">End the session</button>';
+      '<button class="btn danger ghost" id="rpSessionEnd" style="padding:7px 12px;font-size:12px' +
+        (window.RPFlow && RPFlow.gateUp() ? ';display:none' : '') + '">End the session</button>';
     b.style.display = 'flex';
     $('rpSessionEnd').addEventListener('click', () => {
+      if (window.RPFlow) return RPFlow.endSession();
       ROUTINE.on = false;
       routineBar();
       const g = $('gQuit'); if (g && g.offsetParent !== null) g.click();
@@ -9173,6 +9212,7 @@ renderJourney();
     });
   }
   function startRoutine(rt) {
+    if (window.RPFlow) RPFlow.sessionStart();
     ROUTINE.on = true; ROUTINE.steps = rt.steps.slice(); ROUTINE.i = -1; ROUTINE.name = rt.name;
     if (rt.honest) exToast(rt.honest);
     nextRoutineStep();
@@ -9184,13 +9224,14 @@ renderJourney();
       routineBar();
       V10.markPractised(ROUTINE.name);
       exToast(ROUTINE.name + ' finished.');
-      renderTrain();
+      if (window.RPFlow) RPFlow.sessionDone(); else renderTrain();
       return;
     }
     startEx(ROUTINE.steps[ROUTINE.i]);
     routineBar();
   }
   V10.routineState = ROUTINE;
+  V10.nextRoutineStep = nextRoutineStep;
   V10.startRoutine = startRoutine;
 
   /* ================================================================ */
@@ -17292,6 +17333,9 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     var eb = $('earBack'); if (eb && eb.textContent !== 'Back to the test') eb.textContent = 'Back to the test';
     if (Date.now() - pending.since < 1500) return;          /* give the screen time to open */
     if (visible(id)) { pending.seen = true; return; }
+    /* Robert, 1 Oct: a step now waits behind its own Start. Waiting there
+       is not "never opened", so the test keeps its place */
+    if (!pending.seen && window.RPFlow && RPFlow.gateUp()) { pending.since = Date.now() - 1500; return; }
     if (!pending.seen) { if (Date.now() - pending.since > 8000) pending = null; return; }   /* never opened: let it go */
     var key = pending.key; pending = null;
     try { T.open(); } catch (e) {}
@@ -19278,15 +19322,6 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   /* the whole name — "Ja Ronn" is two words, and cutting it to "Ja" is wrong */
   function firstName(p) { return String((p && p.display_name) || 'your coach').trim(); }
 
-  /* Repertoire's own plan — the same one the Coach tab has always built,
-     read from the same place, so the two can never disagree. */
-  function ownPlan() {
-    var P = null, plan = null;
-    try { P = (window.V10 && V10.P) || null; } catch (e) {}
-    try { plan = window.V10 && V10.planFor ? V10.planFor() : null; } catch (e) {}
-    return { P: P, plan: plan };
-  }
-
   /* the base app styles its big button by id, so ours needs the same look */
   (function css() {
     if ($('rpTodayCSS')) return;
@@ -19298,6 +19333,15 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     document.head.appendChild(st);
   })();
 
+  /* Robert, 1 Oct: "Home's Today card must list exactly the steps its
+     Start runs, with their real total minutes. Make the card match what
+     runs. Don't change the routine." Start runs this routine; the card
+     reads its steps and its minutes from the same place. */
+  function todayRoutine() {
+    try { var P = V10.P || {}; return P.quietDefault ? V10.ROUTINES.quiet : V10.ROUTINES[P.level || 1]; } catch (e) { return null; }
+  }
+  D.routine = todayRoutine;
+
   var lastSig = '';
   function draw(force) {
     var hero = document.querySelector('#modeHome .hero');
@@ -19307,8 +19351,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     if (work) {
       sig = 'c:' + work.map(function (w) { return w.a.id + (w.done ? '1' : '0'); }).join(',');
     } else {
-      var op = ownPlan();
-      sig = 'r:' + (op.plan ? (op.plan.warm && op.plan.warm.name) + '|' + (op.plan.focus && op.plan.focus.name) : 'none');
+      var rt0 = todayRoutine();
+      sig = 'r:' + (rt0 ? rt0.name + '|' + rt0.steps.join(',') : 'none');
     }
     if (!force && sig === lastSig && $('rpToday')) return;
     lastSig = sig;
@@ -19348,30 +19392,24 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
       h += '</div>';
       h += open.length
         ? '<button id="rpTodayGo" data-today-open="' + esc(open[0].a.id) + '">Start: ' + esc(open[0].a.title) + '</button>'
-        : '<button id="rpTodayGo" data-today-own="1">Repertoire’s plan · 15 min</button>';
+        : '<button id="rpTodayGo" data-today-own="1">Repertoire’s plan' + (todayRoutine() ? ' · ' + todayRoutine().mins + ' min' : '') + '</button>';
     } else {
-      var op2 = ownPlan(), plan = op2.plan;
+      var rt = todayRoutine();
+      var steps = rt ? rt.steps.map(function (id) { var e = null; try { e = V10.exById(id); } catch (err) {} return e ? e.name : id; }) : [];
       h = '<div class="kicker">TODAY · FROM REPERTOIRE</div>' +
         '<h2 style="font-size:21px;margin:5px 0 3px">Your practice for today</h2>' +
         '<div class="sub" style="font-size:12.5px;color:var(--ink-dim);font-weight:600">' +
         (window.RP && RP.user && !RP.coach
           ? 'Nobody has set you work, so this is Repertoire’s own plan. Join a coach on the Coach tab and theirs goes here instead.'
-          : 'Five things to sing, about fifteen minutes. Press Start and it takes you through them one at a time.') + '</div>';
-      if (plan) {
-        h += '<div style="margin:12px 0 4px">' +
-          '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
-          '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
-          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) + '</div>' +
-          /* Robert, 17 Sep: every other row on this card names something a
-             beginner can picture. This one is an exercise name, and it is
-             the one being singled out, so it gets the line. */
-          (plan.focus.what ? '<div class="pd">' + esc(String(plan.focus.what).replace(/<[^>]*>/g, '')) + '</div>' : '') +
-          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div>' +
-          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
-          '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
-          '</div>';
+          : (rt ? steps.length + ' exercises, about ' + rt.mins + ' minutes.' : '')) + '</div>';
+      if (rt) {
+        h += '<div style="margin:12px 0 4px">';
+        steps.forEach(function (n, i) {
+          h += '<div class="planstep"><div class="pmin">' + (i + 1) + '</div><div><div class="pt">' + esc(n) + '</div></div></div>';
+        });
+        h += '</div>';
       }
-      h += '<button id="rpTodayGo" data-today-own="1">Start · 15 min</button>';
+      h += '<button id="rpTodayGo" data-today-own="1">Start' + (rt ? ' · ' + rt.mins + ' min' : '') + '</button>';
     }
     box.innerHTML = h;
 
@@ -19390,11 +19428,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   D.startOwn = function () {
     try { window.switchMode('train'); } catch (e) {}
     setTimeout(function () {
-      try {
-        var P = V10.P || {};
-        var rt = P.quietDefault ? V10.ROUTINES.quiet : V10.ROUTINES[P.level || 1];
-        V10.startRoutine(rt);
-      } catch (e) {}
+      try { V10.startRoutine(todayRoutine()); } catch (e) {}
     }, 80);
   };
   D.draw = function () { draw(true); };
@@ -19898,6 +19932,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   setTimeout(helpRow, 800);
 
   TR.running = function () { return running(); };
+  TR.TOOLS = TOOLS;
+  TR.DRILLS = DRILLS;
   TR.redraw = function () { try { draw(); } catch (e) {} };
   function running() {
     var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox', 'rpIntervalPanel'];
@@ -19910,7 +19946,8 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function watch() {
     var top = $('rpTrainTop');
     if (!top) return;
-    var r = running();
+    /* an exercise waiting behind its Start is the exercise's screen too */
+    var r = running() || !!(window.RPFlow && RPFlow.gateUp());
     var want = r ? 'none' : '';
     if (top.style.display !== want) top.style.display = want;
   }
@@ -21566,6 +21603,7 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     ticks++;
     if (run) return;
     if (ticks < 3) return;                        /* let the app finish drawing */
+    if (busy()) return;                           /* never over a running exercise */
     if (sheetUp()) return;
     if (!done('student') && !isCoach()) { T.start('student'); return; }
     if (isCoach() && !done('coach')) {
@@ -21640,9 +21678,12 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
   function tipDone(k) { try { return localStorage.getItem('rp_tip_' + k) === 'done'; } catch (e) { return false; } }
   function tipMark(k) { try { localStorage.setItem('rp_tip_' + k, 'done'); } catch (e) {} }
 
+  /* Robert, 1 Oct: "Tips and tour cards never appear over a running
+     exercise. Show them only on screens with nothing running." */
+  function busy() { try { return !!(window.RPFlow && RPFlow.running()); } catch (e) { return false; } }
   T.tip = function (key) {
     var tp = TIPS[key];
-    if (!tp) return;
+    if (!tp || busy()) return;
     if (run) teardown();
     run = { kind: 'tip:' + key, steps: tp.steps.map(function (st) { return { mode: null, find: st.find, text: st.text }; }), i: 0 };
     ensure();
@@ -21655,9 +21696,30 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
 
   /* a ? on each of those screens, and the first-time showing */
   function tipButtons() {
+    var b0 = busy();
+    if (b0 && run) end();                       /* an exercise started under it */
+    /* an exercise waiting behind its Start shows its tip there, where
+       nothing is running yet */
+    var gk = null;
+    try { gk = window.RPFlow && RPFlow.gateTip ? RPFlow.gateTip() : null; } catch (e) {}
+    if (gk && TIPS[gk] && $('rpGateTitle') && !$('rpTipBtn_gate')) {
+      var gb = document.createElement('button');
+      gb.id = 'rpTipBtn_gate';
+      gb.className = 'btn';
+      gb.title = 'What can I do here?';
+      gb.textContent = '?';
+      gb.style.cssText = 'padding:6px 11px;font-size:13px;font-weight:900;margin-left:8px;vertical-align:middle';
+      var key = gk;
+      on(gb, 'click', function (ev) { ev.stopPropagation(); T.tip(key); });
+      $('rpGateTitle').appendChild(gb);
+    }
+    if (gk && TIPS[gk] && !tipDone(gk) && !run && !sheetUp()) { tipMark(gk); setTimeout(function () { T.tip(gk); }, 500); }
     Object.keys(TIPS).forEach(function (k) {
       var tp = TIPS[k];
       var host = $(tp.host), anchor = $(tp.anchor);
+      var qb = $('rpTipBtn_' + k);
+      if (qb) { var wantQ = b0 ? 'none' : ''; if (qb.style.display !== wantQ) qb.style.display = wantQ; }
+      if (b0) return;                           /* nothing over a running exercise */
       if (!host || !anchor || host.offsetParent === null) return;
       if (!$('rpTipBtn_' + k)) {
         var b = document.createElement('button');
@@ -25641,6 +25703,295 @@ body.rp-brand-deep .kbdkey.black.lit{background:linear-gradient(180deg,#2a9d95,#
     try { if (S.mus && !S.mus.paused && !S.mus.ended) return true; } catch (e) {}
     return false;
   };
+})();
+
+</script>
+<script>
+/* ======================================================================
+   Repertoire Pro — nothing starts until you press Start, and ending means
+   ending.
+
+   Robert, 1 Oct:
+     "Every exercise run screen opens PAUSED, with one button: Start. The
+      clock, mic, guide notes and siren glide begin only on that tap."
+     "Routines never chain by themselves. When an exercise in a routine
+      ends, show a screen with 'Next: [exercise name]' and two buttons:
+      Start and End session. End session leaves the routine and goes back
+      to where it was started."
+     "Outside a routine, ending an exercise returns to that exercise's
+      page. Nothing else starts."
+
+   Every way an exercise starts - an exercise by its id, the three pitch
+   games, the ear drills - comes through one door here first. The door is
+   the exercise's screen, paused: its name, what it is, and Start. Inside a
+   routine the same screen reads "Next: ..." and carries End session too.
+   Nothing behind the door runs, plays or opens the microphone until Start
+   is pressed.
+   ====================================================================== */
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function strip(h) { return String(h || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(); }
+  function vis(el) { return !!(el && el.offsetParent !== null); }
+
+  var F = window.RPFlow = {
+    passing: false,     /* true while Start is starting the thing behind the door */
+    pending: null,      /* what the door on screen opens */
+    cur: null,          /* what was last started through it */
+    active: false,      /* something started through it has not ended yet */
+    ending: false,      /* End session is stopping things: they are not "ended" */
+    origin: 'train',    /* where the current routine was started from */
+    lastResult: ''
+  };
+
+  function routine() { try { return V10.routineState || null; } catch (e) { return null; } }
+  F.inRoutine = function () { var r = routine(); return !!(r && r.on); };
+  function mode() { try { return state.mode; } catch (e) { return ''; } }
+
+  /* ---- where a session was started from ------------------------------
+     The screen the singer was on when they tapped: Home's Start, the
+     Coach tab and Train's own cards all switch to Train a moment later,
+     so it is read at the tap itself, before anything moves. */
+  var tapMode = 'train';
+  document.addEventListener('click', function () { var m = mode(); if (m) tapMode = m; }, true);
+  function cameFrom() {
+    return /^(home|train|coach|singhub|learn|lib|you)$/.test(tapMode) ? tapMode : 'train';
+  }
+  function goBack(to) {
+    to = to || 'train';
+    try { window.switchMode(to); } catch (e) {}
+    if (to === 'train') { try { if (window.RPTrain && RPTrain.redraw) RPTrain.redraw(); } catch (e) {} }
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+
+  /* ---- what is on screen ---------------------------------------------- */
+  var RUN = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'v10Ear', 'rpIntervalPanel'];
+  /* something is running: one of the exercise screens is up */
+  F.running = function () {
+    for (var i = 0; i < RUN.length; i++) if (vis($(RUN[i]))) return true;
+    try { if (G.running) return true; } catch (e) {}
+    return false;
+  };
+  F.gateUp = function () { return vis($('rpGate')); };
+  function hideRun() {
+    RUN.forEach(function (id) { var el = $(id); if (el && el.style.display !== 'none') el.style.display = 'none'; });
+    var st = $('sharedStage');
+    if (st && st.parentElement && st.parentElement.id === 'trainSlot') st.style.display = 'none';
+  }
+
+  /* ---- the door ------------------------------------------------------- */
+  function panel() {
+    var p = $('rpGate');
+    if (p) return p;
+    var slot = $('trainSlot') || $('modeTrain');
+    if (!slot || !slot.parentElement) return null;
+    p = document.createElement('div');
+    p.id = 'rpGate';
+    p.className = 'panel';
+    p.style.display = 'none';
+    slot.parentElement.insertBefore(p, slot);
+    return p;
+  }
+
+  /* o: { kind: 'ex' | 'tool' | 'drill', key, title, what, start, tip } */
+  F.gate = function (o) {
+    var p = panel();
+    if (!p || !o) return;
+    F.pending = o;
+    F.active = false;
+    var r = routine(), inR = !!(r && r.on);
+    var res = inR ? F.lastResult : '';
+    F.lastResult = '';
+    p.innerHTML =
+      (inR ? '' : '<button class="pill backpill" id="rpGateBack">← Train</button>') +
+      (res ? '<div class="rp-gate-res">' + esc(res) + '</div>' : '') +
+      '<h3 id="rpGateTitle" style="margin:' + (inR ? '0' : '10px') + ' 0 4px">' +
+        esc((inR && r.i > 0 ? 'Next: ' : '') + o.title) + '</h3>' +
+      (o.what ? '<div class="rp-gate-what">' + esc(strip(o.what)) + '</div>' : '') +
+      '<button class="btn primary" id="rpGateGo">Start</button>' +
+      (inR ? '<button class="btn ghost" id="rpGateEnd">End session</button>' : '');
+    hideRun();
+    /* the session's own line ("step 2 of 7") sits above the card */
+    var bar = $('rpSessionBar');
+    if (bar && bar.parentElement === p.parentElement && (bar.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_PRECEDING)) {
+      bar.parentElement.insertBefore(bar, p);
+    }
+    p.style.display = 'block';
+    var sb = $('rpSessionEnd'); if (sb) sb.style.display = 'none';   /* one End session, on the card */
+    $('rpGateGo').addEventListener('click', go);
+    var b = $('rpGateBack');
+    if (b) b.addEventListener('click', function () { F.pending = null; p.style.display = 'none'; goBack('train'); });
+    var e = $('rpGateEnd');
+    if (e) e.addEventListener('click', F.endSession);
+    try { window.scrollTo(0, 0); } catch (err) {}
+  };
+  F.gateTip = function () { return F.gateUp() && F.pending ? (F.pending.tip || null) : null; };
+
+  function go() {
+    var o = F.pending;
+    if (!o) return;
+    F.pending = null;
+    var p = $('rpGate'); if (p) p.style.display = 'none';
+    var sb = $('rpSessionEnd'); if (sb) sb.style.display = '';
+    try { if (window.RPTour && RPTour.running && RPTour.running()) RPTour.stop(); } catch (e) {}
+    F.cur = o;
+    F.active = true;
+    F.passing = true;
+    try { o.start(); } catch (e) {}
+    F.passing = false;
+  }
+  F.start = go;
+
+  /* ---- when something ends -------------------------------------------- */
+  /* Robert: in a routine, the next step's door ("Next: ..."); outside one,
+     back to the exercise's own page. Nothing starts either way. */
+  F.ended = function (result) {
+    if (F.ending || !F.active) return;
+    F.active = false;
+    if (F.inRoutine()) {
+      if (result) F.lastResult = result;
+      try { V10.nextRoutineStep(); } catch (e) {}
+      return;
+    }
+    F.lastResult = '';
+    var c = F.cur;
+    if (!c) return;
+    if (c.kind === 'ex' && window.RPTrain && RPTrain.detail) {
+      hideRun();
+      RPTrain.detail(c.key);
+      return;
+    }
+    F.gate(c);   /* a game or a drill: its page is its own door */
+  };
+
+  F.sessionStart = function () { F.origin = cameFrom(); F.lastResult = ''; };
+  function closeSession() {
+    var p = $('rpGate'); if (p) p.style.display = 'none';
+    var bar = $('rpSessionBar'); if (bar) bar.style.display = 'none';
+    F.pending = null; F.active = false; F.lastResult = '';
+  }
+  /* the last step is done: back where the session began */
+  F.sessionDone = function () { closeSession(); goBack(F.origin); };
+  F.endSession = function () {
+    var r = routine(); if (r) r.on = false;
+    F.ending = true;
+    try {
+      ['gQuit', 'btnTrainStop', 'btnSusQuit', 'btnMatchQuit'].forEach(function (id) {
+        var b = $(id); if (vis(b)) b.click();
+      });
+    } catch (e) {}
+    F.ending = false;
+    closeSession();
+    goBack(F.origin);
+  };
+
+  /* ---- the three pitch games: their buttons go through the door ------- */
+  var GAMES = {
+    btnMatch: ['Match the note', 'A note plays. Sing it back and hold it. Ten notes.', 'match'],
+    btnSustain: ['Hold a note', 'Hold one note steady for five seconds. Ten notes.', 'sustain'],
+    rpIntervalGo: ['Hold the interval', 'A note plays. Sing the one a step above it, and hold it.', null]
+  };
+  function gameGate(id) {
+    var g = GAMES[id];
+    try {
+      var t = (window.RPTrain && RPTrain.TOOLS || []).filter(function (x) { return x[0] === id; })[0];
+      if (t) g = [t[1], t[2], g[2]];
+    } catch (e) {}
+    return { kind: 'tool', key: id, title: g[0], what: g[1], tip: g[2],
+             start: function () { var b = $(id); if (b) b.click(); } };
+  }
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var b = t.closest('#btnMatch, #btnSustain, #rpIntervalGo');
+    if (!b) return;
+    if (F.passing) { if (b.id === 'btnSustain') holdFirst(); return; }
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
+    F.gate(gameGate(b.id));
+  }, true);
+
+  /* Hold a note's screen has a Start of its own for each note. The first
+     one is the Start just pressed, so it is pressed for him once the
+     screen is up (it waits for the microphone first). */
+  function holdFirst() {
+    var n = 0;
+    var iv = setInterval(function () {
+      n++;
+      var ready = false;
+      try { ready = vis($('susPanel')) && TRAIN.kind === 'sustain' && !SUS.running; } catch (e) {}
+      if (ready) { clearInterval(iv); var s = $('btnSusStart'); if (s) s.click(); }
+      else if (n > 80) clearInterval(iv);
+    }, 100);
+  }
+
+  /* ---- the ear drills ------------------------------------------------- */
+  var DRILLS = {
+    tonic: ['Sing the home note', 'A short tune plays. Sing the note it sounds finished on.'],
+    degree: ['Name the degree', 'A key is set, then one note plays. Which one is it, 1 to 7?'],
+    singdeg: ['Sing the degree', 'A key is set. Then sing the one it asks for.'],
+    hilo: ['Higher or lower', 'Two notes. Which was higher? Listening only.']
+  };
+  (function wrapDrill() {
+    if (!window.V10 || typeof V10.startDrill !== 'function') { setTimeout(wrapDrill, 300); return; }
+    if (V10.startDrill.rpGated) return;
+    var real = V10.startDrill;
+    var w = function (kind) {
+      if (F.passing) return real.apply(this, arguments);
+      var d = DRILLS[kind] || [kind, ''];
+      try {
+        var t = (window.RPTrain && RPTrain.DRILLS || []).filter(function (x) { return x[0] === kind; })[0];
+        if (t) d = [t[1], t[2]];
+      } catch (e) {}
+      F.gate({ kind: 'drill', key: kind, title: d[0], what: d[1], tip: 'ear',
+               start: function () { real(kind); } });
+    };
+    w.rpGated = true;
+    V10.startDrill = w;
+  })();
+
+  /* ---- the ways out of an exercise ------------------------------------ */
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest || F.ending) return;
+    var b = t.closest('#btnTrainStop, #btnSusQuit, #btnMatchQuit, #rpIvBack, #earQuit');
+    if (!b) return;
+    setTimeout(function () { F.ended(); }, 0);
+  });
+  /* a scale ladder that reaches its end inside a routine */
+  (function wrapStop() {
+    if (typeof window.stopRun !== 'function') { setTimeout(wrapStop, 300); return; }
+    if (window.stopRun.rpFlowWrapped) return;
+    var real = window.stopRun;
+    var w = function (show) {
+      var ladder = false;
+      try { ladder = !!show && TRAIN.kind === 'ladder' && mode() === 'train'; } catch (e) {}
+      var r = real.apply(this, arguments);
+      if (ladder && F.inRoutine()) {
+        var res = '';
+        try { res = ($('resSub') || {}).textContent || ''; } catch (e) {}
+        F.ended(res);
+      }
+      return r;
+    };
+    w.rpFlowWrapped = true;
+    window.stopRun = w;
+  })();
+
+  (function css() {
+    var s = document.createElement('style');
+    s.textContent =
+      '#rpGate .rp-gate-what{font-size:14px;line-height:1.5;color:var(--ink-dim);margin-top:4px}' +
+      '#rpGate .rp-gate-res{font-size:13px;font-weight:800;color:var(--hit);margin:0 0 10px}' +
+      '#rpGateGo{width:100%;padding:14px;font-size:16px;margin-top:16px}' +
+      '#rpGateEnd{width:100%;padding:11px;margin-top:8px}';
+    document.head.appendChild(s);
+  })();
 })();
 
 </script>

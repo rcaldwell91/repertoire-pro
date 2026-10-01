@@ -289,6 +289,7 @@
     ticks++;
     if (run) return;
     if (ticks < 3) return;                        /* let the app finish drawing */
+    if (busy()) return;                           /* never over a running exercise */
     if (sheetUp()) return;
     if (!done('student') && !isCoach()) { T.start('student'); return; }
     if (isCoach() && !done('coach')) {
@@ -363,9 +364,12 @@
   function tipDone(k) { try { return localStorage.getItem('rp_tip_' + k) === 'done'; } catch (e) { return false; } }
   function tipMark(k) { try { localStorage.setItem('rp_tip_' + k, 'done'); } catch (e) {} }
 
+  /* Robert, 1 Oct: "Tips and tour cards never appear over a running
+     exercise. Show them only on screens with nothing running." */
+  function busy() { try { return !!(window.RPFlow && RPFlow.running()); } catch (e) { return false; } }
   T.tip = function (key) {
     var tp = TIPS[key];
-    if (!tp) return;
+    if (!tp || busy()) return;
     if (run) teardown();
     run = { kind: 'tip:' + key, steps: tp.steps.map(function (st) { return { mode: null, find: st.find, text: st.text }; }), i: 0 };
     ensure();
@@ -378,9 +382,30 @@
 
   /* a ? on each of those screens, and the first-time showing */
   function tipButtons() {
+    var b0 = busy();
+    if (b0 && run) end();                       /* an exercise started under it */
+    /* an exercise waiting behind its Start shows its tip there, where
+       nothing is running yet */
+    var gk = null;
+    try { gk = window.RPFlow && RPFlow.gateTip ? RPFlow.gateTip() : null; } catch (e) {}
+    if (gk && TIPS[gk] && $('rpGateTitle') && !$('rpTipBtn_gate')) {
+      var gb = document.createElement('button');
+      gb.id = 'rpTipBtn_gate';
+      gb.className = 'btn';
+      gb.title = 'What can I do here?';
+      gb.textContent = '?';
+      gb.style.cssText = 'padding:6px 11px;font-size:13px;font-weight:900;margin-left:8px;vertical-align:middle';
+      var key = gk;
+      on(gb, 'click', function (ev) { ev.stopPropagation(); T.tip(key); });
+      $('rpGateTitle').appendChild(gb);
+    }
+    if (gk && TIPS[gk] && !tipDone(gk) && !run && !sheetUp()) { tipMark(gk); setTimeout(function () { T.tip(gk); }, 500); }
     Object.keys(TIPS).forEach(function (k) {
       var tp = TIPS[k];
       var host = $(tp.host), anchor = $(tp.anchor);
+      var qb = $('rpTipBtn_' + k);
+      if (qb) { var wantQ = b0 ? 'none' : ''; if (qb.style.display !== wantQ) qb.style.display = wantQ; }
+      if (b0) return;                           /* nothing over a running exercise */
       if (!host || !anchor || host.offsetParent === null) return;
       if (!$('rpTipBtn_' + k)) {
         var b = document.createElement('button');

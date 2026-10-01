@@ -33,15 +33,6 @@
   /* the whole name — "Ja Ronn" is two words, and cutting it to "Ja" is wrong */
   function firstName(p) { return String((p && p.display_name) || 'your coach').trim(); }
 
-  /* Repertoire's own plan — the same one the Coach tab has always built,
-     read from the same place, so the two can never disagree. */
-  function ownPlan() {
-    var P = null, plan = null;
-    try { P = (window.V10 && V10.P) || null; } catch (e) {}
-    try { plan = window.V10 && V10.planFor ? V10.planFor() : null; } catch (e) {}
-    return { P: P, plan: plan };
-  }
-
   /* the base app styles its big button by id, so ours needs the same look */
   (function css() {
     if ($('rpTodayCSS')) return;
@@ -53,6 +44,15 @@
     document.head.appendChild(st);
   })();
 
+  /* Robert, 1 Oct: "Home's Today card must list exactly the steps its
+     Start runs, with their real total minutes. Make the card match what
+     runs. Don't change the routine." Start runs this routine; the card
+     reads its steps and its minutes from the same place. */
+  function todayRoutine() {
+    try { var P = V10.P || {}; return P.quietDefault ? V10.ROUTINES.quiet : V10.ROUTINES[P.level || 1]; } catch (e) { return null; }
+  }
+  D.routine = todayRoutine;
+
   var lastSig = '';
   function draw(force) {
     var hero = document.querySelector('#modeHome .hero');
@@ -62,8 +62,8 @@
     if (work) {
       sig = 'c:' + work.map(function (w) { return w.a.id + (w.done ? '1' : '0'); }).join(',');
     } else {
-      var op = ownPlan();
-      sig = 'r:' + (op.plan ? (op.plan.warm && op.plan.warm.name) + '|' + (op.plan.focus && op.plan.focus.name) : 'none');
+      var rt0 = todayRoutine();
+      sig = 'r:' + (rt0 ? rt0.name + '|' + rt0.steps.join(',') : 'none');
     }
     if (!force && sig === lastSig && $('rpToday')) return;
     lastSig = sig;
@@ -103,30 +103,24 @@
       h += '</div>';
       h += open.length
         ? '<button id="rpTodayGo" data-today-open="' + esc(open[0].a.id) + '">Start: ' + esc(open[0].a.title) + '</button>'
-        : '<button id="rpTodayGo" data-today-own="1">Repertoire’s plan · 15 min</button>';
+        : '<button id="rpTodayGo" data-today-own="1">Repertoire’s plan' + (todayRoutine() ? ' · ' + todayRoutine().mins + ' min' : '') + '</button>';
     } else {
-      var op2 = ownPlan(), plan = op2.plan;
+      var rt = todayRoutine();
+      var steps = rt ? rt.steps.map(function (id) { var e = null; try { e = V10.exById(id); } catch (err) {} return e ? e.name : id; }) : [];
       h = '<div class="kicker">TODAY · FROM REPERTOIRE</div>' +
         '<h2 style="font-size:21px;margin:5px 0 3px">Your practice for today</h2>' +
         '<div class="sub" style="font-size:12.5px;color:var(--ink-dim);font-weight:600">' +
         (window.RP && RP.user && !RP.coach
           ? 'Nobody has set you work, so this is Repertoire’s own plan. Join a coach on the Coach tab and theirs goes here instead.'
-          : 'Five things to sing, about fifteen minutes. Press Start and it takes you through them one at a time.') + '</div>';
-      if (plan) {
-        h += '<div style="margin:12px 0 4px">' +
-          '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Body and breath</div></div></div>' +
-          '<div class="planstep"><div class="pmin">3 min</div><div><div class="pt">' + esc(plan.warm.name) + '</div></div></div>' +
-          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">' + esc(plan.focus.name) + '</div>' +
-          /* Robert, 17 Sep: every other row on this card names something a
-             beginner can picture. This one is an exercise name, and it is
-             the one being singled out, so it gets the line. */
-          (plan.focus.what ? '<div class="pd">' + esc(String(plan.focus.what).replace(/<[^>]*>/g, '')) + '</div>' : '') +
-          '<div class="extag" style="display:block;margin-top:3px;color:var(--accent)">The one to concentrate on today</div></div></div>' +
-          '<div class="planstep"><div class="pmin">4 min</div><div><div class="pt">Put it into a song</div></div></div>' +
-          '<div class="planstep"><div class="pmin">2 min</div><div><div class="pt">Cool down</div></div></div>' +
-          '</div>';
+          : (rt ? steps.length + ' exercises, about ' + rt.mins + ' minutes.' : '')) + '</div>';
+      if (rt) {
+        h += '<div style="margin:12px 0 4px">';
+        steps.forEach(function (n, i) {
+          h += '<div class="planstep"><div class="pmin">' + (i + 1) + '</div><div><div class="pt">' + esc(n) + '</div></div></div>';
+        });
+        h += '</div>';
       }
-      h += '<button id="rpTodayGo" data-today-own="1">Start · 15 min</button>';
+      h += '<button id="rpTodayGo" data-today-own="1">Start' + (rt ? ' · ' + rt.mins + ' min' : '') + '</button>';
     }
     box.innerHTML = h;
 
@@ -145,11 +139,7 @@
   D.startOwn = function () {
     try { window.switchMode('train'); } catch (e) {}
     setTimeout(function () {
-      try {
-        var P = V10.P || {};
-        var rt = P.quietDefault ? V10.ROUTINES.quiet : V10.ROUTINES[P.level || 1];
-        V10.startRoutine(rt);
-      } catch (e) {}
+      try { V10.startRoutine(todayRoutine()); } catch (e) {}
     }, 80);
   };
   D.draw = function () { draw(true); };

@@ -345,6 +345,8 @@
   setTimeout(helpRow, 800);
 
   TR.running = function () { return running(); };
+  TR.TOOLS = TOOLS;
+  TR.DRILLS = DRILLS;
   TR.redraw = function () { try { draw(); } catch (e) {} };
   function running() {
     var ids = ['v10Guided', 'trainLadderBar', 'matchPanel', 'susPanel', 'kbdPanel', 'v10Ear', 'v10Game', 'rtBox', 'rpIntervalPanel'];
@@ -357,7 +359,8 @@
   function watch() {
     var top = $('rpTrainTop');
     if (!top) return;
-    var r = running();
+    /* an exercise waiting behind its Start is the exercise's screen too */
+    var r = running() || !!(window.RPFlow && RPFlow.gateUp());
     var want = r ? 'none' : '';
     if (top.style.display !== want) top.style.display = want;
   }

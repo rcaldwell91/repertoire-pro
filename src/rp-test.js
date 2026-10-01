@@ -313,6 +313,9 @@
     var eb = $('earBack'); if (eb && eb.textContent !== 'Back to the test') eb.textContent = 'Back to the test';
     if (Date.now() - pending.since < 1500) return;          /* give the screen time to open */
     if (visible(id)) { pending.seen = true; return; }
+    /* Robert, 1 Oct: a step now waits behind its own Start. Waiting there
+       is not "never opened", so the test keeps its place */
+    if (!pending.seen && window.RPFlow && RPFlow.gateUp()) { pending.since = Date.now() - 1500; return; }
     if (!pending.seen) { if (Date.now() - pending.since > 8000) pending = null; return; }   /* never opened: let it go */
     var key = pending.key; pending = null;
     try { T.open(); } catch (e) {}

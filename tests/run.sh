@@ -13,3 +13,5 @@ node tests/learnsong.test.js
 node tests/score.test.js
 node tests/placement.test.js
 node tests/reading.test.js
+# the microphone fed a real voice that stops (RP_MIC, a WAV kept outside the repo)
+node tests/flow.test.js

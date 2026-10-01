@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-for f in src/rp-onesound.js src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js src/rp-piano.js src/rp-song.js src/rp-filemap.js src/rp-learnsong.js; do node --check "$f"; done
+for f in src/rp-onesound.js src/rp-cloud.js src/rp-coach.js src/rp-score.js src/rp-plain.js src/rp-studio.js src/rp-voice.js src/rp-send.js src/rp-work.js src/rp-test.js src/rp-level.js src/rp-trivia.js src/rp-body.js src/rp-goals.js src/rp-find.js src/rp-range.js src/rp-today.js src/rp-pages.js src/rp-nav.js src/rp-train.js src/rp-learn.js src/rp-profile.js src/rp-lib.js src/rp-sus.js src/rp-tour.js src/rp-example.js src/rp-timing.js src/rp-scroll.js src/rp-back.js src/rp-once.js src/rp-soundcheck.js src/rp-monitor.js src/rp-maps.js src/rp-takes.js src/rp-interval.js src/rp-coachtab.js src/rp-piano.js src/rp-song.js src/rp-filemap.js src/rp-learnsong.js src/rp-flow.js; do node --check "$f"; done
 test -s src/rp-skin.css
 
 python3 - <<'PY'
@@ -190,7 +190,13 @@ PATCHES = [
           (GUIDE.target ? (held >= GUIDE.target ? ', past the ' + GUIDE.target + ' you were aiming for.' : ' of the ' + GUIDE.target + ' you were aiming for.') : '.');
         try { if (window.RP && RP.logResult) RP.logResult({ kind: 'practice', label: GUIDE.ex ? GUIDE.ex.name : 'Timed', score: Math.round(held), out_of: GUIDE.target || null }); } catch (e) {}
         GUIDE.heard = false; GUIDE.quietSince = 0; GUIDE.finished = true;
-        setTimeout(endGuided, 1400);
+        /* Robert, 1 Oct: "after 1 second of quiet, stop the clock and show
+           the result. Never launch anything after." It used to close itself
+           1.4s later and, in a routine, start the next step. Now the clock
+           stops where you did and the result stays; in a routine the next
+           step waits behind its own Start, with this result on it. */
+        if (GUIDE.tick) { clearInterval(GUIDE.tick); GUIDE.tick = null; }
+        if (ROUTINE.on) { if (window.RPFlow) RPFlow.lastResult = sub.textContent; endGuided(); }
         return;
       }
       if (!GUIDE.heard) { el.textContent = '0.0s'; sub.textContent = 'Start when you are ready — it times itself from the first sound.'; return; }
@@ -655,6 +661,29 @@ function susDone(){
   try { if (window.RP && RP.logResult) RP.logResult({ kind: 'ear', label: 'Hold a note', score: held, out_of: 10 }); } catch(e){}
   try { V10.markPractised('Hold a note'); } catch(e){}
   SUS.round = 0; SUS.held = 0;
+  try { if (window.RPFlow && RPFlow.inRoutine()) RPFlow.ended($('susResult').textContent); } catch(e){}
+}
+/* Robert, 1 Oct: "Hold a note: remove the 1.5-second auto-advance. Show a
+   Next button instead." After each hold the next note waits for Next. */
+function susShowNext(){
+  const st = $('btnSusStart');
+  if (!st) return;
+  let nx = $('btnSusNext');
+  if (!nx) {
+    nx = document.createElement('button');
+    nx.id = 'btnSusNext'; nx.className = 'btn primary'; nx.textContent = 'Next';
+    nx.addEventListener('click', ()=>{
+      nx.style.display = 'none'; st.style.display = '';
+      if (TRAIN.kind==='sustain' && SUS.round) susNewRound();
+    });
+    st.parentElement.insertBefore(nx, st);
+  }
+  st.style.display = 'none';
+  nx.style.display = '';
+}
+function susHideNext(){
+  const nx = $('btnSusNext'); if (nx) nx.style.display = 'none';
+  const st = $('btnSusStart'); if (st) st.style.display = '';
 }"""),
     ("""$('btnSustain').addEventListener('click', async ()=>{
   if(!MIC.on){ await enableMic(); if(!MIC.on) return; }
@@ -671,6 +700,7 @@ $('btnSusNote').addEventListener('click', susPickNote);""",
   trainView('sustain');
   SUS.round = 0; SUS.held = 0;
   const sc = $('susScore'); if (sc) sc.textContent = '0';
+  susHideNext();
   susNewRound();
 });
 $('btnSusNote').addEventListener('click', susPickNote);"""),
@@ -678,7 +708,7 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
     if(pct>=70) playDing(); else playBuzz();""",
      """    $('susResult').textContent = pct+'% steady — '+msg;
     if(pct>=70){ SUS.held = (SUS.held||0)+1; const sc=$('susScore'); if(sc) sc.textContent=SUS.held; playDing(); } else playBuzz();
-    setTimeout(()=>{ if(TRAIN.kind==='sustain' && SUS.round) susNewRound(); }, 1500);"""),
+    susShowNext();"""),
 
     # 39. NOTE MATCH ENDS ON THE SCREEN, NOT IN A BROWSER BOX, and leaves you
     #     looking at what you did rather than back at the menu.
@@ -767,14 +797,16 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
       b.id = 'rpSessionBar';
       b.className = 'row';
       b.style.cssText = 'align-items:center;gap:10px;margin:0 0 10px';
-      const slot = $('trainSlot') || $('modeTrain');
+      const slot = $('rpGate') || $('trainSlot') || $('modeTrain');   /* above the step's own card */
       slot.parentElement.insertBefore(b, slot);
     }
     b.innerHTML = '<div style="flex:1;min-width:0;font-size:12.5px;font-weight:700">' +
       esc(ROUTINE.name) + ' · step ' + (ROUTINE.i + 1) + ' of ' + ROUTINE.steps.length + '</div>' +
-      '<button class="btn danger ghost" id="rpSessionEnd" style="padding:7px 12px;font-size:12px">End the session</button>';
+      '<button class="btn danger ghost" id="rpSessionEnd" style="padding:7px 12px;font-size:12px' +
+        (window.RPFlow && RPFlow.gateUp() ? ';display:none' : '') + '">End the session</button>';
     b.style.display = 'flex';
     $('rpSessionEnd').addEventListener('click', () => {
+      if (window.RPFlow) return RPFlow.endSession();
       ROUTINE.on = false;
       routineBar();
       const g = $('gQuit'); if (g && g.offsetParent !== null) g.click();
@@ -783,6 +815,7 @@ $('btnSusNote').addEventListener('click', susPickNote);"""),
     });
   }
   function startRoutine(rt) {
+    if (window.RPFlow) RPFlow.sessionStart();
     ROUTINE.on = true; ROUTINE.steps = rt.steps.slice(); ROUTINE.i = -1; ROUTINE.name = rt.name;"""),
     ("""    startEx(ROUTINE.steps[ROUTINE.i]);
   }""",
@@ -1227,6 +1260,42 @@ function yinHz(buf, sr){
         {
           c2.fillStyle = live ? PAL.keyLitInk : (pc===0 ? PAL.keyWC : PAL.keyWInk);
           c2.font = (pc===0 ? 'bold ' : '') + Math.max(5, Math.min(9, rowH)).toFixed(1) + 'px sans-serif';"""),
+
+    # 118. NOTHING STARTS UNTIL START. Robert, 1 Oct: "Every exercise run
+    #      screen opens PAUSED, with one button: Start." Every way into an
+    #      exercise by its id - Train cards, Home's Start, routines, goals,
+    #      coach work - comes through startEx, so the door goes here. The
+    #      door itself is src/rp-flow.js; Start runs the exercise as before.
+    ("""  function startEx(id) {
+    const e = V10.exById(id);
+    if (!e) return;
+    const eng = e.engine || {};""",
+     """  function startEx(id, now) {
+    const e = V10.exById(id);
+    if (!e) return;
+    if (!now && window.RPFlow) {
+      const k = (e.engine || {}).kind;
+      return RPFlow.gate({ kind: 'ex', key: e.id, title: e.name, what: e.what,
+        tip: k === 'ladder' ? 'ladder' : k === 'hold' ? 'sustain' : 'guided',
+        start: function () { startEx(id, true); } });
+    }
+    const eng = e.engine || {};"""),
+    # 119. ROUTINES NEVER CHAIN BY THEMSELVES. Done hands over to the flow:
+    #      in a routine the next step's door ("Next: ..."), outside one the
+    #      exercise's own page. The last step goes back to where the
+    #      session began.
+    ("""    document.querySelectorAll('#v10TrainHost, #rangePanel').forEach(el => el.style.display = '');
+    if (ROUTINE.on) nextRoutineStep();""",
+     """    document.querySelectorAll('#v10TrainHost, #rangePanel').forEach(el => el.style.display = '');
+    if (window.RPFlow) RPFlow.ended();
+    else if (ROUTINE.on) nextRoutineStep();"""),
+    ("""      exToast(ROUTINE.name + ' finished.');
+      renderTrain();""",
+     """      exToast(ROUTINE.name + ' finished.');
+      if (window.RPFlow) RPFlow.sessionDone(); else renderTrain();"""),
+    ("""  V10.routineState = ROUTINE;""",
+     """  V10.routineState = ROUTINE;
+  V10.nextRoutineStep = nextRoutineStep;"""),
 ]
 # ---------------------------------------------------------------------
 # Home, in plain words with a sense of where you are in the session.
@@ -1566,7 +1635,7 @@ for anchor, replacement in PATCHES:
     base = base.replace(anchor, replacement, 1)
 
 mods = ['<style>\n' + open('src/rp-skin.css', encoding='utf-8').read() + '\n</style>']
-MODS = ('src/rp-onesound.js', 'src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js', 'src/rp-piano.js', 'src/rp-song.js', 'src/rp-filemap.js', 'src/rp-learnsong.js')
+MODS = ('src/rp-onesound.js', 'src/rp-cloud.js', 'src/rp-coach.js', 'src/rp-score.js', 'src/rp-plain.js', 'src/rp-send.js', 'src/rp-studio.js', 'src/rp-voice.js', 'src/rp-work.js', 'src/rp-test.js', 'src/rp-level.js', 'src/rp-trivia.js', 'src/rp-body.js', 'src/rp-goals.js', 'src/rp-find.js', 'src/rp-range.js', 'src/rp-today.js', 'src/rp-pages.js', 'src/rp-nav.js', 'src/rp-train.js', 'src/rp-learn.js', 'src/rp-profile.js', 'src/rp-lib.js', 'src/rp-sus.js', 'src/rp-tour.js', 'src/rp-example.js', 'src/rp-timing.js', 'src/rp-scroll.js', 'src/rp-back.js', 'src/rp-once.js', 'src/rp-soundcheck.js', 'src/rp-monitor.js', 'src/rp-maps.js', 'src/rp-takes.js', 'src/rp-interval.js', 'src/rp-coachtab.js', 'src/rp-piano.js', 'src/rp-song.js', 'src/rp-filemap.js', 'src/rp-learnsong.js', 'src/rp-flow.js')
 for f in MODS:
     mods.append('<script>\n' + open(f, encoding='utf-8').read() + '\n</script>')
 block = '\n<!-- ===== Repertoire Pro cloud layer (accounts, coach channel, scorecards) ===== -->\n' \
