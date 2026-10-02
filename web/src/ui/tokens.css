@@ -1,0 +1,156 @@
+/* Plain until Robert approves a design (RULEBOOK 1). Every colour has one
+   meaning (RULEBOOK 3), and every pair used for text, icons or the voice
+   bar is at least 3:1 (checked on the built app):
+     ink     words
+     muted   things you can tap that are not where you are
+     action  something to press (white words on it)
+     voice   how loud the mic hears you, and nothing else */
+:root {
+  color-scheme: light;
+  --paper: #ffffff;
+  --ink: #161616;
+  --muted: #595959;
+  --bar: #f2f2f2;
+  --line: #d0d0d0;
+  --action: #1d4ed8;
+  --action-ink: #ffffff;
+  --voice: #0f7b3f;
+  --track: #e8e8e8;
+  --tap: 48px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body { -webkit-tap-highlight-color: transparent; }
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  flex: 1;
+  padding: 16px 16px calc(var(--tap) + 40px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.screen h1 {
+  font-size: 1.6rem;
+  margin: 8px 0 16px;
+}
+
+/* every button has its colours set */
+.btn {
+  appearance: none;
+  font: inherit;
+  min-height: var(--tap);
+  min-width: 9rem;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 2px solid var(--action);
+  background: var(--action);
+  color: var(--action-ink);
+  cursor: pointer;
+}
+
+.btn-quiet {
+  background: var(--paper);
+  color: var(--action);
+}
+
+.btn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+
+.back {
+  appearance: none;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--tap);
+  padding: 0 8px 0 0;
+  border: 0;
+  background: var(--paper);
+  color: var(--action);
+  cursor: pointer;
+}
+
+/* the line under Start keeps its room, so nothing below it moves */
+.line {
+  min-height: 3em;
+  margin: 16px 0 8px;
+}
+
+.level {
+  height: 20px;
+  border-radius: 10px;
+  background: var(--track);
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.level[data-on='true'] { visibility: visible; }
+
+.level > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--voice);
+  transform-origin: left center;
+}
+
+.carry-on { margin-top: 24px; }
+
+.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-around;
+  background: var(--bar);
+  border-top: 1px solid var(--line);
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+}
+
+.tab {
+  appearance: none;
+  font: inherit;
+  font-size: 0.75rem;
+  flex: 1;
+  min-height: calc(var(--tap) + 8px);
+  min-width: var(--tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bar);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tab[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 600;
+}
