@@ -4,10 +4,13 @@
 
 measure.py runs songs through it for timing, cost and quality.
 
-Model: Kim's Mel-Band RoFormer (KimberleyJSN/melbandroformer, MIT), run with
-Kim's own code from her repository, both pinned below. The weights are
-downloaded when the image is built on Modal, checked against WEIGHTS_SHA256,
-and never stored anywhere else.
+Model: Kim's Mel-Band RoFormer weights (KimberleyJSN/melbandroformer, MIT),
+run through ZFTurbo's Music-Source-Separation-Training (MIT, release
+v1.0.22), model type mel_band_roformer with Kim's vocal config from that
+release, and Kim's original settings (overlap 2, 8-second chunks, half
+precision, no DC filter). Kim's own GitHub code has no licence and is not
+used. The weights are downloaded when the image is built on Modal, checked
+against WEIGHTS_SHA256, and never stored anywhere else.
 """
 from __future__ import annotations
 
@@ -22,10 +25,11 @@ WEIGHTS_REPO = 'KimberleyJSN/melbandroformer'
 WEIGHTS_REV = 'ac9b0614ab3cd7f77219e18ba494dfd93956c348'
 WEIGHTS_FILE = 'MelBandRoformer.ckpt'
 WEIGHTS_SHA256 = '87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e'
-KIM_REPO = 'https://github.com/KimberleyJensen/Mel-Band-Roformer-Vocal-Model'
-KIM_COMMIT = '25f44ffb55ee3c301281bba21b2d6d311cb69ae2'
+CODE_REPO = 'https://github.com/ZFTurbo/Music-Source-Separation-Training'   # MIT licence
+CODE_TAG = 'v1.0.22'
+CODE_COMMIT = '7671faec526b78156f60c94a767fb243a0aaa41e'
 WEIGHTS = '/weights/' + WEIGHTS_FILE
-CONFIG = '/kim/configs/config_vocals_mel_band_roformer.yaml'
+CONFIG = '/msst/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml'
 
 app = modal.App(APP_NAME, tags={'run': os.environ.get('RP_RUN', 'service')})
 store_dict = modal.Dict.from_name('repertoire-separator-jobs', create_if_missing=True)
@@ -50,10 +54,12 @@ def fetch_weights():
 gpu_image = (
     modal.Image.debian_slim(python_version='3.11')
     .apt_install('ffmpeg', 'git')
-    .pip_install('torch==2.8.0', 'numpy==2.2.6', 'librosa==0.11.0', 'einops==0.6.1',
+    .pip_install('torch==2.8.0', 'numpy==2.2.6', 'librosa==0.11.0', 'einops==0.8.1',
                  'rotary_embedding_torch==0.3.5', 'beartype==0.14.1', 'ml_collections==1.1.0',
-                 'pyyaml==6.0.2', 'packaging', 'huggingface_hub==0.35.3', 'fastapi==0.118.0', 'pyjwt[crypto]==2.10.1')
-    .run_commands(f'git clone {KIM_REPO} /kim && cd /kim && git checkout {KIM_COMMIT} && rm -rf .git')
+                 'pyyaml==6.0.2', 'packaging', 'tqdm', 'huggingface_hub==0.35.3', 'fastapi==0.118.0',
+                 'pyjwt[crypto]==2.10.1')
+    .run_commands(f'git clone --depth 1 --branch {CODE_TAG} {CODE_REPO} /msst && cd /msst && '
+                  f'test "$(git rev-parse HEAD)" = {CODE_COMMIT} && grep -q "MIT License" LICENSE && rm -rf .git')
     .run_function(fetch_weights)
     .add_local_python_source(*OUR_CODE)
 )
@@ -77,13 +83,15 @@ class Separator:
         import yaml
         from ml_collections import ConfigDict
         t = time.time()
-        sys.path.insert(0, '/kim')
-        from utils import get_model_from_config             # Kim's own
+        sys.path.insert(0, '/msst')
+        from models.bs_roformer.mel_band_roformer import MelBandRoformer   # ZFTurbo's, MIT
         with open(CONFIG) as f:
             self.config = ConfigDict(yaml.load(f, Loader=yaml.FullLoader))
-        assert self.config.inference.num_overlap == 2 and self.config.inference.chunk_size == 352800
+        c = self.config
+        assert c.audio.chunk_size == 352800 and c.inference.num_overlap == 2 and c.training.use_amp
         torch.backends.cudnn.benchmark = True
-        model = get_model_from_config('mel_band_roformer', self.config)
+        # zero_dc arrived in ZFTurbo's code after Kim's release; off, as Kim's model ran
+        model = MelBandRoformer(**dict(c.model), zero_dc=False)
         model.load_state_dict(torch.load(WEIGHTS, map_location='cpu'))
         self.device = torch.device('cuda:0')
         self.model = model.to(self.device).eval()
@@ -99,20 +107,26 @@ class Separator:
         return times
 
     @modal.method()
-    def kim_reference(self, job: str, name: str) -> None:
-        """For tests/test_demix.py only: Kim's own demix_track on an
-        uploaded file, saved beside it as float32, to compare against."""
+    def reference(self, clip: bytes) -> dict:
+        """For tests/test_demix.py only: ZFTurbo's own demix() on a short clip
+        (under 2 MB, sent with the call), one chunk at a time and in his
+        default batches of 4, against ours. Returns only numbers; nothing
+        is saved."""
+        import copy
         import numpy as np
-        import torch
-        from storage import VolumeFiles
         import sep_core as S
-        from utils import demix_track
-        files = VolumeFiles(files_vol)
-        mix = S.decode(files.get(job, name))
-        res, _ = demix_track(self.config, self.model, torch.tensor(mix), self.device)
+        from utils.model_utils import demix                  # ZFTurbo's, MIT
+        mix = S.decode(clip)
         ours = S.demix(self.model, mix, self.device)
-        files.put(job, 'kim.f32', np.ascontiguousarray(res['vocals'], dtype=np.float32).tobytes())
-        files.put(job, 'ours.f32', np.ascontiguousarray(ours, dtype=np.float32).tobytes())
+        out = {'samples': int(mix.shape[1])}
+        for batch in (1, 4):
+            cfg = copy.deepcopy(self.config)
+            cfg.inference.batch_size = batch
+            theirs = demix(cfg, self.model, mix, self.device, 'mel_band_roformer')['vocals']
+            d = np.abs(theirs - ours)
+            out[f'batch{batch}'] = {'max_diff': float(d.max()), 'same_shape': theirs.shape == ours.shape,
+                                    'sdr_vs_ours_db': float(10 * np.log10(np.sum(ours ** 2) / max(np.sum((theirs - ours) ** 2), 1e-30)))}
+        return out
 
 
 @app.function(image=web_image, max_containers=2, scaledown_window=60, timeout=300)
@@ -146,6 +160,4 @@ def sweep_now(keep_s: int | None = None) -> dict:
     import time
     import jobs
     from storage import DictStore, VolumeFiles
-    if keep_s is not None:
-        jobs.KEEP_S = keep_s
-    return jobs.sweep(DictStore(store_dict), VolumeFiles(files_vol), time.time())
+    return jobs.sweep(DictStore(store_dict), VolumeFiles(files_vol), time.time(), keep_s)

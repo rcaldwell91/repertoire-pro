@@ -8,6 +8,7 @@ it started, how far it has got, and which files it has made.
   user:<uid>   the one job this person has running (one at a time)
   slot:<n>     the simultaneous-jobs cap: a job holds one slot while running
   cancel:<id>  set when the person cancels
+  got:<id>:<name>  set (once, atomically) when a result is handed over
 
 The audio itself is in Files (a modal.Volume in service), under the job id:
   in            the upload, deleted as soon as the worker has read it
@@ -118,25 +119,34 @@ def finish(store: Store, files: Files, job: str, stage: str, **change) -> None:
         files.remove_job(job)
 
 
+def claim_result(store: Store, job: str, name: str) -> bool:
+    """A result can be handed over once: True for the first asker only."""
+    return store.put(f'got:{job}:{name}', True, skip_if_exists=True)
+
+
+def taken(store: Store, job: str) -> list[str]:
+    return [n for n in NAMES if store.get(f'got:{job}:{n}')]
+
+
 def collected(store: Store, files: Files, job: str, name: str) -> None:
     """A result has been handed over: delete it. Once both whole results
-    are gone, delete everything else the job has too."""
+    are gone, delete everything else the job has too. (Each result has its
+    own marker, so two collections at once cannot undo each other.)"""
     files.remove(job, name)
     rec = record(store, job) or {}
-    got = sorted(set(rec.get('collected', [])) | {name})
-    update(store, job, collected=got)
-    if rec.get('stage') == 'done' and all(r in got for r in RESULTS):
+    if rec.get('stage') == 'done' and all(store.get(f'got:{job}:{r}') for r in RESULTS):
         files.remove_job(job)
 
 
-def sweep(store: Store, files: Files, now: float) -> dict:
-    """Run every SWEEP_S: delete anything older than KEEP_S, and end jobs
-    that died without ending themselves."""
+def sweep(store: Store, files: Files, now: float, keep_s: Optional[float] = None) -> dict:
+    """Run every SWEEP_S: delete anything older than KEEP_S (or keep_s, for
+    the tests), and end jobs that died without ending themselves."""
+    keep = KEEP_S if keep_s is None else keep_s
     gone = {'files': 0, 'records': 0, 'stuck': 0, 'locks': 0}
     for job, newest in files.jobs():
         rec = record(store, job)
         born = rec.get('created', newest) if rec else newest
-        if now - born > KEEP_S or rec is None:
+        if now - born > keep or rec is None:
             files.remove_job(job)
             gone['files'] += 1
     for key in list(store.keys()):
@@ -146,10 +156,12 @@ def sweep(store: Store, files: Files, now: float) -> dict:
             if rec.get('stage') in ACTIVE and age >= STUCK_S:
                 finish(store, files, job, 'failed', error='took too long')
                 gone['stuck'] += 1
-            if age > KEEP_S:
+            if age > keep:
                 files.remove_job(job)
                 store.pop(key)
                 store.pop('cancel:' + job)
+                for n in NAMES:
+                    store.pop(f'got:{job}:{n}')
                 gone['records'] += 1
         elif key.startswith(('user:', 'slot:')):
             held = store.get(key)
@@ -158,10 +170,12 @@ def sweep(store: Store, files: Files, now: float) -> dict:
                 gone['locks'] += 1
         elif key.startswith('cancel:') and record(store, key[7:]) is None:
             store.pop(key)
+        elif key.startswith('got:') and record(store, key.split(':')[1]) is None:
+            store.pop(key)
     return gone
 
 
-def status(rec: dict, now: float) -> dict:
+def status(rec: dict, now: float, taken: list[str] = ()) -> dict:
     """What the app is told about a job: real progress, never a guess."""
     out = {
         'stage': rec.get('stage'),
@@ -170,7 +184,7 @@ def status(rec: dict, now: float) -> dict:
         'chunks': rec.get('chunks'),
         'seconds': rec.get('seconds'),
         'first30_ready': bool(rec.get('first30')),
-        'ready': [n for n in rec.get('made', []) if n not in rec.get('collected', [])],
+        'ready': [n for n in rec.get('made', []) if n not in taken],
         'expires_in': max(0, int(rec.get('created', now) + KEEP_S - now)),
     }
     if rec.get('error'):

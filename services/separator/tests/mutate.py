@@ -25,12 +25,13 @@ MUTATIONS = [
     ('no cap on everyone', 'jobs.py', 'MAX_JOBS = 3 ', 'MAX_JOBS = 30 ', 'test_api.py'),
     ('a collected result is kept', 'jobs.py', "    files.remove(job, name)\n    rec", "    rec", 'test_api.py'),
     ('the upload is kept while separating', 'worker.py', "        files.remove(job, 'in')                         # the upload", "        pass  # the upload", 'test_worker.py'),
-    ('the sweep keeps old files', 'jobs.py', "        if now - born > KEEP_S or rec is None:", "        if False:", 'test_api.py'),
+    ('the sweep keeps old files', 'jobs.py', "        if now - born > keep or rec is None:", "        if False:", 'test_api.py'),
     ('results are kept two hours', 'jobs.py', 'KEEP_S = 45 * 60 ', 'KEEP_S = 120 * 60 ', 'test_api.py'),
     ('the first 30 s are handed back one chunk early', 'sep_core.py', 'return min(self.chunks, max(1, math.ceil(need / self.step)))',
      'return min(self.chunks, max(1, math.ceil(need / self.step) - 1))', 'test_worker.py'),
     ('the music is not song minus voice', 'worker.py', 'music = mix - voice', 'music = mix', 'test_worker.py'),
     ('a cancel is ignored', 'sep_core.py', "                if should_stop():\n                    return None", "                pass", 'test_worker.py'),
+    ('a result can be collected twice', 'jobs.py', "return store.put(f'got:{job}:{name}', True, skip_if_exists=True)", "store.put(f'got:{job}:{name}', True); return True", 'test_api.py'),
     ('a stranger sees your job', 'api.py', "if not rec or rec.get('user') != user:", "if not rec:", 'test_api.py'),
 ]
 

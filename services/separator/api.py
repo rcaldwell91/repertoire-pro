@@ -104,7 +104,7 @@ def make_api(store: J.Store, files: J.Files, verifier: Verifier, spawn: Callable
         rec = mine(user, job)
         if not rec:
             return no(404, 'no such job')
-        return JSONResponse(J.status(rec, now()), headers={'Cache-Control': 'no-store'})
+        return JSONResponse(J.status(rec, now(), J.taken(store, job)), headers={'Cache-Control': 'no-store'})
 
     @api.get('/jobs/{job}/{name}')
     def result(job: str, name: str, request: Request):
@@ -120,12 +120,13 @@ def make_api(store: J.Store, files: J.Files, verifier: Verifier, spawn: Callable
         if now() - rec.get('created', 0) > J.KEEP_S:
             files.remove_job(job)
             return no(410, 'expired')
-        if name in rec.get('collected', []):
-            return no(410, 'already collected')
         if name not in rec.get('made', []):
             return no(409, 'not ready')
+        if not J.claim_result(store, job, name):
+            return no(410, 'already collected')
         data = files.get(job, name)
         if data is None:
+            files.remove(job, name)
             return no(410, 'gone')
         log.info('job %s: %s collected', job, name)
         return Response(data, media_type='audio/mpeg', headers={'Cache-Control': 'no-store'},

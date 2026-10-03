@@ -162,3 +162,21 @@ def test_the_sweep_deletes_anything_over_the_limit(world, songs, store, files):
 
 def test_the_keep_limit_is_under_an_hour():
     assert J.KEEP_S + J.SWEEP_S < 3600
+
+
+def test_two_collections_at_once_still_leave_nothing(world, songs, store, files):
+    """voice and music collected at the same moment: each is handed over once,
+    and when both have gone, so has everything else"""
+    c, _ = world
+    job = up(c, songs['short'], auth()).json()['job']
+    files.remove(job, 'in')
+    for n in J.NAMES:
+        files.put(job, n, b'mp3 of ' + n.encode())
+    J.finish(store, files, job, 'done', made=list(J.NAMES))
+    assert J.claim_result(store, job, 'voice') and J.claim_result(store, job, 'music')
+    assert not J.claim_result(store, job, 'voice')                 # a second asker gets nothing
+    assert c.get(f'/jobs/{job}/music', headers=auth()).status_code == 410
+    J.collected(store, files, job, 'music')
+    J.collected(store, files, job, 'voice')
+    assert files.names(job) == []
+    assert c.get(f'/jobs/{job}', headers=auth()).json()['ready'] == ['voice30', 'music30']
