@@ -163,11 +163,14 @@ def decode(data: bytes, ffmpeg: str = 'ffmpeg') -> np.ndarray:
     return np.frombuffer(p.stdout, dtype=np.float32).reshape(-1, 2).T.copy()
 
 
-def encode_mp3(audio: np.ndarray, ffmpeg: str = 'ffmpeg', kbps: int = 192) -> bytes:
+def encode_mp3(audio: np.ndarray, ffmpeg: str = 'ffmpeg', kbps: int = 320) -> bytes:
     """float32 (2, n) at 44.1 kHz to an MP3. Written to a real file, not a
     pipe: only then can the encoder record its own start-up delay in the
     file's header, so players trim it and the voice and music stay exactly
-    in time with the song (through a pipe they came out 25 ms late)."""
+    in time with the song (through a pipe they came out 25 ms late).
+    320 kbps: at 192 kbps the coding drops about 3% of the energy, so voice
+    + music came back 0.26 dB quieter than the song; at 320 kbps they add
+    back up to it."""
     import os
     import tempfile
     raw = np.ascontiguousarray(audio.T, dtype=np.float32).tobytes()

@@ -24,26 +24,34 @@ stay out of this repo.
 - `sep_core.demix` gives exactly ZFTurbo's own `demix()` (largest difference
   0.0, on the GPU with the real weights: `tests/test_demix.py`).
 
-## Status (3 Oct 2026)
+## Status (4 Oct 2026)
 
-Deployed on Modal (L4), not merged: All of Me's plain SDR is below the CPU
-test's. Separation quality is the same (level-matched 14.11 dB against
-14.12 dB); the plain score differs because last round's tool (audio-separator)
-scaled its voice to a 0.9 peak and this keeps the song's own level, about
-1.7 dB louder. With that same scaling, 12.15 dB plain against 12.35 dB.
+Live on Modal at `https://rcaldwell91--repertoire-separator.modal.run`
+(L4, scales to zero). Results are 320 kbps MP3s at the song's own level, so
+voice + music add back up to the song (at 192 kbps the coding lost 3% of the
+energy).
 
-Measured 3 Oct on an L4, each song in its own fresh copy of the service
-(cold start included), through the web endpoint:
+Quality, All of Me against its voice-only track (quality.py, the 1 Oct
+method): 14.13 dB level-matched (CPU test 14.12 dB), the same on L4 and A10.
+Plain SDR is 6.54 dB because the voice keeps the song's real level, where
+the CPU test's tool scaled its voice to a 0.9 peak; judged on the
+level-matched score (Robert, 4 Oct).
 
-| Song | Length | First 30 s ready | All done | Modal's cost |
+Speed and cost, 4 Oct, through the web endpoint, each song in its own fresh
+copy of the service (cold start included), cost from Modal's usage report:
+
+| Song | GPU | First 30 s ready | All done | Modal's cost |
 |---|---|---|---|---|
-| All of Me | 4:30 | 60.0 s | 98.8 s | $0.0227 |
-| Ride | 3:51 | 32.0 s | 66.1 s | $0.0207 |
-| If I Ain't Got You | 4:39 | 30.2 s | 70.6 s | $0.0226 |
+| All of Me (4:30) | L4 | 42.7 s | 114.9 s | $0.0387 |
+| Ride (3:51) | L4 | 40.0 s | 102.0 s | $0.0332 |
+| If I Ain't Got You (4:39) | L4 | 39.1 s | 114.6 s | $0.0375 |
+| All of Me | A10 | 27.1 s | 54.5 s | $0.0266 |
+| Ride | A10 | 18.3 s | 39.6 s | $0.0182 |
+| If I Ain't Got You | A10 | 25.4 s | 69.3 s | $0.0320 |
 
-Times are from the upload being accepted. Of that, waiting for a GPU to
-start was 51 s, 21 s and 21 s; once running, the first 30 s took 11-13 s
-and the whole song 47-51 s (separating about 37 s, then making the MP3s).
+Times are from the upload being accepted; 11-20 s of each is a GPU starting.
+The same L4 code separated about twice as fast on 3 Oct (37 s a song, total
+66-99 s, about $0.02 a song), so L4 speed varies between machines.
 
 ## What it does
 ## What it does
