@@ -27,7 +27,9 @@ stay out of this repo.
 ## Status (4 Oct 2026)
 
 Live on Modal at `https://rcaldwell91--repertoire-separator.modal.run`
-(L4, scales to zero). Results are 320 kbps MP3s at the song's own level, so
+(A10 since 4 Oct, scales to zero). Status reports `ready_s`: how far into the
+song the split is final. Live tests sign in as the permanent test account
+(`test_account.py`). Results are 320 kbps MP3s at the song's own level, so
 voice + music add back up to the song (at 192 kbps the coding lost 3% of the
 energy).
 

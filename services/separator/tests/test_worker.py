@@ -69,6 +69,11 @@ def test_a_job_from_upload_to_results(store, files, song, monkeypatch):
     assert np.allclose(voice + music, mix, atol=1e-6)
     assert 'user:u' not in store and 'slot:0' not in store
     assert times['first30_ready'] <= times['done']
+    # "ready to" follows the song: final up to the next chunk's start, then the whole song
+    ready = [s['ready_s'] for s in seen if 'ready_s' in s]
+    assert ready == sorted(ready) and ready[-1] == round(mix.shape[1] / S.SR, 2)
+    k = plan.chunks_for_first(30 * S.SR)
+    assert ready[k - 1] >= 30 > ready[k - 2]
 
 
 def test_a_cancelled_job_stops_and_leaves_nothing(store, files, song, monkeypatch):

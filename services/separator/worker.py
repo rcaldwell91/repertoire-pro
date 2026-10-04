@@ -45,7 +45,9 @@ def run_job(job: str, store: J.Store, files: J.Files, model, device, plan_overla
         pool = ThreadPoolExecutor(2)
 
         def chunk(done: int, of: int) -> None:
-            J.update(store, job, progress=round(done / of, 4), chunks_done=done)
+            # how far into the song is final: everything before the next chunk's start
+            ready = max(0, min(plan.n, done * plan.step - plan.offset)) / S.SR
+            J.update(store, job, progress=round(done / of, 4), chunks_done=done, ready_s=round(ready, 2))
 
         def first(voice30: np.ndarray) -> None:
             times['first30_separated'] = round(clock() - t0, 2)

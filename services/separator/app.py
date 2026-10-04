@@ -19,7 +19,7 @@ import os
 import modal
 
 APP_NAME = 'repertoire-separator'
-GPU = os.environ.get('RP_GPU', 'L4')
+GPU = os.environ.get('RP_GPU', 'A10G')     # A10: about twice the L4's speed, and cheaper (4 Oct)
 
 WEIGHTS_REPO = 'KimberleyJSN/melbandroformer'
 WEIGHTS_REV = 'ac9b0614ab3cd7f77219e18ba494dfd93956c348'

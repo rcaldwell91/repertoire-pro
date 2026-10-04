@@ -182,6 +182,7 @@ def status(rec: dict, now: float, taken: list[str] = ()) -> dict:
         'progress': rec.get('progress', 0.0),
         'chunks_done': rec.get('chunks_done', 0),
         'chunks': rec.get('chunks'),
+        'ready_s': rec.get('ready_s', 0.0),
         'seconds': rec.get('seconds'),
         'first30_ready': bool(rec.get('first30')),
         'ready': [n for n in rec.get('made', []) if n not in taken],

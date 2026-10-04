@@ -1,12 +1,11 @@
 """Against the deployed service, with real Supabase sign-in tokens.
 
-    RP_LIVE=1 RP_SEP_URL=https://... RP_EMAIL=... RP_PASSWORD=... \
-    RP_EXPIRED_TOKEN=... RP_MIC=<a real voice recording> python -m pytest tests/test_live.py
+    RP_LIVE=1 RP_SEP_URL=https://... RP_EXPIRED_TOKEN=... RP_MIC=<a real voice recording> python -m pytest tests/test_live.py
 
-RP_EMAIL/RP_PASSWORD: a throwaway account, made through the app's public
-sign-up and deleted afterwards. RP_EXPIRED_TOKEN: a real sign-in token for
-it that has run out (Supabase's last longer than an hour, so it is one taken
-over an hour earlier). Audio is real voice, never a tone, and stays outside
+Signs in as the one permanent test account, rp-test@example.com (see
+test_account.py; RULEBOOK 1d: never throwaway accounts). RP_EXPIRED_TOKEN: a
+real sign-in token from this project that has run out (they last an hour, so
+one taken over an hour earlier). Audio is real voice, never a tone, and stays outside
 the repo.
 """
 import base64
@@ -47,7 +46,8 @@ def claims(token):
 @pytest.fixture(scope='module')
 def token():
     from measure import sign_in
-    return sign_in(os.environ['RP_EMAIL'], os.environ['RP_PASSWORD'])
+    from test_account import EMAIL, password
+    return sign_in(EMAIL, password())
 
 
 def clip(voice_path, seconds, *extra):

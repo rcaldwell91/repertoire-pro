@@ -26,6 +26,8 @@ from auth import Refused, Verifier, bearer
 
 log = logging.getLogger('separator')
 APP_ORIGINS = ['https://rcaldwell91.github.io']
+# the app's own tests run the built app from this machine; a sign-in is still needed
+TEST_ORIGINS = r'http://(127\.0\.0\.1|localhost)(:[0-9]+)?'
 
 
 def no(status: int, why: str) -> JSONResponse:
@@ -35,7 +37,7 @@ def no(status: int, why: str) -> JSONResponse:
 def make_api(store: J.Store, files: J.Files, verifier: Verifier, spawn: Callable[[str], None],
              seconds_of: Callable[[bytes], float], now: Callable[[], float] = time.time) -> FastAPI:
     api = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-    api.add_middleware(CORSMiddleware, allow_origins=APP_ORIGINS, allow_methods=['GET', 'POST', 'DELETE'],
+    api.add_middleware(CORSMiddleware, allow_origins=APP_ORIGINS, allow_origin_regex=TEST_ORIGINS, allow_methods=['GET', 'POST', 'DELETE'],
                        allow_headers=['Authorization', 'Content-Type'], max_age=600)
 
     def who(request: Request) -> str:

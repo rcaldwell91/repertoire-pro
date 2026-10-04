@@ -1,13 +1,12 @@
 """Speed and cost on Modal, through the real web endpoint, as the app will
 use it.
 
-    RP_EMAIL=... RP_PASSWORD=... python measure.py --gpu L4 --out DIR "All of Me=path/to/song.mp3" ...
+    python measure.py --gpu L4 --out DIR "All of Me=path/to/song.mp3" ...
 
 Each song runs in its own short-lived copy of the service (an ephemeral
 Modal app, tagged with the song and the GPU), so Modal's own usage report
 gives each song's real cost, cold start included; nothing else runs in that
-app. The person signs in through the app's public sign-in (the test account
-is a throwaway, deleted afterwards).
+app. It signs in as the permanent test account (test_account.py).
 
 Times are taken by polling the job, as the app would, every 0.25 s:
   accepted     the upload was received and checked
@@ -106,7 +105,8 @@ def main():
         import modal
         import app as service
         service = importlib.reload(service)               # pick up this song's tag and GPU
-        token = sign_in(os.environ['RP_EMAIL'], os.environ['RP_PASSWORD'])
+        from test_account import EMAIL, password
+        token = sign_in(EMAIL, password())
         from storage import DictStore
         store = DictStore(modal.Dict.from_name('repertoire-separator-jobs'))
         t = time.time()
