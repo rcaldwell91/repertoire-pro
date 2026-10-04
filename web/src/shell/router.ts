@@ -9,8 +9,22 @@ import type { LeaveReason } from '../audio/conductor/conductor';
 export const TABS = ['home', 'train', 'sing', 'coach', 'learn', 'library', 'profile'] as const;
 export type Tab = (typeof TABS)[number];
 
-export const ROUTES = [...TABS.map((t) => '/' + t), '/profile/sound-check'] as const;
-export type Route = (typeof ROUTES)[number];
+/* Every screen's address. A song's screen carries the song's id. */
+export const ROUTES = [
+  ...TABS.map((t) => '/' + t),
+  '/profile/sound-check', '/profile/account', '/profile/look',
+  '/sing/learn', '/sing/learn/add',
+] as const;
+export type Route = string;
+export const SONG_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)$/;
+
+export function isRoute(r: string): boolean {
+  return (ROUTES as readonly string[]).includes(r) || SONG_ROUTE.test(r);
+}
+
+export function songRoute(id: string): Route {
+  return '/sing/learn/song/' + id;
+}
 
 export function tabOf(route: Route): Tab {
   return route.split('/')[1] as Tab;
@@ -18,7 +32,7 @@ export function tabOf(route: Route): Tab {
 
 function read(): Route | null {
   const h = location.hash.replace(/^#/, '');
-  return (ROUTES as readonly string[]).includes(h) ? (h as Route) : null;
+  return isRoute(h) ? h : null;
 }
 
 type Listener = (to: Route, why: LeaveReason) => void;

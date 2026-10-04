@@ -3,8 +3,8 @@
    purpose, so a hidden app could never be tested through it. Here,
    opening another tab really hides the app, as switching apps on a phone
    does. Taps are real input events (the page sees isTrusted = true). */
-import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,12 +13,26 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let nextPort = 9400 + Math.floor(Math.random() * 400);
 
-export async function launch({ mic, allowMic }) {
+/* Online tests go through this machine's proxy, which re-signs every site
+   with its own certificate. Trust exactly that certificate (by its key),
+   and nothing else. */
+function proxyTrust() {
+  const ca = process.env.RP_PROXY_CA || '/root/.ccr/agent-proxy-ca.crt';
+  if (!existsSync(ca)) return [];
+  const spki = execSync(`openssl x509 -in '${ca}' -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64`).toString().trim();
+  return ['--ignore-certificate-errors-spki-list=' + spki];
+}
+
+export async function launch({ mic, allowMic, online = false }) {
   const port = nextPort++;
   const profile = mkdtempSync(join(tmpdir(), 'rp-chrome-'));
   const args = [
     '--headless', '--no-sandbox', '--no-first-run', '--disable-background-networking',
-    '--disable-component-update', '--disable-default-apps', '--disable-domain-reliability', '--no-pings', '--no-proxy-server',
+    '--disable-component-update', '--disable-default-apps', '--disable-domain-reliability', '--no-pings',
+    /* online: reach the real separator and sign-in, through this machine's proxy */
+    ...(online && process.env.HTTPS_PROXY
+      ? ['--proxy-server=' + process.env.HTTPS_PROXY, '--proxy-bypass-list=127.0.0.1;localhost', ...proxyTrust()]
+      : ['--no-proxy-server']),
     '--remote-debugging-port=' + port, '--user-data-dir=' + profile,
     '--use-fake-device-for-media-stream',
     '--use-file-for-fake-audio-capture=' + mic,
@@ -164,6 +178,37 @@ class Page {
     if (h.currentIndex < 1) return false;
     await this.c.send('Page.navigateToHistoryEntry', { entryId: h.entries[h.currentIndex - 1].id });
     return true;
+  }
+  /** choose files in a file input, as the phone's picker would */
+  async setFiles(selector, paths) {
+    const { root } = await this.c.send('DOM.getDocument', { depth: 0 });
+    const { nodeId } = await this.c.send('DOM.querySelector', { nodeId: root.nodeId, selector });
+    if (!nodeId) throw new Error('no file input: ' + selector);
+    await this.c.send('DOM.setFileInputFiles', { nodeId, files: paths });
+  }
+  /** type into whatever has focus, as a keyboard would */
+  async type(text) {
+    await this.c.send('Input.insertText', { text });
+  }
+  /** press a key on whatever has focus */
+  async key(key, times = 1) {
+    const codes = { PageDown: 34, PageUp: 33, ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35 };
+    for (let i = 0; i < times; i++) {
+      for (const type of ['keyDown', 'keyUp']) {
+        await this.c.send('Input.dispatchKeyEvent', { type, key, code: key, windowsVirtualKeyCode: codes[key] || 0 });
+      }
+    }
+  }
+  /** make a server unreachable (pattern like *modal.run*), or reachable again (null) */
+  async cutOff(pattern) {
+    if (!this.cutting) {
+      this.cutting = true;
+      this.c.on('Fetch.requestPaused', (p) => {
+        void this.c.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'ConnectionRefused' });
+      });
+    }
+    if (pattern) await this.c.send('Fetch.enable', { patterns: [{ urlPattern: pattern }] });
+    else await this.c.send('Fetch.disable');
   }
   async screenshot() {
     const r = await this.c.send('Page.captureScreenshot', { format: 'png' });

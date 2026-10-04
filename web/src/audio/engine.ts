@@ -17,6 +17,24 @@ export interface Source {
   readonly ended: Promise<void>;
 }
 
+/** Several parts of one song (the voice and the music) started on the same
+    tick of the one clock, so they stay together to the sample. */
+export interface Ensemble extends Source {
+  /** engine time at which the part at `from` sounds */
+  readonly startedAt: number;
+  /** change one part's volume while it plays */
+  setGain(part: number, gain: number): void;
+}
+
+export interface EnsembleOptions {
+  /** where in the song to start, in seconds */
+  readonly from: number;
+  /** one volume per part; 1 is the song's own level */
+  readonly gains: readonly number[];
+  /** play this stretch over and over */
+  readonly loop?: { readonly start: number; readonly end: number };
+}
+
 /** One rung of the mic ladder. Every value is a wish, never a demand:
     RULEBOOK 4 "Never require raw capture." */
 export interface MicSet {
@@ -38,6 +56,10 @@ export interface AudioEngine {
   now(): number;
   load(url: string): Promise<Sample>;
   play(sample: Sample, opts?: { rate?: number; gain?: number }): Source;
+  /** start every part together, on one tick of the clock */
+  playTogether(samples: readonly Sample[], opts: EnsembleOptions): Ensemble;
+  /** drop a loaded sample, to give its memory back */
+  forget(url: string): void;
   /** how many sources are sounding right now */
   sounding(): number;
   /** Tries the sets in the given order and keeps the first that opens. */

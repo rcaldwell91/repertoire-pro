@@ -1,4 +1,4 @@
-import type { AudioEngine, MicResult, MicSet, Sample, Source } from '../engine';
+import type { AudioEngine, Ensemble, EnsembleOptions, MicResult, MicSet, Sample, Source } from '../engine';
 import type { Env, Store } from '../conductor/conductor';
 
 /* A stand-in engine for the conductor's tests. It makes no sound; it keeps
@@ -66,6 +66,29 @@ export class FakeEngine implements AudioEngine {
     this.sources.add(s);
     this.peak = Math.max(this.peak, this.sources.size);
     return s;
+  }
+  /** the last song started: its parts, options and volumes as they are now */
+  song: { urls: string[]; opts: EnsembleOptions; gains: number[]; source: FakeSource } | null = null;
+  readonly forgotten: string[] = [];
+  playTogether(samples: readonly Sample[], opts: EnsembleOptions): Ensemble {
+    const urls = samples.map((x) => x.url);
+    this.log.push('together:' + urls.join('+') + '@' + opts.from + (opts.loop ? `~${opts.loop.start}-${opts.loop.end}` : ''));
+    const s = new FakeSource((x) => this.sources.delete(x));
+    this.sources.add(s);
+    this.peak = Math.max(this.peak, this.sources.size);
+    const song = { urls, opts, gains: [...opts.gains], source: s };
+    this.song = song;
+    return {
+      startedAt: this.clock,
+      ended: s.ended,
+      stop: () => s.stop(),
+      setGain: (part, gain) => {
+        song.gains[part] = gain;
+      },
+    };
+  }
+  forget(url: string): void {
+    this.forgotten.push(url);
   }
   /** the notes playing reach their natural end */
   endNotes(): void {

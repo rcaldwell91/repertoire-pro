@@ -1,4 +1,4 @@
-import type { AudioEngine, MicResult, MicSet, Sample, Source } from '../engine';
+import type { AudioEngine, Ensemble, EnsembleOptions, MicResult, MicSet, Sample, Source } from '../engine';
 
 /* The browser's sound and microphone, behind the engine interface. Only the
    conductor holds it. A native engine replaces this file later; nothing
@@ -33,6 +33,8 @@ export class WebEngine implements AudioEngine {
   private readonly frame = new Float32Array(2048);
   private readonly interruptCbs = new Set<() => void>();
   private letGo = false;
+  private sleepTimer: ReturnType<typeof setTimeout> | null = null;
+  private sleeping: Promise<void> | null = null;
 
   private context(): AudioContext {
     if (!this.ctx) {
@@ -40,7 +42,7 @@ export class WebEngine implements AudioEngine {
       this.ctx.addEventListener('statechange', () => {
         const st = this.ctx?.state as string;
         /* the phone took it (a call, another app) - not us letting it go */
-        if (st === 'interrupted' || (st === 'suspended' && !this.letGo)) this.interruptCbs.forEach((f) => f());
+        if (st === 'interrupted' || (st === 'suspended' && !this.letGo && !this.sleeping)) this.interruptCbs.forEach((f) => f());
       });
     }
     return this.ctx;
@@ -48,6 +50,8 @@ export class WebEngine implements AudioEngine {
 
   unlock(): void {
     const ctx = this.context();
+    if (this.sleepTimer) clearTimeout(this.sleepTimer);   /* starting again: keep the device */
+    this.sleepTimer = null;
     this.letGo = false;
     if (ctx.state !== 'running') void ctx.resume();
   }
@@ -101,6 +105,69 @@ export class WebEngine implements AudioEngine {
         }
       },
     };
+  }
+
+  playTogether(samples: readonly Sample[], opts: EnsembleOptions): Ensemble {
+    const ctx = this.context();
+    /* a moment ahead, so every part is scheduled before the tick comes */
+    const when = ctx.currentTime + 0.05;
+    const gains: GainNode[] = [];
+    const ends: Promise<void>[] = [];
+    const nodes: AudioBufferSourceNode[] = [];
+    samples.forEach((sample, i) => {
+      const buf = this.buffers.get(sample.url);
+      if (!buf) throw new Error('Not loaded: ' + sample.url);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      if (opts.loop) {
+        src.loop = true;
+        src.loopStart = opts.loop.start;
+        src.loopEnd = opts.loop.end;
+      }
+      const g = ctx.createGain();
+      g.gain.value = opts.gains[i] ?? 1;
+      src.connect(g);
+      g.connect(ctx.destination);
+      this.sources.add(src);
+      ends.push(
+        new Promise<void>((done) => {
+          src.onended = () => {
+            this.sources.delete(src);
+            try {
+              g.disconnect();
+            } catch {
+              /* gone */
+            }
+            done();
+          };
+        }),
+      );
+      gains.push(g);
+      nodes.push(src);
+    });
+    nodes.forEach((src) => src.start(when, opts.from));
+    const stop = () =>
+      nodes.forEach((src) => {
+        try {
+          src.stop();
+        } catch {
+          /* already stopped */
+        }
+      });
+    return {
+      startedAt: when,
+      /* the parts are the same length; when one ends, the song has ended */
+      ended: Promise.race(ends).then(() => stop()),
+      stop,
+      setGain: (part, gain) => {
+        const g = gains[part];
+        if (g) g.gain.setTargetAtTime(gain, ctx.currentTime, 0.015);
+      },
+    };
+  }
+
+  forget(url: string): void {
+    this.buffers.delete(url);
   }
 
   sounding(): number {
@@ -162,10 +229,21 @@ export class WebEngine implements AudioEngine {
       }
     }
     this.closeMic();
-    if (this.ctx && this.ctx.state === 'running') {
+    /* Silence is immediate (every source is stopped above). The device is
+       let go a moment later, unless something starts again first: a song
+       restarted by "back 10 s" stops and starts in one tap, and a device
+       still going to sleep then looked like the phone taking the sound. */
+    if (this.sleepTimer) clearTimeout(this.sleepTimer);
+    this.sleepTimer = setTimeout(() => {
+      this.sleepTimer = null;
+      const ctx = this.ctx;
+      if (!ctx || ctx.state !== 'running' || this.sources.size) return;
       this.letGo = true;
-      void this.ctx.suspend();
-    }
+      const p = ctx.suspend().finally(() => {
+        if (this.sleeping === p) this.sleeping = null;
+      });
+      this.sleeping = p;
+    }, 400);
   }
 
   onInterrupt(cb: () => void): () => void {

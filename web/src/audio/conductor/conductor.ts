@@ -1,4 +1,4 @@
-import type { AudioEngine, Source, Sample } from '../engine';
+import type { AudioEngine, Ensemble, Source, Sample } from '../engine';
 import { MIC_LADDER, ladderOrder } from '../mic-ladder';
 
 /* THE CONDUCTOR - the only owner of sound and the microphone (RULEBOOK 2.1).
@@ -23,7 +23,9 @@ export type MicState = 'closed' | 'opening' | 'open' | 'refused' | 'unavailable'
 
 export type Step =
   | { kind: 'note'; url: string; rate?: number; gain?: number }
-  | { kind: 'listen' };
+  | { kind: 'listen' }
+  /** a song's parts (voice, music) together, from a point, maybe looping */
+  | { kind: 'song'; urls: readonly string[]; from: number; gains: readonly number[]; loop?: { start: number; end: number } };
 
 export interface Plan {
   readonly owner: string;
@@ -78,6 +80,8 @@ export class Conductor {
   private gen = 0;
   private readonly tokens = new WeakMap<object, number>();
   private source: Source | null = null;
+  /** the song playing now, for its position and its volumes */
+  private song: { ensemble: Ensemble; from: number; loop?: { start: number; end: number } } | null = null;
   private readonly listeners = new Set<(s: Snapshot) => void>();
   private readonly engine: AudioEngine;
   private readonly env: Env;
@@ -105,6 +109,26 @@ export class Conductor {
   /** loudness of the voice right now, 0 to 1; 0 whenever the mic is not open */
   level(): number {
     return this.snap.mic === 'open' ? this.engine.micLevel() : 0;
+  }
+
+  /** Where the song playing now has got to, in seconds; null if none is. */
+  position(): number | null {
+    const song = this.song;
+    if (!song || this.snap.state !== 'running') return null;
+    const p = song.from + Math.max(0, this.engine.now() - song.ensemble.startedAt);
+    const loop = song.loop;
+    if (loop && p >= loop.end && loop.end > loop.start) return loop.start + ((p - loop.start) % (loop.end - loop.start));
+    return p;
+  }
+
+  /** Change one part's volume (0 to 1) on the song playing now. */
+  setGain(part: number, gain: number): void {
+    this.song?.ensemble.setGain(part, gain);
+  }
+
+  /** The screen is done with these parts: give their memory back. */
+  forget(urls: readonly string[]): void {
+    urls.forEach((u) => this.engine.forget(u));
   }
 
   active(): boolean {
@@ -166,6 +190,12 @@ export class Conductor {
       const samples = new Map<string, Sample>();
       for (const st of plan.steps) {
         if (st.kind === 'note' && !samples.has(st.url)) samples.set(st.url, await this.engine.load(st.url));
+        if (st.kind === 'song') {
+          for (const u of st.urls) {
+            if (!samples.has(u)) samples.set(u, await this.engine.load(u));
+            if (gen !== this.gen) return;
+          }
+        }
         if (gen !== this.gen) return;
       }
       if (plan.countIn && plan.countIn > 0) {
@@ -183,6 +213,17 @@ export class Conductor {
           await src.ended;
           if (gen !== this.gen) return;
           this.source = null;
+          continue;
+        }
+        if (st.kind === 'song') {
+          const ensemble = this.engine.playTogether(st.urls.map((u) => samples.get(u) as Sample),
+            { from: st.from, gains: st.gains, loop: st.loop });
+          this.source = ensemble;
+          this.song = { ensemble, from: st.from, loop: st.loop };
+          await ensemble.ended;
+          if (gen !== this.gen) return;
+          this.source = null;
+          this.song = null;
           continue;
         }
         /* listen: open the mic, and keep listening until Stop or leaving */
@@ -213,6 +254,7 @@ export class Conductor {
     this.gen++;
     const src = this.source;
     this.source = null;
+    this.song = null;
     try {
       src?.stop();
     } catch {

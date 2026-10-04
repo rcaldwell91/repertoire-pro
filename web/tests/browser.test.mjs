@@ -9,7 +9,9 @@ import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, sleep } from './chrome.mjs';
-import { allCopy, copy } from '../src/core/copy.ts';
+import { CONTRAST, strayWords, THEMES } from './checks.mjs';
+import { PROBE, serve } from './harness.mjs';
+import { copy } from '../src/core/copy.ts';
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
 const REPO = resolve(WEB, '..');
@@ -18,7 +20,6 @@ const MIC = process.env.RP_MIC;
 const SHOTS = process.env.SHOTS || '';
 const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
 const QUIET_MS = 300;
-const CONTRAST = '(' + CONTRAST_SRC.toString() + ')()';
 
 if (!MIC || !existsSync(MIC)) {
   console.log('FAIL setup: RP_MIC must name a WAV of a real voice (it is kept outside the repo)');
@@ -29,86 +30,8 @@ if (!existsSync(join(APP, 'index.html'))) {
   process.exit(1);
 }
 
-/* GitHub Pages, locally: the repo at /repertoire-pro/, the build at app/ */
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
-  '.png': 'image/png', '.mp3': 'audio/mpeg', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
-const server = createServer((req, res) => {
-  const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (!path.startsWith('/repertoire-pro/')) {
-    res.writeHead(404).end();
-    return;
-  }
-  let rest = path.slice('/repertoire-pro/'.length);
-  let root = REPO;
-  if (rest === 'app' || rest.startsWith('app/')) {
-    root = APP;
-    rest = rest.slice(4);
-  }
-  let file = normalize(join(root, rest));
-  if (!file.startsWith(root)) {
-    res.writeHead(403).end();
-    return;
-  }
-  if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
-  if (!existsSync(file)) {
-    res.writeHead(404).end();
-    return;
-  }
-  res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
-  createReadStream(file).pipe(res);
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const ORIGIN = 'http://127.0.0.1:' + server.address().port;
-const URL_APP = ORIGIN + '/repertoire-pro/app/';
+const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 
-/* Watches everything that can make sound or listen, from before the app
-   loads: every AudioContext, every buffer source started and stopped,
-   every getUserMedia call and every track it handed out. */
-const PROBE = `(() => {
-  const P = window.__probe = { contexts: 0, started: 0, gum: 0, live: new Set(), tracks: [], fetched: [],
-    decoded: [], actionAt: null, quietAt: null, events: [] };
-  const now = () => performance.now();
-  const note = (k) => P.events.push([k, Math.round(now())]);
-  P.micLive = () => P.tracks.filter((t) => t.readyState === 'live').length;
-  P.quiet = () => P.live.size === 0 && P.micLive() === 0;
-  const checkQuiet = () => { if (P.actionAt !== null && P.quietAt === null && P.quiet()) P.quietAt = now(); };
-  P.mark = () => { P.actionAt = now(); P.quietAt = null; checkQuiet(); };
-  const AC = window.AudioContext;
-  window.AudioContext = class extends AC {
-    constructor(...a) { super(...a); P.contexts++; note('context'); }
-    decodeAudioData(buf, ...rest) {
-      return super.decodeAudioData(buf, ...rest).then((b) => {
-        const d = b.getChannelData(0);
-        let peak = 0; for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]));
-        P.decoded.push({ seconds: b.duration, peak });
-        return b;
-      });
-    }
-  };
-  const S = AudioBufferSourceNode.prototype;
-  const start = S.start, stop = S.stop;
-  S.start = function (...a) {
-    P.started++; P.live.add(this); note('play');
-    this.addEventListener('ended', () => { P.live.delete(this); checkQuiet(); });
-    return start.apply(this, a);
-  };
-  S.stop = function (...a) { P.live.delete(this); note('stop'); const r = stop.apply(this, a); checkQuiet(); return r; };
-  const T = MediaStreamTrack.prototype, tstop = T.stop;
-  T.stop = function () { const r = tstop.apply(this); note('mic-closed'); checkQuiet(); return r; };
-  const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
-  md.getUserMedia = async (c) => {
-    P.gum++; note('mic-asked');
-    const s = await gum(c);
-    P.tracks.push(...s.getTracks()); note('mic-open');
-    return s;
-  };
-  const f = window.fetch;
-  window.fetch = (u, ...r) => f(u, ...r).then((res) => { P.fetched.push([String(u), res.status]); return res; });
-  /* the action a check times from: a tap, the Back button, or hiding */
-  document.addEventListener('click', () => P.mark(), true);
-  window.addEventListener('popstate', () => P.mark(), true);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') P.mark(); });
-})();`;
 
 const results = [];
 function check(name, ok, detail) {
@@ -121,7 +44,7 @@ const want = (...names) => !ONLY.length || names.some((n) => ONLY.includes(n));
 const sel = {
   tab: (t) => '#tab-' + t,
   go: '#sound-check-go',
-  entry: 'main .btn-row',
+  entry: '#go-sound-check',
   backBtn: 'main .back',
   carryOn: 'main .carry-on',
 };
@@ -316,13 +239,17 @@ try {
 
   if (want('contrast')) {
     const screens = [];
-    for (const hash of ['#/home', '#/profile', '#/profile/sound-check']) {
-      await fresh(env, hash);
-      screens.push([hash, await page.eval(CONTRAST)]);
+    for (const theme of THEMES) {
+      await page.eval(`localStorage.setItem('rp.theme', '${theme}')`);
+      for (const hash of ['#/home', '#/sing', '#/sing/learn', '#/profile', '#/profile/account', '#/profile/look', '#/profile/sound-check']) {
+        await fresh(env, hash);
+        screens.push([theme + ' ' + hash, await page.eval(CONTRAST)]);
+      }
+      await startListening(page);
+      screens.push([theme + ' sound check, listening', await page.eval(CONTRAST)]);
+      await page.tap(sel.go);
     }
-    await startListening(page);
-    screens.push(['sound check, listening', await page.eval(CONTRAST)]);
-    await page.tap(sel.go);
+    await page.eval(`localStorage.removeItem('rp.theme')`);
     const worst = screens.flatMap(([at, r]) => r.pairs.map((p) => ({ at, ...p }))).sort((a, b) => a.ratio - b.ratio);
     const unset = screens.flatMap(([at, r]) => r.unsetButtons.map((b) => at + ': ' + b));
     const low = worst.filter((p) => p.ratio < 3);
@@ -333,12 +260,11 @@ try {
   }
 
   if (want('words')) {
-    const known = new Set(allCopy().map((c) => c.text));
     const strays = [];
-    for (const hash of ['#/home', '#/train', '#/sing', '#/coach', '#/learn', '#/library', '#/profile', '#/profile/sound-check']) {
+    for (const hash of ['#/home', '#/train', '#/sing', '#/coach', '#/learn', '#/library', '#/profile', '#/profile/sound-check',
+      '#/profile/account', '#/profile/look', '#/sing/learn', '#/sing/learn/add']) {
       await fresh(env, hash);
-      const lines = await page.eval(`document.body.innerText.split("\\n").map((s) => s.trim()).filter(Boolean)`);
-      for (const l of lines) if (!known.has(l)) strays.push(hash + ': ' + l);
+      for (const l of await strayWords(page)) strays.push(hash + ': ' + l);
     }
     check('words', strays.length === 0, strays.length ? 'not from the copy: ' + strays.join(', ') : 'every word on screen is from the copy');
   }
@@ -399,52 +325,3 @@ const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `\n${failed.length} of ${results.length} checks FAILED` : `\nall ${results.length} checks passed`);
 process.exit(failed.length ? 1 : 0);
 
-/* ------------------------------------------------------------------ */
-/* Every visible word and icon against what is behind it, and the voice
-   bar against its track: at least 3:1 (RULEBOOK 3). Buttons must set
-   their own background. */
-function CONTRAST_SRC() {
-  const parse = (c) => {
-    const m = c.match(/rgba?\(([^)]+)\)/);
-    if (!m) return [0, 0, 0, 0];
-    const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
-    return [v[0], v[1], v[2], v.length > 3 ? v[3] : 1];
-  };
-  const lin = (x) => {
-    x /= 255;
-    return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
-  };
-  const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
-  const ratio = (a, b) => {
-    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
-    return (x + 0.05) / (y + 0.05);
-  };
-  const behind = (el) => {
-    for (let e = el; e; e = e.parentElement) {
-      const c = parse(getComputedStyle(e).backgroundColor);
-      if (c[3] > 0) return c;
-    }
-    return [255, 255, 255, 1];
-  };
-  const shown = (el) => {
-    const s = getComputedStyle(el);
-    return el.getClientRects().length > 0 && s.visibility === 'visible' && s.display !== 'none' && Number(s.opacity) > 0;
-  };
-  const pairs = [];
-  for (const el of document.querySelectorAll('body *')) {
-    if (!shown(el)) continue;
-    const ownText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-    if (ownText || el.tagName.toLowerCase() === 'svg') {
-      const fg = parse(getComputedStyle(el).color);
-      pairs.push({ what: ownText ? '"' + el.textContent.trim().slice(0, 30) + '"' : 'icon in ' + (el.closest('button')?.getAttribute('aria-label') || el.parentElement.textContent.trim().slice(0, 20)), ratio: ratio(fg, behind(el)) });
-    }
-  }
-  const meter = document.querySelector('[role=meter]');
-  if (meter && shown(meter)) {
-    pairs.push({ what: 'voice bar on its track', ratio: ratio(parse(getComputedStyle(meter.firstElementChild).backgroundColor), behind(meter)) });
-  }
-  const unsetButtons = [...document.querySelectorAll('button')]
-    .filter((b) => shown(b) && parse(getComputedStyle(b).backgroundColor)[3] < 1)
-    .map((b) => b.getAttribute('aria-label') || b.textContent.trim());
-  return { pairs, unsetButtons };
-}

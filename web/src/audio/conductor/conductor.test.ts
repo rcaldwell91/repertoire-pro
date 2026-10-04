@@ -303,3 +303,95 @@ describe('the mic ladder', () => {
     expect(engine.sounding()).toBe(1);
   });
 });
+
+describe('a song: voice and music together', () => {
+  const song = (over: Partial<{ from: number; gains: number[]; loop: { start: number; end: number } }> = {}): Plan => ({
+    owner: 'song:1',
+    steps: [{ kind: 'song', urls: ['voice', 'music'], from: over.from ?? 0, gains: over.gains ?? [1, 1], loop: over.loop }],
+  });
+
+  it('plays nothing until a tap, then starts both parts together, from where it is told', async () => {
+    expect(c.start(null, song())).toBe(false);
+    await flush();
+    expect(engine.log).toEqual([]);
+    expect(c.start(c.tap(tap), song({ from: 42 }))).toBe(true);
+    await flush();
+    expect(engine.log).toContain('together:voice+music@42');
+    expect(engine.log.filter((l) => l.startsWith('play:'))).toEqual([]);
+    expect(c.snapshot().state).toBe('running');
+  });
+
+  it('changes each part on its own while it plays', async () => {
+    c.start(c.tap(tap), song({ gains: [1, 1] }));
+    await flush();
+    c.setGain(0, 0.25);
+    expect(engine.song?.gains).toEqual([0.25, 1]);
+    c.setGain(1, 0.5);
+    expect(engine.song?.gains).toEqual([0.25, 0.5]);
+  });
+
+  it('knows where the song is, on the one clock, and wraps a repeated part', async () => {
+    c.start(c.tap(tap), song({ from: 10 }));
+    await flush();
+    engine.clock = 3.5;
+    expect(c.position()).toBeCloseTo(13.5);
+    c.stop();
+    expect(c.position()).toBeNull();
+    engine.clock = 0;
+    c.start(c.tap(tap), song({ from: 20, loop: { start: 20, end: 30 } }));
+    await flush();
+    engine.clock = 12;
+    expect(c.position()).toBeCloseTo(22);
+  });
+
+  it.each(['screen', 'tab', 'back', 'hidden', 'interrupted'] as LeaveReason[])('falls silent on leaving (%s)', async (why) => {
+    c.start(c.tap(tap), song());
+    await flush();
+    expect(engine.sounding()).toBe(1);
+    if (why === 'hidden') env.hide();
+    else if (why === 'interrupted') engine.interrupt();
+    else c.leave(why);
+    expect(silentAndClosed()).toBe(true);
+    expect(c.snapshot().state).toBe('stopped');
+    expect(c.position()).toBeNull();
+  });
+
+  it('finishes, and lets everything go, when the song ends', async () => {
+    c.start(c.tap(tap), song());
+    await flush();
+    engine.endNotes();
+    await flush();
+    expect(c.snapshot().state).toBe('finished');
+    expect(silentAndClosed()).toBe(true);
+  });
+
+  it('is one source: a note started over it stops the song', async () => {
+    c.start(c.tap(tap), song());
+    await flush();
+    c.start(c.tap(tap), noteOnly);
+    await flush();
+    expect(engine.peak).toBe(1);
+  });
+
+  it('gives a song\'s memory back when the screen is done with it', () => {
+    c.forget(['voice', 'music']);
+    expect(engine.forgotten).toEqual(['voice', 'music']);
+  });
+});
+
+describe('a song that loads after it was left', () => {
+  it('never plays, and stops loading', async () => {
+    engine.holdLoads = true;
+    c.start(c.tap(tap), { owner: 'song:2', steps: [{ kind: 'song', urls: ['v', 'm'], from: 0, gains: [1, 1] }] });
+    await flush();
+    c.leave('screen');
+    engine.finishLoads();
+    await flush();
+    engine.finishLoads();
+    await flush();
+    expect(engine.log.some((l) => l.startsWith('together:'))).toBe(false);
+    expect(engine.log).toContain('load:v');
+    expect(engine.log).not.toContain('load:m');      /* nothing more is fetched for it */
+    expect(silentAndClosed()).toBe(true);
+  });
+});

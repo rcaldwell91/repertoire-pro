@@ -1,4 +1,4 @@
-# Repertoire — Rebuild brief for Code (2 Oct)
+# Repertoire — Rebuild brief for Code (updated 4 Oct)
 
 This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK.md and keep it there. When the rulebook and a prompt disagree, ask; don't guess.
 
@@ -17,9 +17,64 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
   - The label shows on the active tab only.
   - The app gets a browser-tab icon (favicon) and a home-screen icon.
 - **Learn** holds theory, ear work and how the voice works (phonation, resonance, registers, posture). **Train** holds singing exercises.
-- **Separator:** Kim Mel-Band RoFormer (MIT, weights SHA-256 87201f4d…559e), on a GPU server later.
+- **Separator:** live on Modal since 4 Oct (services/separator/).
+  - Kim Mel-Band RoFormer weights (MIT, SHA-256 87201f4d…559e), run through ZFTurbo's MIT code pinned at v1.0.22, with Kim's settings (overlap 2).
+  - Only signed-in users can use it, and nothing is kept on the server.
+  - Output is 320 kbps at the song's own level, so voice + music add back up to the song.
+  - Runs on an A10 (decided 4 Oct: about twice as fast as the L4, and cheaper).
+  - $10 spend limit on Robert's Modal account.
 - **Supabase project** **ovafsbloyrlwrolqtcat** is kept, with all its data and security rules. Only the publishable key goes in the repo.
-- **Design** comes from mockups Robert approves. Until then, screens stay plain.
+- **Design:** follow section 1b exactly. Robert approved it in screen mockups (drafts 3–4, 3 Oct).
+
+## 1b. Design decisions (Robert, approved 3 Oct)
+
+- **Font:** Quicksand everywhere. Body text no lighter than 500.
+- **Themes:** dark and light, with a switch.
+  - Dark: background #0c0b16, cards #16152b.
+  - Light: warm cream #f7f2ea, cards #fffdf9.
+- **Brand gradient** (#8b5cf6 → #6366f1 → #ec4899) only on the main Start buttons and the active tab.
+- **Your voice line** has its own gradient:
+  - dark mode: #22e0ff → #b07cff → #ff4fa3
+  - light mode: #0891b2 → #7c3aed → #db2777
+- **Accent purple:**
+  - dark mode: bright lavender #b07cff
+  - light mode: #7c3aed
+- **One colour means one thing:**
+  - Warm-up: orange
+  - Breath: teal
+  - Tone: pink
+  - Agility/pitch: blue
+  - Your songs: purple
+  - Green: only a note you hit
+  - In Learn: Theory blue, Your voice pink, Ear teal
+- **Tab bar:** 7 rounded-stroke icons. The active tab is a gradient pill with its name; the others are icon only. Library = a record.
+- **Exercise screens hide the tab bar.** The preview page has the name, tags, a note preview that plays only on tap, a one-line goal, a one-line how, and a big Start. The singing screen has smaller bubbles, a white ring on the current note, the gradient voice line, and ✕ as the only control.
+- **Learn a song is ONE screen.**
+  - The note map shows the singer's line (thick, soft) and your line (thin, gradient) on top. No bubbles, because they never matched the words.
+  - Bubbles on long held notes only, to measure sustain, may be tested later. They ship only if they measure accurately.
+  - Play bar, back 10 s, Start, repeat this part.
+  - Under the note map, ONE sound card holds the Voice slider, the Music slider, and a "Hear yourself" switch with your level, so everything is in one place.
+- **Intervals are two features:**
+  - Train → "Sing the interval": sing the jump.
+  - Learn → Ear → "Hear the interval": two notes play; pick step, third, fifth or octave.
+
+## 1c. Coaching model (Robert, 3 Oct): many coaches per singer, coaches by specialty
+
+- **A singer can have several coaches at once,** each for what they do best, and a coach has many students. Never assume one coach per singer anywhere: not in screens, data, scoring or messages.
+  - Checked 3 Oct: the database already allows this. The coach–student link is unique per coach+student pair, not per student.
+  - What the old app's code and security rules assume still needs checking when Coach is rebuilt.
+- **Coaches are listed by specialty, not as all-rounders.**
+  - Examples: high notes, low notes, runs and riffs, breathing, performance and presentation, plus "all-round" for those who are.
+  - Coach onboarding steers each coach to name what they're best at.
+  - Find a coach has specialty filters.
+- **Why:** specialised help for every need, and competition in a marketplace that brings vocal coaching prices down and lets coaches take on more students at lower prices.
+- **When:** this shapes the Coach tab, coach onboarding and the marketplace. Design and build it in those steps, not now. Money options are still open.
+
+## 1d. Test accounts
+
+- Use ONE permanent test account for all live tests, rp-test@example.com, created once and reused. Never create throwaway accounts.
+  - Deleting accounts needs an approval Robert can't reliably give from his phone.
+- Never touch Robert's (lyonxdewitt@gmail.com) or Briar's (briarmlocke@gmail.com) accounts.
 
 ## 2. Architecture rules
 
@@ -176,4 +231,6 @@ web/src/
   - follows the voice 93.2% / 96.5% of the loud time
   - singing lands inside a note 87.3% / 91.9% of the time
   - placement within ±30 ms
-- **Separator (CPU test, 1 Oct):** All of Me SDR 12.4 dB (14.1 dB level-matched); one half-second of music left in at 1:58.75. Use Kim's original chunk overlap (2) on the server, not audio-separator's 1.
+- **Separator:** judge quality on the level-matched score.
+  - All of Me: 14.13 dB on the live server (14.12 on the CPU test), with one half-second of music left in at 1:58.75.
+  - Speed from cold on the A10: first 30 s ready in 18–27 s, whole song in 40–69 s, about 2–3¢ a song.
