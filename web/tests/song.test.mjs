@@ -32,6 +32,8 @@ if (songs.length < 2 || !MIC || !existsSync(MIC)) {
 }
 const [[SONG, SONG_PATH], [SONG2, SONG2_PATH]] = songs;
 
+const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'server-off', 'split-progress', 'first30-early', 'sliders',
+  'controls', 'song-contrast', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'signed-out-again', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -320,7 +322,7 @@ try {
       await page.waitFor(`[...document.querySelectorAll('.song-row')].some((b) => b.innerText.includes(${JSON.stringify(SONG)}))`, 5000);
       const id = await page.eval(`[...document.querySelectorAll('.song-row')].find((b) => b.innerText.includes(${JSON.stringify(SONG)}))?.dataset.song`);
       await page.tap(`[data-song="${id}"]`);
-      await page.waitFor(`!document.querySelector('#song-play')?.disabled`, 5000);
+      await page.waitFor(`document.querySelector('#song-play')?.disabled === false`, 10000);
       await page.tap('#song-play');
       const played = await page.waitFor(S('live.size === 2'), 10000);
       const calls = await sepCalls();
@@ -339,7 +341,10 @@ try {
   }
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));
 } catch (e) {
-  check('crashed', false, String(e.stack || e).split('\n').slice(0, 3).join(' | '));
+  /* a check that never got to say is a failed check, not a skipped one */
+  const why = 'the test stopped: ' + String(e.message || e).split('\n')[0];
+  const said = new Set(results.map((r) => r.name));
+  for (const name of ALL) if (want(name) && !said.has(name)) check(name, false, why);
 } finally {
   await env.close();
   server.close();
