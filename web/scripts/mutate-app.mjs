@@ -197,7 +197,7 @@ const MUTATIONS = [
   { test: 'takes', what: 'Save shares the take with every coach', file: 'src/screens/SongScreen.tsx',
     from: 'void saveTake(toStored(rv, props.id, song.title));',
     to: 'void myCoaches().then((cs) => saveTake(toStored(rv, props.id, song.title), cs ?? []));',
-    and: { file: 'src/screens/SongScreen.tsx', from: "import { saveTake, type StoredTake } from '../data/takes';", to: "import { myCoaches, saveTake, type StoredTake } from '../data/takes';" },
+    and: { file: 'src/screens/SongScreen.tsx', from: "import { saveTake, UNDO_MS, type StoredTake } from '../data/takes';", to: "import { myCoaches, saveTake, UNDO_MS, type StoredTake } from '../data/takes';" },
     checks: ['take-private'] },
   { test: 'takes', what: 'sending goes to nobody', file: 'src/screens/SendTake.tsx',
     from: '    const to = coaches.filter((x) => chosen.includes(x.id));', to: '    const to = coaches.filter((x) => chosen.includes(x.id) && false);', checks: ['take-send'] },
