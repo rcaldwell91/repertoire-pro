@@ -91,6 +91,9 @@ async function run(id: string): Promise<void> {
   }
   if (!voice) return;
   warmPitch();
+  /* reading starts now: say so while the voice is unpacked */
+  const was = lines.get(id);
+  show(id, { hop: HOP, m: was?.m ?? new Float32Array(0), readTo: was?.readTo ?? 0, seconds: Math.max(song.seconds ?? 0, was?.seconds ?? 0), reading: true });
   const { mono, sr } = await decodeMono(voice);
   const seconds = whole ? mono.length / sr : Math.max(song.seconds ?? 0, mono.length / sr);
   const m = new Float32Array(Math.floor(seconds / HOP)).fill(NaN);

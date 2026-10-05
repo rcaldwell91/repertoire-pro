@@ -184,10 +184,25 @@ try {
     if (want('line-first30')) {
       /* read while the rest was still splitting, then carried on from where
          the first 30 seconds stopped, not read again from the start */
-      await page.waitFor(`!document.querySelector('#map-line')?.textContent`, 240000);
+      /* until the whole voice has been read and kept */
+      const kept = `(async () => {
+        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+        const songs = await new Promise((ok) => { const q = db.transaction('songs').objectStore('songs').getAll(); q.onsuccess = () => ok(q.result); });
+        const s = songs.find((x) => x.title === ${JSON.stringify(SONG)} && x.voice);
+        const l = s && await new Promise((ok) => { const q = db.transaction('lines').objectStore('lines').get(s.id); q.onsuccess = () => ok(q.result); });
+        db.close();
+        return !!(l && l.whole && l.done);
+      })()`;
+      const tEnd = Date.now() + 240000;
+      while (Date.now() < tEnd && !(await page.eval(kept))) {
+        const m = await page.eval(`document.querySelector('#map-line')?.textContent || ''`);
+        const r = /^Reading the singer's line… (\d+):(\d\d) of (\d+:\d\d)$/.exec(m);
+        if (r && reading[reading.length - 1]?.text !== m) reading.push({ text: m, at: +r[1] * 60 + +r[2], of: r[3], splitting: false });
+        await sleep(100);
+      }
       const firstPart = reading.filter((r) => r.splitting);
       const later = reading.filter((r) => !r.splitting);
-      const restart = later.length ? later[0].at : null;
+      const restart = later.length ? Math.min(...later.map((r) => r.at)) : null;
       const line = await page.eval(`(async () => {
         const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
         const songs = await new Promise((ok) => { const q = db.transaction('songs').objectStore('songs').getAll(); q.onsuccess = () => ok(q.result); });

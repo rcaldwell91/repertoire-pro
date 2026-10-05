@@ -70,7 +70,11 @@ function CONTRAST_SRC() {
       const fg = parse(getComputedStyle(el).color);
       pairs.push({ what: ownText ? '"' + el.textContent.trim().slice(0, 30) + '"' : 'icon in ' + name(el), ratio: worst(fg, el) });
     }
-    if (el.matches('input[type=range], input[type=checkbox]')) {
+    if (el.matches('input[role=switch]')) {
+      /* a switch draws itself: its outline when off, its fill when on */
+      const st = getComputedStyle(el);
+      pairs.push({ what: 'switch ' + name(el), ratio: worst(parse(el.checked ? st.backgroundColor : st.borderTopColor), el.parentElement) });
+    } else if (el.matches('input[type=range], input[type=checkbox]')) {
       pairs.push({ what: 'control ' + name(el), ratio: worst(parse(getComputedStyle(el).accentColor), el.parentElement) });
     }
   }
