@@ -344,10 +344,16 @@ try {
     await page.c.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
     const finalRow = (await rows()).find((x) => x.id === now?.id)?.text || '';
     const own = up?.path ? rest('POST', `/storage/v1/object/sign/takes/${up.path}`, tokenOf(EMAIL), { expiresIn: 60 }).status : 0;
+    /* and still on the phone, to hear offline */
+    await sleep(2000);
+    const stillHere = await page.eval(`(async () => { const d = await new Promise((ok) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); });
+      const t = await new Promise((ok) => { const q = d.transaction('takes').objectStore('takes').get(${JSON.stringify(now?.id)}); q.onsuccess = () => ok(q.result); });
+      d.close(); return !!(t && t.audio && t.audio.size > 1000); })()`);
     if (want('take-offline')) {
       const steps = [...seen].sort((a, b) => a - b);
-      check('take-offline', !!up?.path && own === 200 && steps.length >= 3 && finalRow.includes(copy.takes.saved),
-        `back online it went up by itself, showing ${steps.map((n) => n + '%').join(' ')}; then "${finalRow.split('\n').pop()}"; in the takes store for its owner ${own === 200}`);
+      check('take-offline', !!up?.path && own === 200 && steps.length >= 3 && finalRow.includes(copy.takes.saved) && stillHere,
+        `back online it went up by itself, showing ${steps.map((n) => n + '%').join(' ')}; then "${finalRow.split('\n').pop()}"; in the takes store for its owner ${own === 200}; ` +
+        `its recording still on the phone ${stillHere}`);
     }
   }
 

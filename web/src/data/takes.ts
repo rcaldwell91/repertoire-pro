@@ -241,7 +241,7 @@ async function sync(): Promise<void> {
       return;                                      /* offline or refused: try again later */
     }
   }
-  await pull(me, all);
+  await pull(me);
 }
 
 const round2 = (v: number) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : null);
@@ -249,7 +249,7 @@ const num = (v: number | null) => (v == null ? NaN : v);
 
 /* the singer's takes kept online that this phone does not have (a new
    phone, or one that lost its data): brought back, ready to hear */
-async function pull(me: string, local: StoredTake[]): Promise<void> {
+async function pull(me: string): Promise<void> {
   const r = await supabase.from('takes').select('audio_path, coach_id, created_at, duration, notes')
     .eq('student_id', me).not('audio_path', 'is', null);
   if (r.error || !r.data) return;
@@ -260,7 +260,10 @@ async function pull(me: string, local: StoredTake[]): Promise<void> {
     const p = await supabase.from('profiles').select('id, display_name').in('id', coachIds);
     (p.data ?? []).forEach((x) => names.set(x.id as string, (x.display_name as string) || ''));
   }
-  const have = new Set(local.map((t) => t.path));
+  /* what is on the phone now (not before this sync's uploads): a take
+     here is never replaced by its online copy */
+  const local = await inStore<StoredTake[]>('takes', 'readonly', (s) => s.getAll() as IDBRequest<StoredTake[]>);
+  const have = new Set<string | undefined>([...local.map((t) => t.path), ...local.map((t) => `${me}/${t.id}.wav`)]);
   const added = new Set<string>();
   for (const x of rows) {
     const path = x.audio_path as string;
