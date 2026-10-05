@@ -98,7 +98,7 @@ const MUTATIONS = [
     from: 'onChange={(v) => { setVoice(v); if (playing) c.setGain(0, gainOf(v)); }}',
     to: 'onChange={(v) => { setVoice(v); if (playing) { c.setGain(0, gainOf(v)); c.setGain(1, gainOf(v)); } }}', checks: ['sliders'] },
   { test: 'song', what: 'voice and music start apart', file: 'src/audio/engine-web/web-engine.ts',
-    from: 'nodes.forEach((src) => src.start(when, opts.from));', to: 'nodes.forEach((src, i) => src.start(when + i * 0.02, opts.from));', checks: ['sum-matches'] },
+    from: 'if (opts.from >= begins) src.start(when, opts.from - begins);', to: 'if (opts.from >= begins) src.start(when + i * 0.02, opts.from - begins);', checks: ['sum-matches'] },
   { test: 'song', what: 'leaving the song screen keeps it playing', file: 'src/shell/App.tsx',
     from: 'props.conductor.leave(why);', to: '', checks: ['song-leave'] },
   { test: 'song', what: 'hiding the app during a song is not noticed', file: 'src/shell/env.ts',

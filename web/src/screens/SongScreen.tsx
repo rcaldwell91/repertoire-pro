@@ -13,8 +13,11 @@ import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { useSingerLine, useSong, useSplit } from '../shell/hooks';
 import { readSingerLine } from '../shell/singer-line';
 import { useYourLine } from '../shell/your-line';
+import { review, toStored } from '../shell/take-review';
+import { saveTake, type StoredTake } from '../data/takes';
+import { TakesList } from './TakesList';
 import { localStore } from '../shell/env';
-import { back, navigate } from '../shell/router';
+import { back, navigate, sendRoute } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
 import { Slider } from '../ui/Slider';
 import { LevelBar } from '../ui/LevelBar';
@@ -72,11 +75,27 @@ export function SongScreen(props: { id: string }) {
   const [hear, setHear] = useState(false);
   const [headphones, setHeadphones] = useState(false);
   const [withMic, setWithMic] = useState(true);
+  const [takeVol, setTakeVol] = useState(100);
+  /* the take being heard: the one just made, or a kept one */
+  const [heard, setHeard] = useState<{ key: string; url: string; songAt: number; t: ArrayLike<number>; m: ArrayLike<number> } | null>(null);
+  const [, setDecided] = useState(0);
   const shown = total;
+
+  /* a take just made, waiting for the singer to say what to do with it */
+  const rv = review(c.take(owner), singer?.m ?? null, singer?.hop ?? 0.05, anyOctave);
+  const decided = () => {
+    c.dropTake();
+    setDecided((n) => n + 1);
+  };
+  /* a kept take's sound, made playable while it is being heard */
+  const keptUrl = useRef<string | null>(null);
+  useEffect(() => () => {
+    if (keptUrl.current) URL.revokeObjectURL(keptUrl.current);
+  }, []);
 
 
   const listening = playing && snap.mic === 'open';
-  const you = useYourLine(c, listening, snap.startedAt);
+  const you = useYourLine(c, owner, listening, snap.startedAt);
   const [level, setLevel] = useState(0);
   useEffect(() => {
     if (!listening) return;
@@ -109,13 +128,35 @@ export function SongScreen(props: { id: string }) {
 
   const plan = (from: number, withLoop = loop): Plan | null =>
     parts ? { owner, steps: [{ kind: 'song', urls: parts.urls, from, gains: [gainOf(voice), gainOf(music)], loop: withLoop ?? undefined,
-      listen: withMic, monitor: hear ? MONITOR_GAIN : 0 }] } : null;
+      listen: withMic, record: true, monitor: hear ? MONITOR_GAIN : 0 }] } : null;
 
   function startAt(ev: SyntheticEvent, from: number, withLoop = loop) {
     const p = plan(from, withLoop);
     if (!p) return;
     if (playing) c.stop();
+    /* singing again is trying again: the take not kept goes */
+    if (rv) decided();
+    setHeard(null);
     c.start(c.tap(ev.nativeEvent), p);
+  }
+
+  /* a take over the music, from where it was sung, in its place */
+  function playTake(ev: SyntheticEvent, t: { key: string; url: string; songAt: number; t: ArrayLike<number>; m: ArrayLike<number> }) {
+    if (!parts) return;
+    if (playing) c.stop();
+    if (playing && heard?.key === t.key) {
+      setHeard(null);
+      return;
+    }
+    setHeard(t);
+    setPos(t.songAt);
+    c.start(c.tap(ev.nativeEvent), { owner, steps: [{ kind: 'song', urls: [...parts.urls, t.url], from: t.songAt,
+      gains: [gainOf(voice), gainOf(music), gainOf(takeVol)], starts: [0, 0, t.songAt] }] });
+  }
+  function playKept(ev: SyntheticEvent, t: StoredTake) {
+    if (keptUrl.current) URL.revokeObjectURL(keptUrl.current);
+    keptUrl.current = URL.createObjectURL(t.audio);
+    playTake(ev, { key: t.id, url: keptUrl.current, songAt: t.songAt, t: t.line.t, m: t.line.m });
   }
 
   function toggle(ev: SyntheticEvent) {
@@ -174,7 +215,11 @@ export function SongScreen(props: { id: string }) {
     }
   }
 
-  const lines = useMemo(() => ({ singer: singer?.m ?? new Float32Array(0), hop: singer?.hop ?? 0.05, youT: you.t, youM: you.m }), [singer, you]);
+  /* your line: the take being heard, or the take just made, or as you sing */
+  const shownLine = heard ?? (rv && !playing ? rv : null);
+  const lines = useMemo(() => ({ singer: singer?.m ?? new Float32Array(0), hop: singer?.hop ?? 0.05,
+    youT: shownLine ? Array.from(shownLine.t) : you.t, youM: shownLine ? Array.from(shownLine.m) : you.m }), [singer, you, shownLine]);
+  const hearingTake = playing && !!heard;
   const now = () => (playing ? c.position() ?? pos : seeking ?? pos);
 
   if (song === undefined) return null;
@@ -244,6 +289,33 @@ export function SongScreen(props: { id: string }) {
       <p className="line" style={{ minHeight: '1.5em', textAlign: 'center' }} id="repeat-line">
         {loop ? fill(copy.song.repeating, { from: clock(loop.start), to: clock(loop.end) }) : ''}
       </p>
+      {rv && !(playing && !heard) && (
+        <section className="card take-review" id="take-review" aria-label={copy.take.title}>
+          <h2>{copy.take.title}</h2>
+          <p id="take-summary">
+            {rv.rightPct == null
+              ? fill(copy.take.unscored, { length: clock(rv.take.seconds) })
+              : fill(copy.take.summary, { length: clock(rv.take.seconds), pct: rv.rightPct })}
+          </p>
+          <div className="take-actions">
+            <button type="button" className="btn btn-quiet" id="take-hear"
+              onClick={(e) => playTake(e, { key: 'review', url: rv.url, songAt: rv.take.songAt, t: rv.t, m: rv.m })}>
+              {hearingTake && heard?.key === 'review' ? copy.take.stop : copy.take.hear}
+            </button>
+            <button type="button" className="btn" id="take-save"
+              onClick={() => { void saveTake(toStored(rv, props.id, song.title)); if (playing) c.stop(); setHeard(null); decided(); }}>
+              {copy.take.save}
+            </button>
+            <button type="button" className="btn btn-quiet" id="take-send" onClick={() => navigate(sendRoute(props.id), 'screen')}>
+              {copy.take.send}
+            </button>
+            <button type="button" className="btn btn-quiet" id="take-again" onClick={() => { if (playing) c.stop(); setHeard(null); decided(); }}>
+              {copy.take.again}
+            </button>
+          </div>
+        </section>
+      )}
+
       <div className="mic-line" id="mic-line">
         {mic && <p className="problem" role="status">{mic}</p>}
         {mic && (
@@ -258,6 +330,10 @@ export function SongScreen(props: { id: string }) {
           onChange={(v) => { setVoice(v); if (playing) c.setGain(0, gainOf(v)); }} />
         <Slider id="music-volume" label={copy.song.music} value={music}
           onChange={(v) => { setMusic(v); if (playing) c.setGain(1, gainOf(v)); }} />
+        {(rv || heard) && (
+          <Slider id="take-volume" label={copy.take.volume} value={takeVol}
+            onChange={(v) => { setTakeVol(v); if (hearingTake) c.setGain(2, gainOf(v)); }} />
+        )}
         <label className="switch-row">
           <span>{copy.song.hearYourself}</span>
           <input type="checkbox" role="switch" id="hear-yourself" checked={hear} onChange={(e) => hearYourself(e.target.checked)} />
@@ -265,6 +341,8 @@ export function SongScreen(props: { id: string }) {
         <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
       </section>
+
+      <TakesList songId={props.id} playing={hearingTake ? heard?.key ?? null : null} onPlay={playKept} />
     </>
   );
 }

@@ -480,3 +480,61 @@ describe('a song you sing along to', () => {
     expect(engine.monitorGain).toBe(0);
   });
 });
+
+describe('recording a take', () => {
+  const sing = (over: Partial<{ record: boolean; loop: { start: number; end: number } }> = {}): Plan => ({
+    owner: 'song:5',
+    steps: [{ kind: 'song', urls: ['voice', 'music'], from: 10, gains: [1, 1], listen: true, record: over.record ?? true, loop: over.loop }],
+  });
+  /* a second of what the mic heard, ending at engine time `end` */
+  const second = (end: number) => ({ samples: new Float32Array(48000).fill(0.1), end, sampleRate: 48000 });
+
+  it('keeps what the mic hears, from where in the song it was heard, and ends with the session', async () => {
+    engine.latency = 0.1;
+    c.start(c.tap(tap), sing());
+    await flush();
+    engine.hear(second(1.6));             /* its first sample reached the mic at 0.6: the song at 10.5 */
+    engine.hear(second(2.6));
+    expect(c.take('song:5')).toBeNull();  /* still being made */
+    c.leave('hidden');
+    const t = c.take('song:5');
+    expect(t).not.toBeNull();
+    expect(t!.songAt).toBeCloseTo(10.5, 4);
+    expect(t!.seconds).toBeGreaterThan(1.9);
+    expect(t!.seconds).toBeLessThan(2.01);
+    expect(c.snapshot().takes).toBe(1);
+  });
+
+  it('keeps nothing heard before the song, or after it ends', async () => {
+    c.start(c.tap(tap), sing());
+    await flush();
+    engine.hear(second(-0.5));            /* before the song began */
+    c.stop();
+    engine.hear(second(3));
+    expect(c.take('song:5')).toBeNull();
+  });
+
+  it('records only when asked, and not while a part repeats', async () => {
+    c.start(c.tap(tap), sing({ record: false }));
+    await flush();
+    engine.hear(second(1.5));
+    c.stop();
+    expect(c.take('song:5')).toBeNull();
+    c.start(c.tap(tap), sing({ loop: { start: 10, end: 20 } }));
+    await flush();
+    engine.hear(second(1.5));
+    c.stop();
+    expect(c.take('song:5')).toBeNull();
+  });
+
+  it('gives a take only to its own screen, until it is dropped', async () => {
+    c.start(c.tap(tap), sing());
+    await flush();
+    engine.hear(second(1.5));
+    c.stop();
+    expect(c.take('song:other')).toBeNull();
+    expect(c.take('song:5')).not.toBeNull();
+    c.dropTake();
+    expect(c.take('song:5')).toBeNull();
+  });
+});

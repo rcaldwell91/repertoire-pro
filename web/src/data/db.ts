@@ -1,7 +1,8 @@
 /* The app's store on the phone (IndexedDB): songs (the files and their
-   parts) and lines (the singer's line read from each song's voice). */
+   parts), lines (the singer's line read from each song's voice) and takes
+   (what the singer recorded). */
 const DB = 'repertoire';
-const VERSION = 2;
+const VERSION = 3;
 let opening: Promise<IDBDatabase> | null = null;
 
 function db(): Promise<IDBDatabase> {
@@ -12,6 +13,7 @@ function db(): Promise<IDBDatabase> {
         const d = req.result;
         if (!d.objectStoreNames.contains('songs')) d.createObjectStore('songs', { keyPath: 'id' });
         if (!d.objectStoreNames.contains('lines')) d.createObjectStore('lines', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('takes')) d.createObjectStore('takes', { keyPath: 'id' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);

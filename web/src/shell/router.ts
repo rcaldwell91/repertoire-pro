@@ -17,13 +17,19 @@ export const ROUTES = [
 ] as const;
 export type Route = string;
 export const SONG_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)$/;
+/** sending a song's take to a coach */
+export const SEND_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)\/send$/;
 
 export function isRoute(r: string): boolean {
-  return (ROUTES as readonly string[]).includes(r) || SONG_ROUTE.test(r);
+  return (ROUTES as readonly string[]).includes(r) || SONG_ROUTE.test(r) || SEND_ROUTE.test(r);
 }
 
 export function songRoute(id: string): Route {
   return '/sing/learn/song/' + id;
+}
+
+export function sendRoute(id: string): Route {
+  return songRoute(id) + '/send';
 }
 
 export function tabOf(route: Route): Tab {

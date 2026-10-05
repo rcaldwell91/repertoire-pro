@@ -5,6 +5,7 @@ import { onSplit, splitPhase } from '../data/split';
 import type { SplitPhase } from '../core/song';
 import { onTheme, themeChoice, type ThemeChoice } from './theme';
 import { onSingerLine, singerLine, type SingerLine } from './singer-line';
+import { onTakes, takesFor, type StoredTake } from '../data/takes';
 
 /* What screens watch: the signed-in person, the songs on the phone, and
    splits under way. */
@@ -61,4 +62,20 @@ export function useSingerLine(id: string): SingerLine | null {
     (fn) => onSingerLine((changed) => changed === id && fn()),
     () => singerLine(id),
   );
+}
+
+/** The takes kept for a song, newest first; null while loading. */
+export function useTakes(songId: string): StoredTake[] | null {
+  const [takes, setTakes] = useState<StoredTake[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => void takesFor(songId).then((t) => live && setTakes(t), () => live && setTakes([]));
+    load();
+    const off = onTakes(load);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [songId]);
+  return takes;
 }

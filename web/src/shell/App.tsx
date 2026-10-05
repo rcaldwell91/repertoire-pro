@@ -8,11 +8,12 @@ import { ProfilePage } from '../screens/ProfilePage';
 import { SingPage } from '../screens/SingPage';
 import { SongList } from '../screens/SongList';
 import { SongScreen } from '../screens/SongScreen';
+import { SendTake } from '../screens/SendTake';
 import { SoundCheck } from '../screens/SoundCheck';
 import { TabPage } from '../screens/TabPage';
 import { TabBar } from '../ui/TabBar';
 import { ConductorContext } from './conductor-context';
-import { current, navigate, onRoute, SONG_ROUTE, tabOf, type Route } from './router';
+import { current, navigate, onRoute, SEND_ROUTE, SONG_ROUTE, tabOf, type Route } from './router';
 
 /* The one screen registry (RULEBOOK 4, Screens). */
 const SCREENS: Record<string, () => ReactNode> = {
@@ -33,6 +34,8 @@ const SCREENS: Record<string, () => ReactNode> = {
 function screenFor(route: Route): ReactNode {
   const song = SONG_ROUTE.exec(route);
   if (song) return <SongScreen id={song[1]} />;
+  const send = SEND_ROUTE.exec(route);
+  if (send) return <SendTake id={send[1]} />;
   return SCREENS[route]();
 }
 

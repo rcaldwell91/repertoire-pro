@@ -9,6 +9,7 @@ import { startRouter } from './shell/router';
 import { startTheme } from './shell/theme';
 import { startAuth } from './data/auth';
 import { resumeSplits, watchSignIns } from './data/split';
+import { startTakeSync } from './data/takes';
 import '@fontsource/quicksand/500.css';
 import '@fontsource/quicksand/600.css';
 import '@fontsource/quicksand/700.css';
@@ -33,4 +34,5 @@ void startAuth().finally(() => {
   );
   watchSignIns();
   void resumeSplits();
+  startTakeSync();
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { Conductor } from '../audio/conductor/conductor';
 import { livePitch } from '../audio/pitch/client';
 import type { LivePoint } from '../audio/pitch/core';
@@ -42,9 +42,18 @@ export class YourLine {
   }
 }
 
+/* one line per song, kept while the app is open, so a take's line is
+   still there after leaving its screen and coming back */
+const lines = new Map<string, YourLine>();
+export function yourLine(owner: string): YourLine {
+  let l = lines.get(owner);
+  if (!l) lines.set(owner, (l = new YourLine()));
+  return l;
+}
+
 /** Your line while this screen's session is listening; kept after it ends. */
-export function useYourLine(c: Conductor, listening: boolean, session: number | null): YourLine {
-  const [line] = useState(() => new YourLine());
+export function useYourLine(c: Conductor, owner: string, listening: boolean, session: number | null): YourLine {
+  const line = yourLine(owner);
   useEffect(() => {
     if (!listening) return;
     line.clear();

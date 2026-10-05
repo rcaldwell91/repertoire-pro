@@ -175,7 +175,12 @@ export class WebEngine implements AudioEngine {
       gains.push(g);
       nodes.push(src);
     });
-    nodes.forEach((src) => src.start(when, opts.from));
+    nodes.forEach((src, i) => {
+      /* a part that begins later in the song (a take) waits for its place */
+      const begins = opts.starts?.[i] ?? 0;
+      if (opts.from >= begins) src.start(when, opts.from - begins);
+      else src.start(when + (begins - opts.from), 0);
+    });
     const stop = () =>
       nodes.forEach((src) => {
         try {

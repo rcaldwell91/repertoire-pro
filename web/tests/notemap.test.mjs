@@ -165,8 +165,8 @@ try {
   const voiceMono = decode(`${PREFIX}-voice.mp3`);
   const seconds = voiceMono.length / 44100;
   await page.eval(`(async () => {
-    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire', 2);
-      q.onupgradeneeded = () => { const d = q.result; for (const s of ['songs', 'lines']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); };
+    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire');
+      q.onupgradeneeded = () => { const d = q.result; for (const s of ['songs', 'lines', 'takes']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); };
       q.onsuccess = () => ok(q.result); q.onerror = no; });
     const P = window.__parts;
     const song = { id: ${JSON.stringify(ID)}, title: 'Test song', created: Date.now(), fileName: 'test.mp3', file: P.voice, seconds: ${seconds},

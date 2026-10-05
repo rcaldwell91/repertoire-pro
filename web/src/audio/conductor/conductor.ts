@@ -1,4 +1,5 @@
 import type { AudioEngine, Ensemble, MicBlock, Source, Sample } from '../engine';
+import { Recorder, type Recording } from '../recorder';
 import { MIC_LADDER, ladderOrder } from '../mic-ladder';
 
 /* THE CONDUCTOR - the only owner of sound and the microphone (RULEBOOK 2.1).
@@ -28,7 +29,11 @@ export type Step =
       with `listen`, the mic opens alongside (the song never waits for it)
       and `monitor` plays it back at that volume */
   | { kind: 'song'; urls: readonly string[]; from: number; gains: readonly number[]; loop?: { start: number; end: number };
-      listen?: boolean; monitor?: number };
+      listen?: boolean; monitor?: number;
+      /** with `listen`: keep what the mic hears as a take (not while looping) */
+      record?: boolean;
+      /** where in the song each part begins (a take begins where it was sung) */
+      starts?: readonly number[] };
 
 export interface Plan {
   readonly owner: string;
@@ -45,6 +50,13 @@ export interface Snapshot {
   readonly why: LeaveReason | 'stop' | null;
   /** engine time the session started running (RULEBOOK 2.2: one clock) */
   readonly startedAt: number | null;
+  /** how many takes have been finished, so a screen knows to look */
+  readonly takes: number;
+}
+
+/** A take, finished: what the mic heard while a song played, and whose. */
+export interface Take extends Recording {
+  readonly owner: string;
 }
 
 /** What the browser says about the press that is starting something. */
@@ -79,7 +91,10 @@ export const MIC_KEY = 'rp.mic.set';
 const ACTIVE: readonly State[] = ['armed', 'counting-in', 'running'];
 
 export class Conductor {
-  private snap: Snapshot = { state: 'idle', owner: null, step: 0, mic: 'closed', why: null, startedAt: null };
+  private snap: Snapshot = { state: 'idle', owner: null, step: 0, mic: 'closed', why: null, startedAt: null, takes: 0 };
+  /** the one recorder, while a take is being made */
+  private recorder: Recorder | null = null;
+  private lastTake: Take | null = null;
   private gen = 0;
   private readonly tokens = new WeakMap<object, number>();
   private source: Source | null = null;
@@ -101,8 +116,21 @@ export class Conductor {
     env.onHidden(() => this.leave('hidden'));
     engine.onInterrupt(() => this.leave('interrupted'));
     engine.onMic((b) => {
-      if (this.snap.mic === 'open' && this.snap.state === 'running') this.micListeners.forEach((f) => f(b));
+      if (this.snap.mic !== 'open' || this.snap.state !== 'running') return;
+      /* the recorder first: listeners may hand the samples on */
+      this.recorder?.push(b, (at) => this.songTime(at));
+      this.micListeners.forEach((f) => f(b));
     });
+  }
+
+  /** The last take this owner made, if it has not been taken away. */
+  take(owner: string): Take | null {
+    return this.lastTake && this.lastTake.owner === owner ? this.lastTake : null;
+  }
+
+  /** Done with the last take (kept, sent or thrown away). */
+  dropTake(): void {
+    this.lastTake = null;
   }
 
   /** What the mic hears while a session is listening; nothing otherwise. */
@@ -252,11 +280,12 @@ export class Conductor {
         }
         if (st.kind === 'song') {
           const ensemble = this.engine.playTogether(st.urls.map((u) => samples.get(u) as Sample),
-            { from: st.from, gains: st.gains, loop: st.loop });
+            { from: st.from, gains: st.gains, loop: st.loop, starts: st.starts });
           this.source = ensemble;
           this.song = { ensemble, from: st.from, loop: st.loop };
           if (st.listen) {
             if (st.monitor != null) this.monitorGain = st.monitor;
+            if (st.record && !st.loop) this.recorder = new Recorder();
             void this.listen(gen, true);
           }
           await ensemble.ended;
@@ -273,6 +302,16 @@ export class Conductor {
     } catch {
       if (gen === this.gen) this.halt('stopped', null);
     }
+  }
+
+  /* stopping, leaving or the song ending ends the take */
+  private endTake(): void {
+    const r = this.recorder;
+    this.recorder = null;
+    const rec = r?.finish();
+    if (!rec) return;
+    this.lastTake = { ...rec, owner: this.snap.owner ?? '' };
+    this.snap = { ...this.snap, takes: this.snap.takes + 1 };
   }
 
   /** Open the mic for this session. True if it is open and listening. */
@@ -300,6 +339,7 @@ export class Conductor {
       waiting is made stale, so none of them can start anything later. */
   private halt(state: 'finished' | 'stopped', why: Snapshot['why']): void {
     this.gen++;
+    this.endTake();
     const src = this.source;
     this.source = null;
     this.song = null;

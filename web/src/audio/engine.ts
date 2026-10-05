@@ -33,6 +33,9 @@ export interface EnsembleOptions {
   readonly gains: readonly number[];
   /** play this stretch over and over */
   readonly loop?: { readonly start: number; readonly end: number };
+  /** where in the song each part begins (a take begins where it was
+      sung); 0 if not given */
+  readonly starts?: readonly number[];
 }
 
 /** One rung of the mic ladder. Every value is a wish, never a demand:

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { foldTo, keyName, penDown, singerAt, type Range } from '../core/notemap';
+import { isRight, singerNow } from '../core/takes';
 
 /* The note map (RULEBOOK 1b): key names down the side, the singer's line
    thick and soft, your line thin with the voice gradient on top, and a
@@ -126,6 +127,10 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       grad.addColorStop(0.5, css.getPropertyValue('--you-b'));
       grad.addColorStop(1, css.getPropertyValue('--you-a'));
       const youDrawn = drawLine(g, yp, x, y, 3, grad);
+      /* green, only where your note is right (RULEBOOK 1b: green is only a
+         note you hit; the same rule gives a take its right-note %) */
+      const hits = yp.map((p) => ({ t: p.t, m: isRight(p.m, singerNow(lines.singer, lines.hop, p.t), false) ? p.m : NaN }));
+      const hitDrawn = drawLine(g, hits, x, y, 3, css.getPropertyValue('--hit'));
       g.restore();
 
       /* the now-line */
@@ -138,7 +143,8 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       cv.dataset.now = at.toFixed(2);
       cv.dataset.singer = String(singerDrawn);
       cv.dataset.you = String(youDrawn);
-      (cv as HTMLCanvasElement & { drawn?: unknown }).drawn = { lines, you: yp, anyOctave };
+      cv.dataset.hit = String(hitDrawn);
+      (cv as HTMLCanvasElement & { drawn?: unknown }).drawn = { lines, you: yp, hits, anyOctave };
       if (propsRef.current.live) raf = requestAnimationFrame(draw);
     };
     draw();
