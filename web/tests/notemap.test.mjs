@@ -123,7 +123,7 @@ async function open(id) {
 const ID = 'test-song';
 async function storedLine() {
   return page.eval(`(async () => {
-    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); q.onerror = no; });
     const l = await new Promise((ok) => { const q = db.transaction('lines').objectStore('lines').get(${JSON.stringify(ID)}); q.onsuccess = () => ok(q.result); });
     db.close();
     return l ? { ...l, m: Array.from(l.m, (v) => (Number.isFinite(v) ? v : null)) } : null;
@@ -165,7 +165,7 @@ try {
   const voiceMono = decode(`${PREFIX}-voice.mp3`);
   const seconds = voiceMono.length / 44100;
   await page.eval(`(async () => {
-    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire');
+    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app');
       q.onupgradeneeded = () => { const d = q.result; for (const s of ['songs', 'lines', 'takes']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); };
       q.onsuccess = () => ok(q.result); q.onerror = no; });
     const P = window.__parts;

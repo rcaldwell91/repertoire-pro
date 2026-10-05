@@ -19,6 +19,7 @@ import { copy, fill } from '../src/core/copy.ts';
 import { SUPABASE_KEY, SUPABASE_URL } from '../src/data/config.ts';
 import { COACH_EMAIL, EMAIL, password } from './test-account.mjs';
 import { isRight, rightPct, singerNow } from '../src/core/takes.ts';
+import { clearTestTakes } from './clear-test-takes.mjs';
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
 const REPO = resolve(WEB, '..');
@@ -34,7 +35,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 }
 
 const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-leave', 'take-removed-undo', 'take-saved-first', 'take-offline',
-  'take-delete-undo', 'take-send', 'take-private', 'take-new-phone', 'old-app-takes', 'take-send-kept', 'take-no-coach', 'take-words', 'no-page-errors'];
+  'take-delete-undo', 'take-send', 'take-private', 'apps-side-by-side', 'take-new-phone', 'old-app-takes', 'take-send-kept', 'take-unlinked', 'take-no-coach', 'take-words', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -56,6 +57,11 @@ function rest(method, path, token, body) {
 const tokenOf = (email) => rest('POST', '/auth/v1/token?grant_type=password', null, { email, password: password(email) }).json.access_token;
 const coachToken = tokenOf(COACH_EMAIL);
 const coachId = JSON.parse(Buffer.from(coachToken.split('.')[1], 'base64url')).sub;
+const singerId = JSON.parse(Buffer.from(tokenOf(EMAIL).split('.')[1], 'base64url')).sub;
+/* the coach-singer link, as the coach removes it and adds it back (the old app's own ways) */
+const unlink = () => rest('DELETE', `/rest/v1/coach_students?coach_id=eq.${coachId}&student_id=eq.${singerId}`, coachToken).status;
+const relink = () => rest('POST', '/rest/v1/rpc/add_student_by_email', coachToken, { p_email: EMAIL }).status;
+const linked = () => (rest('GET', `/rest/v1/coach_students?select=id&coach_id=eq.${coachId}&student_id=eq.${singerId}`, coachToken).json || []).length === 1;
 /** what the coach can see of a take: its rows, and whether its sound opens */
 function asCoach(path) {
   const rows = rest('GET', `/rest/v1/takes?select=id,coach_id,student_id,audio_path&audio_path=eq.${encodeURIComponent(path)}`, coachToken).json || [];
@@ -63,6 +69,7 @@ function asCoach(path) {
   return { rows: rows.length, mine: rows.every((r) => r.coach_id === coachId), opens: sign.status === 200 && !!sign.json?.signedURL };
 }
 
+clearTestTakes();             /* nothing left from an earlier run */
 const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 const env = await launch({ mic: `${PREFIX}-voice30.mp3`, allowMic: false, online: true });
 const { page } = env;
@@ -76,7 +83,7 @@ async function open() {
   await page.waitFor(`!!document.querySelector('#song-play')`, 8000);
 }
 const idb = (store, body) => page.eval(`(async () => {
-  const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+  const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); q.onerror = no; });
   const all = await new Promise((ok) => { const q = db.transaction(${JSON.stringify(store)}).objectStore(${JSON.stringify(store)}).getAll(); q.onsuccess = () => ok(q.result); });
   db.close();
   return (${body})(all);
@@ -84,6 +91,25 @@ const idb = (store, body) => page.eval(`(async () => {
 const takesKept = () => idb('takes', `(all) => all.filter((t) => t.songId === ${JSON.stringify(ID)}).map((t) => ({ id: t.id, path: t.path || null,
   sendTo: t.sendTo.map((c) => c.name), sent: t.sent.map((c) => c.name), seconds: t.seconds, songAt: t.songAt, rightPct: t.rightPct, progress: t.progress ?? null }))`);
 const rows = () => page.eval(`[...document.querySelectorAll('.take-row')].map((r) => ({ id: r.dataset.take, text: r.innerText }))`);
+
+/** the old app (next.html), signed in on this browser: does it load the
+    singer's takes, and does any tab show a blank (undefined, null, NaN)? */
+async function oldAppLooks(pg, take) {
+  await pg.goto(ORIGIN + '/repertoire-pro/next.html');
+  const loaded = await pg.waitFor(`typeof RP !== 'undefined' && !!RP.user && Array.isArray(RP.takes) && RP.takes.length > 0`, 30000);
+  const takes = await pg.eval(`(RP.takes || []).filter((t) => t.audio_path === ${JSON.stringify(take.path)}).map((t) => t.coach_id)`);
+  await pg.eval(`document.getElementById('rpTourSkip')?.click()`);
+  const odd = [];
+  for (const nav of ['navHome', 'navTrain', 'navSing', 'navLib', 'navYou']) {
+    await pg.eval(`document.getElementById('${nav}')?.click()`);
+    await sleep(600);
+    const t = await pg.eval(`document.body.innerText`);
+    const hit = /.{0,40}(\bundefined\b|\bnull\b|NaN).{0,40}/.exec(t);
+    if (hit) odd.push(nav + ': "' + hit[0].replace(/\n/g, ' / ') + '"');
+  }
+  return { loaded, takes, odd };
+}
+let sideNote = '';
 
 /** sign in through the Account screen (signing out first if need be) */
 async function signInAs(p, email) {
@@ -134,7 +160,7 @@ try {
     await page.eval(`window.__parts[${JSON.stringify(p)}] = new Blob([Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))], { type: 'audio/mpeg' })`);
   }
   await page.eval(`(async () => {
-    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire');
+    const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app');
       q.onupgradeneeded = () => { const d = q.result; for (const s of ['songs', 'lines', 'takes']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); };
       q.onsuccess = () => ok(q.result); q.onerror = no; });
     const P = window.__parts;
@@ -154,12 +180,13 @@ try {
   const reviewed = await singTake(SUNG, 12);
   const summary = await page.eval(`document.querySelector('#take-summary')?.textContent`);
   /* keep it, so the recording can be read back from the phone */
+  const had = (await takesKept()).map((t) => t.id);
   await page.tap('#take-save');
-  await page.waitFor(`document.querySelectorAll('.take-row').length >= 1`, 5000);
-  const first = (await takesKept())[0];
+  await page.waitFor(`document.querySelectorAll('.take-row').length > ${had.length}`, 5000);
+  const first = (await takesKept()).find((t) => !had.includes(t.id));
   if (first) made.add(first.id);
   const sound = await page.eval(`(async () => {
-    const db = await new Promise((ok) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); });
+    const db = await new Promise((ok) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); });
     const get = (s, id) => new Promise((ok) => { const q = db.transaction(s).objectStore(s).get(id); q.onsuccess = () => ok(q.result); });
     const take = await get('takes', ${JSON.stringify(first?.id)}), song = await get('songs', ${JSON.stringify(ID)});
     db.close();
@@ -197,7 +224,7 @@ try {
     const listed = (await rows())[0]?.text || '';
     /* the % by the one rule, from what was kept: the take's line and the singer's */
     const kept = await page.eval(`(async () => {
-      const db = await new Promise((ok) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); });
+      const db = await new Promise((ok) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); });
       const get = (s, id) => new Promise((ok) => { const q = db.transaction(s).objectStore(s).get(id); q.onsuccess = () => ok(q.result); });
       const t = await get('takes', ${JSON.stringify(first?.id)}), l = await get('lines', ${JSON.stringify(ID)});
       db.close();
@@ -384,11 +411,53 @@ try {
     const p2 = env2.page;
     await p2.addInitScript(PROBE);
     try {
+      if (want('apps-side-by-side')) {
+        /* a phone where this app ran before 5 Oct, sharing the old app's store:
+           one of its songs and lines in there, and one of the old app's songs */
+        await p2.goto(URL_APP + 'favicon.svg');            /* a plain page on the same site: neither app */
+        await p2.eval(`(async () => {
+          const d = await new Promise((ok, no) => { const q = indexedDB.open('repertoire', 2);
+            q.onupgradeneeded = () => { q.result.createObjectStore('songs', { keyPath: 'id' }); q.result.createObjectStore('lines', { keyPath: 'id' }); };
+            q.onsuccess = () => ok(q.result); q.onerror = no; });
+          const t = d.transaction(['songs', 'lines'], 'readwrite');
+          const blob = new Blob([new Uint8Array(16)], { type: 'audio/mpeg' });
+          t.objectStore('songs').put({ id: 'moved-song', title: 'Moved song', created: 1, fileName: 'moved.mp3', file: blob, state: 'new' });
+          t.objectStore('songs').put({ id: 's1', title: 'Old app song', blob, addedAt: 1, artist: 'Someone' });
+          t.objectStore('lines').put({ id: 'moved-song', ver: 1, hop: 0.05, m: new Float32Array(4), readTo: 0, seconds: 1, whole: false, done: false, anchored: true });
+          await new Promise((ok) => (t.oncomplete = ok));
+          d.close();
+        })()`);
+        /* the old app opens it first, as it would */
+        await p2.goto(ORIGIN + '/repertoire-pro/next.html');
+        const oldFirst = await p2.waitFor(`typeof LIB !== 'undefined' && !!LIB.db`, 30000);
+        const oldStores = await p2.eval(`LIB.db ? [...LIB.db.objectStoreNames].join() : ''`);
+        const errs1 = p2.errors.length;
+        /* then this app */
+        await p2.goto(URL_APP + '?load=' + ++loads + '#/sing/learn');
+        await sleep(3000);
+        const songs = await p2.eval(`[...document.querySelectorAll('.song-row')].map((b) => b.querySelector('strong')?.textContent)`);
+        const shared = await p2.eval(`(async () => { const d = await new Promise((ok) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); });
+          const n = await new Promise((ok) => { const q = d.transaction('songs').objectStore('songs').count(); q.onsuccess = () => ok(q.result); });
+          const v = d.version, stores = [...d.objectStoreNames].join(); d.close(); return { n, v, stores }; })()`);
+        /* and the old app again, after this app */
+        await p2.goto(ORIGIN + '/repertoire-pro/next.html');
+        const oldAgain = await p2.waitFor(`typeof LIB !== 'undefined' && !!LIB.db && LIB.db.objectStoreNames.contains('playlists')`, 30000);
+        /* the plain case on the first browser: this app first, then the old app */
+        await page.goto(ORIGIN + '/repertoire-pro/next.html');
+        const oldAfterNew = await page.waitFor(`typeof LIB !== 'undefined' && !!LIB.db && LIB.db.objectStoreNames.contains('playlists')`, 30000);
+        const errsMain = page.errors.length;
+        await open();
+        check('apps-side-by-side', oldFirst && /playlists/.test(oldStores) && songs.includes('Moved song') && !songs.includes('Old app song')
+          && shared.n === 2 && oldAgain && oldAfterNew && errs1 === 0 && p2.errors.length === 0 && errsMain === 0,
+          `a phone that had both apps sharing one store: the old app opened it with its library parts (${oldStores}); this app then listed ${JSON.stringify(songs)} ` +
+          `(its own song copied over, the old app's left alone); the shared store still holds its ${shared.n} songs; the old app works after it ${oldAgain}; ` +
+          `on a phone that opened this app first, the old app works too ${oldAfterNew}; page errors ${p2.errors.concat(page.errors).join(' | ') || 'none'}`);
+      }
       await signInAs(p2, EMAIL);
       await p2.goto(URL_APP + '?load=' + ++loads + '#/sing/learn');
       const listed = await p2.waitFor(`!!document.querySelector('.take-row[data-take="${keptOnly.id}"] .take-hear:not([disabled])')`, 40000);
       const text = await p2.eval(`document.querySelector('.take-row[data-take="${keptOnly.id}"]')?.innerText || ''`);
-      const stored = await p2.eval(`(async () => { const db = await new Promise((ok) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); });
+      const stored = await p2.eval(`(async () => { const db = await new Promise((ok) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); });
         const t = await new Promise((ok) => { const q = db.transaction('takes').objectStore('takes').get(${JSON.stringify(keptOnly.id)}); q.onsuccess = () => ok(q.result); });
         db.close(); return t ? { audio: !!t.audio, songs: 0 } : null; })()`);
       let played = null;
@@ -406,25 +475,26 @@ try {
           `(the take is ${keptOnly.seconds.toFixed(1)} s), heard from online`);
       }
       if (want('old-app-takes')) {
-        /* the old app, signed in as the same singer, with a take that has no coach */
-        await p2.goto(ORIGIN + '/repertoire-pro/next.html');
-        const loaded = await p2.waitFor(`!!(window.RP && RP.user && Array.isArray(RP.takes))`, 30000);
-        const takes = await p2.eval(`(RP.takes || []).filter((t) => t.audio_path === ${JSON.stringify(keptOnly.path)}).map((t) => t.coach_id)`);
-        await p2.eval(`document.getElementById('rpTourSkip')?.click()`);
-        const odd = [];
-        for (const nav of ['navHome', 'navTrain', 'navSing', 'navLib', 'navYou']) {
-          await p2.eval(`document.getElementById('${nav}')?.click()`);
-          await sleep(600);
-          const t = await p2.eval(`document.body.innerText`);
-          if (/\bundefined\b|\bnull\b|NaN/.test(t)) odd.push(nav);
-        }
-        check('old-app-takes', loaded && takes.length === 1 && takes[0] === null && odd.length === 0 && p2.errors.length === 0,
-          `the old app, signed in as the singer: loaded with the take that has no coach ${takes.length === 1 && takes[0] === null}; ` +
-          `its five tabs shown with nothing blank or broken ${odd.length === 0 ? 'true' : 'false (' + odd.join(', ') + ')'}; page errors ${p2.errors.length ? p2.errors.join(' | ') : 'none'}`);
+        /* on this phone the old app's store still holds what the planted
+           "before 5 Oct" data put there: said, not judged here */
+        const planted = await oldAppLooks(p2, keptOnly);
+        sideNote = planted.odd.length ? `on the phone that had shared one store, the old app shows: ${planted.odd.join(', ')}` : '';
       }
     } finally {
       await env2.close();
     }
+  }
+
+  if (want('old-app-takes') && keptOnly) {
+    /* the old app, signed in as the same singer, with a take that has no coach */
+    const errs = page.errors.length;
+    const r = await oldAppLooks(page, keptOnly);
+    const newErrs = page.errors.slice(errs);
+    await open();
+    check('old-app-takes', r.loaded && r.takes.length === 1 && r.takes[0] === null && r.odd.length === 0 && newErrs.length === 0,
+      `the old app, signed in as the singer: loaded with the take that has no coach ${r.takes.length === 1 && r.takes[0] === null}; ` +
+      `its five tabs shown with nothing blank or broken ${r.odd.length === 0 ? 'true' : 'false (' + r.odd.join(', ') + ')'}; page errors ${newErrs.length ? newErrs.join(' | ') : 'none'}` +
+      (sideNote ? `. (Separately: ${sideNote})` : ''));
   }
 
   /* 7. a kept take sent later: shared with the coach, the recording not uploaded again */
@@ -443,6 +513,24 @@ try {
     check('take-send-kept', marked && after === before && seen.rows === 1 && seen.opens,
       `a saved take sent from its menu: marked "Sent to Test Coach" ${marked}; uploads of its recording during the send: ${after - before}; ` +
       `the coach now sees ${seen.rows} row for it and can play it ${seen.opens}`);
+  }
+
+  /* 8. a coach no longer linked loses the takes sent before */
+  if (want('take-unlinked')) {
+    const sent = (await takesKept()).find((t) => made.has(t.id) && t.path && t.sent.length);
+    const before = sent ? asCoach(sent.path).opens : null;
+    let after = null, back = null;
+    try {
+      unlink();
+      after = sent ? asCoach(sent.path).opens : null;
+    } finally {
+      relink();
+      back = linked();
+    }
+    const again = sent ? asCoach(sent.path).opens : null;
+    check('take-unlinked', before === true && after === false && back && again === true,
+      `a take sent to the coach: the coach can open it ${before}; with the link removed ${after}; ` +
+      `link restored ${back}, and it opens again ${again}`);
   }
 
   if (want('take-words')) {
@@ -486,8 +574,15 @@ try {
     }
     if (made.size) await sleep(8000);
     const left = (await takesKept()).filter((t) => made.has(t.id)).length;
-    if (left) console.log(`note: ${left} test take(s) could not be removed`);
+    if (left) console.log(`note: ${left} test take(s) were still on the phone`);
   } catch { /* the browser is gone */ }
+  /* and whatever is left online of the test singer's takes */
+  try {
+    const r = clearTestTakes();
+    if (r.rows || r.files) console.log(`note: removed what was left online of the test singer's takes: ${r.rows} rows, ${r.files} recordings`);
+  } catch (e) {
+    console.log('note: could not clear the test singer\'s takes: ' + e.message);
+  }
   await env.close();
   server.close();
 }

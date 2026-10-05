@@ -186,7 +186,7 @@ try {
          the first 30 seconds stopped, not read again from the start */
       /* until the whole voice has been read and kept */
       const kept = `(async () => {
-        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); q.onerror = no; });
         const songs = await new Promise((ok) => { const q = db.transaction('songs').objectStore('songs').getAll(); q.onsuccess = () => ok(q.result); });
         const s = songs.find((x) => x.title === ${JSON.stringify(SONG)} && x.voice);
         const l = s && await new Promise((ok) => { const q = db.transaction('lines').objectStore('lines').get(s.id); q.onsuccess = () => ok(q.result); });
@@ -204,7 +204,7 @@ try {
       const later = reading.filter((r) => !r.splitting);
       const restart = later.length ? Math.min(...later.map((r) => r.at)) : null;
       const line = await page.eval(`(async () => {
-        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); q.onerror = no; });
         const songs = await new Promise((ok) => { const q = db.transaction('songs').objectStore('songs').getAll(); q.onsuccess = () => ok(q.result); });
         const s = songs.find((x) => x.title === ${JSON.stringify(SONG)} && x.voice);
         const l = await new Promise((ok) => { const q = db.transaction('lines').objectStore('lines').get(s.id); q.onsuccess = () => ok(q.result); });
@@ -328,7 +328,7 @@ try {
       /* the song as stored on the phone: the file, and the voice and music
          the app plays. Played together they must be the song. */
       const r = await page.eval(`(async () => {
-        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); q.onerror = no; });
         const all = await new Promise((ok) => { const q = db.transaction('songs').objectStore('songs').getAll(); q.onsuccess = () => ok(q.result); });
         const s = all.find((x) => x.title === ${JSON.stringify(SONG)} && x.voice);
         const ctx = new OfflineAudioContext(2, 44100, 44100);

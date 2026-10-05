@@ -201,6 +201,17 @@ const MUTATIONS = [
     checks: ['take-private'] },
   { test: 'takes', what: 'sending goes to nobody', file: 'src/screens/SendTake.tsx',
     from: '    const to = coaches.filter((x) => chosen.includes(x.id));', to: '    const to = coaches.filter((x) => chosen.includes(x.id) && false);', checks: ['take-send'] },
+  { test: 'takes', what: 'a saved take is not kept online', file: 'src/data/takes.ts',
+    from: '      if (!t.kept) {', to: '      if (false) {', checks: ['take-new-phone'] },
+  { test: 'takes', what: 'sending a kept take uploads it again', file: 'src/data/takes.ts',
+    from: '      if (!path && t.audio) {', to: '      if (t.audio) {', checks: ['take-send-kept'] },
+  { test: 'takes', what: 'a take thrown away has no undo', file: 'src/screens/SongScreen.tsx',
+    from: '    if (rv) setRemoved(rv.take);', to: '', checks: ['take-removed-undo'] },
+  { test: 'takes', what: 'no line for a singer with no coach', file: 'src/screens/SendTake.tsx',
+    from: '  else if (!coaches.length) body = <p className="line" id="no-coach">{copy.send.none}</p>;', to: '  else if (!coaches.length) body = null;',
+    checks: ['take-no-coach'] },
+  { test: 'takes', what: 'this app shares the old app\'s store again', file: 'src/data/db.ts',
+    from: "export const DB = 'repertoire-app';", to: "export const DB = 'repertoire';", checks: ['apps-side-by-side'] },
 ];
 
 function edit(dir, { file, from, to }) {
