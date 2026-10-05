@@ -43,7 +43,7 @@ export async function serve(REPO, APP) {
    every getUserMedia call and every track it handed out. */
 export const PROBE = `(() => {
   const P = window.__probe = { contexts: 0, started: 0, gum: 0, live: new Set(), tracks: [], fetched: [],
-    decoded: [], actionAt: null, quietAt: null, events: [], starts: [], net: [] };
+    decoded: [], actionAt: null, quietAt: null, events: [], starts: [], net: [], monitors: [], reads: 0 };
   const gainOf = new WeakMap();
   const now = () => performance.now();
   const note = (k) => P.events.push([k, Math.round(now())]);
@@ -76,8 +76,17 @@ export const PROBE = `(() => {
   const connect = AudioNode.prototype.connect;
   AudioNode.prototype.connect = function (to, ...r) {
     if (this instanceof AudioBufferSourceNode && to instanceof GainNode) gainOf.set(this, to);
+    /* the mic played back ("Hear yourself") */
+    if (this instanceof MediaStreamAudioSourceNode && to instanceof GainNode) P.monitors.push(to);
     return connect.call(this, to, ...r);
   };
+  const disconnect = AudioNode.prototype.disconnect;
+  AudioNode.prototype.disconnect = function (...r) { this.__off = true; return disconnect.apply(this, r); };
+  /* what is heard of the mic now: the loudest playback still connected */
+  P.monitorNow = () => Math.max(0, ...P.monitors.filter((g) => !g.__off).map((g) => g.gain.value));
+  /* songs decoded to read their pitch (not to play) */
+  const OD = OfflineAudioContext.prototype.decodeAudioData;
+  OfflineAudioContext.prototype.decodeAudioData = function (...a) { P.reads++; return OD.apply(this, a); };
   P.playing = () => [...P.live].map((s) => ({ seconds: s.buffer ? s.buffer.duration : 0, gain: gainOf.get(s) ? gainOf.get(s).gain.value : null }));
   const T = MediaStreamTrack.prototype, tstop = T.stop;
   T.stop = function () { const r = tstop.apply(this); note('mic-closed'); checkQuiet(); return r; };
@@ -96,4 +105,76 @@ export const PROBE = `(() => {
   document.addEventListener('click', () => P.mark(), true);
   window.addEventListener('popstate', () => P.mark(), true);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') P.mark(); });
+})();`;
+
+/* A singer who sings exactly what they hear, for the timing checks: the
+   mic is given the song's own voice part (or another real recording, such
+   as the same voice an octave down), starting the moment the speaker plays
+   it and reaching the mic after the mic's own delay. The speaker's and the
+   mic's delays are made phone-like (0.15 s and 0.05 s) and reported the way
+   a phone reports them, so an app that leaves either uncorrected puts your
+   line in the wrong place. The test's own route into the mic (a stream
+   inside the browser) is measured first and taken off, so only the app's
+   timing is left to judge. Install BEFORE the PROBE, so the probe still
+   sees every mic track. Off until window.__mirror.on = true. */
+export const MIRROR = `(() => {
+  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, buffer: null, ctx: null, src: null, starts: [], at: null };
+  const AC = window.AudioContext;
+  window.AudioContext = class extends AC {
+    constructor(...a) { super(...a); M.ctx = this; }
+    get outputLatency() { return M.on ? M.out : super.outputLatency; }
+  };
+  const S = AudioBufferSourceNode.prototype, start = S.start;
+  S.start = function (...a) { M.starts.push({ node: this, when: a[0] ?? 0, offset: a[1] ?? 0 }); return start.apply(this, a); };
+  /* another recording to sing, from the next Start on */
+  M.load = (b64) => { M.pending = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer; };
+  /* how late a sound put into a stream comes out of it as a mic, here */
+  M.loop = null;
+  const measureLoop = async (ctx) => {
+    const code = 'class D extends AudioWorkletProcessor { process(i) { const a = i[0] && i[0][0];' +
+      ' if (a) for (let k = 0; k < a.length; k++) if (Math.abs(a[k]) > 0.5) this.port.postMessage(currentTime + k / sampleRate); return true; } }' +
+      ' registerProcessor("rp-loop-probe", D);';
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+    const dest = ctx.createMediaStreamDestination(), src = ctx.createMediaStreamSource(dest.stream);
+    const d = new AudioWorkletNode(ctx, 'rp-loop-probe');
+    src.connect(d);
+    d.connect(ctx.destination);                       /* writes nothing: silent */
+    const got = [];
+    d.port.onmessage = (e) => got.push(e.data);
+    const buf = ctx.createBuffer(1, 4, ctx.sampleRate);
+    buf.getChannelData(0)[0] = 1;
+    const sent = [];
+    for (let i = 0; i < 3; i++) { const s = ctx.createBufferSource(); s.buffer = buf; s.connect(dest); const T = ctx.currentTime + 0.05 + i * 0.1; start.call(s, T); sent.push(T); }
+    await new Promise((r) => setTimeout(r, 450));
+    dest.stream.getTracks().forEach((t) => MediaStreamTrack.prototype.stop.call(t));
+    d.disconnect();
+    src.disconnect();
+    const ds = got.map((t, i) => t - sent[i]).sort((a, b) => a - b);
+    return ds.length ? ds[ds.length >> 1] : 0;
+  };
+  const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
+  md.getUserMedia = async (c) => {
+    if (!M.on) return gum(c);
+    if (M.loop === null && M.ctx) M.loop = await measureLoop(M.ctx);
+    const ctx = M.ctx, last = M.starts.slice(-2);
+    if (!ctx || last.length < 2) return gum(c);
+    if (M.pending) { M.buffer = await ctx.decodeAudioData(M.pending); M.pending = null; }
+    const { when, offset, node } = last[0];            /* the voice part, started with the music */
+    const dest = ctx.createMediaStreamDestination();
+    const src = ctx.createBufferSource();
+    src.buffer = M.buffer || node.buffer;
+    src.connect(dest);
+    if (M.src) try { M.src.stop(); } catch {}
+    M.src = src;
+    const heard = when + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */
+    const sing = heard + M.inLat - (M.loop || 0);          /* the mic has it */
+    const at = Math.max(sing, ctx.currentTime + 0.02);
+    start.call(src, at, offset + (at - sing));
+    M.at = { when, heard, sing, at, offset, loop: M.loop };
+    const track = dest.stream.getAudioTracks()[0];
+    const gs = track.getSettings.bind(track);
+    track.getSettings = () => ({ ...gs(), latency: M.inLat });
+    track.stop = function () { try { src.stop(); } catch {} return MediaStreamTrack.prototype.stop.call(this); };
+    return dest.stream;
+  };
 })();`;

@@ -1,4 +1,5 @@
 import type { Problem, SongHas, SongState } from '../core/song';
+import { inStore } from './db';
 
 /* Songs live on the phone (IndexedDB): the file the singer picked, and the
    voice and music once split, so reopening a song never splits it again.
@@ -24,32 +25,10 @@ export function hasOf(s: Song): SongHas {
   return { state: s.state, full: !!(s.voice && s.music), first30: !!(s.voice30 && s.music30), problem: s.problem };
 }
 
-const DB = 'repertoire';
 const STORE = 'songs';
-let opening: Promise<IDBDatabase> | null = null;
-
-function db(): Promise<IDBDatabase> {
-  if (!opening) {
-    opening = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-  return opening;
-}
 
 function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  return db().then(
-    (d) =>
-      new Promise<T>((resolve, reject) => {
-        const t = d.transaction(STORE, mode);
-        const req = run(t.objectStore(STORE));
-        t.oncomplete = () => resolve(req.result);
-        t.onerror = () => reject(t.error);
-      }),
-  );
+  return inStore(STORE, mode, run);
 }
 
 const listeners = new Set<() => void>();

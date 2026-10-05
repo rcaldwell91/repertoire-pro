@@ -4,6 +4,7 @@ import { getSong, listSongs, onSongs, type Song } from '../data/songs';
 import { onSplit, splitPhase } from '../data/split';
 import type { SplitPhase } from '../core/song';
 import { onTheme, themeChoice, type ThemeChoice } from './theme';
+import { onSingerLine, singerLine, type SingerLine } from './singer-line';
 
 /* What screens watch: the signed-in person, the songs on the phone, and
    splits under way. */
@@ -51,5 +52,13 @@ export function useSplit(id: string): SplitPhase | null {
   return useSyncExternalStore(
     (fn) => onSplit((changed) => changed === id && fn()),
     () => splitPhase(id),
+  );
+}
+
+/** The singer's line for a song, as far as it has been read. */
+export function useSingerLine(id: string): SingerLine | null {
+  return useSyncExternalStore(
+    (fn) => onSingerLine((changed) => changed === id && fn()),
+    () => singerLine(id),
   );
 }

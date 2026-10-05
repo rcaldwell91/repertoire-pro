@@ -44,6 +44,15 @@ export interface MicSet {
   readonly autoGainControl?: boolean;
 }
 
+/** A stretch of what the mic heard. */
+export interface MicBlock {
+  readonly samples: Float32Array;
+  /** engine time at which the last sample reached the mic: the mic's own
+      delay is already taken off, here at its source (RULEBOOK 2.2) */
+  readonly end: number;
+  readonly sampleRate: number;
+}
+
 export type MicResult =
   | { ok: true; set: number }
   | { ok: false; why: 'refused' | 'unavailable' | 'failed' };
@@ -69,6 +78,13 @@ export interface AudioEngine {
   closeMic(): void;
   /** loudness of the mic right now, 0 to 1 */
   micLevel(): number;
+  /** what the mic hears, block by block, while it is open */
+  onMic(cb: (block: MicBlock) => void): () => void;
+  /** Play the mic back to the person at this volume (0 is off). Only
+      while the mic is open; closing the mic ends it. */
+  monitor(gain: number): void;
+  /** seconds from a sound's engine time to when it is heard */
+  outputLatency(): number;
   /** Silence every source, close the mic, let the device go. */
   release(): void;
   /** The phone took the sound away (a call, another app). */

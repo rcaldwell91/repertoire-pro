@@ -1,4 +1,4 @@
-import type { AudioEngine, Ensemble, EnsembleOptions, MicResult, MicSet, Sample, Source } from '../engine';
+import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSet, Sample, Source } from '../engine';
 import type { Env, Store } from '../conductor/conductor';
 
 /* A stand-in engine for the conductor's tests. It makes no sound; it keeps
@@ -122,6 +122,7 @@ export class FakeEngine implements AudioEngine {
   closeMic(): void {
     if (this.mic) this.log.push('closeMic');
     this.mic = false;
+    this.monitorGain = 0;
   }
   micLevel(): number {
     return this.mic ? this.level : 0;
@@ -131,6 +132,28 @@ export class FakeEngine implements AudioEngine {
     this.log.push('release');
     [...this.sources].forEach((s) => s.stop());
     this.mic = false;
+    this.monitorGain = 0;
+  }
+  /** the mic played back, as it is now (0 when the mic is closed) */
+  monitorGain = 0;
+  latency = 0;
+  private readonly micCbs = new Set<(b: MicBlock) => void>();
+  onMic(cb: (b: MicBlock) => void): () => void {
+    this.micCbs.add(cb);
+    return () => {
+      this.micCbs.delete(cb);
+    };
+  }
+  /** the mic hears something (only while it is open) */
+  hear(block: MicBlock): void {
+    if (this.mic) this.micCbs.forEach((f) => f(block));
+  }
+  monitor(gain: number): void {
+    this.log.push('monitor:' + gain);
+    if (this.mic) this.monitorGain = gain;
+  }
+  outputLatency(): number {
+    return this.latency;
   }
   onInterrupt(cb: () => void): () => void {
     this.interruptCbs.add(cb);

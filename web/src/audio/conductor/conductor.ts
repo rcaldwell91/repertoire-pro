@@ -1,4 +1,4 @@
-import type { AudioEngine, Ensemble, Source, Sample } from '../engine';
+import type { AudioEngine, Ensemble, MicBlock, Source, Sample } from '../engine';
 import { MIC_LADDER, ladderOrder } from '../mic-ladder';
 
 /* THE CONDUCTOR - the only owner of sound and the microphone (RULEBOOK 2.1).
@@ -24,8 +24,11 @@ export type MicState = 'closed' | 'opening' | 'open' | 'refused' | 'unavailable'
 export type Step =
   | { kind: 'note'; url: string; rate?: number; gain?: number }
   | { kind: 'listen' }
-  /** a song's parts (voice, music) together, from a point, maybe looping */
-  | { kind: 'song'; urls: readonly string[]; from: number; gains: readonly number[]; loop?: { start: number; end: number } };
+  /** a song's parts (voice, music) together, from a point, maybe looping;
+      with `listen`, the mic opens alongside (the song never waits for it)
+      and `monitor` plays it back at that volume */
+  | { kind: 'song'; urls: readonly string[]; from: number; gains: readonly number[]; loop?: { start: number; end: number };
+      listen?: boolean; monitor?: number };
 
 export interface Plan {
   readonly owner: string;
@@ -83,6 +86,10 @@ export class Conductor {
   /** the song playing now, for its position and its volumes */
   private song: { ensemble: Ensemble; from: number; loop?: { start: number; end: number } } | null = null;
   private readonly listeners = new Set<(s: Snapshot) => void>();
+  private readonly micListeners = new Set<(b: MicBlock) => void>();
+  /** "Hear yourself": only while a song is listening (RULEBOOK 4, Mic) */
+  private monitorGain = 0;
+  private monitoring = false;
   private readonly engine: AudioEngine;
   private readonly env: Env;
   private readonly store: Store;
@@ -93,6 +100,24 @@ export class Conductor {
     this.store = store;
     env.onHidden(() => this.leave('hidden'));
     engine.onInterrupt(() => this.leave('interrupted'));
+    engine.onMic((b) => {
+      if (this.snap.mic === 'open' && this.snap.state === 'running') this.micListeners.forEach((f) => f(b));
+    });
+  }
+
+  /** What the mic hears while a session is listening; nothing otherwise. */
+  onMic(fn: (b: MicBlock) => void): () => void {
+    this.micListeners.add(fn);
+    return () => {
+      this.micListeners.delete(fn);
+    };
+  }
+
+  /** "Hear yourself" at this volume (0 is off). It sounds only while a
+      song is playing and listening; the setting waits for the next one. */
+  setMonitor(gain: number): void {
+    this.monitorGain = Math.max(0, gain);
+    if (this.monitoring && this.snap.mic === 'open') this.engine.monitor(this.monitorGain);
   }
 
   snapshot(): Snapshot {
@@ -111,11 +136,21 @@ export class Conductor {
     return this.snap.mic === 'open' ? this.engine.micLevel() : 0;
   }
 
-  /** Where the song playing now has got to, in seconds; null if none is. */
+  /** Where the song playing now has got to, as it is heard: in seconds;
+      null if none is. */
   position(): number | null {
+    return this.songTime(this.engine.now());
+  }
+
+  /** The point in the song heard at engine time `at` (RULEBOOK 2.2: one
+      clock; the speaker's delay is taken off here, at the song's source).
+      Null if no song is playing, or `at` is before it started. */
+  songTime(at: number): number | null {
     const song = this.song;
     if (!song || this.snap.state !== 'running') return null;
-    const p = song.from + Math.max(0, this.engine.now() - song.ensemble.startedAt);
+    const d = at - this.engine.outputLatency() - song.ensemble.startedAt;
+    if (d < -0.001) return at === this.engine.now() ? song.from : null;
+    const p = song.from + Math.max(0, d);
     const loop = song.loop;
     if (loop && p >= loop.end && loop.end > loop.start) return loop.start + ((p - loop.start) % (loop.end - loop.start));
     return p;
@@ -220,6 +255,10 @@ export class Conductor {
             { from: st.from, gains: st.gains, loop: st.loop });
           this.source = ensemble;
           this.song = { ensemble, from: st.from, loop: st.loop };
+          if (st.listen) {
+            if (st.monitor != null) this.monitorGain = st.monitor;
+            void this.listen(gen, true);
+          }
           await ensemble.ended;
           if (gen !== this.gen) return;
           this.source = null;
@@ -227,25 +266,34 @@ export class Conductor {
           continue;
         }
         /* listen: open the mic, and keep listening until Stop or leaving */
-        this.set({ mic: 'opening' });
-        const r = await this.engine.openMic(MIC_LADDER, ladderOrder(this.remembered()));
-        if (gen !== this.gen) {
-          /* it opened after its session ended: close it again, unless a
-             newer session is using the mic itself */
-          if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening') this.engine.closeMic();
-          return;
-        }
-        if (r.ok) {
-          this.store.set(MIC_KEY, String(r.set));
-          this.set({ mic: 'open' });
-          return;                         /* running, listening, until Stop or leaving */
-        }
-        this.set({ mic: r.why });         /* refused or missing: the rest carries on without it */
+        if (await this.listen(gen, false)) return;   /* running, listening, until Stop or leaving */
+        if (gen !== this.gen) return;
       }
       if (gen === this.gen) this.halt('finished', null);
     } catch {
       if (gen === this.gen) this.halt('stopped', null);
     }
+  }
+
+  /** Open the mic for this session. True if it is open and listening. */
+  private async listen(gen: number, withSong: boolean): Promise<boolean> {
+    this.set({ mic: 'opening' });
+    const r = await this.engine.openMic(MIC_LADDER, ladderOrder(this.remembered()));
+    if (gen !== this.gen) {
+      /* it opened after its session ended: close it again, unless a
+         newer session is using the mic itself */
+      if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening') this.engine.closeMic();
+      return false;
+    }
+    if (r.ok) {
+      this.store.set(MIC_KEY, String(r.set));
+      this.monitoring = withSong;
+      if (withSong) this.engine.monitor(this.monitorGain);
+      this.set({ mic: 'open' });
+      return true;
+    }
+    this.set({ mic: r.why });             /* refused or missing: the rest carries on without it */
+    return false;
   }
 
   /** Silence, the mic closed, the device let go - and every step still
@@ -255,6 +303,7 @@ export class Conductor {
     const src = this.source;
     this.source = null;
     this.song = null;
+    this.monitoring = false;
     try {
       src?.stop();
     } catch {

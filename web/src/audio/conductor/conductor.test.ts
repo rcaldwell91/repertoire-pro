@@ -395,3 +395,69 @@ describe('a song that loads after it was left', () => {
     expect(silentAndClosed()).toBe(true);
   });
 });
+
+describe('a song you sing along to', () => {
+  const sing = (monitor = 0): Plan => ({
+    owner: 'song:3',
+    steps: [{ kind: 'song', urls: ['voice', 'music'], from: 5, gains: [1, 1], listen: true, monitor }],
+  });
+  const block = (end: number) => ({ samples: new Float32Array(4), end, sampleRate: 48000 });
+
+  it('plays the song at once and opens the mic alongside; the song never waits for it', async () => {
+    engine.holdMic = true;
+    c.start(c.tap(tap), sing());
+    await flush();
+    expect(engine.log).toContain('together:voice+music@5');
+    expect(c.snapshot().mic).toBe('opening');
+    engine.answerMic();
+    await flush();
+    expect(c.snapshot().mic).toBe('open');
+    expect(engine.micOpen()).toBe(true);
+    expect(c.snapshot().state).toBe('running');
+  });
+
+  it('a refused mic leaves the song playing, and says so', async () => {
+    engine.micPlan = ['refused'];
+    c.start(c.tap(tap), sing());
+    await flush();
+    expect(c.snapshot().mic).toBe('refused');
+    expect(c.snapshot().state).toBe('running');
+    expect(engine.sounding()).toBe(1);
+  });
+
+  it('hands on what the mic hears only while listening, and nothing after leaving', async () => {
+    const heard: number[] = [];
+    c.onMic((b) => heard.push(b.end));
+    c.start(c.tap(tap), sing());
+    await flush();
+    engine.hear(block(1));
+    c.leave('screen');
+    engine.hear(block(2));
+    expect(heard).toEqual([1]);
+    expect(silentAndClosed()).toBe(true);
+  });
+
+  it('dates what is heard in the song, taking the speaker\'s delay off the song', async () => {
+    engine.latency = 0.12;
+    c.start(c.tap(tap), sing());
+    await flush();
+    /* the song left at engine time 0 from 5 s in; heard 0.12 s later */
+    expect(c.songTime(1.12)).toBeCloseTo(6);
+    engine.clock = 2.12;
+    expect(c.position()).toBeCloseTo(7);
+  });
+
+  it('"Hear yourself" sounds only while singing, and stops with everything else', async () => {
+    c.setMonitor(0.5);
+    expect(engine.monitorGain).toBe(0);
+    c.start(c.tap(tap), sing(0.7));
+    await flush();
+    expect(engine.monitorGain).toBe(0.7);
+    c.setMonitor(0.3);
+    expect(engine.monitorGain).toBe(0.3);
+    c.leave('hidden');
+    expect(engine.monitorGain).toBe(0);
+    c.setMonitor(0.9);
+    expect(engine.monitorGain).toBe(0);
+  });
+});

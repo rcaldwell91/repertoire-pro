@@ -1,23 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
-import { Pause, Play, Repeat, RotateCcw } from 'lucide-react';
+import { Repeat, RotateCcw } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { gainOf, repeatPart, songLine } from '../core/song';
+import { gainOf, micLine, repeatPart, songLine, MONITOR_GAIN } from '../core/song';
+import { barFill } from '../core/level';
 import { clock } from '../core/time';
 import { FIRST_SECONDS } from '../core/limits';
 import type { Plan } from '../audio/conductor/conductor';
 import { hasOf } from '../data/songs';
 import { startSplit } from '../data/split';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
-import { useSong, useSplit } from '../shell/hooks';
+import { useSingerLine, useSong, useSplit } from '../shell/hooks';
+import { readSingerLine } from '../shell/singer-line';
+import { useYourLine } from '../shell/your-line';
+import { localStore } from '../shell/env';
 import { back, navigate } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
 import { Slider } from '../ui/Slider';
+import { LevelBar } from '../ui/LevelBar';
+import { NoteMap } from '../ui/NoteMap';
 
-/* One song: hear the voice and the music together, each at its own volume.
-   The conductor plays them; this screen only asks and shows. Nothing plays
-   until Play is tapped, and leaving the screen or hiding the app means
-   silence (the shell tells the conductor). */
+const HEADPHONES_SEEN = 'rp.hint.headphones';
+
+/* Learn a song, one screen (RULEBOOK 1b): the note map with the singer's
+   line and yours, the play bar, back 10 s, Start, repeat this part, and
+   one sound card. Start plays the song and, if the mic is allowed, draws
+   your line as you sing. The conductor plays and listens; this screen only
+   asks and shows. Nothing plays until Start is tapped, and leaving the
+   screen or hiding the app means silence and the mic closed (the shell
+   tells the conductor). */
 export function SongScreen(props: { id: string }) {
   const c = useConductor();
   const snap = useSnapshot();
@@ -28,6 +39,12 @@ export function SongScreen(props: { id: string }) {
   const has = song ? hasOf(song) : null;
   const which: 'full' | 'first30' | null = has?.full ? 'full' : has?.first30 ? 'first30' : null;
   const playing = c.active() && snap.owner === owner;
+  const singer = useSingerLine(props.id);
+  /* read the singer's line as soon as there is a voice to read it from */
+  const voiceParts = has ? (has.full ? 2 : has.first30 ? 1 : 0) : 0;
+  useEffect(() => {
+    if (voiceParts) readSingerLine(props.id);
+  }, [props.id, voiceParts]);
 
   /* the parts to play, as addresses the engine can load, made once per set
      of parts and given back when the screen is done with them (a sound
@@ -51,7 +68,26 @@ export function SongScreen(props: { id: string }) {
   const [voice, setVoice] = useState(100);
   const [music, setMusic] = useState(100);
   const [loop, setLoop] = useState<{ start: number; end: number } | null>(null);
+  const [anyOctave, setAnyOctave] = useState(false);
+  const [hear, setHear] = useState(false);
+  const [headphones, setHeadphones] = useState(false);
+  const [withMic, setWithMic] = useState(true);
   const shown = total;
+
+
+  const listening = playing && snap.mic === 'open';
+  const you = useYourLine(c, listening, snap.startedAt);
+  const [level, setLevel] = useState(0);
+  useEffect(() => {
+    if (!listening) return;
+    let raf = 0;
+    const tick = () => {
+      setLevel(barFill(c.level()));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [listening, c]);
 
   /* follow the song while it plays; when it ends, back to the start */
   const lastState = useRef(snap.state);
@@ -72,7 +108,8 @@ export function SongScreen(props: { id: string }) {
   }, [snap.state, snap.owner, owner]);
 
   const plan = (from: number, withLoop = loop): Plan | null =>
-    parts ? { owner, steps: [{ kind: 'song', urls: parts.urls, from, gains: [gainOf(voice), gainOf(music)], loop: withLoop ?? undefined }] } : null;
+    parts ? { owner, steps: [{ kind: 'song', urls: parts.urls, from, gains: [gainOf(voice), gainOf(music)], loop: withLoop ?? undefined,
+      listen: withMic, monitor: hear ? MONITOR_GAIN : 0 }] } : null;
 
   function startAt(ev: SyntheticEvent, from: number, withLoop = loop) {
     const p = plan(from, withLoop);
@@ -123,6 +160,22 @@ export function SongScreen(props: { id: string }) {
   }
 
   const line = useMemo(() => (has ? songLine(has, split) : null), [has, split]);
+  const mic = playing && withMic ? micLine(snap.mic) : null;
+
+  function hearYourself(on: boolean) {
+    setHear(on);
+    c.setMonitor(on ? MONITOR_GAIN : 0);
+    if (on) {
+      const store = localStore();
+      if (!store.get(HEADPHONES_SEEN)) {
+        store.set(HEADPHONES_SEEN, '1');
+        setHeadphones(true);
+      }
+    }
+  }
+
+  const lines = useMemo(() => ({ singer: singer?.m ?? new Float32Array(0), hop: singer?.hop ?? 0.05, youT: you.t, youM: you.m }), [singer, you]);
+  const now = () => (playing ? c.position() ?? pos : seeking ?? pos);
 
   if (song === undefined) return null;
   if (song === null) {
@@ -155,6 +208,19 @@ export function SongScreen(props: { id: string }) {
         )}
       </div>
 
+      {voiceParts > 0 && (
+        <>
+          <NoteMap lines={lines} range={singer?.range ?? null} now={now} live={playing} anyOctave={anyOctave} label={copy.song.map} />
+          <p className="hint map-line" id="map-line" role="status">
+            {singer?.reading ? fill(copy.song.reading, { at: clock(singer.readTo), of: clock(singer.seconds) }) : ''}
+          </p>
+          <label className="switch-row">
+            <span>{copy.song.anyOctave}</span>
+            <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(e) => setAnyOctave(e.target.checked)} />
+          </label>
+        </>
+      )}
+
       <div className="playbar">
         <input type="range" id="song-position" aria-label={copy.song.position} min={0} max={Math.max(shown, 0.1)} step={0.1}
           value={Math.min(at, shown)} disabled={!parts}
@@ -167,9 +233,8 @@ export function SongScreen(props: { id: string }) {
         <button type="button" className="round" id="back-10" aria-label={copy.song.back10} disabled={!parts} onClick={back10}>
           <RotateCcw size={24} strokeWidth={2} aria-hidden="true" />
         </button>
-        <button type="button" className="round play" id="song-play" aria-label={playing ? copy.song.pause : copy.song.play}
-          disabled={!parts} onClick={toggle}>
-          {playing ? <Pause size={34} strokeWidth={2.5} aria-hidden="true" /> : <Play size={34} strokeWidth={2.5} aria-hidden="true" />}
+        <button type="button" className="round play" id="song-play" disabled={!parts} onClick={toggle}>
+          {playing ? copy.song.pause : copy.song.start}
         </button>
         <button type="button" className="round" id="repeat-part" aria-label={copy.song.repeat} aria-pressed={!!loop}
           disabled={!parts} onClick={repeat}>
@@ -179,12 +244,26 @@ export function SongScreen(props: { id: string }) {
       <p className="line" style={{ minHeight: '1.5em', textAlign: 'center' }} id="repeat-line">
         {loop ? fill(copy.song.repeating, { from: clock(loop.start), to: clock(loop.end) }) : ''}
       </p>
+      <div className="mic-line" id="mic-line">
+        {mic && <p className="problem" role="status">{mic}</p>}
+        {mic && (
+          <button type="button" className="btn btn-quiet" id="carry-on" onClick={() => setWithMic(false)}>
+            {copy.song.carryOn}
+          </button>
+        )}
+      </div>
 
       <section className="card" aria-label={copy.song.sound}>
         <Slider id="voice-volume" label={copy.song.voice} value={voice}
           onChange={(v) => { setVoice(v); if (playing) c.setGain(0, gainOf(v)); }} />
         <Slider id="music-volume" label={copy.song.music} value={music}
           onChange={(v) => { setMusic(v); if (playing) c.setGain(1, gainOf(v)); }} />
+        <label className="switch-row">
+          <span>{copy.song.hearYourself}</span>
+          <input type="checkbox" role="switch" id="hear-yourself" checked={hear} onChange={(e) => hearYourself(e.target.checked)} />
+        </label>
+        <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
+        {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
       </section>
     </>
   );

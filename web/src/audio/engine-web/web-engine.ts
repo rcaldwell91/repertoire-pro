@@ -1,4 +1,4 @@
-import type { AudioEngine, Ensemble, EnsembleOptions, MicResult, MicSet, Sample, Source } from '../engine';
+import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSet, Sample, Source } from '../engine';
 
 /* The browser's sound and microphone, behind the engine interface. Only the
    conductor holds it. A native engine replaces this file later; nothing
@@ -23,6 +23,30 @@ function finalAnswer(err: unknown): MicResult | null {
   return null;
 }
 
+/* The mic tap: runs on the sound thread, hands over the mic's samples in
+   blocks of 1024, each stamped with the engine time of its last sample. */
+const TAP = `
+class Tap extends AudioWorkletProcessor {
+  constructor() { super(); this.buf = new Float32Array(1024); this.n = 0; }
+  process(inputs) {
+    const ch = inputs[0];
+    if (ch && ch.length) {
+      const a = ch[0], b = ch[1];
+      for (let i = 0; i < a.length; i++) {
+        this.buf[this.n++] = b ? (a[i] + b[i]) / 2 : a[i];
+        if (this.n === 1024) {
+          this.port.postMessage({ s: this.buf, end: currentTime + i / sampleRate }, [this.buf.buffer]);
+          this.buf = new Float32Array(1024);
+          this.n = 0;
+        }
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('rp-mic-tap', Tap);
+`;
+
 export class WebEngine implements AudioEngine {
   private ctx: AudioContext | null = null;
   private readonly sources = new Set<AudioBufferSourceNode>();
@@ -35,6 +59,12 @@ export class WebEngine implements AudioEngine {
   private letGo = false;
   private sleepTimer: ReturnType<typeof setTimeout> | null = null;
   private sleeping: Promise<void> | null = null;
+  private tapReady: Promise<boolean> | null = null;
+  private tap: AudioWorkletNode | null = null;
+  private monitorGain: GainNode | null = null;
+  private monitorLevel = 0;
+  private inputLatency = 0;
+  private readonly micCbs = new Set<(b: MicBlock) => void>();
 
   private context(): AudioContext {
     if (!this.ctx) {
@@ -185,7 +215,16 @@ export class WebEngine implements AudioEngine {
         this.micNode = ctx.createMediaStreamSource(stream);
         this.analyser = ctx.createAnalyser();
         this.analyser.fftSize = 2048;
-        this.micNode.connect(this.analyser);     /* measured, never played back */
+        this.micNode.connect(this.analyser);     /* measured */
+        /* the mic's own delay, as the phone reports it, taken off at the source */
+        const lat = (stream.getAudioTracks()[0]?.getSettings() as { latency?: number } | undefined)?.latency;
+        this.inputLatency = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
+        this.monitorGain = ctx.createGain();
+        this.monitorGain.gain.value = this.monitorLevel;
+        this.micNode.connect(this.monitorGain);
+        this.monitorGain.connect(ctx.destination);
+        await this.openTap(ctx, this.micNode);
+        if (this.stream !== stream) return { ok: false, why: 'failed' };   /* closed meanwhile */
         return { ok: true, set: i };
       } catch (err) {
         const final = finalAnswer(err);
@@ -196,20 +235,63 @@ export class WebEngine implements AudioEngine {
     return { ok: false, why: 'failed' };
   }
 
+  private async openTap(ctx: AudioContext, from: MediaStreamAudioSourceNode): Promise<void> {
+    if (!ctx.audioWorklet) return;
+    if (!this.tapReady) {
+      const url = URL.createObjectURL(new Blob([TAP], { type: 'text/javascript' }));
+      this.tapReady = ctx.audioWorklet.addModule(url).then(() => true, () => false);
+    }
+    if (!(await this.tapReady) || this.micNode !== from) return;
+    const tap = new AudioWorkletNode(ctx, 'rp-mic-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+    tap.port.onmessage = (e: MessageEvent<{ s: Float32Array; end: number }>) => {
+      if (this.tap !== tap) return;
+      const block: MicBlock = { samples: e.data.s, end: e.data.end - this.inputLatency, sampleRate: ctx.sampleRate };
+      this.micCbs.forEach((f) => f(block));
+    };
+    from.connect(tap);
+    tap.connect(ctx.destination);              /* it writes nothing: silent */
+    this.tap = tap;
+  }
+
+  onMic(cb: (b: MicBlock) => void): () => void {
+    this.micCbs.add(cb);
+    return () => {
+      this.micCbs.delete(cb);
+    };
+  }
+
+  monitor(gain: number): void {
+    this.monitorLevel = Math.max(0, gain);
+    const g = this.monitorGain;
+    if (g && this.ctx) g.gain.setTargetAtTime(this.monitorLevel, this.ctx.currentTime, 0.015);
+  }
+
+  outputLatency(): number {
+    const ctx = this.ctx;
+    if (!ctx) return 0;
+    return (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+  }
+
   micOpen(): boolean {
     return !!this.stream && this.stream.getAudioTracks().some((t) => t.readyState === 'live');
   }
 
   closeMic(): void {
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-    try {
-      this.micNode?.disconnect();
-    } catch {
-      /* gone */
+    for (const n of [this.micNode, this.tap, this.monitorGain]) {
+      try {
+        n?.disconnect();
+      } catch {
+        /* gone */
+      }
     }
+    if (this.tap) this.tap.port.onmessage = null;
     this.stream = null;
     this.micNode = null;
     this.analyser = null;
+    this.tap = null;
+    this.monitorGain = null;
+    this.monitorLevel = 0;               /* the next time, it starts silent again */
   }
 
   micLevel(): number {
