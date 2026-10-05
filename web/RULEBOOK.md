@@ -54,6 +54,11 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
   - Bubbles on long held notes only, to measure sustain, may be tested later. They ship only if they measure accurately.
   - Play bar, back 10 s, Start, repeat this part.
   - Under the note map, ONE sound card holds the Voice slider, the Music slider, and a "Hear yourself" switch with your level, so everything is in one place.
+  - Robert's learning path (5 Oct):
+    1. Sing with the singer's voice up and the music down, to learn the notes.
+    2. Turn the voice down and sing over the music, karaoke style.
+    3. Save the take, or send it to a coach.
+  - The singer's line is ALWAYS shown, whatever the Voice slider says, because it's read from the separated voice file, not from what's playing.
 - **Intervals are two features:**
   - Train → "Sing the interval": sing the jump.
   - Learn → Ear → "Hear the interval": two notes play; pick step, third, fifth or octave.
@@ -74,6 +79,8 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
 
 - Use ONE permanent test account for all live tests, rp-test@example.com, created once and reused. Never create throwaway accounts.
   - Deleting accounts needs an approval Robert can't reliably give from his phone.
+- One permanent test COACH account, rp-coach@example.com, created once, linked as coach to rp-test@example.com, and reused for every test of sending to a coach.
+- Never create any other accounts.
 - Never touch Robert's (lyonxdewitt@gmail.com) or Briar's (briarmlocke@gmail.com) accounts.
 
 ## 2. Architecture rules
@@ -227,8 +234,10 @@ web/src/
 
 - **Test tracks:** voice-only All of Me and Ride, supplied by Robert (professional singers, not Robert).
   - Ride's voice-only track is NOT the same audio as the full song (correlation 0.35), so don't use it to score separation.
-- **Live pitch:**
-  - follows the voice 93.2% / 96.5% of the loud time
+- **Live pitch** (bake-off, 5 Oct; voice-only All of Me / Ride):
+  - The old method, as measured today: follows the voice 97.0% / 94.0% of the loud time.
+  - This app (the old method, median centred): follows the voice 97.1% / 94.2%; right note 84.2% / 89.0%; the line within ±10 ms; live reaction about 125 ms.
+  - The old 93.2% / 96.5% were measured another way and are superseded.
   - singing lands inside a note 87.3% / 91.9% of the time
   - placement within ±30 ms
 - **Separator:** judge quality on the level-matched score.
