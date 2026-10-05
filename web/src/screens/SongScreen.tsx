@@ -6,7 +6,7 @@ import { gainOf, micLine, repeatPart, songLine, MONITOR_GAIN } from '../core/son
 import { barFill } from '../core/level';
 import { clock } from '../core/time';
 import { FIRST_SECONDS } from '../core/limits';
-import type { Plan } from '../audio/conductor/conductor';
+import type { Plan, Take } from '../audio/conductor/conductor';
 import { hasOf } from '../data/songs';
 import { startSplit } from '../data/split';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
@@ -14,7 +14,7 @@ import { useSingerLine, useSong, useSplit } from '../shell/hooks';
 import { readSingerLine } from '../shell/singer-line';
 import { useYourLine } from '../shell/your-line';
 import { review, toStored } from '../shell/take-review';
-import { saveTake, type StoredTake } from '../data/takes';
+import { saveTake, UNDO_MS, type StoredTake } from '../data/takes';
 import { TakesList } from './TakesList';
 import { localStore } from '../shell/env';
 import { back, navigate, sendRoute } from '../shell/router';
@@ -87,11 +87,23 @@ export function SongScreen(props: { id: string }) {
     c.dropTake();
     setDecided((n) => n + 1);
   };
-  /* a kept take's sound, made playable while it is being heard */
-  const keptUrl = useRef<string | null>(null);
-  useEffect(() => () => {
-    if (keptUrl.current) URL.revokeObjectURL(keptUrl.current);
-  }, []);
+  /* a take not kept, thrown away by Start or Try again: Undo for a moment */
+  const [removed, setRemoved] = useState<Take | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const t = setTimeout(() => setRemoved(null), UNDO_MS);
+    return () => clearTimeout(t);
+  }, [removed]);
+  const discard = () => {
+    if (rv) setRemoved(rv.take);
+    decided();
+  };
+  function undoRemove() {
+    if (!removed) return;
+    if (playing) c.stop();
+    c.restoreTake(removed);
+    setRemoved(null);
+  }
 
 
   const listening = playing && snap.mic === 'open';
@@ -134,8 +146,8 @@ export function SongScreen(props: { id: string }) {
     const p = plan(from, withLoop);
     if (!p) return;
     if (playing) c.stop();
-    /* singing again is trying again: the take not kept goes */
-    if (rv) decided();
+    /* singing again is trying again: the take not kept goes (with Undo) */
+    if (rv) discard();
     setHeard(null);
     c.start(c.tap(ev.nativeEvent), p);
   }
@@ -153,10 +165,8 @@ export function SongScreen(props: { id: string }) {
     c.start(c.tap(ev.nativeEvent), { owner, steps: [{ kind: 'song', urls: [...parts.urls, t.url], from: t.songAt,
       gains: [gainOf(voice), gainOf(music), gainOf(takeVol)], starts: [0, 0, t.songAt] }] });
   }
-  function playKept(ev: SyntheticEvent, t: StoredTake) {
-    if (keptUrl.current) URL.revokeObjectURL(keptUrl.current);
-    keptUrl.current = URL.createObjectURL(t.audio);
-    playTake(ev, { key: t.id, url: keptUrl.current, songAt: t.songAt, t: t.line.t, m: t.line.m });
+  function playKept(ev: SyntheticEvent, t: StoredTake, url: string) {
+    playTake(ev, { key: t.id, url, songAt: t.songAt, t: t.line.t, m: t.line.m });
   }
 
   function toggle(ev: SyntheticEvent) {
@@ -309,12 +319,21 @@ export function SongScreen(props: { id: string }) {
             <button type="button" className="btn btn-quiet" id="take-send" onClick={() => navigate(sendRoute(props.id), 'screen')}>
               {copy.take.send}
             </button>
-            <button type="button" className="btn btn-quiet" id="take-again" onClick={() => { if (playing) c.stop(); setHeard(null); decided(); }}>
+            <button type="button" className="btn btn-quiet" id="take-again" onClick={() => { if (playing) c.stop(); setHeard(null); discard(); }}>
               {copy.take.again}
             </button>
           </div>
         </section>
       )}
+
+      <div className="undo-line" role="status" id="take-removed-line">
+        {removed && !rv && (
+          <>
+            <span>{copy.take.removed}</span>
+            <button type="button" className="btn btn-quiet" id="undo-remove" onClick={undoRemove}>{copy.take.undo}</button>
+          </>
+        )}
+      </div>
 
       <div className="mic-line" id="mic-line">
         {mic && <p className="problem" role="status">{mic}</p>}
@@ -342,7 +361,7 @@ export function SongScreen(props: { id: string }) {
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
       </section>
 
-      <TakesList songId={props.id} playing={hearingTake ? heard?.key ?? null : null} onPlay={playKept} />
+      <TakesList songId={props.id} title={song.title} playing={hearingTake ? heard?.key ?? null : null} onPlay={playKept} />
     </>
   );
 }

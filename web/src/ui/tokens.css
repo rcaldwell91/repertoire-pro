@@ -434,3 +434,5 @@ input[type='range'] {
 .take-more { width: var(--tap); height: var(--tap); flex: none; }
 .take-delete { min-width: 0; }
 .undo-line { display: flex; align-items: center; gap: 12px; min-height: var(--tap); }
+.take-row { flex-wrap: wrap; }
+.take-menu { display: flex; gap: 8px; width: 100%; justify-content: flex-end; }

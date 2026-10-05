@@ -35,7 +35,7 @@ function screenFor(route: Route): ReactNode {
   const song = SONG_ROUTE.exec(route);
   if (song) return <SongScreen id={song[1]} />;
   const send = SEND_ROUTE.exec(route);
-  if (send) return <SendTake id={send[1]} />;
+  if (send) return <SendTake id={send[1]} takeId={send[2]} />;
   return SCREENS[route]();
 }
 

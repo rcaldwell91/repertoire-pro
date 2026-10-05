@@ -33,8 +33,8 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
   process.exit(1);
 }
 
-const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-leave', 'take-saved-first', 'take-offline', 'take-delete-undo',
-  'take-send', 'take-private', 'take-words', 'no-page-errors'];
+const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-leave', 'take-removed-undo', 'take-saved-first', 'take-offline',
+  'take-delete-undo', 'take-send', 'take-private', 'take-new-phone', 'old-app-takes', 'take-send-kept', 'take-no-coach', 'take-words', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -63,7 +63,7 @@ function asCoach(path) {
   return { rows: rows.length, mine: rows.every((r) => r.coach_id === coachId), opens: sign.status === 200 && !!sign.json?.signedURL };
 }
 
-const { server, URL_APP } = await serve(REPO, APP);
+const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 const env = await launch({ mic: `${PREFIX}-voice30.mp3`, allowMic: false, online: true });
 const { page } = env;
 await page.addInitScript(MIRROR);
@@ -84,6 +84,22 @@ const idb = (store, body) => page.eval(`(async () => {
 const takesKept = () => idb('takes', `(all) => all.filter((t) => t.songId === ${JSON.stringify(ID)}).map((t) => ({ id: t.id, path: t.path || null,
   sendTo: t.sendTo.map((c) => c.name), sent: t.sent.map((c) => c.name), seconds: t.seconds, songAt: t.songAt, rightPct: t.rightPct, progress: t.progress ?? null }))`);
 const rows = () => page.eval(`[...document.querySelectorAll('.take-row')].map((r) => ({ id: r.dataset.take, text: r.innerText }))`);
+
+/** sign in through the Account screen (signing out first if need be) */
+async function signInAs(p, email) {
+  await p.goto(URL_APP + '?load=' + ++loads + '#/profile/account');
+  await p.waitFor(`!!document.querySelector('#email') || !!document.querySelector('#sign-out')`, 8000);
+  if (await p.eval(`!!document.querySelector('#sign-out')`)) {
+    await p.tap('#sign-out');
+    await p.waitFor(`!!document.querySelector('#email')`, 8000);
+  }
+  await p.tap('#email');
+  await p.type(email);
+  await p.tap('#password');
+  await p.type(password(email));
+  await p.tap('#sign-in');
+  if (!(await p.waitFor(`document.querySelector('#signed-in-as')?.textContent.includes(${JSON.stringify(email)})`, 15000))) throw new Error('could not sign in as ' + email);
+}
 
 /** sing (the mirror) from a point for some seconds, then stop: one take */
 async function singTake(from, seconds) {
@@ -109,14 +125,7 @@ const made = new Set();      /* takes this run made, deleted at the end */
 
 try {
   /* sign in as the test singer, through the Account screen */
-  await page.goto(URL_APP + '?load=0#/profile/account');
-  await page.waitFor(`!!document.querySelector('#email')`, 8000);
-  await page.tap('#email');
-  await page.type(EMAIL);
-  await page.tap('#password');
-  await page.type(password(EMAIL));
-  await page.tap('#sign-in');
-  if (!(await page.waitFor(`document.querySelector('#signed-in-as')?.textContent.includes(${JSON.stringify(EMAIL)})`, 15000))) throw new Error('could not sign in');
+  await signInAs(page, EMAIL);
 
   /* the split song, stored on the phone as the app stores one */
   await page.eval(`window.__parts = {}`);
@@ -246,6 +255,33 @@ try {
       `hearing it, then another tab: silence in ${q2.ms} ms, still silent 1 s later ${still}; Try again threw it away with no question ${gone}`);
   }
 
+  /* thrown away by Try again, or by singing again: "Take removed", with Undo */
+  if (want('take-removed-undo')) {
+    const LINE = `document.querySelector('#take-removed-line')?.innerText || ''`;
+    await singTake(SUNG, 4);
+    const pct1 = await page.eval(`document.querySelector('#take-summary')?.textContent`);
+    await page.tap('#take-again');
+    const shown = await page.waitFor(`(${LINE}).includes(${JSON.stringify(copy.take.removed)})`, 2000);
+    await page.tap('#undo-remove');
+    const back = await page.waitFor(`document.querySelector('#take-summary')?.textContent === ${JSON.stringify(pct1)}`, 2000);
+    /* singing again throws it away too */
+    await page.eval(`window.__mirror.on = true`);
+    const n = await page.eval(S('starts.length'));
+    await page.tap('#song-play');
+    await page.waitFor(S(`starts.length >= ${n + 2}`), 8000);
+    const shown2 = await page.waitFor(`(${LINE}).includes(${JSON.stringify(copy.take.removed)})`, 2000);
+    await sleep(1000);
+    await page.tap('#undo-remove');
+    const back2 = await page.waitFor(`document.querySelector('#take-summary')?.textContent === ${JSON.stringify(pct1)}`, 3000);
+    const quiet = await page.waitFor(S('live.size === 0'), 2000);
+    await page.tap('#take-again');
+    await sleep(6500);
+    const after = await page.eval(LINE);
+    check('take-removed-undo', shown && back && shown2 && back2 && quiet && !after.trim(),
+      `Try again: "${copy.take.removed}" with Undo ${shown}, and Undo brought the same take back ${back}; singing again: the same ${shown2}, ` +
+      `Undo stopped the song and brought it back ${back2 && quiet}; a few seconds after Try again the line is gone ${!after.trim()}`);
+  }
+
   /* 3. kept on the phone first; online when it can be */
   if (want('take-saved-first', 'take-offline')) {
     await page.c.send('Network.enable');
@@ -341,6 +377,74 @@ try {
       `a take only saved: the coach sees ${seen?.rows} row for it; can still open its recording ${seen?.opens}`);
   }
 
+  /* 6. a saved take is online, the singer's alone: on a new phone, and in the old app */
+  const keptOnly = (await takesKept()).find((t) => made.has(t.id) && t.path && !t.sent.length);
+  if (want('take-new-phone', 'old-app-takes') && keptOnly) {
+    const env2 = await launch({ mic: `${PREFIX}-voice30.mp3`, allowMic: false, online: true });
+    const p2 = env2.page;
+    await p2.addInitScript(PROBE);
+    try {
+      await signInAs(p2, EMAIL);
+      await p2.goto(URL_APP + '?load=' + ++loads + '#/sing/learn');
+      const listed = await p2.waitFor(`!!document.querySelector('.take-row[data-take="${keptOnly.id}"] .take-hear:not([disabled])')`, 40000);
+      const text = await p2.eval(`document.querySelector('.take-row[data-take="${keptOnly.id}"]')?.innerText || ''`);
+      const stored = await p2.eval(`(async () => { const db = await new Promise((ok) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); });
+        const t = await new Promise((ok) => { const q = db.transaction('takes').objectStore('takes').get(${JSON.stringify(keptOnly.id)}); q.onsuccess = () => ok(q.result); });
+        db.close(); return t ? { audio: !!t.audio, songs: 0 } : null; })()`);
+      let played = null;
+      if (listed) {
+        await p2.tap(`.take-row[data-take="${keptOnly.id}"] .take-hear`);
+        await p2.waitFor(`window.__probe.starts.length >= 1`, 15000);
+        played = await p2.eval(`window.__probe.starts[0]?.seconds`);
+        await sleep(500);
+        await p2.tap(`.take-row[data-take="${keptOnly.id}"] .take-hear`);
+      }
+      if (want('take-new-phone')) {
+        check('take-new-phone', listed && text.includes('Take test song') && text.includes(`${keptOnly.rightPct}% right notes`) && stored && !stored.audio
+          && played != null && Math.abs(played - keptOnly.seconds) < 0.2,
+          `a fresh browser, nothing stored, signed in: Learn a song lists "${text.replace(/\n/g, ' / ')}"; tapped, it played ${played?.toFixed(1)} s ` +
+          `(the take is ${keptOnly.seconds.toFixed(1)} s), heard from online`);
+      }
+      if (want('old-app-takes')) {
+        /* the old app, signed in as the same singer, with a take that has no coach */
+        await p2.goto(ORIGIN + '/repertoire-pro/next.html');
+        const loaded = await p2.waitFor(`!!(window.RP && RP.user && Array.isArray(RP.takes))`, 30000);
+        const takes = await p2.eval(`(RP.takes || []).filter((t) => t.audio_path === ${JSON.stringify(keptOnly.path)}).map((t) => t.coach_id)`);
+        await p2.eval(`document.getElementById('rpTourSkip')?.click()`);
+        const odd = [];
+        for (const nav of ['navHome', 'navTrain', 'navSing', 'navLib', 'navYou']) {
+          await p2.eval(`document.getElementById('${nav}')?.click()`);
+          await sleep(600);
+          const t = await p2.eval(`document.body.innerText`);
+          if (/\bundefined\b|\bnull\b|NaN/.test(t)) odd.push(nav);
+        }
+        check('old-app-takes', loaded && takes.length === 1 && takes[0] === null && odd.length === 0 && p2.errors.length === 0,
+          `the old app, signed in as the singer: loaded with the take that has no coach ${takes.length === 1 && takes[0] === null}; ` +
+          `its five tabs shown with nothing blank or broken ${odd.length === 0 ? 'true' : 'false (' + odd.join(', ') + ')'}; page errors ${p2.errors.length ? p2.errors.join(' | ') : 'none'}`);
+      }
+    } finally {
+      await env2.close();
+    }
+  }
+
+  /* 7. a kept take sent later: shared with the coach, the recording not uploaded again */
+  if (want('take-send-kept') && keptOnly) {
+    const ups = () => page.eval(S(`net.filter((u) => u.includes('/storage/v1/object/takes/${keptOnly.path}')).length`));
+    const before = await ups();
+    await page.tap(`.take-row[data-take="${keptOnly.id}"] .take-more`);
+    await page.tap(`.take-row[data-take="${keptOnly.id}"] .take-send`);
+    await page.waitFor(`!!document.querySelector('#send-go')`, 10000);
+    await page.tap('.coach-pick input');
+    await page.tap('#send-go');
+    await page.waitFor(`!!document.querySelector('#song-play')`, 5000);
+    const marked = await page.waitFor(`document.querySelector('.take-row[data-take="${keptOnly.id}"]')?.innerText.includes('Sent to Test Coach')`, 30000);
+    const after = await ups();
+    const seen = asCoach(keptOnly.path);
+    check('take-send-kept', marked && after === before && seen.rows === 1 && seen.opens,
+      `a saved take sent from its menu: marked "Sent to Test Coach" ${marked}; uploads of its recording during the send: ${after - before}; ` +
+      `the coach now sees ${seen.rows} row for it and can play it ${seen.opens}`);
+  }
+
   if (want('take-words')) {
     const { strayWords } = await import('./checks.mjs');
     await singTake(SUNG, 3);
@@ -348,6 +452,21 @@ try {
     await page.tap('#take-again');
     check('take-words', stray.length === 0, stray.length ? 'words not from the copy: ' + stray.join(' | ') : 'every word on the song screen with a take is from the copy');
   }
+  /* 8. a singer with no coach (the test coach, singing as a singer) */
+  if (want('take-no-coach')) {
+    await signInAs(page, COACH_EMAIL);
+    await open();
+    await singTake(SUNG, 3);
+    await page.tap('#take-send');
+    const said = await page.waitFor(`document.querySelector('#no-coach')?.textContent === ${JSON.stringify(copy.send.none)}`, 10000);
+    const noSend = await page.eval(`!document.querySelector('#send-go')`);
+    await page.tap('main .back');
+    await page.waitFor(`!!document.querySelector('#take-again')`, 5000);
+    await page.tap('#take-again');
+    await signInAs(page, EMAIL);
+    check('take-no-coach', said && noSend, `signed in as a singer with no coach, Send to a coach says "${copy.send.none}" ${said}, with nothing to send to ${noSend}`);
+  }
+
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));
 } catch (e) {
   const why = 'the test stopped: ' + String(e.message || e).split('\n')[0];
@@ -357,6 +476,7 @@ try {
   /* every take this run made goes, through the app (and nothing else) */
   try {
     await page.c.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+    if (made.size) await signInAs(page, EMAIL);         /* only the singer can delete its takes */
     for (const id of made) {
       if (!(await page.eval(`!!document.querySelector('.take-row[data-take="${id}"]')`))) await open();
       if (await page.eval(`!!document.querySelector('.take-row[data-take="${id}"]')`)) {

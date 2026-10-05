@@ -133,6 +133,12 @@ export class Conductor {
     this.lastTake = null;
   }
 
+  /** A take thrown away, taken back (Undo). */
+  restoreTake(t: Take): void {
+    this.lastTake = t;
+    this.set({ takes: this.snap.takes + 1 });
+  }
+
   /** What the mic hears while a session is listening; nothing otherwise. */
   onMic(fn: (b: MicBlock) => void): () => void {
     this.micListeners.add(fn);

@@ -1,20 +1,31 @@
 import { useEffect, useState } from 'react';
 import { copy } from '../core/copy';
-import { myCoaches, saveTake, type Coach } from '../data/takes';
+import { myCoaches, saveTake, sendTake, takesFor, type Coach, type StoredTake } from '../data/takes';
 import { useConductor } from '../shell/conductor-context';
 import { useSingerLine, useSong } from '../shell/hooks';
 import { review, toStored } from '../shell/take-review';
 import { back, navigate, songRoute } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
 
-/* Send the take just made to one or more of your coaches (a singer can
-   have several: RULEBOOK 1c). Sending keeps the take, as Save does, and
-   shares it only with the coaches picked. */
-export function SendTake(props: { id: string }) {
+/* Send a take to one or more of your coaches (a singer can have several:
+   RULEBOOK 1c): the take just made (sending keeps it, as Save does), or one
+   already kept (its recording is already online: nothing is uploaded
+   again). Only the coaches picked can hear it. */
+export function SendTake(props: { id: string; takeId?: string }) {
   const c = useConductor();
   const song = useSong(props.id);
   const singer = useSingerLine(props.id);
-  const rv = review(c.take('song:' + props.id), singer?.m ?? null, singer?.hop ?? 0.05, false);
+  const rv = props.takeId ? null : review(c.take('song:' + props.id), singer?.m ?? null, singer?.hop ?? 0.05, false);
+  const [kept, setKept] = useState<StoredTake | null | undefined>(undefined);
+  useEffect(() => {
+    if (!props.takeId) return;
+    let live = true;
+    void takesFor(null).then((all) => live && setKept(all.find((t) => t.id === props.takeId) ?? null));
+    return () => {
+      live = false;
+    };
+  }, [props.takeId]);
+  const hasTake = props.takeId ? !!kept : !!rv;
   const [coaches, setCoaches] = useState<Coach[] | null | 'offline' | undefined>(undefined);
   const [chosen, setChosen] = useState<string[]>([]);
 
@@ -27,16 +38,19 @@ export function SendTake(props: { id: string }) {
   }, []);
 
   async function send() {
-    if (!rv || !song || !Array.isArray(coaches)) return;
+    if (!Array.isArray(coaches)) return;
     const to = coaches.filter((x) => chosen.includes(x.id));
     if (!to.length) return;
-    await saveTake(toStored(rv, props.id, song.title), to);
-    c.dropTake();
+    if (kept) await sendTake(kept.id, to);
+    else if (rv && song) {
+      await saveTake(toStored(rv, props.id, song.title), to);
+      c.dropTake();
+    } else return;
     back(songRoute(props.id));
   }
 
   let body;
-  if (!rv) body = <p className="line">{copy.send.noTake}</p>;
+  if (!hasTake) body = props.takeId && kept === undefined ? null : <p className="line">{copy.send.noTake}</p>;
   else if (coaches === undefined) body = null;
   else if (coaches === null) {
     body = (

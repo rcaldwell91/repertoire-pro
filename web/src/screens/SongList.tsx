@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import type { SyntheticEvent } from 'react';
 import { ChevronRight, Music, Plus } from 'lucide-react';
 import { copy } from '../core/copy';
 import { listLine } from '../core/song';
@@ -7,12 +8,29 @@ import { splitPhase } from '../data/split';
 import { useSongs, useUser } from '../shell/hooks';
 import { back, navigate, songRoute } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
+import { useConductor, useSnapshot } from '../shell/conductor-context';
+import { TakesList } from './TakesList';
+import type { StoredTake } from '../data/takes';
 
 /* Learn a song: the songs on this phone, and Add a song. */
 export function SongList() {
   const me = useUser();
   const songs = useSongs();
   const input = useRef<HTMLInputElement>(null);
+  const c = useConductor();
+  const snap = useSnapshot();
+  /* a take heard on its own (its song may not be on this phone) */
+  const [heard, setHeard] = useState<string | null>(null);
+  const hearing = c.active() && snap.owner === 'takes' ? heard : null;
+  function hear(ev: SyntheticEvent, t: StoredTake, url: string) {
+    if (hearing === t.id) {
+      c.stop();
+      return;
+    }
+    if (hearing) c.stop();
+    setHeard(t.id);
+    c.start(c.tap(ev.nativeEvent), { owner: 'takes', steps: [{ kind: 'note', url, gain: 1 }] });
+  }
 
   return (
     <>
@@ -53,6 +71,7 @@ export function SongList() {
           <ChevronRight size={22} strokeWidth={2} aria-hidden="true" />
         </button>
       ))}
+      {me && <TakesList songId={null} showSong playing={hearing} onPlay={hear} />}
     </>
   );
 }

@@ -4,11 +4,13 @@ import { SUPABASE_URL, SUPABASE_KEY } from './config';
 
 /* Takes: kept on the phone the moment they are saved (RULEBOOK 3: saved
    straight away), then put online in the background, with real progress,
-   into the old app's private takes store - a folder per person - and,
-   when sent, into its takes table: one row per chosen coach, which the
-   database lets only that coach and the singer read. Offline, a take
-   waits on the phone and goes up when the phone is back online. Nobody
-   waits for any of it. */
+   into the old app's private takes store - a folder per person - and its
+   takes table: one row with no coach (the singer's alone: phones can wipe
+   a website's data, so a take kept only there is not safe), and one more
+   row for each coach it is sent to. A coach can open a recording only if
+   it was sent to them (database rule, 5 Oct). Offline, a take waits on the
+   phone and goes up when the phone is back online; on a new phone, the
+   singer's takes come back down. Nobody waits for any of it. */
 
 export interface Coach {
   readonly id: string;
@@ -20,7 +22,8 @@ export interface StoredTake {
   readonly songId: string;
   readonly songTitle: string;
   readonly created: number;
-  readonly audio: Blob;
+  /** the recording, on this phone; null for a take kept online only */
+  readonly audio: Blob | null;
   readonly seconds: number;
   /** where in the song it begins */
   readonly songAt: number;
@@ -31,6 +34,8 @@ export interface StoredTake {
   readonly rightPct: number | null;
   /** online: where it is, or how far it has got */
   readonly path?: string;
+  /** its own row (no coach) is in the takes table */
+  readonly kept?: boolean;
   readonly progress?: number;
   /** coaches it is to be sent to, and those it has been sent to */
   readonly sendTo: readonly Coach[];
@@ -52,9 +57,21 @@ export function onTakes(fn: () => void): () => void {
 const going = new Map<string, ReturnType<typeof setTimeout>>();
 export const UNDO_MS = 6000;
 
-export async function takesFor(songId: string): Promise<StoredTake[]> {
+/** A song's takes, newest first: by the song, or by its title (the same
+    song added again, on a new phone). No song: every take. */
+export async function takesFor(songId: string | null, title?: string): Promise<StoredTake[]> {
   const all = await inStore<StoredTake[]>('takes', 'readonly', (s) => s.getAll() as IDBRequest<StoredTake[]>);
-  return all.filter((t) => t.songId === songId && !going.has(t.id)).sort((a, b) => b.created - a.created);
+  return all.filter((t) => !going.has(t.id) && (songId == null || t.songId === songId || (!!title && t.songTitle === title)))
+    .sort((a, b) => b.created - a.created);
+}
+
+/** somewhere a take can be heard from: its recording on this phone, or a
+    signed link to it online that lasts an hour */
+export async function takeUrl(t: StoredTake): Promise<string | null> {
+  if (t.audio) return URL.createObjectURL(t.audio);
+  if (!t.path) return null;
+  const r = await supabase.storage.from('takes').createSignedUrl(t.path, 3600);
+  return r.error ? null : r.data.signedUrl;
 }
 
 function get(id: string): Promise<StoredTake | undefined> {
@@ -112,7 +129,7 @@ async function removeForGood(id: string): Promise<void> {
   /* online too: the rows sent to coaches, and the recording */
   try {
     const me = (await supabase.auth.getSession()).data.session?.user.id;
-    if (me && t.sent.length) await supabase.from('takes').delete().eq('student_id', me).eq('audio_path', t.path);
+    if (me) await supabase.from('takes').delete().eq('student_id', me).eq('audio_path', t.path);
     await supabase.storage.from('takes').remove([t.path]);
   } catch {
     /* offline: the phone's copy is gone; the online copy stays private to its owner */
@@ -187,7 +204,7 @@ async function sync(): Promise<void> {
     if (going.has(t.id)) continue;
     try {
       let path = t.path;
-      if (!path) {
+      if (!path && t.audio) {
         const p = `${me}/${t.id}.wav`;
         let shown = -1;
         await put(p, t.audio, session.access_token, (f) => {
@@ -198,10 +215,20 @@ async function sync(): Promise<void> {
         await patch(t.id, { path: p, progress: 1 });
         path = p;
       }
+      if (!path) continue;
+      const details = { app: 'learn', songId: t.songId, songTitle: t.songTitle, songAt: t.songAt, created: t.created,
+        rightPct: t.rightPct, anyOctave: t.anyOctave, t: Array.from(t.line.t, round2), m: Array.from(t.line.m, round2) };
+      const row = (coach: string | null) => ({ student_id: me, coach_id: coach, title: t.songTitle, note: '', audio_path: path,
+        duration: Math.round(t.seconds * 10) / 10, kind: 'song', notes: details });
+      if (!t.kept) {
+        /* its own row: the singer's alone, so it is safe online and comes back on a new phone */
+        const r = await supabase.from('takes').insert(row(null));
+        if (r.error) throw r.error;
+        await patch(t.id, { kept: true });
+      }
       for (const c of t.sendTo) {
-        const row = { student_id: me, coach_id: c.id, title: t.songTitle, note: '', audio_path: path,
-          duration: Math.round(t.seconds * 10) / 10, kind: 'song' };
-        const r = await supabase.from('takes').insert(row);
+        /* the same recording, now shared with this coach: nothing uploaded again */
+        const r = await supabase.from('takes').insert(row(c.id));
         if (r.error) throw r.error;
         const now = await get(t.id);
         if (!now) continue;
@@ -211,9 +238,45 @@ async function sync(): Promise<void> {
       }
     } catch {
       await patch(t.id, { progress: undefined });
-      break;                                       /* offline or refused: try again later */
+      return;                                      /* offline or refused: try again later */
     }
   }
+  await pull(me, all);
+}
+
+const round2 = (v: number) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : null);
+const num = (v: number | null) => (v == null ? NaN : v);
+
+/* the singer's takes kept online that this phone does not have (a new
+   phone, or one that lost its data): brought back, ready to hear */
+async function pull(me: string, local: StoredTake[]): Promise<void> {
+  const r = await supabase.from('takes').select('audio_path, coach_id, created_at, duration, notes')
+    .eq('student_id', me).not('audio_path', 'is', null);
+  if (r.error || !r.data) return;
+  const rows = r.data.filter((x) => (x.notes as { app?: string } | null)?.app === 'learn');
+  const coachIds = [...new Set(rows.map((x) => x.coach_id as string | null).filter((x): x is string => !!x))];
+  const names = new Map<string, string>();
+  if (coachIds.length) {
+    const p = await supabase.from('profiles').select('id, display_name').in('id', coachIds);
+    (p.data ?? []).forEach((x) => names.set(x.id as string, (x.display_name as string) || ''));
+  }
+  const have = new Set(local.map((t) => t.path));
+  const added = new Set<string>();
+  for (const x of rows) {
+    const path = x.audio_path as string;
+    if (have.has(path) || added.has(path) || x.coach_id) continue;
+    added.add(path);
+    const d = x.notes as { songId: string; songTitle: string; songAt: number; created: number; rightPct: number | null;
+      anyOctave: boolean; t: (number | null)[]; m: (number | null)[] };
+    const id = path.split('/').pop()!.replace(/\.wav$/, '');
+    const sent = rows.filter((y) => y.audio_path === path && y.coach_id)
+      .map((y) => ({ id: y.coach_id as string, name: names.get(y.coach_id as string) ?? '' }));
+    const take: StoredTake = { id, songId: d.songId, songTitle: d.songTitle, created: d.created, audio: null,
+      seconds: Number(x.duration) || 0, songAt: d.songAt, line: { t: Float32Array.from(d.t, num), m: Float32Array.from(d.m, num) },
+      anyOctave: d.anyOctave, rightPct: d.rightPct, path, kept: true, sendTo: [], sent };
+    await inStore('takes', 'readwrite', (s) => s.put(take));
+  }
+  if (added.size) changed();
 }
 
 let started = false;

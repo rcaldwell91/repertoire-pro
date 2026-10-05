@@ -65,17 +65,17 @@ export function useSingerLine(id: string): SingerLine | null {
 }
 
 /** The takes kept for a song, newest first; null while loading. */
-export function useTakes(songId: string): StoredTake[] | null {
+export function useTakes(songId: string | null, title?: string): StoredTake[] | null {
   const [takes, setTakes] = useState<StoredTake[] | null>(null);
   useEffect(() => {
     let live = true;
-    const load = () => void takesFor(songId).then((t) => live && setTakes(t), () => live && setTakes([]));
+    const load = () => void takesFor(songId, title).then((t) => live && setTakes(t), () => live && setTakes([]));
     load();
     const off = onTakes(load);
     return () => {
       live = false;
       off();
     };
-  }, [songId]);
+  }, [songId, title]);
   return takes;
 }
