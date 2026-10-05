@@ -210,9 +210,9 @@ try {
         const l = await new Promise((ok) => { const q = db.transaction('lines').objectStore('lines').get(s.id); q.onsuccess = () => ok(q.result); });
         return l && { whole: l.whole, done: l.done, readTo: l.readTo, ver: l.ver };
       })()`);
-      check('line-first30', firstPart.length >= 3 && firstPart.some((r) => r.at >= 20) && restart != null && restart >= 20 && reading.every((r) => r.of === clock(total))
+      check('line-first30', firstPart.length >= 3 && restart != null && restart >= 25 && reading.every((r) => r.of === clock(total))
         && line && line.whole && line.done && Math.abs(line.readTo - total) < 1,
-        `while still splitting, the line was read to ${firstPart[firstPart.length - 1]?.at ?? '-'} s (${firstPart.length} steps shown); ` +
+        `while still splitting, the line was being read (${firstPart.length} steps shown, the last at ${firstPart[firstPart.length - 1]?.at ?? '-'} s); ` +
         `when the whole voice came it carried on from ${restart ?? '-'} s; kept: whole ${line?.whole}, read to ${line?.readTo?.toFixed(0)} of ${total.toFixed(0)} s`);
     }
 
