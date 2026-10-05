@@ -1,4 +1,4 @@
-import { foldTo } from './notemap';
+import { foldTo } from './notemap.ts';
 
 /* A take, as numbers: which of your notes were right, and the share of
    them. ONE rule, used both to colour your line on the note map and for

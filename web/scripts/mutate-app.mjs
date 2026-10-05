@@ -139,8 +139,8 @@ const MUTATIONS = [
   { test: 'notemap', what: 'the singer\'s line is read from the music', file: 'src/shell/singer-line.ts',
     from: 'const voice = song.voice ?? song.voice30;', to: 'const voice = song.music ?? song.music30;', checks: ['line-follows'] },
   { test: 'notemap', what: 'the singer\'s line goes with the Voice slider', file: 'src/screens/SongScreen.tsx',
-    from: 'singer: singer?.m ?? new Float32Array(0),', to: 'singer: voice > 0 && singer ? singer.m : new Float32Array(0),',
-    and: { file: 'src/screens/SongScreen.tsx', from: '[singer, you]);', to: '[singer, you, voice]);' }, checks: ['voice-zero'] },
+    from: 'singer: singer?.m ?? new Float32Array(0), hop:', to: 'singer: voice > 0 && singer ? singer.m : new Float32Array(0), hop:',
+    and: { file: 'src/screens/SongScreen.tsx', from: '[singer, you, shownLine]);', to: '[singer, you, shownLine, voice]);' }, checks: ['voice-zero'] },
   { test: 'notemap', what: 'the view follows the newest note', file: 'src/ui/NoteMap.tsx',
     from: 'const r = range ?? { lo: 55, hi: 72 };',
     to: 'const cur = singerAt(lines.singer, lines.hop, at); const r = Number.isFinite(cur) ? { lo: Math.round(cur) - 8, hi: Math.round(cur) + 8 } : range ?? { lo: 55, hi: 72 };',
@@ -169,6 +169,38 @@ const MUTATIONS = [
     to: '        {mic && false && (\n          <button type="button" className="btn btn-quiet" id="carry-on"', checks: ['mic-refused'] },
   { test: 'notemap', what: 'reopening a song reads its line again', file: 'src/shell/singer-line.ts',
     from: '    if (stored.anchored && stored.done && (stored.whole || !whole)) return;', to: '', checks: ['reopen-line'] },
+  /* takes (tests/takes.test.mjs, against the real database, with the two test accounts) */
+  { test: 'takes', what: 'the take records the music too', file: 'src/audio/engine-web/web-engine.ts',
+    from: '    from.connect(tap);', to: '    from.connect(tap);\n    for (const s of this.sources) s.connect(tap);', checks: ['take-voice-only'] },
+  { test: 'takes', what: 'a take is placed without the speaker\'s delay', file: 'src/audio/conductor/conductor.ts',
+    from: 'this.recorder?.push(b, (at) => this.songTime(at));', to: 'this.recorder?.push(b, (at) => this.songTime(at + this.engine.outputLatency()));',
+    checks: ['take-lines-up'] },
+  { test: 'takes', what: 'a take plays back from the song\'s start, not its own place', file: 'src/screens/SongScreen.tsx',
+    from: 'starts: [0, 0, t.songAt] }] });', to: 'starts: [0, 0, 0] }] });', checks: ['take-lines-up'] },
+  { test: 'takes', what: 'the right-note % uses a looser rule than the map', file: 'src/core/takes.ts',
+    from: '    if (isRight(m[i], s, anyOctave)) hit++;', to: '    if (Math.abs(m[i] - s) < 1) hit++;', checks: ['take-review'] },
+  { test: 'takes', what: 'the map colours by a looser rule than the right-note %', file: 'src/ui/NoteMap.tsx',
+    from: 'isRight(p.m, singerNow(lines.singer, lines.hop, p.t), false) ? p.m : NaN', to: 'Math.abs(p.m - singerNow(lines.singer, lines.hop, p.t)) < 1 ? p.m : NaN',
+    checks: ['take-review'] },
+  { test: 'takes', what: 'leaving a take keeps it playing', file: 'src/shell/App.tsx',
+    from: 'props.conductor.leave(why);', to: '', checks: ['take-leave'] },
+  { test: 'takes', what: 'offline, Save keeps nothing', file: 'src/data/takes.ts',
+    from: "  await inStore('takes', 'readwrite', (s) => s.put({ ...t, sendTo, sent: [] }));",
+    to: "  if (!navigator.onLine) return;\n  await inStore('takes', 'readwrite', (s) => s.put({ ...t, sendTo, sent: [] }));", checks: ['take-saved-first'] },
+  { test: 'takes', what: 'a take kept offline never goes online by itself', file: 'src/data/takes.ts',
+    from: "  window.addEventListener('online', () => void syncTakes());", to: '',
+    and: { file: 'src/data/takes.ts', from: '  setInterval(() => void syncTakes(), 20000);', to: '' }, checks: ['take-offline'] },
+  { test: 'takes', what: 'delete has no undo', file: 'src/data/takes.ts',
+    from: 'export const UNDO_MS = 6000;', to: 'export const UNDO_MS = 0;', checks: ['take-delete-undo'] },
+  { test: 'takes', what: 'deleting leaves the recording online', file: 'src/data/takes.ts',
+    from: "    await supabase.storage.from('takes').remove([t.path]);", to: '', checks: ['take-delete-undo'] },
+  { test: 'takes', what: 'Save shares the take with every coach', file: 'src/screens/SongScreen.tsx',
+    from: 'void saveTake(toStored(rv, props.id, song.title));',
+    to: 'void myCoaches().then((cs) => saveTake(toStored(rv, props.id, song.title), cs ?? []));',
+    and: { file: 'src/screens/SongScreen.tsx', from: "import { saveTake, type StoredTake } from '../data/takes';", to: "import { myCoaches, saveTake, type StoredTake } from '../data/takes';" },
+    checks: ['take-private'] },
+  { test: 'takes', what: 'sending goes to nobody', file: 'src/screens/SendTake.tsx',
+    from: '    const to = coaches.filter((x) => chosen.includes(x.id));', to: '    const to = coaches.filter((x) => chosen.includes(x.id) && false);', checks: ['take-send'] },
 ];
 
 function edit(dir, { file, from, to }) {
@@ -194,7 +226,7 @@ for (const m of RUN) {
     const b = spawnSync('npx', ['vite', 'build', '--outDir', join(dir, 'app'), '--emptyOutDir', '--logLevel', 'error'], { cwd: dir, encoding: 'utf8' });
     if (b.status !== 0) throw new Error('broken copy did not build: ' + b.stderr);
     /* the checks (from the real test file) against the broken build */
-    const suite = { song: 'tests/song.test.mjs', notemap: 'tests/notemap.test.mjs' }[m.test] || 'tests/browser.test.mjs';
+    const suite = { song: 'tests/song.test.mjs', notemap: 'tests/notemap.test.mjs', takes: 'tests/takes.test.mjs' }[m.test] || 'tests/browser.test.mjs';
     const r = spawnSync('node', [join(WEB, suite)], {
       cwd: WEB,
       encoding: 'utf8',
