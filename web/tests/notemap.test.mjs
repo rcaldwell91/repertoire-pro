@@ -195,10 +195,10 @@ try {
   const line = await storedLine();
   if (want('line-read')) {
     const rising = at.join() === [...at].sort((a, b) => a - b).join() && new Set(at).size >= 10;
-    check('line-read', prog.length > 0 && rising && prog.every((m) => m[2] === clock(seconds)) && at[0] <= 10 && at[at.length - 1] >= seconds - 2
-      && line && line.ver === LINE_VER && line.whole && line.done && line.anchored,
+    check('line-read', prog.length > 0 && rising && prog.every((m) => m[2] === clock(seconds)) && at[0] <= 10 && at[at.length - 1] >= seconds - 15
+      && line && line.ver === LINE_VER && line.whole && line.done && line.anchored && Math.abs(line.readTo - seconds) < 0.1,
       `progress shown ${prog.length} times, ${prog[0]?.[1]} → ${prog[prog.length - 1]?.[1]} of ${prog[0]?.[2]} (the voice is ${clock(seconds)}), in ${(readMs / 1000).toFixed(0)} s; ` +
-      `kept on the phone: version ${line?.ver}, whole voice ${line?.whole}, finished ${line?.done}, with the octave anchor ${line?.anchored}`);
+      `kept on the phone: read to ${line?.readTo.toFixed(1)} s, version ${line?.ver}, whole voice ${line?.whole}, finished ${line?.done}, with the octave anchor ${line?.anchored}`);
   }
 
   if (want('line-follows')) {

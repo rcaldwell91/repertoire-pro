@@ -32,7 +32,7 @@ if (songs.length < 2 || !MIC || !existsSync(MIC)) {
 }
 const [[SONG, SONG_PATH], [SONG2, SONG2_PATH]] = songs;
 
-const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'server-off', 'split-progress', 'first30-early', 'sliders',
+const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'server-off', 'split-progress', 'first30-early', 'line-first30', 'sliders',
   'controls', 'song-contrast', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'signed-out-again', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -138,16 +138,21 @@ try {
     check('server-off', said && retry, `said "${copy.song.offline}" ${said}; offers Try again ${retry}`);
   }
 
-  if (want('split-progress', 'first30-early', 'sliders', 'controls', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'song-contrast')) {
+  if (want('split-progress', 'first30-early', 'line-first30', 'sliders', 'controls', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'song-contrast')) {
     const total = secondsOf(SONG_PATH);
     const before = await addSong(SONG_PATH, SONG);
     /* follow the line under the title, as the singer sees it */
     const seen = [];
     let early = null;
+    /* the singer's line as the screen says it is being read, and whether
+       the song was still splitting at the time */
+    const reading = [];
     const t0 = Date.now();
     for (;;) {
-      const s = await page.eval(`({ line: ${LINE}, play: !document.querySelector('#song-play').disabled })`);
+      const s = await page.eval(`({ line: ${LINE}, play: !document.querySelector('#song-play').disabled, map: document.querySelector('#map-line')?.textContent || '' })`);
       if (seen[seen.length - 1] !== s.line) seen.push(s.line);
+      const r = /^Reading the singer's line… (\d+):(\d\d) of (\d+:\d\d)$/.exec(s.map);
+      if (r && reading[reading.length - 1]?.text !== s.map) reading.push({ text: s.map, at: +r[1] * 60 + +r[2], of: r[3], splitting: /^Splitting/.test(s.line || '') });
       if (!early && s.play && s.line && s.line.startsWith('Splitting')) {
         /* the first 30 seconds can be played while the rest is still splitting */
         const n = await page.eval(S('starts.length'));
@@ -176,6 +181,26 @@ try {
         `title from the file "${before.title}", Save waited for "I own this copy" ${before.disabled}; sending ${sending.join('% ')}%; ` +
         `ready to ${ready.map((m) => m[1]).join(', ')} of ${ready[0]?.[2]} (the song is ${clock(total)}); finished ${done}` + (done ? '' : '; the line said: ' + seen.join(' / ')));
     }
+    if (want('line-first30')) {
+      /* read while the rest was still splitting, then carried on from where
+         the first 30 seconds stopped, not read again from the start */
+      await page.waitFor(`!document.querySelector('#map-line')?.textContent`, 240000);
+      const firstPart = reading.filter((r) => r.splitting);
+      const later = reading.filter((r) => !r.splitting);
+      const restart = later.length ? later[0].at : null;
+      const line = await page.eval(`(async () => {
+        const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+        const songs = await new Promise((ok) => { const q = db.transaction('songs').objectStore('songs').getAll(); q.onsuccess = () => ok(q.result); });
+        const s = songs.find((x) => x.title === ${JSON.stringify(SONG)} && x.voice);
+        const l = await new Promise((ok) => { const q = db.transaction('lines').objectStore('lines').get(s.id); q.onsuccess = () => ok(q.result); });
+        return l && { whole: l.whole, done: l.done, readTo: l.readTo, ver: l.ver };
+      })()`);
+      check('line-first30', firstPart.length >= 3 && firstPart.some((r) => r.at >= 20) && restart != null && restart >= 20 && reading.every((r) => r.of === clock(total))
+        && line && line.whole && line.done && Math.abs(line.readTo - total) < 1,
+        `while still splitting, the line was read to ${firstPart[firstPart.length - 1]?.at ?? '-'} s (${firstPart.length} steps shown); ` +
+        `when the whole voice came it carried on from ${restart ?? '-'} s; kept: whole ${line?.whole}, read to ${line?.readTo?.toFixed(0)} of ${total.toFixed(0)} s`);
+    }
+
     if (want('first30-early')) {
       const ok = !!early && early.st.length === 2 && early.st.every((x) => Math.abs(x.seconds - 30) < 0.5)
         && early.st[0].when === early.st[1].when && early.st[0].offset === early.st[1].offset && /^Splitting/.test(early.still || '');

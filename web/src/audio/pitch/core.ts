@@ -82,7 +82,10 @@ export function centred5(raw: ArrayLike<number>, j: number, upTo: number, ring =
 export class FileTrace {
   private k = 0;
   private readonly win = new Float32Array(WIN);
-  private readonly anc: { midi: number[]; conf: number[] } = { midi: [], conf: [] };
+  private readonly ancN: number;
+  private readonly ancMidi: Float32Array;
+  private readonly ancConf: Float32Array;
+  private readonly one = { step: 1, midi: new Float32Array(1), conf: new Float32Array(1) };
   private readonly raw: Float32Array;
   private rawTo: number;
   private readonly mono: Float32Array;
@@ -97,6 +100,10 @@ export class FileTrace {
     this.method = method;
     this.k = startK;
     this.raw = new Float32Array(this.points).fill(NaN);
+    /* as many anchors as the old app made: one every ANCHOR_STEP, to the end */
+    this.ancN = Math.floor(mono.length / sr / ANCHOR_STEP) + 1;
+    this.ancMidi = new Float32Array(this.ancN).fill(NaN);
+    this.ancConf = new Float32Array(this.ancN);
     this.rawTo = Math.max(0, startK - 2);
   }
 
@@ -108,22 +115,26 @@ export class FileTrace {
     return this.k;
   }
 
-  private anchors(upTo: number): Anchors | null {
+  /* the model's anchor nearest time t: made only where a point needs one
+     (where there is a pitch to anchor), and once */
+  private anchorAt(t: number): Anchors | null {
     if (!this.crepe) return null;
-    const need = Math.min(Math.floor(this.mono.length / this.sr / ANCHOR_STEP), Math.round(upTo / ANCHOR_STEP) + 1);
-    for (let a = this.anc.midi.length; a <= need; a++) {
-      const r = actToMidiConf(crepePredict(this.crepe, crepeFrame(this.mono, this.sr, a * ANCHOR_STEP)));
-      this.anc.midi.push(r.midi);
-      this.anc.conf.push(r.conf);
+    const ai = Math.round(t / ANCHOR_STEP);
+    if (ai < 0 || ai >= this.ancN) return null;
+    if (Number.isNaN(this.ancMidi[ai])) {
+      const r = actToMidiConf(crepePredict(this.crepe, crepeFrame(this.mono, this.sr, ai * ANCHOR_STEP)));
+      this.ancMidi[ai] = r.midi;
+      this.ancConf[ai] = r.conf;
     }
-    return { step: ANCHOR_STEP, midi: Float32Array.from(this.anc.midi), conf: Float32Array.from(this.anc.conf) };
+    this.one.midi[0] = this.ancMidi[ai];
+    this.one.conf[0] = this.ancConf[ai];
+    return this.one;
   }
 
   /** the reading at each point up to `to` (not included), once each */
   private readTo(to: number): void {
     to = Math.min(this.points, to);
     if (to <= this.rawTo) return;
-    const anc = this.anchors(to * HOP);
     for (let k = this.rawTo; k < to; k++) {
       const t = k * HOP;
       const start = Math.round(t * this.sr) - (WIN >> 1);
@@ -132,7 +143,7 @@ export class FileTrace {
         this.win[j] = sp >= 0 && sp < this.mono.length ? this.mono[sp] : 0;
       }
       const m = reading(this.win, this.sr, this.method);
-      this.raw[k] = m == null ? NaN : anchored(m, t, anc);
+      this.raw[k] = m == null ? NaN : anchored(m, 0, this.anchorAt(t));
     }
     this.rawTo = to;
   }

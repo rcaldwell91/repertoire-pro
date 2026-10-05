@@ -57,10 +57,6 @@ export function yinHz(buf: Float32Array, sr: number, clarity: number): number {
   return freq;
 }
 
-export function freqMidi(f: number): number {
-  return 69 + 12 * Math.log2(f / 440);
-}
-
 /* The old app's gate at its default setting (ngateApply(20)): a loudness
    floor and the clarity YIN must reach. */
 export const GATE_LEVEL = 0.002 + 0.2 * 0.2 * 0.13;

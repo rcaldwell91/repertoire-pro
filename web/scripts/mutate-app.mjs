@@ -126,6 +126,46 @@ const MUTATIONS = [
     checks: ['controls'] },
   { test: 'song', what: 'the song screen is too faint in the dark', file: 'src/ui/tokens.css',
     from: '--muted: #a6a2c4;', to: '--muted: #4a4766;', checks: ['song-contrast'] },
+  /* the singer's line, your line and the note map (tests/notemap.test.mjs, and the song test for the first 30 seconds) */
+  { test: 'song', what: 'the singer\'s line waits for the whole voice', file: 'src/screens/SongScreen.tsx',
+    from: 'const voiceParts = has ? (has.full ? 2 : has.first30 ? 1 : 0) : 0;', to: 'const voiceParts = has ? (has.full ? 2 : 0) : 0;', checks: ['line-first30'] },
+  { test: 'song', what: 'the whole voice is read again from the start', file: 'src/shell/singer-line.ts',
+    from: 'fromK = Math.round(stored.readTo / HOP);', to: 'fromK = 0;', checks: ['line-first30'] },
+  { test: 'notemap', what: 'the reading progress shows the end, not how far it has got', file: 'src/screens/SongScreen.tsx',
+    from: 'at: clock(singer.readTo), of: clock(singer.seconds)', to: 'at: clock(singer.seconds), of: clock(singer.seconds)', checks: ['line-read'] },
+  { test: 'notemap', what: 'the singer\'s line is read from the music', file: 'src/shell/singer-line.ts',
+    from: 'const voice = song.voice ?? song.voice30;', to: 'const voice = song.music ?? song.music30;', checks: ['line-follows'] },
+  { test: 'notemap', what: 'the singer\'s line goes with the Voice slider', file: 'src/screens/SongScreen.tsx',
+    from: 'singer: singer?.m ?? new Float32Array(0),', to: 'singer: voice > 0 && singer ? singer.m : new Float32Array(0),',
+    and: { file: 'src/screens/SongScreen.tsx', from: '[singer, you]);', to: '[singer, you, voice]);' }, checks: ['voice-zero'] },
+  { test: 'notemap', what: 'the view follows the newest note', file: 'src/ui/NoteMap.tsx',
+    from: 'const r = range ?? { lo: 55, hi: 72 };',
+    to: 'const cur = singerAt(lines.singer, lines.hop, at); const r = Number.isFinite(cur) ? { lo: Math.round(cur) - 8, hi: Math.round(cur) + 8 } : range ?? { lo: 55, hi: 72 };',
+    checks: ['pinned'] },
+  { test: 'notemap', what: 'the speaker\'s delay is not taken off the song', file: 'src/audio/conductor/conductor.ts',
+    from: 'const d = at - this.engine.outputLatency() - song.ensemble.startedAt;', to: 'const d = at - song.ensemble.startedAt;', checks: ['placement'] },
+  { test: 'notemap', what: 'the mic\'s delay is not taken off what it hears', file: 'src/audio/engine-web/web-engine.ts',
+    from: 'end: e.data.end - this.inputLatency', to: 'end: e.data.end', checks: ['placement'] },
+  { test: 'notemap', what: 'your notes are dated when read, not at the middle of what was heard', file: 'src/audio/pitch/core.ts',
+    from: 'const at = endT - WIN / 2 / this.sr;', to: 'const at = endT;', checks: ['placement'] },
+  { test: 'notemap', what: '"Any octave" does nothing', file: 'src/ui/NoteMap.tsx',
+    from: 'if (Number.isFinite(s)) m = foldTo(m, s);', to: 'void foldTo; void s;', checks: ['octave-switch'] },
+  { test: 'notemap', what: 'octaves are folded by default', file: 'src/screens/SongScreen.tsx',
+    from: 'const [anyOctave, setAnyOctave] = useState(false);', to: 'const [anyOctave, setAnyOctave] = useState(true);', checks: ['octave-switch'] },
+  { test: 'notemap', what: '"Hear yourself" sounds while it is off', file: 'src/audio/conductor/conductor.ts',
+    from: 'if (withSong) this.engine.monitor(this.monitorGain);', to: 'if (withSong) this.engine.monitor(0.8);', checks: ['hear-yourself'] },
+  { test: 'notemap', what: 'the headphones line shows every time', file: 'src/screens/SongScreen.tsx',
+    from: 'if (!store.get(HEADPHONES_SEEN)) {', to: 'if (store) {', checks: ['hear-yourself'] },
+  { test: 'notemap', what: 'letting go of sound leaves the mic open, singing a song', file: 'src/audio/engine-web/web-engine.ts',
+    from: '    this.closeMic();\n    /* Silence is immediate', to: '    /* Silence is immediate', checks: ['mic-leave', 'mic-hidden'] },
+  { test: 'notemap', what: 'a refused mic stops the song', file: 'src/audio/conductor/conductor.ts',
+    from: '    this.set({ mic: r.why });             /* refused or missing: the rest carries on without it */\n    return false;',
+    to: '    this.set({ mic: r.why });\n    if (withSong) this.halt(\'stopped\', null);\n    return false;', checks: ['mic-refused'] },
+  { test: 'notemap', what: 'no "Carry on without it" on the song screen', file: 'src/screens/SongScreen.tsx',
+    from: '        {mic && (\n          <button type="button" className="btn btn-quiet" id="carry-on"',
+    to: '        {mic && false && (\n          <button type="button" className="btn btn-quiet" id="carry-on"', checks: ['mic-refused'] },
+  { test: 'notemap', what: 'reopening a song reads its line again', file: 'src/shell/singer-line.ts',
+    from: '    if (stored.anchored && stored.done && (stored.whole || !whole)) return;', to: '', checks: ['reopen-line'] },
 ];
 
 function edit(dir, { file, from, to }) {
@@ -151,7 +191,8 @@ for (const m of RUN) {
     const b = spawnSync('npx', ['vite', 'build', '--outDir', join(dir, 'app'), '--emptyOutDir', '--logLevel', 'error'], { cwd: dir, encoding: 'utf8' });
     if (b.status !== 0) throw new Error('broken copy did not build: ' + b.stderr);
     /* the checks (from the real test file) against the broken build */
-    const r = spawnSync('node', [join(WEB, m.test === 'song' ? 'tests/song.test.mjs' : 'tests/browser.test.mjs')], {
+    const suite = { song: 'tests/song.test.mjs', notemap: 'tests/notemap.test.mjs' }[m.test] || 'tests/browser.test.mjs';
+    const r = spawnSync('node', [join(WEB, suite)], {
       cwd: WEB,
       encoding: 'utf8',
       env: { ...process.env, APP_DIR: join(dir, 'app'), ONLY: m.checks.join(',') },

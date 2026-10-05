@@ -18,7 +18,7 @@ export interface Lines {
 const SPAN = 8;          /* seconds across the map */
 const NOW_AT = 0.3;      /* where the now-line sits, from the left */
 const GUTTER = 44;
-const PEN_GAP = 0.12;    /* seconds: more than two points apart is a break */
+const PEN_GAP = 0.21;    /* seconds between drawn points: a gap of 0.15 s (three points) or less is bridged (RULEBOOK 4, Pitch) */
 
 type Pt = { t: number; m: number };
 
@@ -35,11 +35,9 @@ function drawLine(g: CanvasRenderingContext2D, pts: Pt[], x: (t: number) => numb
   let prev = NaN;
   let prevT = -Infinity;
   for (const p of pts) {
-    if (!Number.isFinite(p.m)) {
-      prev = NaN;
-      continue;
-    }
-    /* the pen lifts across a gap, a big leap, or a break in time */
+    if (!Number.isFinite(p.m)) continue;
+    /* the pen lifts across a gap of more than 0.15 s, a big leap, or a
+       step back in time */
     if (penDown(prev, p.m) && p.t >= prevT && p.t - prevT <= PEN_GAP) g.lineTo(x(p.t), y(p.m));
     else g.moveTo(x(p.t), y(p.m));
     prev = p.m;
@@ -86,9 +84,13 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       /* rows and key names */
       g.font = `600 11px Quicksand, system-ui, sans-serif`;
       g.textBaseline = 'middle';
+      /* every white key named when there is room; otherwise C, E, G and A,
+         so no two names touch */
+      const roomy = (H - 2 * pad) / (r.hi - r.lo) >= 14;
       for (let m = Math.ceil(r.lo); m <= Math.floor(r.hi); m++) {
-        const isC = ((m % 12) + 12) % 12 === 0;
-        const natural = ![1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12);
+        const pc = ((m % 12) + 12) % 12;
+        const isC = pc === 0;
+        const natural = roomy ? ![1, 3, 6, 8, 10].includes(pc) : [0, 4, 7, 9].includes(pc);
         g.fillStyle = css.getPropertyValue(isC ? '--row-c' : '--row');
         g.fillRect(GUTTER, Math.round(y(m)), W - GUTTER, 1);
         if (natural) {

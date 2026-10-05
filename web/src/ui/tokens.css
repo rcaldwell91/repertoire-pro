@@ -381,7 +381,31 @@ input[type='range'] {
 .notemap { position: relative; margin: 8px 0 4px; }
 .notemap canvas { display: block; width: 100%; height: 260px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--tap); }
-.switch-row input[type='checkbox'] { width: 24px; height: 24px; accent-color: var(--accent); }
+.switch-row input[role='switch'] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 30px;
+  margin: 0;
+  border-radius: 999px;
+  border: 2px solid var(--muted);
+  background: var(--card);
+  cursor: pointer;
+}
+.switch-row input[role='switch']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s;
+}
+.switch-row input[role='switch']:checked { border-color: var(--accent); background: var(--accent); }
+.switch-row input[role='switch']:checked::after { background: var(--on-accent); transform: translateX(22px); }
 .hint { color: var(--muted); font-size: 0.9rem; margin: 4px 0 0; }
 .map-line { min-height: 1.4em; }
 .mic-line { text-align: center; }

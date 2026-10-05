@@ -1,9 +1,8 @@
-/* The file's own loudness gate (RULEBOOK 4, Pitch: "use Otsu on the
-   file's own loudness, not a guessed threshold"): the loudness of 50 ms
-   around each point, split into quiet and loud where the two groups are
-   best told apart (Otsu's method, on log loudness). A point of the
-   singer's line is kept only where the voice is loud. Only a whole file
-   can be gated this way; the mic keeps the core's fixed gate. */
+/* A candidate in the bake-off, not in the app: a gate on the file's own
+   loudness (RULEBOOK 4, Pitch: Otsu on the file's own loudness), keeping a
+   point of the singer's line only where the voice is loud. Measured on
+   5 Oct: it took the line out of the quiet parts but also lowered "follows
+   the voice" below the old app's, so the app does not use it. */
 
 /** Loudness (RMS) of `hop` seconds centred on each point k*hop. */
 export function loudness(mono: Float32Array, sr: number, hop: number): Float32Array {

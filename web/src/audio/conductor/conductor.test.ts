@@ -435,6 +435,8 @@ describe('a song you sing along to', () => {
     engine.hear(block(2));
     expect(heard).toEqual([1]);
     expect(silentAndClosed()).toBe(true);
+    engine.hear(block(3));                        /* even if the device still sends something */
+    expect(heard).toEqual([1]);
   });
 
   it('dates what is heard in the song, taking the speaker\'s delay off the song', async () => {
@@ -445,6 +447,23 @@ describe('a song you sing along to', () => {
     expect(c.songTime(1.12)).toBeCloseTo(6);
     engine.clock = 2.12;
     expect(c.position()).toBeCloseTo(7);
+  });
+
+  it('a plain song does not ask for the mic', async () => {
+    c.start(c.tap(tap), { owner: 'song:4', steps: [{ kind: 'song', urls: ['voice', 'music'], from: 0, gains: [1, 1] }] });
+    await flush();
+    expect(engine.log.some((l) => l.startsWith('openMic'))).toBe(false);
+    expect(c.snapshot().mic).toBe('closed');
+  });
+
+  it('"Hear yourself" never sounds on a screen that only listens (the sound check)', async () => {
+    c.start(c.tap(tap), soundCheck);
+    await flush();
+    engine.endNotes();
+    await flush();
+    expect(c.snapshot().mic).toBe('open');
+    c.setMonitor(0.9);
+    expect(engine.monitorGain).toBe(0);
   });
 
   it('"Hear yourself" sounds only while singing, and stops with everything else', async () => {

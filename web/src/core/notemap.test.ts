@@ -14,6 +14,14 @@ describe('the note map', () => {
     expect(pinnedRange(line)).toEqual({ lo: 54, hi: 71 });
     expect(pinnedRange(new Float32Array([NaN, 60]))).toBeNull();
   });
+  it('leaves out brief slips an octave or more from the notes around them', () => {
+    const line = Float32Array.from({ length: 2000 }, (_, i) => 55 + (i % 200) / 20);   /* G3 .. F#4, rising */
+    for (let s = 100; s < 2000; s += 150) for (let k = 0; k < 6; k++) line[s + k] = 43;   /* a slip down every 7 s */
+    expect(pinnedRange(line)).toEqual({ lo: 52, hi: 68 });
+    /* a low phrase that is really sung counts */
+    for (let k = 0; k < 60; k++) line[1000 + k] = 45;
+    expect(pinnedRange(line)?.lo).toBe(42);
+  });
   it('is the same range wherever the song has got to: never recentred', () => {
     const line = Float32Array.from({ length: 300 }, (_, i) => 60 + Math.sin(i / 10) * 5);
     expect(pinnedRange(line)).toEqual(pinnedRange(line.slice().reverse()));

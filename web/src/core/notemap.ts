@@ -15,13 +15,29 @@ export interface Range {
   readonly hi: number;
 }
 
+/** points either side looked at to judge a reading against the notes
+    around it (1.5 s at twenty points a second) */
+export const AROUND = 30;
+/** a reading this far from the notes around it is a slip, not the song */
+export const SLIP = 10;
+
 /** The song's own range, from its singer's line, 3 semitones either side.
     Pinned: it depends only on the whole line, never on where the song is
-    (RULEBOOK 4, Pitch: "Pin the view; don't recentre"). The lowest and
-    highest 1% are left out, so one stray reading cannot stretch it. */
+    (RULEBOOK 4, Pitch: "Pin the view; don't recentre"). Brief slips - a
+    reading an octave or more away from the notes sung around it - are left
+    out, and so are the lowest and highest 1%, so stray readings cannot
+    stretch it. */
 export function pinnedRange(line: ArrayLike<number>): Range | null {
   const v: number[] = [];
-  for (let i = 0; i < line.length; i++) if (Number.isFinite(line[i])) v.push(line[i]);
+  const near: number[] = [];
+  for (let i = 0; i < line.length; i++) {
+    const m = line[i];
+    if (!Number.isFinite(m)) continue;
+    near.length = 0;
+    for (let j = Math.max(0, i - AROUND); j <= Math.min(line.length - 1, i + AROUND); j++) if (Number.isFinite(line[j])) near.push(line[j]);
+    near.sort((a, b) => a - b);
+    if (Math.abs(m - near[near.length >> 1]) < SLIP) v.push(m);
+  }
   if (v.length < 5) return null;
   v.sort((a, b) => a - b);
   const lo = v[Math.floor(v.length * 0.01)];

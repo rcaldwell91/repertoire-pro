@@ -12,12 +12,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { yinHz, CLARITY, GATE_LEVEL, yinOffset } from '../../src/audio/pitch/yin.ts';
-import { mpmHz } from '../../src/audio/pitch/mpm.ts';
+import { mpmHz } from './mpm.ts';
 import { crepeBuild, crepePredict, actToMidiConf, crepeFrame } from '../../src/audio/pitch/crepe.ts';
-import { traceFile } from '../../src/audio/pitch/trace.ts';
-import { bridge, Median5, anchored } from '../../src/audio/pitch/line.ts';
+import { traceFile, bridge, Median5 } from './trace.ts';
+import { anchored } from '../../src/audio/pitch/line.ts';
 import { FileTrace, LiveTrace } from '../../src/audio/pitch/core.ts';
-import { loudPoints } from '../../src/audio/pitch/loud.ts';
+import { loudPoints } from './loud.ts';
 
 const FF = process.env.FFMPEG || 'ffmpeg';
 const SR = 44100;            /* the test browser's own rate, where the old app's numbers were measured */
@@ -263,6 +263,14 @@ for (const spec of specs) {
   console.error('scored', name);
 }
 writeFileSync(join(dir, 'bakeoff.json'), JSON.stringify(rows, null, 1));
+/* WINNER=label also keeps the numbers (never the recordings) beside this
+   script, for the app's tests to hold the app to */
+if (process.env.WINNER) {
+  const keep = rows.map((r) => ({ song: r.song, method: r.method, follows: +r.follows.toFixed(2), gaps: +r.gaps.toFixed(2),
+    accuracy: +r.accuracy.toFixed(2), octave: +r.octave.toFixed(2), lateMs: r.lateMs, reactMs: r.react?.median ?? null,
+    msPerSec: r.msPerSec == null ? null : Math.round(r.msPerSec) }));
+  writeFileSync(new URL('./results.json', import.meta.url), JSON.stringify({ measured: new Date().toISOString().slice(0, 10), winner: process.env.WINNER, rows: keep }, null, 1) + '\n');
+}
 const f = (x, d = 1) => (x == null || Number.isNaN(x) ? '—' : x.toFixed(d));
 console.log('| Recording | Method | Follows the voice (% of loud time) | Line in the gaps % | Right note (±½ semitone) % | Octave errors % | Line late by (ms) | Live reaction, median ms (missed %) | Reading ms per s of audio |');
 console.log('|---|---|---|---|---|---|---|---|---|');

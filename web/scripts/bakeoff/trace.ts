@@ -1,4 +1,48 @@
-import { anchored, bridge, Median5, type Anchors, type Point } from './line.ts';
+import { anchored, GAP_MAX, GAP_STEP, type Anchors } from '../../src/audio/pitch/line.ts';
+
+export interface Point {
+  t: number;
+  m: number | null;
+}
+
+/* the old app's median: of the LAST five readings; a gap starts it again */
+export class Median5 {
+  private hist: number[] = [];
+  push(m: number | null): number | null {
+    if (m == null) {
+      this.hist.length = 0;
+      return null;
+    }
+    this.hist.push(m);
+    if (this.hist.length > 5) this.hist.shift();
+    const s = [...this.hist].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  }
+}
+
+
+/* the old app's bridging, on points */
+export function bridge(points: Point[], gapMax = GAP_MAX): Point[] {
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    if (points[i].m != null) continue;
+    const a = i - 1;
+    if (a < 0 || points[a].m == null) continue;
+    let j = i;
+    while (j < n && points[j].m == null) j++;
+    if (j >= n) break;
+    if (j - i > gapMax || Math.abs((points[j].m as number) - (points[a].m as number)) > GAP_STEP) {
+      i = j - 1;
+      continue;
+    }
+    const m0 = points[a].m as number, m1 = points[j].m as number;
+    for (let k = i; k < j; k++) points[k].m = +(m0 + ((m1 - m0) * (k - a)) / (j - a)).toFixed(2);
+    i = j - 1;
+  }
+  return points;
+}
+
+
 
 /* Reading a whole file into a line: a point every `hop` seconds from a
    window of `win` samples, a loudness gate on the window, a pitch method on

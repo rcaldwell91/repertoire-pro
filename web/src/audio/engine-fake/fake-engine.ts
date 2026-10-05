@@ -144,9 +144,10 @@ export class FakeEngine implements AudioEngine {
       this.micCbs.delete(cb);
     };
   }
-  /** the mic hears something (only while it is open) */
+  /** the mic hears something (whatever the conductor thinks; it must
+      hand on only what it is listening for) */
   hear(block: MicBlock): void {
-    if (this.mic) this.micCbs.forEach((f) => f(block));
+    this.micCbs.forEach((f) => f(block));
   }
   monitor(gain: number): void {
     this.log.push('monitor:' + gain);
