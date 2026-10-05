@@ -76,9 +76,26 @@ export function centred5(raw: ArrayLike<number>, j: number, upTo: number, ring =
   return v[v.length >> 1];
 }
 
+/** Where a piece of a song sits in the whole: its first sample's number,
+    and the whole song's length in samples. */
+export interface Place {
+  readonly offset: number;
+  readonly total: number;
+}
+
+/** Samples either side of a stretch of points that its readings can use:
+    the two points either side the median looks at, the model's frame
+    nearest each point (up to half a step away, 32 ms either side of it),
+    and a whole window to spare. */
+export function piecePad(sr: number): number {
+  return Math.ceil((2 * HOP + ANCHOR_STEP / 2 + 0.032) * sr) + WIN;
+}
+
 /** Reads a file a piece at a time, in order, keeping its place: read in
-    pieces, or started part way (to carry on from the first 30 seconds), it
-    gives exactly what it gives read in one go. */
+    pieces, started part way (to carry on from the first 30 seconds), or
+    given only a stretch of the song with piecePad() samples around it (so
+    several readers can share a song), it gives exactly what it gives read
+    in one go. */
 export class FileTrace {
   private k = 0;
   private readonly win = new Float32Array(WIN);
@@ -92,23 +109,28 @@ export class FileTrace {
   private readonly sr: number;
   private readonly crepe: Crepe | null;
   private readonly method: Method;
+  private readonly offset: number;
+  private readonly total: number;
 
-  constructor(mono: Float32Array, sr: number, crepe: Crepe | null, method: Method = METHOD, startK = 0) {
+  constructor(mono: Float32Array, sr: number, crepe: Crepe | null, method: Method = METHOD, startK = 0,
+    place: Place = { offset: 0, total: mono.length }) {
     this.mono = mono;
     this.sr = sr;
+    this.offset = place.offset;
+    this.total = place.total;
     this.crepe = crepe;
     this.method = method;
     this.k = startK;
     this.raw = new Float32Array(this.points).fill(NaN);
     /* as many anchors as the old app made: one every ANCHOR_STEP, to the end */
-    this.ancN = Math.floor(mono.length / sr / ANCHOR_STEP) + 1;
+    this.ancN = Math.floor(this.total / sr / ANCHOR_STEP) + 1;
     this.ancMidi = new Float32Array(this.ancN).fill(NaN);
     this.ancConf = new Float32Array(this.ancN);
     this.rawTo = Math.max(0, startK - 2);
   }
 
   get points(): number {
-    return Math.floor(this.mono.length / this.sr / HOP);
+    return Math.floor(this.total / this.sr / HOP);
   }
 
   get at(): number {
@@ -122,7 +144,7 @@ export class FileTrace {
     const ai = Math.round(t / ANCHOR_STEP);
     if (ai < 0 || ai >= this.ancN) return null;
     if (Number.isNaN(this.ancMidi[ai])) {
-      const r = actToMidiConf(crepePredict(this.crepe, crepeFrame(this.mono, this.sr, ai * ANCHOR_STEP)));
+      const r = actToMidiConf(crepePredict(this.crepe, crepeFrame(this.mono, this.sr, ai * ANCHOR_STEP, this.offset, this.total)));
       this.ancMidi[ai] = r.midi;
       this.ancConf[ai] = r.conf;
     }
@@ -140,7 +162,7 @@ export class FileTrace {
       const start = Math.round(t * this.sr) - (WIN >> 1);
       for (let j = 0; j < WIN; j++) {
         const sp = start + j;
-        this.win[j] = sp >= 0 && sp < this.mono.length ? this.mono[sp] : 0;
+        this.win[j] = sp >= 0 && sp < this.total ? this.mono[sp - this.offset] : 0;
       }
       const m = reading(this.win, this.sr, this.method);
       this.raw[k] = m == null ? NaN : anchored(m, 0, this.anchorAt(t));

@@ -84,6 +84,16 @@ export const PROBE = `(() => {
   AudioNode.prototype.disconnect = function (...r) { this.__off = true; return disconnect.apply(this, r); };
   /* what is heard of the mic now: the loudest playback still connected */
   P.monitorNow = () => Math.max(0, ...P.monitors.filter((g) => !g.__off).map((g) => g.gain.value));
+  /* workers started, and how many were given a stretch of a song to read */
+  P.readers = new Set();
+  const W = window.Worker;
+  window.Worker = class extends W {
+    constructor(...a) {
+      super(...a);
+      const post = this.postMessage.bind(this);
+      this.postMessage = (m, ...r) => { if (m && m.type === 'read') P.readers.add(this); return post(m, ...r); };
+    }
+  };
   /* songs decoded to read their pitch (not to play) */
   const OD = OfflineAudioContext.prototype.decodeAudioData;
   OfflineAudioContext.prototype.decodeAudioData = function (...a) { P.reads++; return OD.apply(this, a); };

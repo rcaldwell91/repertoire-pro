@@ -42,7 +42,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 const RECORDING = process.env.RP_SPLIT_NAME || 'All of Me (separated)';
 const expected = BAKEOFF.rows.find((r) => r.song === RECORDING && r.method === BAKEOFF.winner);
 
-const ALL = ['line-read', 'line-follows', 'pinned', 'voice-zero', 'placement', 'octave-switch', 'hear-yourself', 'mic-leave', 'mic-hidden',
+const ALL = ['line-read', 'line-shared', 'line-follows', 'pinned', 'voice-zero', 'placement', 'octave-switch', 'hear-yourself', 'mic-leave', 'mic-hidden',
   'mic-refused', 'reopen-line', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -199,6 +199,13 @@ try {
       && line && line.ver === LINE_VER && line.whole && line.done && line.anchored && Math.abs(line.readTo - seconds) < 0.1,
       `progress shown ${prog.length} times, ${prog[0]?.[1]} → ${prog[prog.length - 1]?.[1]} of ${prog[0]?.[2]} (the voice is ${clock(seconds)}), in ${(readMs / 1000).toFixed(0)} s; ` +
       `kept on the phone: read to ${line?.readTo.toFixed(1)} s, version ${line?.ver}, whole voice ${line?.whole}, finished ${line?.done}, with the octave anchor ${line?.anchored}`);
+  }
+
+  if (want('line-shared')) {
+    /* read faster by sharing the song out to several readers at once */
+    const readers = await page.eval(S('readers.size'));
+    const cores = await page.eval('navigator.hardwareConcurrency');
+    check('line-shared', readers >= 2, `the song was shared out to ${readers} readers (this computer reports ${cores} cores); the whole ${clock(seconds)} read in ${(readMs / 1000).toFixed(0)} s`);
   }
 
   if (want('line-follows')) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FileTrace, HOP, LiveTrace, WIN } from './core';
+import { FileTrace, HOP, LiveTrace, piecePad, WIN } from './core';
 
 /* A voice-like test sound is not a real voice (RULEBOOK 4, Tests), so this
    only checks the bookkeeping: that file and mic read the same window the
@@ -35,6 +35,17 @@ describe('one pitch core for file and mic', () => {
     const late = new FileTrace(x, sr, null, undefined, 31).next(1e9);
     expect(late.length).toBe(whole.length - 31);
     for (let i = 0; i < late.length; i++) expect(Object.is(late[i], whole[31 + i]) || late[i] === whole[31 + i]).toBe(true);
+  });
+
+  it('reads a stretch of the song, given only that stretch and its edges, exactly as the whole', () => {
+    const whole = new FileTrace(x, sr, null).next(1e9);
+    for (const [k0, k1] of [[0, 23], [23, 51], [51, whole.length]]) {
+      const pad = piecePad(sr);
+      const a = Math.max(0, Math.round(k0 * HOP * sr) - pad), b = Math.min(x.length, Math.round(k1 * HOP * sr) + pad);
+      const part = new FileTrace(x.slice(a, b), sr, null, undefined, k0, { offset: a, total: x.length }).next(k1 - k0);
+      expect(part.length).toBe(k1 - k0);
+      for (let i = 0; i < part.length; i++) expect(Object.is(part[i], whole[k0 + i]) || part[i] === whole[k0 + i]).toBe(true);
+    }
   });
 
   it('changes note when the sound does, not two points late', () => {

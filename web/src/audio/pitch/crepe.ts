@@ -129,15 +129,18 @@ export function actToMidiConf(act: Float32Array): { midi: number; conf: number }
 }
 
 /** The 64 ms around time tc, resampled to the model's 1024 samples
-    (old app, ancFrames). */
-export function crepeFrame(mono: Float32Array, sr: number, tc: number): Float32Array {
-  const need = Math.round(0.064 * sr), step = need / 1024, len = mono.length;
+    (old app, ancFrames). `mono` may be a piece of a longer song that
+    starts at sample `offset` of it; `len` is the whole song's length. The
+    sums are done in the whole song's sample numbers, so a piece gives
+    exactly what the whole would. */
+export function crepeFrame(mono: Float32Array, sr: number, tc: number, offset = 0, len = mono.length): Float32Array {
+  const need = Math.round(0.064 * sr), step = need / 1024;
   const out = new Float32Array(1024);
   const off = tc * sr - need / 2;
   for (let i = 0; i < 1024; i++) {
     const sp = off + i * step, lo = Math.floor(sp), fr = sp - lo;
-    const a = lo >= 0 && lo < len ? mono[lo] : 0;
-    const b = lo + 1 >= 0 && lo + 1 < len ? mono[lo + 1] : 0;
+    const a = lo >= 0 && lo < len ? mono[lo - offset] : 0;
+    const b = lo + 1 >= 0 && lo + 1 < len ? mono[lo + 1 - offset] : 0;
     out[i] = a + (b - a) * fr;
   }
   return out;

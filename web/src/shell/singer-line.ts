@@ -105,9 +105,14 @@ async function run(id: string): Promise<void> {
     m.set(stored.m.subarray(0, Math.min(fromK, m.length)));
   }
   const certain = certainPoints(mono.length, sr, whole);
+  /* stretches come back from several readers at once: "read to" is how
+     far the line is read with nothing missing */
+  const got = new Uint8Array(m.length);
+  got.fill(1, 0, fromK);
   let readK = fromK;
   let savedAt = fromK;
-  const save = (anchored: boolean, done: boolean) => {
+  let anchored = true;
+  const save = (done: boolean) => {
     const line: StoredLine = { id, ver: LINE_VER, hop: HOP, m: m.slice(), readTo: readK * HOP, seconds, whole, done, anchored };
     return putLine(line);
   };
@@ -115,15 +120,19 @@ async function run(id: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     readLine(mono, sr, fromK, (p) => {
       try {
+        anchored &&= p.anchored;
         const upTo = Math.min(p.from + p.m.length, certain, m.length);
-        if (upTo > p.from) m.set(p.m.subarray(0, upTo - p.from), p.from);
-        readK = Math.max(readK, upTo);
+        if (upTo > p.from) {
+          m.set(p.m.subarray(0, upTo - p.from), p.from);
+          got.fill(1, p.from, upTo);
+        }
+        while (readK < Math.min(certain, m.length) && got[readK]) readK++;
         bridgeLine(m, readK);
         show(id, { hop: HOP, m, readTo: readK * HOP, seconds, reading: !p.done });
         /* kept on the phone as it goes, every 8 seconds of song, and at the end */
         if (p.done || readK - savedAt >= 8 / HOP) {
           savedAt = readK;
-          void save(p.anchored, p.done).then(() => p.done && resolve(), reject);
+          void save(p.done).then(() => p.done && resolve(), reject);
         }
       } catch (err) {
         reject(err);
