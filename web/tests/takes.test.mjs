@@ -506,6 +506,7 @@ try {
   /* 7. a kept take sent later: shared with the coach, the recording not uploaded again */
   if (want('take-send-kept') && keptOnly) {
     const ups = () => page.eval(S(`net.filter((u) => u.includes('/storage/v1/object/takes/${keptOnly.path}')).length`));
+    await page.waitFor(`!!document.querySelector('.take-row[data-take="${keptOnly.id}"] .take-more')`, 15000);
     const before = await ups();
     await page.tap(`.take-row[data-take="${keptOnly.id}"] .take-more`);
     await page.tap(`.take-row[data-take="${keptOnly.id}"] .take-send`);
