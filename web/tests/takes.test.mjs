@@ -70,7 +70,12 @@ function asCoach(path) {
 }
 
 clearTestTakes();             /* nothing left from an earlier run */
-const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
+const local = await serve(REPO, APP);
+/* RP_LIVE=1: the live site itself, as a phone reaches it */
+const LIVE = process.env.RP_LIVE === '1';
+const server = local.server;
+const ORIGIN = LIVE ? 'https://rcaldwell91.github.io' : local.ORIGIN;
+const URL_APP = LIVE ? 'https://rcaldwell91.github.io/repertoire-pro/app/' : local.URL_APP;
 const env = await launch({ mic: `${PREFIX}-voice30.mp3`, allowMic: false, online: true });
 const { page } = env;
 await page.addInitScript(MIRROR);
