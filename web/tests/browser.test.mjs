@@ -173,11 +173,19 @@ try {
     }
     const barShown = await page.eval(`getComputedStyle(document.querySelector('[role=meter]')).visibility === 'visible'`);
     if (SHOTS) writeFileSync(join(SHOTS, 'sound-check-listening.png'), await page.screenshot());
-    const order = await page.eval(`window.__probe.events.map((e) => e[0]).filter((k) => k !== 'context').join(' > ')`);
+    const order = await page.eval(`window.__probe.events.map((e) => e[0]).filter((k) => k !== 'context' && k !== 'kick').join(' > ')`);
+    /* what the phone says, in plain words, to screenshot (RULEBOOK 4, Sound, Android) */
+    const report = await page.waitFor(`!!document.querySelector('#sound-report')`, 3000) && await page.eval(`({
+      clock: document.querySelector('#report-clock')?.textContent, mic: document.querySelector('#report-mic')?.textContent,
+      name: document.querySelector('#report-mic-name')?.textContent, out: document.querySelector('#report-out')?.textContent })`);
+    const reportOk = !!report && report.clock?.startsWith(copy.soundCheck.moving + ' (') && report.clock.includes('running') &&
+      report.mic === copy.soundCheck.micWorking && !!report.name && report.out === copy.soundCheck.yes;
+    if (SHOTS) writeFileSync(join(SHOTS, 'sound-check-report.png'), await page.screenshot());
     check('start', before[0] === copy.soundCheck.start && before[1] === copy.soundCheck.ready && played && stopShown &&
-      !!piano && real && listening && barShown && top >= 30 && order.startsWith('play > mic-asked > mic-open'),
+      !!piano && real && listening && barShown && top >= 30 && order.startsWith('mic-asked > mic-open > play') && reportOk,
       `piano note ${piano ? 'loaded' : 'NOT loaded'} (${p.decoded[0] ? p.decoded[0].seconds.toFixed(1) + ' s, peak ' + p.decoded[0].peak.toFixed(2) : 'not decoded'}); ` +
-      `played ${played}; then mic open and bar shown ${listening && barShown}; bar reached ${top} of 100; order: ${order}`);
+      `played ${played}; then mic open and bar shown ${listening && barShown}; bar reached ${top} of 100; order: ${order}; ` +
+      `the phone says: ${report ? Object.values(report).join(' / ') : 'nothing shown'}`);
 
     await page.tap(sel.go);
     const q = await quietWithin(page);

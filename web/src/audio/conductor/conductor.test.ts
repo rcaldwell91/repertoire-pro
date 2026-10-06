@@ -85,16 +85,16 @@ describe('nothing starts without a tap', () => {
 });
 
 describe('a tap starts it, in order', () => {
-  it('goes armed, then running: plays the note, then listens', async () => {
+  it('goes armed, then running: opens the mic, wakes the sound, plays the note, then listens', async () => {
     const seen: string[] = [];
     c.subscribe((s) => seen.push(s.state));
     expect(c.start(c.tap(tap), soundCheck)).toBe(true);
-    expect(engine.unlocks).toBe(1);                 /* unlocked inside the tap */
+    expect(engine.log[0]).toBe('openMic:0,1,2');    /* asked inside the tap, before anything else */
     expect(c.snapshot().state).toBe('armed');
     await flush();
+    expect(engine.log.indexOf('wake')).toBeGreaterThan(engine.log.indexOf('try:0'));
     expect(c.snapshot().state).toBe('running');
     expect(engine.sounding()).toBe(1);
-    expect(engine.micOpen()).toBe(false);           /* the note first */
     engine.endNotes();
     await flush();
     expect(engine.micOpen()).toBe(true);
@@ -137,15 +137,16 @@ describe('one source at a time', () => {
     expect(engine.peak).toBe(1);
   });
 
-  it('a session that was replaced never reaches its mic', async () => {
+  it('a session replaced while its mic is asked never wakes, and its mic is closed', async () => {
+    engine.holdMic = true;
     c.start(c.tap(tap), soundCheck);
     await flush();
     c.start(c.tap(tap), noteOnly);
+    engine.answerMic();
     await flush();
-    engine.endNotes();
-    await flush();
-    expect(engine.log.some((l) => l.startsWith('openMic'))).toBe(false);
+    expect(engine.log.filter((l) => l === 'wake').length).toBe(1);   /* the note's own */
     expect(engine.micOpen()).toBe(false);
+    expect(c.snapshot().owner).toBe('note');
   });
 });
 
@@ -403,14 +404,19 @@ describe('a song you sing along to', () => {
   });
   const block = (end: number) => ({ samples: new Float32Array(4), end, sampleRate: 48000 });
 
-  it('plays the song at once and opens the mic alongside; the song never waits for it', async () => {
+  it('opens the mic first, then wakes the sound, then plays (RULEBOOK 4, Sound, Android 4)', async () => {
     engine.holdMic = true;
     c.start(c.tap(tap), sing());
     await flush();
-    expect(engine.log).toContain('together:voice+music@5');
     expect(c.snapshot().mic).toBe('opening');
+    expect(engine.log).not.toContain('wake');
+    expect(engine.sounding()).toBe(0);
+    expect(c.snapshot().state).toBe('armed');        /* never said to play */
     engine.answerMic();
     await flush();
+    const log = engine.log;
+    expect(log.indexOf('try:0')).toBeLessThan(log.indexOf('wake'));
+    expect(log.indexOf('wake')).toBeLessThan(log.indexOf('together:voice+music@5'));
     expect(c.snapshot().mic).toBe('open');
     expect(engine.micOpen()).toBe(true);
     expect(c.snapshot().state).toBe('running');
@@ -536,5 +542,125 @@ describe('recording a take', () => {
     expect(c.take('song:5')).not.toBeNull();
     c.dropTake();
     expect(c.take('song:5')).toBeNull();
+  });
+});
+
+describe('sound is proved by its clock (RULEBOOK 4, Sound, Android)', () => {
+  const song: Plan = { owner: 'song:7', steps: [{ kind: 'song', urls: ['voice', 'music'], from: 12, gains: [1, 1] }] };
+  const sing: Plan = { owner: 'song:7', steps: [{ kind: 'song', urls: ['voice', 'music'], from: 12, gains: [1, 1], listen: true, monitor: 0.6 }] };
+
+  it('wakes inside the tap when nothing listens', () => {
+    c.start(c.tap(tap), song);
+    expect(engine.log).toEqual(['wake']);
+  });
+
+  it('says nothing plays until the clock has proved it', async () => {
+    engine.holdWake = true;
+    c.start(c.tap(tap), song);
+    await flush();
+    expect(c.snapshot().state).toBe('armed');
+    expect(engine.log.some((l) => l.startsWith('load:') || l.startsWith('together:'))).toBe(false);
+    engine.answerWake();
+    await flush();
+    expect(c.snapshot().state).toBe('running');
+  });
+
+  it('sound that will not start: stops at once, says so, never claims to play', async () => {
+    engine.wakePlan = [{ ok: false, why: 'blocked', tap: true }];
+    const seen: string[] = [];
+    c.subscribe((s) => seen.push(s.state));
+    c.start(c.tap(tap), sing);
+    await flush();
+    expect(c.snapshot()).toMatchObject({ state: 'stopped', sound: 'blocked' });
+    expect(seen).not.toContain('running');
+    expect(silentAndClosed()).toBe(true);
+    expect(engine.log.some((l) => l.startsWith('together:'))).toBe(false);
+  });
+
+  it('a tap that came too late for the phone asks for another tap', async () => {
+    engine.wakePlan = [{ ok: false, why: 'blocked', tap: false }];
+    c.start(c.tap(tap), song);
+    await flush();
+    expect(c.snapshot().sound).toBe('tap');
+  });
+
+  it('after a failed start, only the next tap rebuilds the sound; then it plays', async () => {
+    engine.wakePlan = [{ ok: false, why: 'stalled', tap: true }];
+    c.start(c.tap(tap), song);
+    await flush();
+    expect(c.snapshot().sound).toBe('stalled');
+    expect(engine.wakes).toBe(1);                    /* nothing more by itself */
+    c.start(c.tap(tap), song);
+    await flush();
+    expect(engine.log.filter((l) => l.startsWith('wake'))).toEqual(['wake', 'wake:rebuild']);
+    expect(c.snapshot()).toMatchObject({ state: 'running', sound: null });
+    c.stop();
+    c.start(c.tap(tap), song);                       /* healthy again: no rebuild */
+    await flush();
+    expect(engine.log.filter((l) => l.startsWith('wake')).pop()).toBe('wake');
+  });
+
+  it('a clock that stops while playing is a stall: silence, said, and no rebuild until a tap', async () => {
+    c.start(c.tap(tap), sing);
+    await flush();
+    engine.clock = 3.5;
+    const at = c.position();
+    engine.stall();
+    expect(c.snapshot()).toMatchObject({ state: 'stopped', sound: 'stalled' });
+    expect(silentAndClosed()).toBe(true);
+    await flush();
+    expect(engine.wakes).toBe(1);
+    expect(at).toBeCloseTo(15.5);
+    /* the tap: rebuilt, the mic opened again first, from where it froze */
+    engine.log.length = 0;
+    c.start(c.tap(tap), { ...sing, steps: [{ ...sing.steps[0], from: at as number } as Plan['steps'][number]] });
+    await flush();
+    expect(engine.log.slice(0, 3)).toEqual(['openMic:0,1,2', 'try:0', 'wake:rebuild']);
+    expect(engine.song?.opts.from).toBeCloseTo(15.5);
+    expect(engine.monitorGain).toBe(0.6);            /* Hear yourself, on the new sound */
+  });
+
+  it('a change of state while the sound wakes is left to the clock', async () => {
+    engine.holdWake = true;
+    c.start(c.tap(tap), song);
+    await flush();
+    engine.interrupt();
+    expect(c.snapshot().state).toBe('armed');
+    engine.answerWake();
+    await flush();
+    expect(c.snapshot().state).toBe('running');
+    engine.interrupt();                              /* while playing: the phone took it */
+    expect(c.snapshot()).toMatchObject({ state: 'stopped', why: 'interrupted' });
+  });
+
+  it('a stall when nothing plays is not this session\'s', async () => {
+    c.start(c.tap(tap), song);
+    c.stop();
+    engine.stall();
+    expect(c.snapshot().sound).toBe(null);
+  });
+
+  it('says plainly when another app has the mic, and records nothing then', async () => {
+    engine.micPlan = ['held'];
+    c.start(c.tap(tap), sing);
+    await flush();
+    expect(c.snapshot()).toMatchObject({ mic: 'held', state: 'running' });   /* the song still plays */
+    c.stop();
+    engine.micPlan = ['held-open'];
+    c.start(c.tap(tap), sing);
+    await flush();
+    expect(c.snapshot().mic).toBe('held');
+    c.stop();
+    engine.micPlan = ['ok'];
+    const heard: number[] = [];
+    c.onMic((b) => heard.push(b.end));
+    c.start(c.tap(tap), sing);
+    await flush();
+    engine.holdMicElsewhere(true);
+    expect(c.snapshot().mic).toBe('held');
+    engine.hear({ samples: new Float32Array(4), end: 1, sampleRate: 48000 });
+    expect(heard).toEqual([]);
+    engine.holdMicElsewhere(false);
+    expect(c.snapshot().mic).toBe('open');
   });
 });

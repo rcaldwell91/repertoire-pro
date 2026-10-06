@@ -436,3 +436,19 @@ input[type='range'] {
 .undo-line { display: flex; align-items: center; gap: 12px; min-height: var(--tap); }
 .take-row { flex-wrap: wrap; }
 .take-menu { display: flex; gap: 8px; width: 100%; justify-content: flex-end; }
+
+/* sound that would not start (RULEBOOK 4, Sound, Android 8) */
+.sound-trouble {
+  margin: 12px 0; padding: 14px 16px; border-radius: var(--radius);
+  border: 1px solid var(--problem); background: var(--card);
+}
+.sound-trouble p { margin: 0 0 6px; }
+.sound-trouble ol { margin: 4px 0 10px; padding-left: 1.4em; }
+.sound-trouble li { margin: 4px 0; }
+.sound-check-link { margin-top: 12px; }
+
+/* the Sound check's report, to screenshot */
+.report h2 { font-size: 1.15rem; margin: 0 0 4px; }
+.report dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 12px 0 0; }
+.report dt { color: var(--muted); }
+.report dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }

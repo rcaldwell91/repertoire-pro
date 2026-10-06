@@ -22,6 +22,7 @@ import { BackButton } from '../ui/BackButton';
 import { Slider } from '../ui/Slider';
 import { LevelBar } from '../ui/LevelBar';
 import { NoteMap } from '../ui/NoteMap';
+import { SoundTrouble } from '../ui/SoundTrouble';
 
 const HEADPHONES_SEEN = 'rp.hint.headphones';
 
@@ -42,6 +43,9 @@ export function SongScreen(props: { id: string }) {
   const has = song ? hasOf(song) : null;
   const which: 'full' | 'first30' | null = has?.full ? 'full' : has?.first30 ? 'first30' : null;
   const playing = c.active() && snap.owner === owner;
+  /* Pause only once the clock has proved the sound (RULEBOOK 4, Sound, Android 7) */
+  const sounding = playing && snap.state === 'running';
+  const trouble = snap.owner === owner && !playing ? snap.sound : null;
   const singer = useSingerLine(props.id);
   /* read the singer's line as soon as there is a voice to read it from */
   const voiceParts = has ? (has.full ? 2 : has.first30 ? 1 : 0) : 0;
@@ -289,7 +293,7 @@ export function SongScreen(props: { id: string }) {
           <RotateCcw size={24} strokeWidth={2} aria-hidden="true" />
         </button>
         <button type="button" className="round play" id="song-play" disabled={!parts} onClick={toggle}>
-          {playing ? copy.song.pause : copy.song.start}
+          {sounding ? copy.song.pause : playing ? copy.song.starting : copy.song.start}
         </button>
         <button type="button" className="round" id="repeat-part" aria-label={copy.song.repeat} aria-pressed={!!loop}
           disabled={!parts} onClick={repeat}>
@@ -335,6 +339,8 @@ export function SongScreen(props: { id: string }) {
         )}
       </div>
 
+      <SoundTrouble sound={trouble} onCheck={() => navigate('/profile/sound-check', 'screen')} />
+
       <div className="mic-line" id="mic-line">
         {mic && <p className="problem" role="status">{mic}</p>}
         {mic && (
@@ -359,6 +365,8 @@ export function SongScreen(props: { id: string }) {
         </label>
         <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
+        <button type="button" className="btn btn-quiet sound-check-link" id="song-sound-check"
+          onClick={() => navigate('/profile/sound-check', 'screen')}>{copy.song.soundCheck}</button>
       </section>
 
       <TakesList songId={props.id} title={song.title} playing={hearingTake ? heard?.key ?? null : null} onPlay={playKept} />

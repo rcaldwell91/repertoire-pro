@@ -36,8 +36,8 @@ const MUTATIONS = [
   {
     what: 'letting go of sound leaves the mic open',
     file: 'src/audio/engine-web/web-engine.ts',
-    from: '    this.closeMic();\n    /* Silence is immediate',
-    to: '    /* Silence is immediate',
+    from: '    this.closeMic();\n    /* RULEBOOK 4, Sound, Android 1',
+    to: '    /* RULEBOOK 4, Sound, Android 1',
     checks: ['tab-switch-listening', 'hidden-listening', 'stop', 'back-while-running'],
   },
   {
@@ -119,11 +119,34 @@ const MUTATIONS = [
     from: '        src.loop = true;', to: '        src.loop = false;', checks: ['controls'] },
   { test: 'song', what: 'back 10 s does nothing while playing', file: 'src/screens/SongScreen.tsx',
     from: '    if (playing) startAt(ev, at, loop && (at < loop.start || at >= loop.end) ? null : loop);', to: '', checks: ['controls'] },
-  { test: 'song', what: 'a restart looks like the phone taking the sound (the bug fixed this round)', file: 'src/audio/engine-web/web-engine.ts',
-    from: '    this.sleepTimer = setTimeout(() => {\n      this.sleepTimer = null;\n      const ctx = this.ctx;\n      if (!ctx || ctx.state !== \'running\' || this.sources.size) return;',
-    to: '    this.sleepTimer = null;\n    { const ctx = this.ctx;\n      if (!ctx || ctx.state !== \'running\') return;',
-    and: { file: 'src/audio/engine-web/web-engine.ts', from: '      this.sleeping = p;\n    }, 400);', to: '      this.sleeping = null; void p;\n    }' },
-    checks: ['controls'] },
+  /* sound on an Android phone (RULEBOOK 4, Sound, Android; tests/android.test.mjs) */
+  { test: 'android', what: 'a hung resume is waited for forever (Android 2)', file: 'src/audio/engine-web/web-engine.ts',
+    from: '      await race(ctx.resume(), LIMITS.resume);', to: '      await ctx.resume();', checks: ['start-hangs'] },
+  { test: 'android', what: 'sound is said to play without the clock proving it (Android 3, 7)', file: 'src/audio/engine-web/web-engine.ts',
+    from: '    if (!(await this.clockMoves(ctx, LIMITS.clock)) || ctx !== this.ctx) {', to: '    if (ctx !== this.ctx) {', checks: ['start-hangs'] },
+  { test: 'android', what: 'Start says Pause before the sound is proved', file: 'src/screens/SongScreen.tsx',
+    from: '{sounding ? copy.song.pause : playing ? copy.song.starting : copy.song.start}', to: '{playing ? copy.song.pause : copy.song.start}', checks: ['start-hangs'] },
+  { test: 'android', what: 'sound that will not start sits silently, with no message (Android 8)', file: 'src/screens/SongScreen.tsx',
+    from: '<SoundTrouble sound={trouble}', to: '<SoundTrouble sound={null}', checks: ['start-hangs'] },
+  { test: 'android', what: 'the sound is woken after the tap has run out', file: 'src/audio/engine-web/web-engine.ts',
+    from: '    const ctx = this.context();\n    /* Android 3', to: '    await pause(5500);\n    const ctx = this.context();\n    /* Android 3', checks: ['gesture-only'] },
+  { test: 'android', what: 'the sound is suspended after it stops (Android 1)', file: 'src/audio/engine-web/web-engine.ts',
+    from: '  release(): void {\n    this.stopAll();\n    this.closeMic();',
+    to: '  release(): void {\n    this.stopAll();\n    this.closeMic();\n    setTimeout(() => { if (!this.sources.size) void this.ctx?.suspend(); }, 400);',
+    checks: ['never-suspends', 'ten-starts'] },
+  { test: 'android', what: 'the sound wakes before the mic opens (Android 4)', file: 'src/audio/conductor/conductor.ts',
+    from: '        if (!(await this.openMic(gen))) return;', to: '        void this.openMic(gen);', checks: ['mic-first'] },
+  { test: 'android', what: 'a clock standing still is never noticed (Android 5)', file: 'src/audio/engine-web/web-engine.ts',
+    from: '    });\n    this.watch();\n    const stop = () =>', to: '    });\n    const stop = () =>', checks: ['stall-rebuild', 'hear-yourself-rebuilt'] },
+  { test: 'android', what: 'the tap after a stall keeps the stalled sound (Android 5)', file: 'src/audio/conductor/conductor.ts',
+    from: '      const woke = await this.engine.wake(this.rebuild);', to: '      const woke = await this.engine.wake(false);', checks: ['stall-rebuild'] },
+  { test: 'android', what: 'a rebuilt sound leaves the mic on the old one (Android 5)', file: 'src/audio/engine-web/web-engine.ts',
+    from: '    if (this.stream) await this.attachMic(ctx);\n    return { ok: true };', to: '    if (this.stream && !rebuild) await this.attachMic(ctx);\n    return { ok: true };',
+    checks: ['hear-yourself-rebuilt'] },
+  { test: 'android', what: 'a mic another app takes is not noticed (Android 9)', file: 'src/audio/engine-web/web-engine.ts',
+    from: '          track.onmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));\n', to: '', checks: ['mic-held'] },
+  { what: 'the Sound check says the clock stands still when it moves', file: 'src/core/sound-check.ts',
+    from: "    clock: r.moving ? 'moving' : 'still',", to: "    clock: 'still',", checks: ['start'] },
   { test: 'song', what: 'the song screen is too faint in the dark', file: 'src/ui/tokens.css',
     from: '--muted: #a6a2c4;', to: '--muted: #4a4766;', checks: ['song-contrast'] },
   /* the singer's line, your line and the note map (tests/notemap.test.mjs, and the song test for the first 30 seconds) */
@@ -160,10 +183,10 @@ const MUTATIONS = [
   { test: 'notemap', what: 'the headphones line shows every time', file: 'src/screens/SongScreen.tsx',
     from: 'if (!store.get(HEADPHONES_SEEN)) {', to: 'if (store) {', checks: ['hear-yourself'] },
   { test: 'notemap', what: 'letting go of sound leaves the mic open, singing a song', file: 'src/audio/engine-web/web-engine.ts',
-    from: '    this.closeMic();\n    /* Silence is immediate', to: '    /* Silence is immediate', checks: ['mic-leave', 'mic-hidden'] },
+    from: '    this.closeMic();\n    /* RULEBOOK 4, Sound, Android 1', to: '    /* RULEBOOK 4, Sound, Android 1', checks: ['mic-leave', 'mic-hidden'] },
   { test: 'notemap', what: 'a refused mic stops the song', file: 'src/audio/conductor/conductor.ts',
-    from: '    this.set({ mic: r.why });             /* refused or missing: the rest carries on without it */\n    return false;',
-    to: '    this.set({ mic: r.why });\n    if (withSong) this.halt(\'stopped\', null);\n    return false;', checks: ['mic-refused'] },
+    from: "    this.set({ mic: r.ok ? (r.held ? 'held' : 'open') : r.why });\n    return true;",
+    to: "    this.set({ mic: r.ok ? (r.held ? 'held' : 'open') : r.why });\n    if (!r.ok) this.halt('stopped', null);\n    return r.ok;", checks: ['mic-refused'] },
   { test: 'notemap', what: 'no "Carry on without it" on the song screen', file: 'src/screens/SongScreen.tsx',
     from: '        {mic && (\n          <button type="button" className="btn btn-quiet" id="carry-on"',
     to: '        {mic && false && (\n          <button type="button" className="btn btn-quiet" id="carry-on"', checks: ['mic-refused'] },
@@ -240,7 +263,7 @@ for (const m of RUN) {
     const b = spawnSync('npx', ['vite', 'build', '--outDir', join(dir, 'app'), '--emptyOutDir', '--logLevel', 'error'], { cwd: dir, encoding: 'utf8' });
     if (b.status !== 0) throw new Error('broken copy did not build: ' + b.stderr);
     /* the checks (from the real test file) against the broken build */
-    const suite = { song: 'tests/song.test.mjs', notemap: 'tests/notemap.test.mjs', takes: 'tests/takes.test.mjs' }[m.test] || 'tests/browser.test.mjs';
+    const suite = { song: 'tests/song.test.mjs', notemap: 'tests/notemap.test.mjs', takes: 'tests/takes.test.mjs', android: 'tests/android.test.mjs' }[m.test] || 'tests/browser.test.mjs';
     const r = spawnSync('node', [join(WEB, suite)], {
       cwd: WEB,
       encoding: 'utf8',

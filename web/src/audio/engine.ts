@@ -57,13 +57,40 @@ export interface MicBlock {
 }
 
 export type MicResult =
-  | { ok: true; set: number }
-  | { ok: false; why: 'refused' | 'unavailable' | 'failed' };
+  | { ok: true; set: number; held?: boolean }
+  /** held: another app has the microphone */
+  | { ok: false; why: 'refused' | 'unavailable' | 'failed' | 'held' };
+
+/** Whether sound really started (RULEBOOK 4, Sound, Android 3): the clock
+    moved. blocked: it never got going; stalled: it says running but its
+    clock stands still. tap: the browser still counted it as part of the
+    tap when it was asked (if not, another tap may be all it needs). */
+export type Wake = { ok: true } | { ok: false; why: 'blocked' | 'stalled'; tap: boolean };
+
+/** What the phone says about its sound, for the Sound check. */
+export interface SoundReport {
+  /** the sound clock moved while it was watched */
+  readonly moving: boolean;
+  /** the phone's own word for its sound ("running", "suspended"...), or
+      "none" if sound has not been started */
+  readonly state: string;
+  /** the microphone in use: its name, and whether another app has it */
+  readonly mic: { readonly label: string; readonly live: boolean; readonly muted: boolean } | null;
+  /** headphones the phone lists, by name; empty if none */
+  readonly headphones: readonly string[];
+  /** where sound goes, by name, if the phone says */
+  readonly output: string | null;
+  /** the loudest sound the app sent out while it was watched, 0 to 1 */
+  readonly outLevel: number;
+  /** the loudest the mic heard while it was watched, 0 to 1 */
+  readonly micLevel: number;
+}
 
 export interface AudioEngine {
-  /** Must be called inside the tap that starts something: browsers only
-      let sound begin from a tap. */
-  unlock(): void;
+  /** Wake the sound and prove it with the clock. Only ever on the way from
+      a tap: browsers only let sound begin from one. With `rebuild`, the old
+      sound is closed and a new one made (after a stall); never otherwise. */
+  wake(rebuild: boolean): Promise<Wake>;
   /** The one clock (RULEBOOK 2.2), in seconds. */
   now(): number;
   load(url: string): Promise<Sample>;
@@ -88,8 +115,15 @@ export interface AudioEngine {
   monitor(gain: number): void;
   /** seconds from a sound's engine time to when it is heard */
   outputLatency(): number;
-  /** Silence every source, close the mic, let the device go. */
+  /** Silence every source and close the mic. The sound itself is never
+      suspended (RULEBOOK 4, Sound, Android 1). */
   release(): void;
   /** The phone took the sound away (a call, another app). */
   onInterrupt(cb: () => void): () => void;
+  /** The clock stood still while sound was playing: a stall. */
+  onStall(cb: () => void): () => void;
+  /** Another app took the mic (true), or gave it back (false). */
+  onMicHeld(cb: (held: boolean) => void): () => void;
+  /** What the phone says about its sound, watched for a moment. */
+  report(): Promise<SoundReport>;
 }

@@ -1,11 +1,11 @@
-import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSet, Sample, Source } from '../engine';
+import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSet, Sample, SoundReport, Source, Wake } from '../engine';
 import type { Env, Store } from '../conductor/conductor';
 
 /* A stand-in engine for the conductor's tests. It makes no sound; it keeps
    a log of everything asked of it, and lets a test decide when a sample
    finishes loading, when a note ends, and what each mic set does. */
 
-type MicOutcome = 'ok' | 'busy' | 'refused' | 'unavailable';
+type MicOutcome = 'ok' | 'busy' | 'refused' | 'unavailable' | 'held' | 'held-open';
 
 class FakeSource implements Source {
   done = false;
@@ -27,7 +27,11 @@ class FakeSource implements Source {
 
 export class FakeEngine implements AudioEngine {
   readonly log: string[] = [];
-  unlocks = 0;
+  wakes = 0;
+  /** how the next wakes go, in turn; after that, they work */
+  wakePlan: Wake[] = [];
+  holdWake = false;
+  private readonly heldWakes: Array<() => void> = [];
   releases = 0;
   clock = 0;
   /** what each rung of the mic ladder does, by index */
@@ -43,9 +47,15 @@ export class FakeEngine implements AudioEngine {
   private readonly heldMic: Array<() => void> = [];
   private readonly interruptCbs = new Set<() => void>();
 
-  unlock(): void {
-    this.unlocks++;
-    this.log.push('unlock');
+  async wake(rebuild: boolean): Promise<Wake> {
+    this.wakes++;
+    this.log.push(rebuild ? 'wake:rebuild' : 'wake');
+    if (this.holdWake) await new Promise<void>((r) => this.heldWakes.push(r));
+    return this.wakePlan.shift() ?? { ok: true };
+  }
+  /** let a held wake answer */
+  answerWake(): void {
+    this.heldWakes.splice(0).forEach((f) => f());
   }
   now(): number {
     return this.clock;
@@ -109,6 +119,11 @@ export class FakeEngine implements AudioEngine {
       }
       if (what === 'refused') return { ok: false, why: 'refused' };
       if (what === 'unavailable') return { ok: false, why: 'unavailable' };
+      if (what === 'held') return { ok: false, why: 'held' };
+      if (what === 'held-open') {
+        this.mic = true;
+        return { ok: true, set: i, held: true };
+      }
     }
     return { ok: false, why: 'failed' };
   }
@@ -165,6 +180,32 @@ export class FakeEngine implements AudioEngine {
   /** the phone takes the sound away */
   interrupt(): void {
     this.interruptCbs.forEach((f) => f());
+  }
+  private readonly stallCbs = new Set<() => void>();
+  onStall(cb: () => void): () => void {
+    this.stallCbs.add(cb);
+    return () => {
+      this.stallCbs.delete(cb);
+    };
+  }
+  /** the clock stands still while sound plays */
+  stall(): void {
+    this.stallCbs.forEach((f) => f());
+  }
+  private readonly heldCbs = new Set<(held: boolean) => void>();
+  onMicHeld(cb: (held: boolean) => void): () => void {
+    this.heldCbs.add(cb);
+    return () => {
+      this.heldCbs.delete(cb);
+    };
+  }
+  /** another app takes the mic, or gives it back */
+  holdMicElsewhere(held: boolean): void {
+    this.heldCbs.forEach((f) => f(held));
+  }
+  async report(): Promise<SoundReport> {
+    return { moving: true, state: 'running', mic: this.mic ? { label: 'Fake mic', live: true, muted: false } : null,
+      headphones: [], output: null, outLevel: 0, micLevel: this.micLevel() };
   }
 }
 

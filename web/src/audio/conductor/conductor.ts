@@ -1,4 +1,4 @@
-import type { AudioEngine, Ensemble, MicBlock, Source, Sample } from '../engine';
+import type { AudioEngine, Ensemble, MicBlock, MicResult, SoundReport, Source, Sample } from '../engine';
 import { Recorder, type Recording } from '../recorder';
 import { MIC_LADDER, ladderOrder } from '../mic-ladder';
 
@@ -16,18 +16,26 @@ import { MIC_LADDER, ladderOrder } from '../mic-ladder';
      the count-in, asking for the mic) checks on its way back that its
      session is still the current one; if it is not, it does nothing more,
      and a mic that opened too late is closed again.
-   - Finished releases everything. */
+   - Finished releases everything.
+   - Sound is proved, never assumed (RULEBOOK 4, Sound, Android): a plan
+     that listens opens the mic first; then the sound is woken and its
+     clock must move before anything is said to be playing. If it will not
+     start, or its clock stops while playing, the session stops and says
+     so; only the next tap rebuilds the sound, and carries on. */
 
 export type State = 'idle' | 'armed' | 'counting-in' | 'running' | 'finished' | 'stopped';
 export type LeaveReason = 'screen' | 'tab' | 'back' | 'hidden' | 'interrupted';
-export type MicState = 'closed' | 'opening' | 'open' | 'refused' | 'unavailable' | 'failed';
+export type MicState = 'closed' | 'opening' | 'open' | 'refused' | 'unavailable' | 'failed' | 'held';
+/** Why no sound, as the clock showed it. blocked: it would not start;
+    tap: it needs another tap; stalled: it stopped while playing. */
+export type SoundTrouble = 'blocked' | 'tap' | 'stalled';
 
 export type Step =
   | { kind: 'note'; url: string; rate?: number; gain?: number }
   | { kind: 'listen' }
   /** a song's parts (voice, music) together, from a point, maybe looping;
-      with `listen`, the mic opens alongside (the song never waits for it)
-      and `monitor` plays it back at that volume */
+      with `listen`, the mic opens first (a refused mic still lets the song
+      play) and `monitor` plays it back at that volume */
   | { kind: 'song'; urls: readonly string[]; from: number; gains: readonly number[]; loop?: { start: number; end: number };
       listen?: boolean; monitor?: number;
       /** with `listen`: keep what the mic hears as a take (not while looping) */
@@ -52,6 +60,8 @@ export interface Snapshot {
   readonly startedAt: number | null;
   /** how many takes have been finished, so a screen knows to look */
   readonly takes: number;
+  /** sound that would not start, or stopped by itself; null if none */
+  readonly sound: SoundTrouble | null;
 }
 
 /** A take, finished: what the mic heard while a song played, and whose. */
@@ -91,7 +101,9 @@ export const MIC_KEY = 'rp.mic.set';
 const ACTIVE: readonly State[] = ['armed', 'counting-in', 'running'];
 
 export class Conductor {
-  private snap: Snapshot = { state: 'idle', owner: null, step: 0, mic: 'closed', why: null, startedAt: null, takes: 0 };
+  private snap: Snapshot = { state: 'idle', owner: null, step: 0, mic: 'closed', why: null, startedAt: null, takes: 0, sound: null };
+  /** the next tap makes the sound anew (after it stalled or would not start) */
+  private rebuild = false;
   /** the one recorder, while a take is being made */
   private recorder: Recorder | null = null;
   private lastTake: Take | null = null;
@@ -114,7 +126,23 @@ export class Conductor {
     this.env = env;
     this.store = store;
     env.onHidden(() => this.leave('hidden'));
-    engine.onInterrupt(() => this.leave('interrupted'));
+    /* the phone took the sound (a call, another app). While the sound is
+       still being woken its state means nothing: the clock decides that */
+    engine.onInterrupt(() => {
+      if (this.snap.state !== 'armed') this.leave('interrupted');
+    });
+    /* the clock stood still while playing: stop, say so, and wait for a tap */
+    engine.onStall(() => {
+      if (this.snap.state !== 'running') return;
+      this.rebuild = true;
+      this.halt('stopped', null);
+      this.set({ sound: 'stalled' });
+    });
+    engine.onMicHeld((held) => {
+      if (!this.active()) return;
+      if (held && this.snap.mic === 'open') this.set({ mic: 'held' });
+      else if (!held && this.snap.mic === 'held') this.set({ mic: 'open' });
+    });
     engine.onMic((b) => {
       if (this.snap.mic !== 'open' || this.snap.state !== 'running') return;
       /* the recorder first: listeners may hand the samples on */
@@ -163,6 +191,12 @@ export class Conductor {
     return () => {
       this.listeners.delete(fn);
     };
+  }
+
+  /** What the phone says about its sound, for the Sound check. It looks
+      and listens; it never starts or changes anything. */
+  report(): Promise<SoundReport> {
+    return this.engine.report();
   }
 
   /** loudness of the voice right now, 0 to 1; 0 whenever the mic is not open */
@@ -227,10 +261,9 @@ export class Conductor {
     if (!this.spend(token)) return false;
     if (this.env.hidden()) return false;                                /* nothing starts out of sight */
     if (this.active()) this.halt('stopped', null);                      /* one source at a time */
-    this.engine.unlock();                                               /* inside the tap */
     const gen = ++this.gen;
-    this.set({ state: 'armed', owner: plan.owner, step: 0, mic: 'closed', why: null, startedAt: null });
-    void this.run(gen, plan);
+    this.set({ state: 'armed', owner: plan.owner, step: 0, mic: 'closed', why: null, startedAt: null, sound: null });
+    void this.run(gen, plan);                                           /* its first call is inside the tap */
     return true;
   }
 
@@ -256,6 +289,20 @@ export class Conductor {
 
   private async run(gen: number, plan: Plan): Promise<void> {
     try {
+      /* the mic first, so the sound is born on the route it chose */
+      if (plan.steps.some((st) => st.kind === 'listen' || (st.kind === 'song' && st.listen))) {
+        if (!(await this.openMic(gen))) return;
+      }
+      const woke = await this.engine.wake(this.rebuild);
+      if (gen !== this.gen) return;
+      if (!woke.ok) {
+        /* never sit there looking as if it plays: stop and say so */
+        this.rebuild = true;
+        this.halt('stopped', null);
+        this.set({ sound: woke.why === 'blocked' && !woke.tap ? 'tap' : woke.why });
+        return;
+      }
+      this.rebuild = false;
       const samples = new Map<string, Sample>();
       for (const st of plan.steps) {
         if (st.kind === 'note' && !samples.has(st.url)) samples.set(st.url, await this.engine.load(st.url));
@@ -292,7 +339,7 @@ export class Conductor {
           if (st.listen) {
             if (st.monitor != null) this.monitorGain = st.monitor;
             if (st.record && !st.loop) this.recorder = new Recorder();
-            void this.listen(gen, true);
+            this.listen(true);
           }
           await ensemble.ended;
           if (gen !== this.gen) return;
@@ -300,9 +347,8 @@ export class Conductor {
           this.song = null;
           continue;
         }
-        /* listen: open the mic, and keep listening until Stop or leaving */
-        if (await this.listen(gen, false)) return;   /* running, listening, until Stop or leaving */
-        if (gen !== this.gen) return;
+        /* listen: keep listening until Stop or leaving */
+        if (this.listen(false)) return;
       }
       if (gen === this.gen) this.halt('finished', null);
     } catch {
@@ -320,28 +366,32 @@ export class Conductor {
     this.snap = { ...this.snap, takes: this.snap.takes + 1 };
   }
 
-  /** Open the mic for this session. True if it is open and listening. */
-  private async listen(gen: number, withSong: boolean): Promise<boolean> {
+  /** Open the mic for this session, before the sound wakes. False if the
+      session ended meanwhile (and then a mic that opened is closed again). */
+  private async openMic(gen: number): Promise<boolean> {
     this.set({ mic: 'opening' });
-    const r = await this.engine.openMic(MIC_LADDER, ladderOrder(this.remembered()));
+    const r: MicResult = await this.engine.openMic(MIC_LADDER, ladderOrder(this.remembered()));
     if (gen !== this.gen) {
       /* it opened after its session ended: close it again, unless a
          newer session is using the mic itself */
-      if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening') this.engine.closeMic();
+      if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening' && this.snap.mic !== 'held') this.engine.closeMic();
       return false;
     }
-    if (r.ok) {
-      this.store.set(MIC_KEY, String(r.set));
-      this.monitoring = withSong;
-      if (withSong) this.engine.monitor(this.monitorGain);
-      this.set({ mic: 'open' });
-      return true;
-    }
-    this.set({ mic: r.why });             /* refused or missing: the rest carries on without it */
-    return false;
+    if (r.ok) this.store.set(MIC_KEY, String(r.set));
+    /* refused or missing: the rest carries on without it */
+    this.set({ mic: r.ok ? (r.held ? 'held' : 'open') : r.why });
+    return true;
   }
 
-  /** Silence, the mic closed, the device let go - and every step still
+  /** Listen, on the mic opened at the start. True if it is listening. */
+  private listen(withSong: boolean): boolean {
+    if (this.snap.mic !== 'open' && this.snap.mic !== 'held') return false;
+    this.monitoring = withSong;
+    if (withSong) this.engine.monitor(this.monitorGain);
+    return true;
+  }
+
+  /** Silence and the mic closed - and every step still
       waiting is made stale, so none of them can start anything later. */
   private halt(state: 'finished' | 'stopped', why: Snapshot['why']): void {
     this.gen++;
@@ -356,7 +406,7 @@ export class Conductor {
       /* already stopped */
     }
     this.engine.release();
-    const mic: MicState = this.snap.mic === 'open' || this.snap.mic === 'opening' ? 'closed' : this.snap.mic;
+    const mic: MicState = this.snap.mic === 'open' || this.snap.mic === 'opening' || this.snap.mic === 'held' ? 'closed' : this.snap.mic;
     this.set({ state, why, mic });
   }
 

@@ -65,7 +65,10 @@ export const PROBE = `(() => {
   };
   const S = AudioBufferSourceNode.prototype;
   const start = S.start, stop = S.stop;
+  P.kicks = 0;
   S.start = function (...a) {
+    /* the one silent sample that opens the way out (RULEBOOK 4, Sound, Android 3): not a sound */
+    if (this.buffer && this.buffer.length <= 1) { P.kicks++; note('kick'); return start.apply(this, a); }
     P.started++; P.live.add(this); note('play');
     P.starts.push({ when: a[0] ?? 0, offset: a[1] ?? 0, seconds: this.buffer ? this.buffer.duration : 0, loop: this.loop, loopStart: this.loopStart, loopEnd: this.loopEnd });
     this.addEventListener('ended', () => { P.live.delete(this); checkQuiet(); });
@@ -128,14 +131,30 @@ export const PROBE = `(() => {
    timing is left to judge. Install BEFORE the PROBE, so the probe still
    sees every mic track. Off until window.__mirror.on = true. */
 export const MIRROR = `(() => {
-  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, buffer: null, ctx: null, src: null, starts: [], at: null };
+  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, buffer: null, ctx: null, src: null, starts: [], at: null, pre: null, waiting: null };
   const AC = window.AudioContext;
-  window.AudioContext = class extends AC {
-    constructor(...a) { super(...a); M.ctx = this; }
+  /* The app opens the mic before it makes its sound (RULEBOOK 4, Sound,
+     Android 4). The mirror's mic has to come from the app's own sound, so
+     when the mic is asked for first, the mirror makes that sound early and
+     hands it to the app when the app makes its own. */
+  class MAC extends AC {
+    constructor(...a) {
+      if (M.pre) { const c = M.pre; M.pre = null; return c; }
+      super(...a);
+      M.ctx = this;
+    }
     get outputLatency() { return M.on ? M.out : super.outputLatency; }
-  };
+  }
+  window.AudioContext = MAC;
   const S = AudioBufferSourceNode.prototype, start = S.start;
-  S.start = function (...a) { M.starts.push({ node: this, when: a[0] ?? 0, offset: a[1] ?? 0 }); return start.apply(this, a); };
+  S.start = function (...a) {
+    const real = this.buffer && this.buffer.length > 1;
+    if (real) M.starts.push({ node: this, when: a[0] ?? 0, offset: a[1] ?? 0 });
+    const r = start.apply(this, a);
+    /* the first part of the song (the voice) starts: the singer joins in */
+    if (real && M.waiting && this.context === M.ctx) { const w = M.waiting; M.waiting = null; void w(M.starts[M.starts.length - 1]); }
+    return r;
+  };
   /* another recording to sing, from the next Start on */
   M.load = (b64) => { M.pending = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer; };
   /* how late a sound put into a stream comes out of it as a mic, here */
@@ -165,26 +184,75 @@ export const MIRROR = `(() => {
   const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
   md.getUserMedia = async (c) => {
     if (!M.on) return gum(c);
-    if (M.loop === null && M.ctx) M.loop = await measureLoop(M.ctx);
-    const ctx = M.ctx, last = M.starts.slice(-2);
-    if (!ctx || last.length < 2) return gum(c);
+    if (!M.ctx || M.ctx.state === 'closed') { new MAC({ latencyHint: 'interactive' }); M.pre = M.ctx; }
+    const ctx = M.ctx;
+    if (M.loop === null) M.loop = await measureLoop(ctx);
     if (M.pending) { M.buffer = await ctx.decodeAudioData(M.pending); M.pending = null; }
-    const { when, offset, node } = last[0];            /* the voice part, started with the music */
     const dest = ctx.createMediaStreamDestination();
     const src = ctx.createBufferSource();
-    src.buffer = M.buffer || node.buffer;
     src.connect(dest);
     if (M.src) try { M.src.stop(); } catch {}
     M.src = src;
-    const heard = when + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */
-    const sing = heard + M.inLat - (M.loop || 0);          /* the mic has it */
-    const at = Math.max(sing, ctx.currentTime + 0.02);
-    start.call(src, at, offset + (at - sing));
-    M.at = { when, heard, sing, at, offset, loop: M.loop };
+    M.waiting = async ({ when, offset, node }) => {
+      if (M.src !== src) return;
+      src.buffer = M.buffer || node.buffer;
+      const heard = when + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */
+      const sing = heard + M.inLat - (M.loop || 0);          /* the mic has it */
+      const at = Math.max(sing, ctx.currentTime + 0.02);
+      start.call(src, at, offset + (at - sing));
+      M.at = { when, heard, sing, at, offset, loop: M.loop };
+    };
     const track = dest.stream.getAudioTracks()[0];
     const gs = track.getSettings.bind(track);
     track.getSettings = () => ({ ...gs(), latency: M.inLat });
     track.stop = function () { try { src.stop(); } catch {} return MediaStreamTrack.prototype.stop.call(this); };
     return dest.stream;
   };
+})();`;
+
+/* An Android phone's sound, as the old app learned it (RULEBOOK 4, Sound,
+   Android), on top of desktop Chrome, which hides all of it. Install
+   BEFORE the probe. Every switch is off until a test turns it on:
+     born: 'suspended'   new sound starts out suspended, its clock at 0
+     resume: 'hang'      resume() never answers
+     resume: 'gesture'   resume() works only inside a tap (otherwise it
+                         never answers, as on Android)
+     sticky: true        sound the app suspended never comes back
+     freeze()            every sound made so far: its clock stops, while it
+                         still says "running"
+   It counts every suspend() the app makes, and notes the order of mic and
+   sound events. */
+export const ANDROID = `(() => {
+  const E = window.__android = { born: 'running', resume: 'ok', sticky: false, suspends: 0, refused: 0, contexts: [], order: [] };
+  const AC = window.AudioContext;
+  const base = Object.getPrototypeOf(AC.prototype);
+  const get = (k) => (Object.getOwnPropertyDescriptor(AC.prototype, k) || Object.getOwnPropertyDescriptor(base, k)).get;
+  const realTime = get('currentTime'), realState = get('state');
+  const realResume = AC.prototype.resume, realSuspend = AC.prototype.suspend;
+  window.AudioContext = class extends AC {
+    constructor(...a) {
+      super(...a);
+      this.__held = E.born === 'suspended';
+      this.__frozen = null;
+      this.__stuck = false;
+      E.contexts.push(this);
+      E.order.push('context');
+    }
+    get currentTime() { return this.__held ? 0 : this.__frozen ?? realTime.call(this); }
+    get state() { const s = realState.call(this); return this.__held && s !== 'closed' ? 'suspended' : s; }
+    resume() {
+      E.order.push('resume');
+      if (this.__stuck || E.resume === 'hang') return new Promise(() => {});
+      if (E.resume === 'gesture' && !navigator.userActivation.isActive) { E.refused++; return new Promise(() => {}); }
+      this.__held = false;
+      return realResume.call(this);
+    }
+    suspend() { E.suspends++; if (E.sticky) this.__stuck = true; return realSuspend.call(this); }
+  };
+  E.freeze = () => E.contexts.forEach((c) => { if (c.__frozen == null) c.__frozen = realTime.call(c); });
+  E.newest = () => E.contexts[E.contexts.length - 1] || null;
+  /* the newest sound's clock moves, over a quarter of a second */
+  E.moving = () => new Promise((ok) => { const c = E.newest(); if (!c) return ok(false); const t = c.currentTime; setTimeout(() => ok(c.currentTime > t), 250); });
+  const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
+  md.getUserMedia = (c) => { E.order.push('mic-asked'); return gum(c).then((s) => { E.order.push('mic-open'); return s; }); };
 })();`;

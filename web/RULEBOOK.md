@@ -174,6 +174,19 @@ web/src/
 - Ignore a repeat press mid-note.
 - Measure the sample file that ships.
 
+Android (learned the hard way in the old app; the first phone test of this app failed on every one):
+
+1. Never suspend the context ourselves. Silence comes from stopping the sounds and closing the mic, never from suspending.
+2. Race every audio promise (resume, close, getUserMedia, decode) against a timeout. On Android they can hang forever.
+3. On Start: await resume, then play one silent 1-sample buffer (Chrome on Android may not open the output until something plays), then confirm the clock (currentTime) moves within 1.5 s. Judge by the clock, never by the context's state.
+4. Open the mic first, then create or wake the engine, so it is born on the right audio route (headsets change the route when the mic opens).
+5. A clock that says "running" but doesn't move is a stall. Recovery happens only on a tap: close the old context, wait for the close, make a new one, re-attach the mic, and carry on from where it froze.
+6. Never take heavy audio action on its own: no automatic mic retries, no automatic rebuilds. A tap, or nothing.
+7. Never report success on sound the clock hasn't proved.
+8. If sound can't start, say so on screen in plain words, with the steps in order: reload the app; unplug headphones and reload; close Chrome fully; restart the phone. Never sit in Pause silently.
+9. If another app holds the mic (the track is muted or ends), say so plainly.
+10. Test against silence, not a tone.
+
 ### Screens
 
 - One screen registry.

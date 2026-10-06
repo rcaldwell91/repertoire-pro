@@ -1,4 +1,4 @@
-import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSet, Sample, Source } from '../engine';
+import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSet, Sample, SoundReport, Source, Wake } from '../engine';
 
 /* The browser's sound and microphone, behind the engine interface. Only the
    conductor holds it. A native engine replaces this file later; nothing
@@ -20,8 +20,48 @@ function finalAnswer(err: unknown): MicResult | null {
   const name = (err as { name?: string } | null)?.name || '';
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') return { ok: false, why: 'refused' };
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return { ok: false, why: 'unavailable' };
+  /* the phone could not start it: almost always another app has it */
+  if (name === 'NotReadableError' || name === 'TrackStartError') return { ok: false, why: 'held' };
   return null;
 }
+
+/* RULEBOOK 4, Sound, Android 2: every sound promise races a timeout. On
+   Android they can hang forever. */
+export const LATE = Symbol('late');
+export function race<T>(p: Promise<T>, ms: number): Promise<T | typeof LATE> {
+  return new Promise((ok, bad) => {
+    const t = setTimeout(() => ok(LATE), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        ok(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        bad(e);
+      },
+    );
+  });
+}
+const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** How long each thing may take before it counts as hung, in ms. */
+export const LIMITS = {
+  resume: 1500,
+  /** the clock must move within this, after resume (Android 3) */
+  clock: 1500,
+  /** a clock standing still this long while sound plays is a stall (Android 5) */
+  stall: 1500,
+  close: 1500,
+  decode: 30000,
+  module: 3000,
+  /** the mic, when it is already allowed; and when the phone may be asking */
+  micAllowed: 8000,
+  micAsking: 60000,
+};
+
+/** names that mean headphones, in the phone's list of devices */
+const HEADPHONES = /headset|headphone|earphone|earbud|buds|airpods|bluetooth|usb|wired/i;
 
 /* The mic tap: runs on the sound thread, hands over the mic's samples in
    blocks of 1024, each stamped with the engine time of its last sample. */
@@ -52,38 +92,138 @@ export class WebEngine implements AudioEngine {
   private readonly sources = new Set<AudioBufferSourceNode>();
   private readonly buffers = new Map<string, AudioBuffer>();
   private stream: MediaStream | null = null;
+  /** the context the mic's nodes belong to */
+  private attached: AudioContext | null = null;
   private micNode: MediaStreamAudioSourceNode | null = null;
   private analyser: AnalyserNode | null = null;
   private readonly frame = new Float32Array(2048);
   private readonly interruptCbs = new Set<() => void>();
-  private letGo = false;
-  private sleepTimer: ReturnType<typeof setTimeout> | null = null;
-  private sleeping: Promise<void> | null = null;
-  private tapReady: Promise<boolean> | null = null;
+  private readonly stallCbs = new Set<() => void>();
+  private readonly heldCbs = new Set<(held: boolean) => void>();
+  private tapReady: { ctx: AudioContext; ready: Promise<boolean> } | null = null;
   private tap: AudioWorkletNode | null = null;
   private monitorGain: GainNode | null = null;
   private monitorLevel = 0;
   private inputLatency = 0;
   private readonly micCbs = new Set<(b: MicBlock) => void>();
+  /** everything played goes out through here, so the Sound check can see it */
+  private out: GainNode | null = null;
+  private outMeter: AnalyserNode | null = null;
+  private watchTimer: ReturnType<typeof setInterval> | null = null;
 
-  private context(): AudioContext {
-    if (!this.ctx) {
-      this.ctx = new AudioContext({ latencyHint: 'interactive' });
-      this.ctx.addEventListener('statechange', () => {
-        const st = this.ctx?.state as string;
-        /* the phone took it (a call, another app) - not us letting it go */
-        if (st === 'interrupted' || (st === 'suspended' && !this.letGo && !this.sleeping)) this.interruptCbs.forEach((f) => f());
-      });
-    }
-    return this.ctx;
+  /** A new context, and its way out. Only from wake (or, if nothing has
+      woken yet, to decode): never on its own. */
+  private make(): AudioContext {
+    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    this.ctx = ctx;
+    ctx.addEventListener('statechange', () => {
+      if (ctx !== this.ctx) return;               /* an old one, closing */
+      const st = ctx.state as string;
+      /* the phone took it (a call, another app): we never suspend it ourselves */
+      if (st === 'interrupted' || st === 'suspended') this.interruptCbs.forEach((f) => f());
+    });
+    this.out = ctx.createGain();
+    this.outMeter = ctx.createAnalyser();
+    this.outMeter.fftSize = 2048;
+    this.out.connect(ctx.destination);
+    this.out.connect(this.outMeter);
+    return ctx;
   }
 
-  unlock(): void {
+  private context(): AudioContext {
+    return this.ctx && this.ctx.state !== 'closed' ? this.ctx : this.make();
+  }
+
+  async wake(rebuild: boolean): Promise<Wake> {
+    const ua = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+    const tap = ua ? ua.isActive : true;
+    if (rebuild && this.ctx) {
+      /* Android 5: close the old one, wait for it, then a new one */
+      const old = this.ctx;
+      this.stopAll();
+      this.detachMic();
+      this.ctx = null;
+      this.out = null;
+      this.outMeter = null;
+      try {
+        await race(old.close(), LIMITS.close);
+      } catch {
+        /* closed already */
+      }
+    }
     const ctx = this.context();
-    if (this.sleepTimer) clearTimeout(this.sleepTimer);   /* starting again: keep the device */
-    this.sleepTimer = null;
-    this.letGo = false;
-    if (ctx.state !== 'running') void ctx.resume();
+    /* Android 3: await resume (raced), one silent sample, then the clock */
+    try {
+      await race(ctx.resume(), LIMITS.resume);
+    } catch {
+      /* not allowed: the clock says so below */
+    }
+    if (ctx !== this.ctx) return { ok: false, why: 'blocked', tap };
+    this.kick(ctx);
+    if (!(await this.clockMoves(ctx, LIMITS.clock)) || ctx !== this.ctx) {
+      return { ok: false, why: ctx.state === 'running' ? 'stalled' : 'blocked', tap };
+    }
+    if (this.stream) await this.attachMic(ctx);
+    return { ok: true };
+  }
+
+  /** one silent sample: Chrome on Android may not open the way out until something plays */
+  private kick(ctx: AudioContext): void {
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      src.connect(ctx.destination);
+      src.onended = () => {
+        try {
+          src.disconnect();
+        } catch {
+          /* gone */
+        }
+      };
+      src.start();
+    } catch {
+      /* nothing to play it on: the clock will say */
+    }
+  }
+
+  /** the only proof that sound works: the clock moves (never ctx.state) */
+  private async clockMoves(ctx: AudioContext, ms: number): Promise<boolean> {
+    const t0 = ctx.currentTime;
+    const end = performance.now() + ms;
+    while (performance.now() < end) {
+      await pause(30);
+      if (ctx.currentTime > t0) return true;
+    }
+    return false;
+  }
+
+  /* While anything plays, watch the clock. Standing still is a stall: say
+     so, and do nothing else (Android 6: only a tap rebuilds). */
+  private watch(): void {
+    if (this.watchTimer) return;
+    let last = this.ctx ? this.ctx.currentTime : 0;
+    let movedAt = performance.now();
+    this.watchTimer = setInterval(() => {
+      const ctx = this.ctx;
+      if (!ctx || !this.sources.size) {
+        this.unwatch();
+        return;
+      }
+      if (ctx.currentTime !== last) {
+        last = ctx.currentTime;
+        movedAt = performance.now();
+        return;
+      }
+      if (performance.now() - movedAt > LIMITS.stall) {
+        this.unwatch();
+        this.stallCbs.forEach((f) => f());
+      }
+    }, 250);
+  }
+
+  private unwatch(): void {
+    if (this.watchTimer) clearInterval(this.watchTimer);
+    this.watchTimer = null;
   }
 
   now(): number {
@@ -95,10 +235,16 @@ export class WebEngine implements AudioEngine {
     if (!buf) {
       const res = await fetch(url);
       if (!res.ok) throw new Error('Could not load ' + url + ': ' + res.status);
-      buf = await this.context().decodeAudioData(await res.arrayBuffer());
+      const got = await race(this.context().decodeAudioData(await res.arrayBuffer()), LIMITS.decode);
+      if (got === LATE) throw new Error('Decoding hung: ' + url);
+      buf = got;
       this.buffers.set(url, buf);
     }
     return { url, seconds: buf.duration };
+  }
+
+  private way(ctx: AudioContext): AudioNode {
+    return this.out && this.out.context === ctx ? this.out : ctx.destination;
   }
 
   play(sample: Sample, opts?: { rate?: number; gain?: number }): Source {
@@ -111,7 +257,7 @@ export class WebEngine implements AudioEngine {
     const g = ctx.createGain();
     g.gain.value = opts?.gain ?? 0.8;
     src.connect(g);
-    g.connect(ctx.destination);
+    g.connect(this.way(ctx));
     this.sources.add(src);
     let done!: () => void;
     const ended = new Promise<void>((r) => (done = r));
@@ -125,6 +271,7 @@ export class WebEngine implements AudioEngine {
       done();
     };
     src.start();
+    this.watch();
     return {
       ended,
       stop: () => {
@@ -157,7 +304,7 @@ export class WebEngine implements AudioEngine {
       const g = ctx.createGain();
       g.gain.value = opts.gains[i] ?? 1;
       src.connect(g);
-      g.connect(ctx.destination);
+      g.connect(this.way(ctx));
       this.sources.add(src);
       ends.push(
         new Promise<void>((done) => {
@@ -181,6 +328,7 @@ export class WebEngine implements AudioEngine {
       if (opts.from >= begins) src.start(when, opts.from - begins);
       else src.start(when + (begins - opts.from), 0);
     });
+    this.watch();
     const stop = () =>
       nodes.forEach((src) => {
         try {
@@ -209,28 +357,45 @@ export class WebEngine implements AudioEngine {
     return this.sources.size;
   }
 
+  /** how long to wait for the mic: a phone that may be asking the person
+      gets a minute; one that has said yes already, a few seconds */
+  private async micWait(): Promise<number> {
+    try {
+      const q = navigator.permissions?.query({ name: 'microphone' as PermissionName });
+      const st = q ? await race(q, 500) : LATE;
+      if (st !== LATE && st.state === 'granted') return LIMITS.micAllowed;
+    } catch {
+      /* this browser will not say */
+    }
+    return LIMITS.micAsking;
+  }
+
+  /* Android 4: the mic opens before the sound is made or woken, so the
+     sound is born on the route the mic chose. Here only the stream is
+     opened; its nodes join the sound when it wakes, which always follows. */
   async openMic(sets: readonly MicSet[], order: readonly number[]): Promise<MicResult> {
     this.closeMic();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return { ok: false, why: 'unavailable' };
+    const wait = await this.micWait();
     for (const i of order) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: toConstraints(sets[i]) });
+        const asked = navigator.mediaDevices.getUserMedia({ audio: toConstraints(sets[i]) });
+        const stream = await race(asked, wait);
+        if (stream === LATE) {
+          /* hung (Android 2): if it ever answers, close it at once */
+          void asked.then((s) => s.getTracks().forEach((t) => t.stop()), () => undefined);
+          return { ok: false, why: 'failed' };
+        }
         this.stream = stream;
-        const ctx = this.context();
-        this.micNode = ctx.createMediaStreamSource(stream);
-        this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 2048;
-        this.micNode.connect(this.analyser);     /* measured */
-        /* the mic's own delay, as the phone reports it, taken off at the source */
-        const lat = (stream.getAudioTracks()[0]?.getSettings() as { latency?: number } | undefined)?.latency;
-        this.inputLatency = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
-        this.monitorGain = ctx.createGain();
-        this.monitorGain.gain.value = this.monitorLevel;
-        this.micNode.connect(this.monitorGain);
-        this.monitorGain.connect(ctx.destination);
-        await this.openTap(ctx, this.micNode);
-        if (this.stream !== stream) return { ok: false, why: 'failed' };   /* closed meanwhile */
-        return { ok: true, set: i };
+        const track = stream.getAudioTracks()[0];
+        if (track) {
+          /* Android 9: another app took the mic, or gave it back */
+          track.onmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
+          track.onunmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(false));
+          track.onended = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
+        }
+        /* its nodes join the sound when the sound wakes (never a stalled one) */
+        return { ok: true, set: i, held: !!track && (track.muted || track.readyState === 'ended') };
       } catch (err) {
         const final = finalAnswer(err);
         if (final) return final;
@@ -240,13 +405,51 @@ export class WebEngine implements AudioEngine {
     return { ok: false, why: 'failed' };
   }
 
+  /** the open mic's nodes, on this context (again, after a rebuild) */
+  private async attachMic(ctx: AudioContext): Promise<void> {
+    const stream = this.stream;
+    if (!stream || this.attached === ctx) return;
+    this.detachMic();
+    this.attached = ctx;
+    const micNode = ctx.createMediaStreamSource(stream);
+    this.micNode = micNode;
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    micNode.connect(this.analyser);     /* measured */
+    /* the mic's own delay, as the phone reports it, taken off at the source */
+    const lat = (stream.getAudioTracks()[0]?.getSettings() as { latency?: number } | undefined)?.latency;
+    this.inputLatency = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
+    this.monitorGain = ctx.createGain();
+    this.monitorGain.gain.value = this.monitorLevel;
+    micNode.connect(this.monitorGain);
+    this.monitorGain.connect(ctx.destination);
+    await this.openTap(ctx, micNode);
+  }
+
+  private detachMic(): void {
+    for (const n of [this.micNode, this.tap, this.monitorGain]) {
+      try {
+        n?.disconnect();
+      } catch {
+        /* gone */
+      }
+    }
+    if (this.tap) this.tap.port.onmessage = null;
+    this.micNode = null;
+    this.analyser = null;
+    this.tap = null;
+    this.monitorGain = null;
+    this.attached = null;
+  }
+
   private async openTap(ctx: AudioContext, from: MediaStreamAudioSourceNode): Promise<void> {
     if (!ctx.audioWorklet) return;
-    if (!this.tapReady) {
+    if (!this.tapReady || this.tapReady.ctx !== ctx) {
       const url = URL.createObjectURL(new Blob([TAP], { type: 'text/javascript' }));
-      this.tapReady = ctx.audioWorklet.addModule(url).then(() => true, () => false);
+      const ready = race(ctx.audioWorklet.addModule(url), LIMITS.module).then((r) => r !== LATE, () => false);
+      this.tapReady = { ctx, ready };
     }
-    if (!(await this.tapReady) || this.micNode !== from) return;
+    if (!(await this.tapReady.ready) || this.micNode !== from) return;
     const tap = new AudioWorkletNode(ctx, 'rp-mic-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
     tap.port.onmessage = (e: MessageEvent<{ s: Float32Array; end: number }>) => {
       if (this.tap !== tap) return;
@@ -283,31 +486,25 @@ export class WebEngine implements AudioEngine {
 
   closeMic(): void {
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-    for (const n of [this.micNode, this.tap, this.monitorGain]) {
-      try {
-        n?.disconnect();
-      } catch {
-        /* gone */
-      }
-    }
-    if (this.tap) this.tap.port.onmessage = null;
     this.stream = null;
-    this.micNode = null;
-    this.analyser = null;
-    this.tap = null;
-    this.monitorGain = null;
+    this.detachMic();
     this.monitorLevel = 0;               /* the next time, it starts silent again */
   }
 
-  micLevel(): number {
-    if (!this.analyser) return 0;
-    this.analyser.getFloatTimeDomainData(this.frame);
+  private rms(a: AnalyserNode | null): number {
+    if (!a) return 0;
+    a.getFloatTimeDomainData(this.frame);
     let sum = 0;
     for (let i = 0; i < this.frame.length; i++) sum += this.frame[i] * this.frame[i];
     return Math.min(1, Math.sqrt(sum / this.frame.length));
   }
 
-  release(): void {
+  micLevel(): number {
+    return this.rms(this.analyser);
+  }
+
+  private stopAll(): void {
+    this.unwatch();
     for (const s of [...this.sources]) {
       try {
         s.stop();
@@ -315,28 +512,68 @@ export class WebEngine implements AudioEngine {
         /* already stopped */
       }
     }
+  }
+
+  release(): void {
+    this.stopAll();
     this.closeMic();
-    /* Silence is immediate (every source is stopped above). The device is
-       let go a moment later, unless something starts again first: a song
-       restarted by "back 10 s" stops and starts in one tap, and a device
-       still going to sleep then looked like the phone taking the sound. */
-    if (this.sleepTimer) clearTimeout(this.sleepTimer);
-    this.sleepTimer = setTimeout(() => {
-      this.sleepTimer = null;
-      const ctx = this.ctx;
-      if (!ctx || ctx.state !== 'running' || this.sources.size) return;
-      this.letGo = true;
-      const p = ctx.suspend().finally(() => {
-        if (this.sleeping === p) this.sleeping = null;
-      });
-      this.sleeping = p;
-    }, 400);
+    /* RULEBOOK 4, Sound, Android 1: silence is the sounds stopped and the
+       mic closed. The sound itself is never suspended: on Android a
+       suspended one often never comes back. */
   }
 
   onInterrupt(cb: () => void): () => void {
     this.interruptCbs.add(cb);
     return () => {
       this.interruptCbs.delete(cb);
+    };
+  }
+
+  onStall(cb: () => void): () => void {
+    this.stallCbs.add(cb);
+    return () => {
+      this.stallCbs.delete(cb);
+    };
+  }
+
+  onMicHeld(cb: (held: boolean) => void): () => void {
+    this.heldCbs.add(cb);
+    return () => {
+      this.heldCbs.delete(cb);
+    };
+  }
+
+  async report(): Promise<SoundReport> {
+    const ctx = this.ctx;
+    const t0 = ctx ? ctx.currentTime : 0;
+    let outLevel = 0;
+    let micLevel = 0;
+    let moving = false;
+    const end = performance.now() + 600;
+    while (performance.now() < end) {
+      await pause(40);
+      if (ctx && ctx.currentTime > t0) moving = true;
+      outLevel = Math.max(outLevel, this.rms(this.outMeter));
+      micLevel = Math.max(micLevel, this.micLevel());
+    }
+    const track = this.stream?.getAudioTracks()[0];
+    let devices: MediaDeviceInfo[] = [];
+    try {
+      const d = await race(navigator.mediaDevices.enumerateDevices(), 1000);
+      if (d !== LATE) devices = d;
+    } catch {
+      /* the phone will not say */
+    }
+    const audio = devices.filter((d) => d.kind !== 'videoinput' && d.label);
+    const outs = audio.filter((d) => d.kind === 'audiooutput');
+    return {
+      moving,
+      state: ctx ? ctx.state : 'none',
+      mic: track ? { label: track.label, live: track.readyState === 'live', muted: track.muted } : null,
+      headphones: [...new Set(audio.filter((d) => HEADPHONES.test(d.label)).map((d) => d.label))],
+      output: (outs.find((d) => d.deviceId === 'default') ?? outs[0])?.label || null,
+      outLevel,
+      micLevel,
     };
   }
 }
