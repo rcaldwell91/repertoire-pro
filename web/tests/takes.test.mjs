@@ -77,6 +77,10 @@ const server = local.server;
 const ORIGIN = LIVE ? 'https://rcaldwell91.github.io' : local.ORIGIN;
 const URL_APP = LIVE ? 'https://rcaldwell91.github.io/repertoire-pro/app/' : local.URL_APP;
 const env = await launch({ mic: `${PREFIX}-voice30.mp3`, allowMic: false, online: true });
+/* the singer has said yes to the mic, as on the phone: the app opens the
+   mic before the sound (RULEBOOK 4, Sound, Android 4), so a question nobody
+   answers would hold Start */
+await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'granted', origin: ORIGIN });
 const { page } = env;
 await page.addInitScript(MIRROR);
 await page.addInitScript(PROBE);

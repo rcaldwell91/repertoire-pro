@@ -55,14 +55,14 @@ export const MUTATIONS = [
     from: 'if (this.monitoring && this.snap.mic === \'open\') this.engine.monitor(this.monitorGain);',
     to: 'if (this.snap.mic === \'open\') this.engine.monitor(this.monitorGain);' },
   { rule: 'a song without the mic opens it anyway', file: C,
-    from: '          if (st.listen) {', to: '          if (true) {' },
+    from: "      if (plan.steps.some((st) => st.kind === 'listen' || (st.kind === 'song' && st.listen))) {", to: '      if (true) {' },
   { rule: 'a repeated part does not wrap', file: C,
     from: 'if (loop && p >= loop.end && loop.end > loop.start)', to: 'if (false)' },
   { rule: 'a song keeps its memory', file: C,
     from: 'urls.forEach((u) => this.engine.forget(u));', to: ';' },
   { rule: 'a late count-in still plays', file: C,
     from: 'await this.env.wait(plan.countIn);\n        if (gen !== this.gen) return;', to: 'await this.env.wait(plan.countIn);' },
-  { rule: 'a stopped note carries on to the mic', file: C,
+  { rule: 'a stopped note carries on to the next step', file: C,
     from: 'await src.ended;\n          if (gen !== this.gen) return;', to: 'await src.ended;' },
   { rule: 'a late mic stays open', file: C,
     from: "if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening' && this.snap.mic !== 'held') this.engine.closeMic();", to: ';' },
@@ -102,7 +102,7 @@ export const MUTATIONS = [
   { rule: 'a healthy start rebuilds every time', file: C,
     from: '      this.rebuild = false;\n', to: '' },
   { rule: 'a mic another app holds is not said (Android 9)', file: C,
-    from: "      if (held && this.snap.mic === 'open') this.set({ mic: 'held' });", to: ';' },
+    from: "      if (held && this.snap.mic === 'open') this.set({ mic: 'held' });", to: "      if (held && false) this.set({ mic: 'held' });" },
 ];
 
 function run() {

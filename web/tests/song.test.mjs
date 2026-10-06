@@ -54,8 +54,12 @@ function secondsOf(path) {
 }
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-const { server, URL_APP } = await serve(REPO, APP);
+const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 const env = await launch({ mic: MIC, allowMic: false, online: true });
+/* the singer has said yes to the mic, as on the phone: the app opens the
+   mic before the sound (RULEBOOK 4, Sound, Android 4), so a question nobody
+   answers would hold Start */
+await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'granted', origin: ORIGIN });
 const { page } = env;
 await page.addInitScript(PROBE);
 

@@ -194,6 +194,16 @@ describe('leaving means silence and the mic closed', () => {
     expect(c.snapshot().why).toBe('interrupted');
   });
 
+  it('a stopped note never carries on to the next step', async () => {
+    c.start(c.tap(tap), { owner: 'notes', steps: [{ kind: 'note', url: NOTE }, { kind: 'note', url: 'piano/62.mp3' }] });
+    await flush();
+    c.stop();
+    await flush();
+    expect(engine.log.filter((l) => l.startsWith('play:'))).toEqual(['play:' + NOTE]);
+    expect(engine.sounding()).toBe(0);
+    expect(c.snapshot().step).toBe(0);
+  });
+
   it('Stop ends it the same way', async () => {
     c.start(c.tap(tap), soundCheck);
     await flush();

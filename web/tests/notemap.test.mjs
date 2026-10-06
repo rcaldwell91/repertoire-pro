@@ -109,6 +109,10 @@ spawnSync(FFMPEG, ['-v', 'error', '-y', '-i', `${PREFIX}-voice.mp3`, '-af', 'ase
 
 const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 const env = await launch({ mic: `${PREFIX}-voice30.mp3`, allowMic: false, online: true });
+/* the singer has said yes to the mic, as on the phone: the app opens the
+   mic before the sound (RULEBOOK 4, Sound, Android 4), so a question nobody
+   answers would hold Start */
+await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'granted', origin: ORIGIN });
 const { page } = env;
 await page.addInitScript(MIRROR);       /* before the probe, so the probe sees the mirror's mic */
 await page.addInitScript(PROBE);
