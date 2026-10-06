@@ -194,7 +194,7 @@ const MUTATIONS = [
     from: '    if (stored.anchored && stored.done && (stored.whole || !whole)) return;', to: '', checks: ['reopen-line'] },
   /* takes (tests/takes.test.mjs, against the real database, with the two test accounts) */
   { test: 'takes', what: 'the take records the music too', file: 'src/audio/engine-web/web-engine.ts',
-    from: '    from.connect(tap);', to: '    from.connect(tap);\n    for (const s of this.sources) s.connect(tap);', checks: ['take-voice-only'] },
+    from: '      src.connect(g);\n      g.connect(this.way(ctx));', to: '      src.connect(g);\n      g.connect(this.way(ctx));\n      if (this.tap) g.connect(this.tap);', checks: ['take-voice-only'] },
   { test: 'takes', what: 'a take is placed without the speaker\'s delay', file: 'src/audio/conductor/conductor.ts',
     from: 'this.recorder?.push(b, (at) => this.songTime(at));', to: 'this.recorder?.push(b, (at) => this.songTime(at + this.engine.outputLatency()));',
     checks: ['take-lines-up'] },
