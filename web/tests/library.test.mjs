@@ -58,7 +58,8 @@ const SETUP = `(async () => {
   old.close();
   /* this app's own store: the first song is safe here; the second never made it */
   const mine = await open('repertoire-app', 1, ['songs', 'lines', 'takes']);
-  await put(mine, 'songs', [stray]);
+  /* (the old-app song with a file name was copied here once too, as the first move would have) */
+  await put(mine, 'songs', [stray, { ...oldOwn, blob: undefined }]);
   mine.close();
   localStorage.setItem('rp.db.moved', '1');
 })()`;
@@ -103,7 +104,7 @@ try {
   if (want('once-only')) {
     /* another stray appears later: a second start leaves it, since it runs once per phone */
     await page.eval(`(async () => { const q = indexedDB.open('repertoire'); const d = await new Promise((ok) => (q.onsuccess = () => ok(q.result)));
-      await new Promise((ok) => { const t = d.transaction('songs', 'readwrite'); t.objectStore('songs').put({ id: 'new-song-1', title: 'All of Me', created: 1, fileName: 'a.mp3', file: new Blob(['x']), state: 'ready' }); t.oncomplete = ok; });
+      await new Promise((ok) => { const t = d.transaction('songs', 'readwrite'); t.objectStore('songs').put({ id: 'new-song-1', title: 'All of Me', created: 1, fileName: 'All of Me.mp3', file: new Blob(['x']), state: 'ready' }); t.oncomplete = ok; });
       d.close(); })()`);
     await page.goto(URL_APP + '?again=1#/home');
     await page.waitFor(`!!document.querySelector('main h1')`, 8000);
