@@ -68,19 +68,103 @@ async function copyOnce(d: IDBDatabase): Promise<void> {
   }
 }
 
+/** A song this app made, left in the old app's store from when the two
+    shared it: a file name, the file and a split state, and none of what
+    every old-app song carries (an artist, a time it was added). */
+export function stray(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.fileName === 'string' && o.file instanceof Blob && typeof o.state === 'string' &&
+    !('artist' in o) && !('added' in o) && !('addedAt' in o);
+}
+
+const STRAYS = 'rp.db.strays';
+
+/* Once per phone, quietly: the old app's Library listed this app's songs as
+   "undefined · –:––". Remove those from the old app's store, each only once
+   the same song is safe in this app's own store. Nothing shaped like an
+   old-app song is ever touched, and a stray with no copy here is left. */
+async function clearStrays(d: IDBDatabase): Promise<void> {
+  try {
+    if (localStorage.getItem(STRAYS) || !localStorage.getItem(MOVED)) return;
+  } catch {
+    return;
+  }
+  try {
+    const list = indexedDB.databases ? await indexedDB.databases() : [];
+    if (list.some((x) => x.name === SHARED)) {
+      const old = await new Promise<IDBDatabase | null>((ok) => {
+        const r = indexedDB.open(SHARED);
+        r.onupgradeneeded = () => r.transaction?.abort();   /* never made or changed here */
+        r.onsuccess = () => ok(r.result);
+        r.onerror = () => ok(null);
+      });
+      if (old) {
+        if (old.objectStoreNames.contains('songs')) {
+          const all = (await req(old.transaction('songs', 'readonly').objectStore('songs').getAll())) as Record<string, unknown>[];
+          const go: IDBValidKey[] = [];
+          for (const v of all.filter(stray)) {
+            const here = (await req(d.transaction('songs', 'readonly').objectStore('songs').get(v.id as IDBValidKey))) as
+              Record<string, unknown> | undefined;
+            if (here && here.fileName === v.fileName) go.push(v.id as IDBValidKey);
+          }
+          if (go.length) {
+            const t = old.transaction('songs', 'readwrite');
+            go.forEach((id) => t.objectStore('songs').delete(id));
+            await new Promise((ok, no) => {
+              t.oncomplete = ok;
+              t.onerror = () => no(t.error);
+            });
+          }
+        }
+        old.close();
+      }
+    }
+    localStorage.setItem(STRAYS, '1');
+  } catch {
+    /* tried again next time */
+  }
+}
+
+/** On start: open the store (and tidy the old app's Library, once). */
+export function startStore(): void {
+  void db().catch(() => undefined);
+}
+
 function db(): Promise<IDBDatabase> {
   if (!opening) {
     opening = new Promise<IDBDatabase>((resolve, reject) => {
-      const r = indexedDB.open(DB, VERSION);
+      /* storage that is missing, blocked or silent for 3 s is not there
+         (the old app's rule): say so rather than wait for ever */
+      const late = setTimeout(() => reject(new Error('storage did not answer')), 3000);
+      let r: IDBOpenDBRequest;
+      try {
+        r = indexedDB.open(DB, VERSION);
+      } catch (e) {
+        clearTimeout(late);
+        reject(e);
+        return;
+      }
       r.onupgradeneeded = () => {
         const d = r.result;
         for (const s of ['songs', 'lines', 'takes']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' });
       };
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
+      r.onsuccess = () => {
+        clearTimeout(late);
+        resolve(r.result);
+      };
+      r.onerror = () => {
+        clearTimeout(late);
+        reject(r.error);
+      };
     }).then(async (d) => {
       await copyOnce(d);
+      await clearStrays(d);
       return d;
+    });
+    /* a failed open is tried again next time it is needed */
+    opening.catch(() => {
+      opening = null;
     });
   }
   return opening;

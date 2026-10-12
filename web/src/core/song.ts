@@ -107,7 +107,9 @@ export const MONITOR_GAIN = 0.8;
 
 /** What the song screen says about the mic, if anything: the song plays
     on whatever the mic does (RULEBOOK 3: "Carry on without it"). */
-export function micLine(mic: 'closed' | 'opening' | 'open' | 'refused' | 'unavailable' | 'failed' | 'held'): string | null {
+export function micLine(mic: 'closed' | 'opening' | 'open' | 'refused' | 'unavailable' | 'failed' | 'held', blockedBrowser = false): string | null {
+  /* a browser that never gives the mic: say it is the browser, not the phone */
+  if (blockedBrowser && mic !== 'closed' && mic !== 'opening' && mic !== 'open') return copy.song.micBrowser;
   if (mic === 'refused') return copy.song.micRefused;
   if (mic === 'held') return copy.song.micHeld;
   if (mic === 'unavailable') return copy.song.micMissing;

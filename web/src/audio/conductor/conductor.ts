@@ -27,8 +27,9 @@ export type State = 'idle' | 'armed' | 'counting-in' | 'running' | 'finished' | 
 export type LeaveReason = 'screen' | 'tab' | 'back' | 'hidden' | 'interrupted';
 export type MicState = 'closed' | 'opening' | 'open' | 'refused' | 'unavailable' | 'failed' | 'held';
 /** Why no sound, as the clock showed it. blocked: it would not start;
-    tap: it needs another tap; stalled: it stopped while playing. */
-export type SoundTrouble = 'blocked' | 'tap' | 'stalled';
+    tap: it needs another tap; stalled: it stopped while playing; load: a
+    sound file would not load. */
+export type SoundTrouble = 'blocked' | 'tap' | 'stalled' | 'load';
 
 export type Step =
   | { kind: 'note'; url: string; rate?: number; gain?: number }
@@ -352,7 +353,11 @@ export class Conductor {
       }
       if (gen === this.gen) this.halt('finished', null);
     } catch {
-      if (gen === this.gen) this.halt('stopped', null);
+      /* never back to Start without a word (RULEBOOK 4, Sound, Android 8) */
+      if (gen === this.gen) {
+        this.halt('stopped', null);
+        this.set({ sound: 'load' });
+      }
     }
   }
 

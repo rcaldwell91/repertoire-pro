@@ -42,7 +42,24 @@ export function pinnedRange(line: ArrayLike<number>): Range | null {
   v.sort((a, b) => a - b);
   const lo = v[Math.floor(v.length * 0.01)];
   const hi = v[Math.min(v.length - 1, Math.ceil(v.length * 0.99) - 1)];
-  return { lo: Math.floor(lo) - 3, hi: Math.ceil(hi) + 3 };
+  return widthOk(Math.floor(lo) - 3, Math.ceil(hi) + 3);
+}
+
+/* never so tight the lanes fuse, nor so wide nothing reads (the old app's
+   rpPinLane: 14 to 36 semitones) */
+export const MIN_SPAN = 14;
+export const MAX_SPAN = 36;
+function widthOk(lo: number, hi: number): Range {
+  while (hi - lo < MIN_SPAN) {
+    lo--;
+    hi++;
+  }
+  if (hi - lo > MAX_SPAN) {
+    const mid = Math.round((lo + hi) / 2);
+    lo = mid - MAX_SPAN / 2;
+    hi = mid + MAX_SPAN / 2;
+  }
+  return { lo, hi };
 }
 
 /** "Any octave": move your note by whole octaves to the one nearest the

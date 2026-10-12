@@ -18,11 +18,12 @@ export function useTheme(): ThemeChoice {
   return useSyncExternalStore(onTheme, themeChoice);
 }
 
-export function useSongs(): Song[] | null {
-  const [songs, setSongs] = useState<Song[] | null>(null);
+/** null while loading; false if this phone will not keep songs */
+export function useSongs(): Song[] | null | false {
+  const [songs, setSongs] = useState<Song[] | null | false>(null);
   useEffect(() => {
     let live = true;
-    const load = () => void listSongs().then((s) => live && setSongs(s), () => live && setSongs([]));
+    const load = () => void listSongs().then((s) => live && setSongs(s), () => live && setSongs(false));
     load();
     const off = onSongs(load);
     return () => {

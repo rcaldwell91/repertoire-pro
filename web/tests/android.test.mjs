@@ -34,7 +34,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 }
 
 const ALL = ['start-hangs', 'stall-rebuild', 'gesture-only', 'never-suspends', 'mic-first', 'ten-starts', 'hear-yourself-rebuilt', 'mic-held',
-  'no-page-errors'];
+  'clock-crawls', 'close-hangs', 'mic-hangs', 'load-fails', 'use-headphones', 'any-octave-kept', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -49,8 +49,10 @@ if (!existsSync(SILENCE)) {
   process.exit(1);
 }
 
-const { server, URL_APP } = await serve(REPO, APP);
+const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 const env = await launch({ mic: SILENCE, allowMic: true });
+/* the singer has said yes to the mic before, so a mic that never answers is given seconds, not a minute */
+await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'granted', origin: ORIGIN });
 const { page } = env;
 await page.addInitScript(ANDROID);
 await page.addInitScript(PROBE);
@@ -141,15 +143,17 @@ try {
     await page.tap('#song-play');
     const ok2 = await playing();
     const from = await lastFrom();
+    const gains = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
     const moving = await page.eval(A('moving()'));
     const ctx = await page.eval(`({ n: ${A('contexts.length')}, old: ${A('contexts[0].state')}, suspends: ${A('suspends')}, gone: !document.querySelector('#sound-trouble') })`);
     await page.tap('#song-play');
     await stopped();
     check('stall-rebuild', ok1 && said && ms <= 4000 && quiet.play === copy.song.start && quiet.live === 0 && quiet.mic === 0 &&
-      ok2 && froze > 2 && from !== null && Math.abs(from - froze) < 0.3 && moving && ctx.n === 2 && ctx.old === 'closed' && ctx.suspends === 0 && ctx.gone,
+      ok2 && froze > 2 && from !== null && Math.abs(from - froze) < 0.3 && moving && ctx.n === 2 && ctx.old === 'closed' && ctx.suspends === 0 && ctx.gone &&
+      gains.length === 2 && gains.every((g) => Math.abs(g - 1) < 0.01),
       `stall said after ${(ms / 1000).toFixed(1)} s (${said}); then silent ${quiet.live === 0 && quiet.mic === 0}, Start shown ${quiet.play === copy.song.start}; ` +
       `froze at ${froze.toFixed(2)} s; after the tap: playing ${ok2} from ${from == null ? 'nowhere' : from.toFixed(2) + ' s'}, clock moving ${moving}, ` +
-      `sounds made ${ctx.n} (the old one ${ctx.old}), suspended by the app ${ctx.suspends} times`);
+      `sounds made ${ctx.n} (the old one ${ctx.old}), suspended by the app ${ctx.suspends} times; volumes on the new sound ${gains.join(' / ')}`);
   }
 
   /* 3. Resume works only inside a tap (Android's rule; desktop Chrome hides it) */
@@ -227,8 +231,16 @@ try {
       await sleep(500);
     }
     const n = await page.eval(A('contexts.length'));
-    check('ten-starts', each.length === 10 && each.every(Boolean) && n === 1,
-      `${each.filter(Boolean).length} of 10 played with the clock moving and stopped again; sounds made ${n}`);
+    const k = await page.eval(P('kicks'));
+    /* the old app: never stack mic graphs on the one sound - one live mic path at most */
+    await page.tap('#song-play');
+    await playing();
+    const graphs = await page.eval(`window.__probe.monitors.filter((g) => !g.__off).length`);
+    await page.tap('#song-play');
+    await stopped();
+    check('ten-starts', each.length === 10 && each.every(Boolean) && n === 1 && k >= 10 && graphs === 1,
+      `${each.filter(Boolean).length} of 10 played with the clock moving and stopped again; sounds made ${n}; ` +
+      `the silent sample played on Start ${k} times; mic paths live on the 11th Start ${graphs}`);
   }
 
   /* 7. "Hear yourself" sounds while singing on a sound that was rebuilt */
@@ -265,6 +277,94 @@ try {
     await page.tap('#song-play');
     await stopped();
     check('mic-held', ok && said && still, `playing ${ok}; "${copy.song.micHeld}" shown ${said}; the song played on ${still}`);
+  }
+
+  /* 9. A clock that crawls (under a third of real time) is a stall too (the old app's rule) */
+  if (want('clock-crawls')) {
+    await open();
+    await page.tap('#song-play');
+    const ok1 = await playing();
+    await sleep(1000);
+    await page.eval(A('crawl(0.2)'));
+    const said = await page.waitFor(`(${TROUBLE}) === ${JSON.stringify(copy.song.soundStalled)}`, 5000);
+    await page.tap('#song-play');
+    const ok2 = await playing();
+    const moving = await page.eval(A('moving()'));
+    await page.tap('#song-play');
+    await stopped();
+    check('clock-crawls', ok1 && said && ok2 && moving, `a clock keeping a fifth of real time: seen as a stall and said ${said}; a tap plays again ${ok2}, clock moving ${moving}`);
+  }
+
+  /* 10. A close that never answers does not hold up the rebuild (Android 2) */
+  if (want('close-hangs')) {
+    await open({ closeHangs: true });
+    await page.tap('#song-play');
+    await playing();
+    await sleep(800);
+    await page.eval(A('freeze()'));
+    const said = await page.waitFor(`(${TROUBLE}) === ${JSON.stringify(copy.song.soundStalled)}`, 5000);
+    const t0 = Date.now();
+    await page.tap('#song-play');
+    const ok = await playing();
+    const ms = Date.now() - t0;
+    const n = await page.eval(A('contexts.length'));
+    await page.tap('#song-play');
+    await stopped();
+    check('close-hangs', said && ok && ms < 6000 && n === 2, `stalled ${said}; the old sound's close never answered, and the tap played again on a new sound ${ok} in ${(ms / 1000).toFixed(1)} s (sounds made ${n})`);
+  }
+
+  /* 11. A mic that never answers: the song still plays, and it is said (Android 2) */
+  if (want('mic-hangs')) {
+    await open({ gumHangs: true });
+    const t0 = Date.now();
+    await page.tap('#song-play');
+    const w = await watchPlay(`${PLAY} === ${JSON.stringify(copy.song.pause)} && ${P('live.size')} >= 2`, 15000);
+    const ms = Date.now() - t0;
+    const said = await page.waitFor(`document.querySelector('#mic-line')?.textContent.includes(${JSON.stringify(copy.song.micFailed)})`, 2000);
+    await page.tap('#song-play');
+    await stopped();
+    check('mic-hangs', w.done && said && ms < 12000, `the mic never answered: the song played anyway ${w.done} after ${(ms / 1000).toFixed(1)} s; "${copy.song.micFailed}" shown ${said}`);
+  }
+
+  /* 12. A song that will not load says so, and goes back to Start (Android 8) */
+  if (want('load-fails')) {
+    await open({ decodeFails: true });
+    await page.tap('#song-play');
+    const w = await watchPlay(`(${TROUBLE}) === ${JSON.stringify(copy.song.soundLoad)}`, 8000);
+    const back = await page.eval(`${PLAY} === ${JSON.stringify(copy.song.start)}`);
+    check('load-fails', w.done && back && !w.seen.includes(copy.song.pause), `"${copy.song.soundLoad}" shown ${w.done}; Start said: ${w.seen.join(' → ')}`);
+  }
+
+  /* 13. While you sing: "Use headphones." unless the phone lists some (the old app) */
+  if (want('use-headphones')) {
+    await open();
+    await page.tap('#song-play');
+    await playing();
+    const shown = await page.waitFor(`document.querySelector('#use-headphones')?.textContent === ${JSON.stringify(copy.song.useHeadphones)}`, 3000);
+    await page.tap('#song-play');
+    await stopped();
+    const gone = await page.eval(`!document.querySelector('#use-headphones')`);
+    await open({ headset: true });
+    await page.tap('#song-play');
+    await playing();
+    await sleep(1500);
+    const quiet = await page.eval(`!document.querySelector('#use-headphones')`);
+    await page.tap('#song-play');
+    await stopped();
+    check('use-headphones', shown && gone && quiet, `no headphones listed: "${copy.song.useHeadphones}" shown while singing ${shown}, gone after ${gone}; a wired headset listed: not shown ${quiet}`);
+  }
+
+  /* 14. "Any octave" is remembered on the phone (the old app's rp_any_octave) */
+  if (want('any-octave-kept')) {
+    await open();
+    const before = await page.eval(`document.querySelector('#any-octave').checked`);
+    await page.tap('#any-octave');
+    await open();
+    const after = await page.eval(`document.querySelector('#any-octave').checked`);
+    await page.tap('#any-octave');
+    await open();
+    const off = await page.eval(`document.querySelector('#any-octave').checked`);
+    check('any-octave-kept', before === false && after === true && off === false, `off at first ${!before}; switched on, then the app opened again: still on ${after}; switched off again: stays off ${!off}`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

@@ -643,6 +643,17 @@ describe('sound is proved by its clock (RULEBOOK 4, Sound, Android)', () => {
     expect(c.snapshot()).toMatchObject({ state: 'stopped', why: 'interrupted' });
   });
 
+  it('a song that will not load stops, and says so', async () => {
+    engine.failLoads = true;
+    const seen: string[] = [];
+    c.subscribe((s) => seen.push(s.state));
+    c.start(c.tap(tap), song);
+    await flush();
+    expect(c.snapshot()).toMatchObject({ state: 'stopped', sound: 'load' });
+    expect(seen).not.toContain('running');
+    expect(silentAndClosed()).toBe(true);
+  });
+
   it('a stall when nothing plays is not this session\'s', async () => {
     c.start(c.tap(tap), song);
     c.stop();

@@ -328,6 +328,26 @@ if (want('mic-refused')) {
   }
 }
 
+/* DuckDuckGo's browser will not give the mic (the old app, 12 Sep): it is
+   named, with the browser that works, rather than "No microphone" */
+if (want('duckduckgo')) {
+  const ddg = await launch({ mic: MIC, allowMic: false });
+  try {
+    await ddg.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'denied', origin: ORIGIN });
+    const p = ddg.page;
+    await p.c.send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36 DuckDuckGo/5' });
+    await p.goto(URL_APP + '#/profile/sound-check');
+    await p.waitFor(`!!document.querySelector("main h1")`);
+    await p.tap(sel.go);
+    const said = await p.waitFor(`${LINE} === ${JSON.stringify(copy.song.micBrowser)}`, 10000);
+    check('duckduckgo', said, `the mic refused in DuckDuckGo: "${copy.song.micBrowser}" shown ${said}`);
+  } catch (e) {
+    if (!results.some((r) => r.name === 'duckduckgo')) check('duckduckgo', false, 'the test stopped: ' + e.message.split('\n')[0]);
+  } finally {
+    await ddg.close();
+  }
+}
+
 server.close();
 const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `\n${failed.length} of ${results.length} checks FAILED` : `\nall ${results.length} checks passed`);

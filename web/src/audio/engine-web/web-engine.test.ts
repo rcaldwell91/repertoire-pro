@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toConstraints } from './web-engine';
+import { heardDelay, toConstraints } from './web-engine';
 import { MIC_LADDER, ladderOrder } from '../mic-ladder';
 
 /* RULEBOOK 4, Mic: "Never require raw capture. Walk a ladder of constraint
@@ -22,5 +22,19 @@ describe('the mic ladder', () => {
     expect(ladderOrder(null)).toEqual([0, 1, 2]);
     expect(ladderOrder(2)).toEqual([2, 0, 1]);
     expect(ladderOrder(7)).toEqual([0, 1, 2]);
+  });
+});
+
+/* The old app (rpEarLag): "a reading past half a second is not believable". */
+describe('the speaker\'s delay, as the phone reports it', () => {
+  it('is the output and base delays together', () => {
+    expect(heardDelay(0.12, 0.01)).toBeCloseTo(0.13);
+    expect(heardDelay(0, 0.02)).toBeCloseTo(0.02);
+  });
+  it('is not believed at half a second or more, nor below zero', () => {
+    expect(heardDelay(0.49, 0.02)).toBe(0);
+    expect(heardDelay(0.8, 0)).toBe(0);
+    expect(heardDelay(-0.1, 0)).toBe(0);
+    expect(heardDelay(NaN, 0.01)).toBeCloseTo(0.01);
   });
 });

@@ -60,8 +60,9 @@ export function SongList() {
         </div>
       )}
       <div className="gap" />
+      {songs === false && <p className="line problem" id="no-storage" role="status">{copy.songs.noStorage}</p>}
       {songs && songs.length === 0 && <p className="line">{copy.songs.none}</p>}
-      {songs?.map((s) => (
+      {songs && songs.map((s) => (
         <button key={s.id} type="button" className="song-row" data-song={s.id} onClick={() => navigate(songRoute(s.id), 'screen')}>
           <Music size={24} strokeWidth={2} aria-hidden="true" />
           <span style={{ flex: 1 }}>

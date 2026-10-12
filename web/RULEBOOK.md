@@ -108,6 +108,7 @@ web/src/
    - bans the words "acapella" and "a cappella", and jargon such as "stem", "separator", "latency" and "f0" in user-facing text
    - caps instruction lines at 8 words
 5. **No fix without a failing test first.** Every test runs against the built app.
+6. **For any part the old app already has, read the old app's version of it in next.html and the comments around it first. Write down every rule that code enforces and every failure it guards against. The new version must have a test for each one before it's built. The old code is the checklist, never the source.** The lists live in CHECKLIST.md, each rule with the test that guards it; a unit test checks every named test exists.
 
 ## 3. Product must-haves
 

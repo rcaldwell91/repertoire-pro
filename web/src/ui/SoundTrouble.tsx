@@ -6,11 +6,11 @@ import { copy } from '../core/copy';
 export function SoundTrouble(props: { sound: Trouble | null; onCheck?: () => void }) {
   const s = props.sound;
   if (!s) return null;
-  const line = s === 'stalled' ? copy.song.soundStalled : s === 'tap' ? copy.song.soundTap : copy.song.soundBlocked;
+  const line = s === 'stalled' ? copy.song.soundStalled : s === 'tap' ? copy.song.soundTap : s === 'load' ? copy.song.soundLoad : copy.song.soundBlocked;
   return (
     <div className="sound-trouble" id="sound-trouble" role="alert">
       <p className="problem" id="sound-trouble-line">{line}</p>
-      {s !== 'tap' && (
+      {s !== 'tap' && s !== 'load' && (
         <>
           <p className="hint">{copy.song.stepsTitle}</p>
           <ol id="sound-steps">

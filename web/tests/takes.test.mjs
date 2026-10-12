@@ -34,7 +34,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
   process.exit(1);
 }
 
-const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-leave', 'take-removed-undo', 'take-saved-first', 'take-offline',
+const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-no-clip', 'take-leave', 'take-removed-undo', 'take-saved-first', 'take-offline',
   'take-delete-undo', 'take-send', 'take-private', 'apps-side-by-side', 'take-new-phone', 'old-app-takes', 'take-send-kept', 'take-unlinked', 'take-no-coach', 'take-words', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -258,6 +258,21 @@ try {
     check('take-review', reviewed && !!m && listed.includes(`${m?.[2]}% right notes`) && first?.rightPct === +m?.[2] && byRule === first?.rightPct && scored > 20 && wrongColour === 0,
       `after the take: "${summary}"; in Your takes: "${listed.replace(/\n/g, ' / ')}"; the rule gives ${byRule}% from what was kept; ` +
       `hearing it back, the map coloured ${scored - wrongColour} of ${scored} of your notes by that same rule`);
+  }
+
+  /* the old app's limiter: overlapping sounds never go past full scale. A
+     take at your full voice, over the voice and the music at 100%, adds up
+     to about twice full scale, and would crackle */
+  if (want('take-no-clip')) {
+    await page.eval(`window.__probe.outPeak = 0`);
+    await page.tap(`.take-row[data-take="${first.id}"] .take-hear`);
+    await page.waitFor(S('live.size >= 3'), 5000);
+    await sleep(6000);
+    const peak = await page.eval(S('outPeak'));
+    const parts = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
+    await page.tap('#song-play');
+    check('take-no-clip', parts.length === 3 && parts.every((g) => g >= 0.99) && peak > 0.3 && peak <= 1.0,
+      `a take heard over the voice and music, all at 100% (${parts.map((g) => g.toFixed(2)).join(' / ')}): the loudest sound sent to the speaker ${peak.toFixed(3)} (full scale is 1)`);
   }
 
   /* 2. leaving ends it: silence, the mic closed; the take is still there to decide on */

@@ -22,6 +22,11 @@ describe('the note map', () => {
     for (let k = 0; k < 60; k++) line[1000 + k] = 45;
     expect(pinnedRange(line)?.lo).toBe(42);
   });
+  it('is never so tight the lanes fuse, nor so wide nothing reads: 14 to 36 semitones (the old app\'s rule)', () => {
+    expect(pinnedRange(new Float32Array(100).fill(60))).toEqual({ lo: 53, hi: 67 });
+    const wide = Float32Array.from({ length: 2000 }, (_, i) => 40 + (i % 1000) / 20);   /* 40 .. 90, slowly */
+    expect(pinnedRange(wide)).toEqual({ lo: 47, hi: 83 });
+  });
   it('is the same range wherever the song has got to: never recentred', () => {
     const line = Float32Array.from({ length: 300 }, (_, i) => 60 + Math.sin(i / 10) * 5);
     expect(pinnedRange(line)).toEqual(pinnedRange(line.slice().reverse()));

@@ -101,13 +101,34 @@ export const MUTATIONS = [
     from: "      this.rebuild = true;\n      this.halt('stopped', null);\n      this.set({ sound: 'stalled' });", to: "      this.halt('stopped', null);\n      this.set({ sound: 'stalled' });" },
   { rule: 'a healthy start rebuilds every time', file: C,
     from: '      this.rebuild = false;\n', to: '' },
+  /* the old app as the checklist (RULEBOOK 2.6), 12 Oct */
+  { rule: 'a song that will not load goes back to Start without a word', file: C,
+    from: "        this.set({ sound: 'load' });\n", to: '' },
+  { rule: 'the pitch reader drifts from the old app\'s (the first dip)', file: 'src/audio/pitch/yin.ts',
+    from: '    if (dp[tau] < 0.15) {', to: '    if (dp[tau] < 0.16) {' },
+  { rule: 'the pitch reader drifts from the old app\'s (its highest note)', file: 'src/audio/pitch/yin.ts',
+    from: 'const tmin = Math.max(2, Math.floor(sr / 1400));', to: 'const tmin = Math.max(2, Math.floor(sr / 1500));' },
+  { rule: 'the gate drifts from the old app\'s default', file: 'src/audio/pitch/yin.ts',
+    from: 'export const CLARITY = 0.42 - 0.2 * 0.16;', to: 'export const CLARITY = 0.42 - 0.25 * 0.16;' },
+  { rule: 'a reading is dated where the old app did not date it', file: 'src/audio/pitch/yin.ts',
+    from: 'return (win >> 1) - Math.round(512 + 0.002 * sr);', to: 'return (win >> 1) - 512;' },
+  { rule: 'the octave anchor trusts an unsure model', file: 'src/audio/pitch/line.ts',
+    from: 'anc.conf[ai] < 0.5) return m;', to: 'anc.conf[ai] < 0.4) return m;' },
+  { rule: 'the view can pin too tight to read', file: 'src/core/notemap.ts',
+    from: 'export const MIN_SPAN = 14;', to: 'export const MIN_SPAN = 0;' },
+  { rule: 'the view can pin too wide to read', file: 'src/core/notemap.ts',
+    from: '  if (hi - lo > MAX_SPAN) {', to: '  if (hi - lo > 999) {' },
+  { rule: 'an unbelievable speaker delay is believed', file: 'src/audio/engine-web/web-engine.ts',
+    from: '  return d > 0 && d < 0.5 ? d : 0;', to: '  return d > 0 ? d : 0;' },
+  { rule: 'the checklist names a test that is gone', file: 'src/core/notemap.test.ts',
+    from: "  it('is never so tight the lanes fuse", to: "  it('is narrow or wide" },
   { rule: 'a mic another app holds is not said (Android 9)', file: C,
     from: "      if (held && this.snap.mic === 'open') this.set({ mic: 'held' });", to: "      if (held && false) this.set({ mic: 'held' });" },
 ];
 
 function run() {
   const out = join(mkdtempSync(join(tmpdir(), 'mut-')), 'r.json');
-  const r = spawnSync('npx', ['vitest', 'run', 'src/audio', '--reporter=json', '--outputFile=' + out], { encoding: 'utf8' });
+  const r = spawnSync('npx', ['vitest', 'run', 'src', '--reporter=json', '--outputFile=' + out], { encoding: 'utf8' });
   let failed = [];
   try {
     const j = JSON.parse(readFileSync(out, 'utf8'));

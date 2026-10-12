@@ -77,7 +77,23 @@ export const PROBE = `(() => {
   S.stop = function (...a) { P.live.delete(this); note('stop'); const r = stop.apply(this, a); checkQuiet(); return r; };
   /* which volume each sound goes through, to read what each slider did */
   const connect = AudioNode.prototype.connect;
+  /* everything that reaches the speaker, summed as the speaker sums it:
+     the loudest sample since outPeak was last reset */
+  P.outPeak = 0;
+  const outs = new Map();
+  const tapOut = (ctx) => {
+    if (outs.has(ctx)) return outs.get(ctx);
+    const g = ctx.createGain(), an = ctx.createAnalyser();
+    an.fftSize = 32768;
+    connect.call(g, an);
+    const buf = new Float32Array(an.fftSize);
+    outs.set(ctx, g);
+    setInterval(() => { if (ctx.state === 'closed') return; an.getFloatTimeDomainData(buf);
+      for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i]); if (v > P.outPeak) P.outPeak = v; } }, 200);
+    return g;
+  };
   AudioNode.prototype.connect = function (to, ...r) {
+    if (to instanceof AudioDestinationNode && !(this instanceof AudioBufferSourceNode && this.buffer && this.buffer.length <= 1)) connect.call(this, tapOut(this.context));
     if (this instanceof AudioBufferSourceNode && to instanceof GainNode) gainOf.set(this, to);
     /* the mic played back ("Hear yourself") */
     if (this instanceof MediaStreamAudioSourceNode && to instanceof GainNode) P.monitors.push(to);
@@ -220,15 +236,23 @@ export const MIRROR = `(() => {
      sticky: true        sound the app suspended never comes back
      freeze()            every sound made so far: its clock stops, while it
                          still says "running"
+     crawl(rate)         every sound made so far: its clock keeps only this
+                         share of real time, while it says "running"
+     closeHangs: true    close() never answers (and nothing closes)
+     gumHangs: true      the mic is asked for, and never answers
+     decodeFails: true   no sound file will decode
+     headset: true       the phone lists a wired headset
    It counts every suspend() the app makes, and notes the order of mic and
    sound events. */
 export const ANDROID = `(() => {
-  const E = window.__android = { born: 'running', resume: 'ok', sticky: false, suspends: 0, refused: 0, contexts: [], order: [] };
+  const E = window.__android = { born: 'running', resume: 'ok', sticky: false, suspends: 0, refused: 0, contexts: [], order: [],
+    closeHangs: false, gumHangs: false, decodeFails: false, headset: false };
   const AC = window.AudioContext;
   const base = Object.getPrototypeOf(AC.prototype);
   const get = (k) => (Object.getOwnPropertyDescriptor(AC.prototype, k) || Object.getOwnPropertyDescriptor(base, k)).get;
   const realTime = get('currentTime'), realState = get('state');
-  const realResume = AC.prototype.resume, realSuspend = AC.prototype.suspend;
+  const realResume = AC.prototype.resume, realSuspend = AC.prototype.suspend, realClose = AC.prototype.close;
+  const realDecode = AC.prototype.decodeAudioData || base.decodeAudioData;
   window.AudioContext = class extends AC {
     constructor(...a) {
       super(...a);
@@ -238,7 +262,12 @@ export const ANDROID = `(() => {
       E.contexts.push(this);
       E.order.push('context');
     }
-    get currentTime() { return this.__held ? 0 : this.__frozen ?? realTime.call(this); }
+    get currentTime() {
+      if (this.__held) return 0;
+      if (this.__frozen != null) return this.__frozen;
+      const t = realTime.call(this);
+      return this.__crawl ? this.__crawl.at + (t - this.__crawl.at) * this.__crawl.rate : t;
+    }
     get state() { const s = realState.call(this); return this.__held && s !== 'closed' ? 'suspended' : s; }
     resume() {
       E.order.push('resume');
@@ -248,11 +277,16 @@ export const ANDROID = `(() => {
       return realResume.call(this);
     }
     suspend() { E.suspends++; if (E.sticky) this.__stuck = true; return realSuspend.call(this); }
+    close() { E.order.push('close'); if (E.closeHangs) return new Promise(() => {}); return realClose.call(this); }
+    decodeAudioData(...a) { if (E.decodeFails) return Promise.reject(new DOMException('cannot decode', 'EncodingError')); return realDecode.apply(this, a); }
   };
+  E.crawl = (rate) => E.contexts.forEach((c) => { if (!c.__crawl) c.__crawl = { at: realTime.call(c), rate }; });
   E.freeze = () => E.contexts.forEach((c) => { if (c.__frozen == null) c.__frozen = realTime.call(c); });
   E.newest = () => E.contexts[E.contexts.length - 1] || null;
   /* the newest sound's clock moves, over a quarter of a second */
   E.moving = () => new Promise((ok) => { const c = E.newest(); if (!c) return ok(false); const t = c.currentTime; setTimeout(() => ok(c.currentTime > t), 250); });
   const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
-  md.getUserMedia = (c) => { E.order.push('mic-asked'); return gum(c).then((s) => { E.order.push('mic-open'); return s; }); };
+  md.getUserMedia = (c) => { E.order.push('mic-asked'); if (E.gumHangs) return new Promise(() => {}); return gum(c).then((s) => { E.order.push('mic-open'); return s; }); };
+  const list = md.enumerateDevices.bind(md);
+  md.enumerateDevices = () => list().then((d) => E.headset ? [...d, { kind: 'audiooutput', label: 'Wired headset', deviceId: 'headset', groupId: 'h' }] : d);
 })();`;

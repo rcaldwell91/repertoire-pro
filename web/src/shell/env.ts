@@ -20,6 +20,12 @@ export function browserEnv(): Env {
   };
 }
 
+/** DuckDuckGo's browser will not give the app the microphone (the old
+    app, 12 Sep): name the browser, and the one that works. */
+export function micBlockedBrowser(): boolean {
+  return /DuckDuckGo|Ddg\//.test(navigator.userAgent);
+}
+
 /** Remembered on this phone; a private window or full storage just forgets. */
 export function localStore(): Store {
   return {

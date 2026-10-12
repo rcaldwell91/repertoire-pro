@@ -16,7 +16,7 @@ import { useYourLine } from '../shell/your-line';
 import { review, toStored } from '../shell/take-review';
 import { saveTake, UNDO_MS, type StoredTake } from '../data/takes';
 import { TakesList } from './TakesList';
-import { localStore } from '../shell/env';
+import { localStore, micBlockedBrowser } from '../shell/env';
 import { back, navigate, sendRoute } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
 import { Slider } from '../ui/Slider';
@@ -25,6 +25,7 @@ import { NoteMap } from '../ui/NoteMap';
 import { SoundTrouble } from '../ui/SoundTrouble';
 
 const HEADPHONES_SEEN = 'rp.hint.headphones';
+const ANY_OCTAVE = 'rp.anyOctave';
 
 /* Learn a song, one screen (RULEBOOK 1b): the note map with the singer's
    line and yours, the play bar, back 10 s, Start, repeat this part, and
@@ -75,7 +76,12 @@ export function SongScreen(props: { id: string }) {
   const [voice, setVoice] = useState(100);
   const [music, setMusic] = useState(100);
   const [loop, setLoop] = useState<{ start: number; end: number } | null>(null);
-  const [anyOctave, setAnyOctave] = useState(false);
+  /* remembered on this phone, as the old app did (rp_any_octave) */
+  const [anyOctave, setAnyOctaveNow] = useState(() => localStore().get(ANY_OCTAVE) === '1');
+  const setAnyOctave = (on: boolean) => {
+    setAnyOctaveNow(on);
+    localStore().set(ANY_OCTAVE, on ? '1' : '0');
+  };
   const [hear, setHear] = useState(false);
   const [headphones, setHeadphones] = useState(false);
   const [withMic, setWithMic] = useState(true);
@@ -215,7 +221,19 @@ export function SongScreen(props: { id: string }) {
   }
 
   const line = useMemo(() => (has ? songLine(has, split) : null), [has, split]);
-  const mic = playing && withMic ? micLine(snap.mic) : null;
+  const mic = playing && withMic ? micLine(snap.mic, micBlockedBrowser()) : null;
+  /* while you sing: "Use headphones." unless the phone lists some (the old
+     app; RULEBOOK 4, Mic: warn when headphones can't be confirmed) */
+  const [noHeadphones, setNoHeadphones] = useState(false);
+  useEffect(() => {
+    if (!listening) return;
+    let live = true;
+    void c.report().then((r) => live && setNoHeadphones(r.headphones.length === 0), () => undefined);
+    return () => {
+      live = false;
+      setNoHeadphones(false);
+    };
+  }, [listening, c]);
 
   function hearYourself(on: boolean) {
     setHear(on);
@@ -365,6 +383,7 @@ export function SongScreen(props: { id: string }) {
         </label>
         <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
+        {listening && noHeadphones && <p className="hint" id="use-headphones">{copy.song.useHeadphones}</p>}
         <button type="button" className="btn btn-quiet sound-check-link" id="song-sound-check"
           onClick={() => navigate('/profile/sound-check', 'screen')}>{copy.song.soundCheck}</button>
       </section>

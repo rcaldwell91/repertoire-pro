@@ -1,0 +1,173 @@
+# The old app as the checklist (RULEBOOK 2.6)
+
+For each part the new app has built, every rule the old app's code (next.html) enforces, and every failure it guards against, read from the code and the comments around it on 12 Oct. Numbers in brackets are next.html lines.
+
+**✓** means the new app has a test for it, named after "test:". A name like android:clock-crawls is a browser check in tests/android.test.mjs. A name starting unit: is a unit test file under src, and words from the test's name.
+
+**✗** means not tested and not built, because it waits on Robert's decision.
+
+**—** means not part of the new app: the old feature it belongs to was not built, or was replaced by a decision in the RULEBOOK (named).
+
+`unit:core/checklist.test.ts` checks that every test named here exists. Rules marked "fixed 12 Oct" were real gaps found by this list. Each got its test first, then the fix.
+
+## 1. The sound engine
+
+### Making and waking the sound
+
+- ✓ One sound at a time, made on the way from a tap, never before (982-989, 6837-6842) — test: `browser:nothing-before-start`, `android:mic-first`
+- ✓ The microphone first, then the sound, so it is born on the route the phone ends up using (1421-1428, 1477, 3829-3830) — test: `android:mic-first`, `unit:audio/conductor/conductor.test.ts:opens the mic first, then wakes the sound`
+- ✓ Resume only from a tap; browsers allow nothing else (2979-2981, 12) — test: `android:gesture-only`
+- ✓ "Running" is proved by the clock moving, never by the state flag (3084, 3109-3118, 3133) — test: `android:start-hangs`, `android:stall-rebuild`
+- ✓ One silent sample opens Android's way out (3120-3131, 38-39) — test: `android:ten-starts`
+- ✓ Every promise that can hang is raced against a timeout: resume (3100-3106) — test: `android:start-hangs`
+- ✓ ...and close (3191, 3201) — test: `android:close-hangs`
+- ✓ ...and the microphone (Robert's Android rule 2) — test: `android:mic-hangs`
+- ✓ ...and decoding a file (Robert's Android rule 2) — test: `android:load-fails`
+- ✓ A failure in sound never throws into the screen; it is said (2873-2877, 37) — test: `android:load-fails`, `unit:audio/conductor/conductor.test.ts:a song that will not load stops, and says so` (fixed 12 Oct: a song that would not load went back to Start without a word)
+- ✓ Never suspend the sound ourselves (Robert's Android rule 1; the old app's lesson from Robert's S24) — test: `android:never-suspends`
+- ✓ A sound that will not start says so, with what to do, in order; never a silent Pause (3139-3153, 6708-6713) — test: `android:start-hangs`
+- — Resume on every gesture, focus and pageshow (2979-2981, 3045-3047). Replaced by Robert's Android rule 3: Start awaits resume and proves it with the clock.
+- — Status chips for "sound not started" (1543, 3398). The new app has no status chips. The Sound check says it instead.
+
+### Stalls and the watchdog
+
+- ✓ A clock that says "running" but stands still is a stall (2858-2862, 2923-2931) — test: `android:stall-rebuild`
+- ✓ A clock that moves too slowly is a stall too: the old app wanted 40% of real time (3110-3117, 6661-6664) — test: `android:clock-crawls` (fixed 12 Oct: only a clock standing quite still was caught)
+- ✓ The watchdog runs only while something plays (2907-2910) — test: `unit:audio/conductor/conductor.test.ts:a stall when nothing plays is not this session`
+- ✓ A stall shows one message and does nothing heavy by itself; only a tap rebuilds (2864-2869, 3087-3088) — test: `unit:audio/conductor/conductor.test.ts:a clock that stops while playing is a stall`
+- ✓ The rebuild waits for the old sound to close before making the new one (3186-3192) — test: `android:stall-rebuild`
+- ✓ ...and carries on from where it froze, on the new clock (3171-3178, 3215-3222) — test: `android:stall-rebuild`
+- ✓ ...with the volumes put back (3206-3210) — test: `android:stall-rebuild`
+- ✓ ...and the microphone re-attached to the new sound (3211-3214) — test: `android:hear-yourself-rebuilt`
+- ✓ Never stack microphone graphs; the phone slows until the clock stalls (1338-1346, 2888) — test: `android:ten-starts`
+- ✓ A change of state while the sound is being woken is left to the clock — test: `unit:audio/conductor/conductor.test.ts:a change of state while the sound wakes is left to the clock`
+- ✓ A call or interruption stops it (2875, 2879) — test: `unit:audio/conductor/conductor.test.ts:a call or interruption stops it by itself`
+- ✓ Restarting reports what is true now, never a blanket "rebuilt" (6769-6779) — test: `unit:audio/conductor/conductor.test.ts:after a failed start, only the next tap rebuilds`
+- — Only one rebuild at a time, "busy" (3166-3168). In the new app one tap starts one session, so two rebuilds can't overlap.
+- — A second try 600 ms after a failed rebuild (3195-3204). The new app gives a new sound 3 s to prove itself, and the next tap tries again (Robert's rule: a tap, or nothing).
+- — The headset going in or out re-judges the clock at once (3240-3248). In the new app the watchdog judges every 250 ms while anything plays.
+
+### What leaves the app
+
+- ✓ Overlapping sounds never clip: the old app had a limiter, measured at 1.796 with three notes (992-1012) — test: `takes:take-no-clip` (fixed 12 Oct: a take at full voice over the voice and music measured 1.10 at the speaker, 2.1 in the files)
+- ✓ Measure what actually leaves the app, not what was scheduled (6644-6654) — test: `browser:start`
+- ✓ One check of "working" used everywhere, so they can't disagree (6647-6648) — test: `unit:core/sound-check.test.ts:reads each row from what the phone says`
+- — The compressor, the loudness tuning and the keyboard levels (1003-1005, 6276-6280). The new app plays songs at their own level, and has no synth or keyboard.
+- — Test sound into a muted channel, the phone's call volume, "Test without mic" (6693-6696, 6737-6741, 6783-6824). See the decisions at the end.
+
+### Playing notes and songs
+
+- ✓ Song position comes from the sound's clock, not wall time (1180-1184) — test: `unit:audio/conductor/conductor.test.ts:knows where the song is, on the one clock`
+- ✓ Parts of one song start together and stay together (23787-23816: the old app re-synced two players every 400 ms) — test: `unit:audio/conductor/conductor.test.ts:starts both parts together`, `song:sum-matches`
+- ✓ Repeat a part, back 10 s and seeking start again from the right place (1194-1211) — test: `song:controls`
+- ✓ One press, one note: a second press while it sounds is ignored (22372-22390) — test: `unit:audio/conductor/conductor.test.ts:ignores a repeat press on what is already going`
+- ✓ The reference note is a real piano, corrected to its measured pitch (23330-23373) — test: `unit:core/piano.test.ts:puts the measured C4 sample exactly on C4`
+- ✓ A note file that fails to load is said, never silence (1099-1101, 23336-23337) — test: `android:load-fails` (the old app played a synth note instead; the new one says "It didn't load. Tap Start to try again.")
+- — The scheduler, the count-in clicks, the synth piano and voice, the keyboard trainer, packs, the map preview (76-113, 1025-1236, 4239-4273, 7546-7635). The new app has none of these.
+
+### One thing at a time, and leaving
+
+- ✓ One owner of sound; starting something stops what was going (11199-11235) — test: `unit:audio/conductor/conductor.test.ts:stops what was going before starting something else`
+- ✓ Nothing starts while the app is hidden (11214-11220, 11276-11292) — test: `unit:audio/conductor/conductor.test.ts:will not start while the app is hidden`
+- ✓ A finished background job never starts sound by itself (25173-25179) — test: `unit:audio/conductor/conductor.test.ts:coming back, and everything that was waiting finishing, starts nothing`
+- ✓ Leaving by tab, back button or hiding stops it for good (25051-25086, 20097-20113, 22311-22320) — test: `browser:tab-switch-note`, `browser:back-while-running`, `song:song-leave`, `song:song-hidden`
+- ✓ Nothing starts until Start is pressed (25710-25729) — test: `browser:nothing-before-start`
+- ✓ A stop during the start is a stop (25315, 15930-15956) — test: `unit:audio/conductor/conductor.test.ts:a count-in that ends after leaving plays nothing`
+- — Sleep pauses Learn a song and resumes it later (25088-25114). Replaced by RULEBOOK 2.1: hiding the app means silence, and nothing resumes by itself.
+- — A 3-2-1 count-in before the song (25310-25333). See the decisions at the end.
+
+### Timing
+
+- ✓ The speaker's delay is taken off each line at its own source, never counted twice (2540-2553, 2585-2592) — test: `notemap:placement`, `takes:take-lines-up`
+- ✓ A speaker delay of half a second or more is not believed (2551) — test: `unit:audio/engine-web/web-engine.test.ts:is not believed at half a second or more` (fixed 12 Oct: any reading was trusted)
+- — A hand-set mic delay (22097-22128). The new app measures, and is checked to ±30 ms.
+
+## 2. The microphone
+
+- ✓ Ask for the raw microphone, as a wish, never a demand, down a ladder (1322-1333) — test: `unit:audio/engine-web/web-engine.test.ts:only ever asks, never requires`
+- ✓ Remember the setting that worked and try it first (1435-1438, 1473-1474) — test: `unit:audio/conductor/conductor.test.ts:remembers the one that worked`
+- ✓ Ask once; silence is not a reason to ask again (1410-1418) — test: `android:ten-starts`
+- ✓ Release our own microphone before asking again (1393-1404) — test: `android:ten-starts`
+- ✓ Permission refused: say so, and "Carry on without it" (1998-2005, 572) — test: `browser:mic-refused`, `notemap:mic-refused`
+- ✓ Another app holding the mic, by error or by a muted track: said plainly (2007-2018, 1359-1370) — test: `android:mic-held`, `unit:audio/conductor/conductor.test.ts:says plainly when another app has the mic`
+- ✓ A track already muted when it opens counts as held (1365) — test: `unit:audio/conductor/conductor.test.ts:says plainly when another app has the mic`
+- ✓ "Mic live" only when the track is live and not muted (2105-2116) — test: `unit:audio/conductor/conductor.test.ts:says plainly when another app has the mic`
+- ✓ No microphone found: said (2040-2047) — test: `unit:core/sound-check.test.ts:offers "Carry on without it"`
+- ✓ DuckDuckGo's browser won't give the mic: name the browser and the one that works (16174-16228) — test: `browser:duckduckgo` (fixed 12 Oct: it said "No microphone")
+- ✓ The microphone opens before the sound (1421-1428) — test: `android:mic-first`
+- ✓ Never stack input graphs (1338-1346) — test: `android:ten-starts`
+- ✓ The engine rebuilt: the same stream re-attached, never asked for again (3211-3214) — test: `android:hear-yourself-rebuilt`
+- ✓ Released when the app is hidden or closed (2982-3063) — test: `browser:hidden-listening`, `notemap:mic-hidden`
+- ✓ On return, no automatic request and no loop (2996-2999) — test: `unit:audio/conductor/conductor.test.ts:a mic that opens after leaving is closed again at once`
+- ✓ The microphone check on screen: on, hearing, which mic, held by another app (1531-1547) — test: `browser:start`
+- ✓ Hear yourself hangs off the one mic, straight to the speaker, off unless singing (1271-1293, 22510-22539) — test: `notemap:hear-yourself`, `unit:audio/conductor/conductor.test.ts:"Hear yourself" sounds only while singing`
+- ✓ Hear yourself is headphones only (1312, 7370-7371) — test: `notemap:hear-yourself`
+- ✓ While singing, "Use headphones." unless the phone lists some (25216-25238; RULEBOOK 4, Mic) — test: `android:use-headphones` (fixed 12 Oct: it only showed once, the first time Hear yourself was switched on)
+- ✓ One microphone, one recorder (15052-15055) — test: `unit:audio/conductor/conductor.test.ts:keeps what the mic hears, from where in the song`
+- ✓ Nothing recorded means nothing kept (5020, 15356) — test: `unit:audio/conductor/conductor.test.ts:keeps nothing heard before the song`
+- ✓ A take not kept is thrown away only with Undo (15044-15045) — test: `takes:take-removed-undo`
+- ✓ The mic's own delay taken off at its source (2520-2539) — test: `notemap:placement`
+- ✗ "Device busy": one release and one retry after 400 ms, because Android hands the mic back a beat late (1405-1408, 1463-1469). Robert's Android rule 6 says no automatic mic retries, so the new app says "another app is using the microphone" at once. Needs Robert's decision.
+- — Choosing which microphone, and remembering one that crashed the phone (1429-1530, 5977-5980). Not built. See the decisions at the end.
+- — In-app browsers and plain http (1969-1997). Not in the new app: it is only served over https, and in-app browsers aren't tested.
+- — "Try another mode", the noise gate calibration, the mic chips (1548-1643, 6717-6727). Not in the new app.
+- — Timed exercises start at the first sound (9058-9137). Not in the new app yet: exercises aren't built.
+- — Hold the mic while a take records in the background (2994-3013). Replaced by RULEBOOK 2.1: hiding ends the take, and it's kept to decide on (`takes:take-leave`).
+
+## 3. Pitch reading
+
+- ✓ One reader for files and the microphone, the old app's own (24186-24191, 1712-1715) — test: `unit:audio/pitch/core.test.ts:gives the mic the same note at the same time as the file`
+- ✓ YIN exactly as the old app: the dip under 0.15, the clarity gate, 60-1400 Hz (the shortest lag is what stops it at the top; the 1400 Hz cap itself never decides), the interpolation (1716-1754) — test: `unit:audio/pitch/old-app.test.ts:reads exactly what the old app's yinHz reads` (new 12 Oct: compared with next.html's own code)
+- ✓ The loudness and clarity gates at the old app's default setting (1589-1602, 1642) — test: `unit:audio/pitch/old-app.test.ts:gates at the old app's default setting`
+- ✓ A reading is dated where YIN reads, not the middle of the window (24216-24236) — test: `unit:audio/pitch/old-app.test.ts:dates a file's reading where the old app does`
+- ✓ The octave anchor: a sure model (0.5), more than 4 semitones away, moved by whole octaves to within 1.5 (1760-1768, 24406-24411) — test: `unit:audio/pitch/old-app.test.ts:moves a note onto the model's octave only as the old app does`
+- ✓ Twenty points a second, a 4096-sample window, an anchor every 0.22 s (24211-24213) — test: `unit:audio/pitch/core.test.ts:reads a file in pieces exactly as in one go`
+- ✓ Median of five, never across silence (1758-1772) — test: `unit:audio/pitch/core.test.ts:changes note when the sound does` (the new app centres it: measured better in the bake-off, RULEBOOK 5)
+- ✓ Reading in pieces gives exactly what one read gives (24426-24429) — test: `unit:audio/pitch/core.test.ts:reads a file in pieces exactly as in one go`
+- ✓ The model can't be dropped: it corrects the octave of about 5% of points (24256-24259) — test: `notemap:line-follows`
+- ✓ Shared over up to 4 workers, first notes back quickly, Start never waits (24326-24327, 24380-24387, 24599-24600) — test: `notemap:line-shared`, `song:line-first30`
+- ✓ Read as soon as there is a voice, from the start, showing real progress, never 0% (24500-24513, 24719-24725) — test: `notemap:line-read`
+- ✓ A stored line is versioned; a line read another way is read again (24214, 24239-24244) — test: `notemap:reopen-line`
+- ✓ Gaps of 0.15 s or less bridged, only with a voice both sides and within 6 semitones; silence never (24797-24835) — test: `unit:audio/pitch/line.test.ts:bridges a gap of 0.15 s`, `unit:audio/pitch/line.test.ts:leaves a longer gap, a big leap, and the ends alone`
+- ✓ The line on the phone follows the voice as well as the old app's measured (RULEBOOK 5) — test: `notemap:line-follows`
+- ✓ The line breaks on a leap over 6 semitones or a gap over 0.15 s (3449-3455) — test: `unit:core/notemap.test.ts:lifts the pen across gaps and big jumps`
+- ✓ The view is pinned before Start and the mic can't move it (2471-2518, 25149-25166) — test: `notemap:pinned`, `unit:core/notemap.test.ts:never recentred`
+- ✓ ...never so tight the lanes fuse nor so wide nothing reads: 14 to 36 semitones (2475-2478) — test: `unit:core/notemap.test.ts:is never so tight the lanes fuse` (fixed 12 Oct: a narrow song could pin to 6 semitones)
+- ✓ The exact octave by default, with an "Any octave" switch (25361-25365) — test: `notemap:octave-switch`, `unit:core/takes.test.ts:in the singer's octave unless "Any octave" is on`
+- ✓ ...remembered on the phone (24975, 25024-25029) — test: `android:any-octave-kept` (fixed 12 Oct: it reset every visit)
+- ✓ A note is right within half a semitone, one rule for the map and the score (25366-25375) — test: `unit:core/takes.test.ts:is right within half a semitone`, `takes:take-review` (the old app used one semitone and half the note's length; RULEBOOK 4 settled half a semitone)
+- — Bubbles: cutting notes, rounding, scoops, fill (24841-24919, 25570-25627). Replaced by RULEBOOK 1b: no bubbles on Learn a song.
+- — The old song analyser, the map editor, MIDI import, key detection, room listening, the voice-only sniff (882, 4080-5395, 1776-1851, 23949-24108). Not in the new app.
+- — Live CREPE every 220 ms in its own worker (1674-1686). The new app reads the mic with the file's own code, so the anchor comes every 0.22 s of sound.
+- — Scoring rules for exercises and games (3255-3332, 3792-4018, 9426-9445, 23149). Not in the new app yet: exercises aren't built.
+
+## 4. Learn a song
+
+- ✓ One screen; leaving by any route stops it for good (25051-25086) — test: `song:song-leave`, `song:song-hidden`, `browser:back-while-running`
+- ✓ Start does nothing if it's already playing (25275) — test: `unit:audio/conductor/conductor.test.ts:ignores a repeat press`
+- ✓ One sound in the headphones at a time, and none while hidden (25283-25285) — test: `unit:audio/conductor/conductor.test.ts:is one source: a note started over it stops the song`
+- ✓ The song is read as soon as it's added, progressively, without blocking (24771-24787, 24380-24387) — test: `song:line-first30`, `notemap:line-read`
+- ✓ A song opened while still being read shows its progress, not an empty map (25186-25187, 25551-25556) — test: `notemap:line-read`
+- ✓ Only what has been read so far is shown; an old line is never shown under the singer (25468-25474) — test: `notemap:reopen-line`
+- ✓ The singer and the music each have a slider, live while playing, starting at 100% (25240-25267) — test: `song:sliders`
+- ✓ Your line is the mic on the song's clock, minus each delay (25500-25514, 2612-2619) — test: `notemap:placement`
+- ✓ The title is the singer's own file name, wrapped, never cut (24996-25001) — test: `library:long-title`, `unit:core/song.test.ts:makes a title from the file name`
+- ✓ A song that can't be stored says so; it's never claimed as added (23613, 23699-23709) — test: `song:add-fails` (fixed 12 Oct: Save stayed on "saving" for ever)
+- ✓ Storage missing, refused or silent for 3 s is said (5411-5433) — test: `library:no-storage` (fixed 12 Oct: it showed "No songs yet.", or nothing)
+- ✓ A song with no sound says so (25036) — test: `unit:core/song.test.ts:says what to do about each problem`
+- ✓ A song that can't be read says so (25199-25200) — test: `unit:core/song.test.ts:says what to do about each problem`
+- ✓ Use headphones while singing (25216-25238) — test: `android:use-headphones`
+- ✓ Any octave is remembered (24975) — test: `android:any-octave-kept`
+- ✓ Takes on this screen are recorded, kept, sent and played back in place (21098-21099) — test: `takes:take-review`, `takes:take-lines-up`
+- — Built-in songs, two files split by hand, Listen to the room, the founders' lock (23505-23710, 24023-24108). Not in the new app: songs are split by the server (`song:split-progress`).
+- — Wait to start until reading is 8 s ahead; "Catching up…" (24515-24516, 25655-25679). In the new app the song plays straight away and the singer's line draws as it's read (`song:first30-early`).
+- — A stop resets to the beginning; scores at the end (25336-25434). Replaced by RULEBOOK 1b: Start and Pause on a play bar, and right notes on each take.
+- — Sleep pauses and resumes (25088-25114). Replaced by RULEBOOK 2.1: hiding the app means silence.
+- — A 3-2-1 count-in (25310-25333). See the decisions below.
+
+## Decisions for Robert
+
+1. **"Device busy" retry.** When another app has just let go of the mic, the old app waited 400 ms and asked once more. Your Android rule 6 says no automatic mic retries, so the new app says "Another app is using the microphone." at once. Keep it that way, or allow one quick retry inside the same tap?
+2. **A count-in.** The old Learn a song counted 3-2-1 before the song, "so he knows when to come in". The new one starts straight away. Add one?
+3. **Choosing the microphone.** The old app let you pick the mic, and remembered one that once crashed the phone. The new one uses the phone's choice. Build the picker?
+4. **"Test without mic" in the Sound check.** On your S24, sound died when a USB-C headset with a mic went in. The old app had a button that checks the sound with the mic off, to tell whether the mic is the cause. Add it to the Sound check?

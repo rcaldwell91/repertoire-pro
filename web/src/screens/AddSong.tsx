@@ -13,11 +13,21 @@ export function AddSong() {
   const [title, setTitle] = useState(() => (file ? titleFrom(file.name) : ''));
   const [own, setOwn] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   async function save() {
     if (!file || !own || !title.trim()) return;
     setSaving(true);
-    const song = await addSong(file, title.trim());
+    setFailed(false);
+    let song;
+    try {
+      song = await addSong(file, title.trim());
+    } catch {
+      /* never claimed as saved (the old app's rule) */
+      setSaving(false);
+      setFailed(true);
+      return;
+    }
     holdPicked(null);
     void startSplit(song.id);
     navigate(songRoute(song.id), 'screen');
@@ -42,6 +52,7 @@ export function AddSong() {
           <button type="button" className="btn" id="save-song" disabled={!own || !title.trim() || saving} onClick={() => void save()}>
             {copy.addSong.save}
           </button>
+          {failed && <p className="line problem" id="add-failed" role="status">{copy.addSong.failed}</p>}
         </>
       )}
     </>

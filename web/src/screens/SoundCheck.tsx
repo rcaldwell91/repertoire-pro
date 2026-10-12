@@ -7,6 +7,7 @@ import { reportWords, soundCheckView, type ReportWords } from '../core/sound-che
 import type { Plan } from '../audio/conductor/conductor';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { back } from '../shell/router';
+import { micBlockedBrowser } from '../shell/env';
 import { BackButton } from '../ui/BackButton';
 import { LevelBar } from '../ui/LevelBar';
 import { SoundTrouble } from '../ui/SoundTrouble';
@@ -86,7 +87,9 @@ export function SoundCheck() {
       <button type="button" className="btn" id="sound-check-go" onClick={press}>
         {view.button === 'stop' ? S.stop : S.start}
       </button>
-      <p className="line" role="status" id="sound-check-line">{S[view.line]}</p>
+      <p className="line" role="status" id="sound-check-line">
+        {micBlockedBrowser() && ['refused', 'unavailable', 'failed', 'held'].includes(view.line) ? copy.song.micBrowser : S[view.line]}
+      </p>
       <LevelBar on={view.level} fill={fill} label={S.level} />
       {view.carryOn && (
         <button type="button" className="btn btn-quiet carry-on" onClick={() => setWithoutMic(true)}>

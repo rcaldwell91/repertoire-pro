@@ -60,8 +60,11 @@ export class FakeEngine implements AudioEngine {
   now(): number {
     return this.clock;
   }
+  /** loads fail, as a file that will not decode */
+  failLoads = false;
   load(url: string): Promise<Sample> {
     this.log.push('load:' + url);
+    if (this.failLoads) return Promise.reject(new Error('could not decode'));
     const sample = { url, seconds: 3 };
     if (!this.holdLoads) return Promise.resolve(sample);
     return new Promise((res) => this.heldLoads.push(() => res(sample)));

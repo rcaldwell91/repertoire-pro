@@ -32,7 +32,7 @@ if (songs.length < 2 || !MIC || !existsSync(MIC)) {
 }
 const [[SONG, SONG_PATH], [SONG2, SONG2_PATH]] = songs;
 
-const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'server-off', 'split-progress', 'first30-early', 'line-first30', 'sliders',
+const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'add-fails', 'server-off', 'split-progress', 'first30-early', 'line-first30', 'sliders',
   'controls', 'song-contrast', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'signed-out-again', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -62,6 +62,11 @@ const env = await launch({ mic: MIC, allowMic: false, online: true });
 await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'granted', origin: ORIGIN });
 const { page } = env;
 await page.addInitScript(PROBE);
+/* a phone that refuses to store a song, when a check asks it to */
+await page.addInitScript(`(() => { const put = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...a) {
+    if (this.name === 'songs' && localStorage.getItem('rp.test.refuse') === '1') throw new DOMException('full', 'QuotaExceededError');
+    return put.apply(this, a); }; })()`);
 
 const H1 = 'document.querySelector("main h1")?.textContent';
 const LINE = 'document.querySelector("#song-line [role=status]")?.textContent';
@@ -131,6 +136,24 @@ try {
     const said = await page.waitFor(`${LINE} === ${JSON.stringify(copy.song.tooLong)}`, 10000);
     const sent = (await sepCalls()) - before;
     check('too-long', said && sent === 0, `said "${copy.song.tooLong}" ${said}; sent to the server ${sent} times`);
+  }
+
+  /* the old app: "A failed save is reported, never claimed as success" */
+  if (want('add-fails')) {
+    await fresh('#/sing/learn');
+    await page.eval(`localStorage.setItem('rp.test.refuse', '1')`);
+    await page.waitFor(`!!document.querySelector("#add-song")`, 5000);
+    await page.setFiles('#pick-song', [SONG2_PATH]);
+    await page.waitFor(`${H1} === ${JSON.stringify(copy.addSong.title)}`, 5000);
+    await page.tap('#own-copy');
+    const before = await sepCalls();
+    await page.tap('#save-song');
+    const said = await page.waitFor(`document.querySelector('#add-failed')?.textContent === ${JSON.stringify(copy.addSong.failed)}`, 5000);
+    const after = await page.eval(`({ h1: ${H1}, again: !document.querySelector('#save-song').disabled })`);
+    const sent = (await sepCalls()) - before;
+    await page.eval(`localStorage.removeItem('rp.test.refuse')`);
+    check('add-fails', said && after.h1 === copy.addSong.title && after.again && sent === 0,
+      `the phone refused to store it: "${copy.addSong.failed}" shown ${said}; stayed on Add a song ${after.h1 === copy.addSong.title}; Save can be tapped again ${after.again}; sent to the server ${sent} times`);
   }
 
   if (want('server-off')) {

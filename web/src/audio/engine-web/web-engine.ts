@@ -25,6 +25,14 @@ function finalAnswer(err: unknown): MicResult | null {
   return null;
 }
 
+/** Seconds from sending a sound to hearing it, as the phone reports it.
+    A reading of half a second or more is not believable (the old app,
+    rpEarLag), and is taken as none. */
+export function heardDelay(output: number, base: number): number {
+  const d = (Number.isFinite(output) ? output : 0) + (Number.isFinite(base) ? base : 0);
+  return d > 0 && d < 0.5 ? d : 0;
+}
+
 /* RULEBOOK 4, Sound, Android 2: every sound promise races a timeout. On
    Android they can hang forever. */
 export const LATE = Symbol('late');
@@ -59,6 +67,9 @@ export const LIMITS = {
   micAllowed: 8000,
   micAsking: 60000,
 };
+
+/** a clock that keeps less than this share of real time is stalled */
+export const STALL_PACE = 0.3;
 
 /** names that mean headphones, in the phone's list of devices */
 const HEADPHONES = /headset|headphone|earphone|earbud|buds|airpods|bluetooth|usb|wired/i;
@@ -125,8 +136,18 @@ export class WebEngine implements AudioEngine {
     this.out = ctx.createGain();
     this.outMeter = ctx.createAnalyser();
     this.outMeter.fftSize = 2048;
-    this.out.connect(ctx.destination);
-    this.out.connect(this.outMeter);
+    /* the old app's limiter: parts that add up past full scale (a take at
+       full voice over the voice and the music) are held under it, never
+       clipped. Below its threshold it does nothing. */
+    const limit = ctx.createDynamicsCompressor();
+    limit.threshold.value = -2;
+    limit.knee.value = 0;
+    limit.ratio.value = 20;
+    limit.attack.value = 0.002;
+    limit.release.value = 0.15;
+    this.out.connect(limit);
+    limit.connect(ctx.destination);
+    limit.connect(this.outMeter);
     return ctx;
   }
 
@@ -197,27 +218,27 @@ export class WebEngine implements AudioEngine {
     return false;
   }
 
-  /* While anything plays, watch the clock. Standing still is a stall: say
-     so, and do nothing else (Android 6: only a tap rebuilds). */
+  /* While anything plays, watch the clock. Standing still, or crawling
+     (under STALL_PACE of real time, as the old app judged it), is a stall:
+     say so, and do nothing else (Android 6: only a tap rebuilds). */
   private watch(): void {
     if (this.watchTimer) return;
-    let last = this.ctx ? this.ctx.currentTime : 0;
-    let movedAt = performance.now();
+    let ref = { clock: this.ctx ? this.ctx.currentTime : 0, wall: performance.now() };
     this.watchTimer = setInterval(() => {
       const ctx = this.ctx;
       if (!ctx || !this.sources.size) {
         this.unwatch();
         return;
       }
-      if (ctx.currentTime !== last) {
-        last = ctx.currentTime;
-        movedAt = performance.now();
-        return;
-      }
-      if (performance.now() - movedAt > LIMITS.stall) {
+      const now = { clock: ctx.currentTime, wall: performance.now() };
+      const wall = (now.wall - ref.wall) / 1000;
+      if (wall * 1000 < LIMITS.stall) return;
+      if (now.clock - ref.clock < STALL_PACE * wall) {
         this.unwatch();
         this.stallCbs.forEach((f) => f());
+        return;
       }
+      ref = now;
     }, 250);
   }
 
@@ -477,7 +498,7 @@ export class WebEngine implements AudioEngine {
   outputLatency(): number {
     const ctx = this.ctx;
     if (!ctx) return 0;
-    return (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+    return heardDelay(ctx.outputLatency, ctx.baseLatency);
   }
 
   micOpen(): boolean {
