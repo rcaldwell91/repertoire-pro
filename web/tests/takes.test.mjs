@@ -467,8 +467,8 @@ try {
         await sleep(3000);
         const songs = await p2.eval(`[...document.querySelectorAll('.song-row')].map((b) => b.querySelector('strong')?.textContent)`);
         const shared = await p2.eval(`(async () => { const d = await new Promise((ok) => { const q = indexedDB.open('repertoire'); q.onsuccess = () => ok(q.result); });
-          const n = await new Promise((ok) => { const q = d.transaction('songs').objectStore('songs').count(); q.onsuccess = () => ok(q.result); });
-          const v = d.version, stores = [...d.objectStoreNames].join(); d.close(); return { n, v, stores }; })()`);
+          const ids = await new Promise((ok) => { const q = d.transaction('songs').objectStore('songs').getAllKeys(); q.onsuccess = () => ok(q.result); });
+          const v = d.version, stores = [...d.objectStoreNames].join(); d.close(); return { ids, v, stores }; })()`);
         /* and the old app again, after this app */
         await p2.goto(ORIGIN + '/repertoire-pro/next.html');
         const oldAgain = await p2.waitFor(`typeof LIB !== 'undefined' && !!LIB.db && LIB.db.objectStoreNames.contains('playlists')`, 30000);
@@ -478,9 +478,9 @@ try {
         const errsMain = page.errors.length;
         await open();
         check('apps-side-by-side', oldFirst && /playlists/.test(oldStores) && songs.includes('Moved song') && !songs.includes('Old app song')
-          && shared.n === 2 && oldAgain && oldAfterNew && errs1 === 0 && p2.errors.length === 0 && errsMain === 0,
+          && shared.ids.join() === 's1' && oldAgain && oldAfterNew && errs1 === 0 && p2.errors.length === 0 && errsMain === 0,
           `a phone that had both apps sharing one store: the old app opened it with its library parts (${oldStores}); this app then listed ${JSON.stringify(songs)} ` +
-          `(its own song copied over, the old app's left alone); the shared store still holds its ${shared.n} songs; the old app works after it ${oldAgain}; ` +
+          `(its own song copied over, the old app's left alone); the shared store now holds ${JSON.stringify(shared.ids)} (this app's song gone from the old Library once safe here, 12 Oct); the old app works after it ${oldAgain}; ` +
           `on a phone that opened this app first, the old app works too ${oldAfterNew}; page errors ${p2.errors.concat(page.errors).join(' | ') || 'none'}`);
       }
       await signInAs(p2, EMAIL);
