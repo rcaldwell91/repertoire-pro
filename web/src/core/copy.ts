@@ -207,7 +207,6 @@ export const copy = {
     noMicTest: 'Test without mic',
     testing: 'Testing without the mic…',
     noMicWorks: 'Sound works without the mic.',
-    noMicCause: 'The mic may be the cause.',
     noMicStill: 'Still no sound, even without the mic.',
     phoneMic: "Use the phone's own mic",
     nowUsing: 'Now using {mic}.',

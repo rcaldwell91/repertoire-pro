@@ -460,7 +460,7 @@ try {
     const n0 = await page.eval(A('contexts.length'));
     await page.tap('#test-without-mic');
     const let_go = await page.waitFor(P('micLive() === 0'), 1500);
-    const works = await page.waitFor(`document.querySelector('#no-mic-result')?.textContent === ${JSON.stringify(copy.soundCheck.noMicWorks + ' ' + copy.soundCheck.noMicCause)}`, 8000);
+    const works = await page.waitFor(`document.querySelector('#no-mic-result')?.textContent === ${JSON.stringify(copy.soundCheck.noMicWorks)}`, 8000);
     const made = (await page.eval(A('contexts.length'))) - n0;
     const micAfter = await page.eval(P('micLive()'));
     /* a phone where sound will not come back, even without the mic */
@@ -470,7 +470,7 @@ try {
     const still = await page.waitFor(`document.querySelector('#no-mic-result')?.textContent === ${JSON.stringify(copy.soundCheck.noMicStill)}`, 9000);
     await page.eval(`window.__android.bornFrozen = false`);
     check('test-without-mic', let_go && works && made === 1 && micAfter === 0 && still,
-      `the mic let go ${let_go}; a new sound made ${made}; "${copy.soundCheck.noMicWorks} ${copy.soundCheck.noMicCause}" ${works}, mic still off ${micAfter === 0}; ` +
+      `the mic let go ${let_go}; a new sound made ${made}; "${copy.soundCheck.noMicWorks}" ${works}, mic still off ${micAfter === 0}; ` +
       `where sound won't come back: "${copy.soundCheck.noMicStill}" ${still}`);
   }
 

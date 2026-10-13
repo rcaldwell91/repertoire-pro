@@ -123,7 +123,7 @@ export function SoundCheck() {
       </div>
       {mode === 'no-mic' && mine && (
         <p className={'line' + (noMicDone && !cameBack ? ' problem' : '')} id="no-mic-result" role="status">
-          {!noMicDone ? S.testing : cameBack ? S.noMicWorks + ' ' + S.noMicCause : S.noMicStill}
+          {!noMicDone ? S.testing : cameBack ? S.noMicWorks : S.noMicStill}
         </p>
       )}
       {mode === 'phone' && mine && report?.micName && (
