@@ -102,6 +102,15 @@ export function titleFrom(fileName: string): string {
   return t || fileName;
 }
 
+/** The count-in's beat, in seconds: the song's own tempo when it is known
+    (and believable), else one a second, as the old app did. */
+/** the count-in: 3, 2, 1 */
+export const COUNT_BEATS = 3;
+
+export function countBeat(bpm: number | undefined): number {
+  return bpm && Number.isFinite(bpm) && bpm >= 40 && bpm <= 240 ? 60 / bpm : 1;
+}
+
 /** "Hear yourself": how loud your voice comes back, when it is on. */
 export const MONITOR_GAIN = 0.8;
 
@@ -111,7 +120,7 @@ export function micLine(mic: 'closed' | 'opening' | 'open' | 'refused' | 'unavai
   /* a browser that never gives the mic: say it is the browser, not the phone */
   if (blockedBrowser && mic !== 'closed' && mic !== 'opening' && mic !== 'open') return copy.song.micBrowser;
   if (mic === 'refused') return copy.song.micRefused;
-  if (mic === 'held') return copy.song.micHeld;
+  if (mic === 'held') return copy.song.micHeld + ' ' + copy.song.tryStart;
   if (mic === 'unavailable') return copy.song.micMissing;
   if (mic === 'failed') return copy.song.micFailed;
   return null;

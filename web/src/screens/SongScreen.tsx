@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { Repeat, RotateCcw } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { gainOf, micLine, repeatPart, songLine, MONITOR_GAIN } from '../core/song';
+import { countBeat, gainOf, micLine, repeatPart, songLine, COUNT_BEATS, MONITOR_GAIN } from '../core/song';
 import { barFill } from '../core/level';
 import { clock } from '../core/time';
 import { FIRST_SECONDS } from '../core/limits';
@@ -148,12 +148,15 @@ export function SongScreen(props: { id: string }) {
     lastState.current = snap.state;
   }, [snap.state, snap.owner, owner]);
 
-  const plan = (from: number, withLoop = loop): Plan | null =>
-    parts ? { owner, steps: [{ kind: 'song', urls: parts.urls, from, gains: [gainOf(voice), gainOf(music)], loop: withLoop ?? undefined,
-      listen: withMic, record: true, monitor: hear ? MONITOR_GAIN : 0 }] } : null;
+  /* Start counts in, 3-2-1, as the old app did; back 10 s, repeat this
+     part and the play bar carry straight on */
+  const plan = (from: number, withLoop = loop, countIn = false): Plan | null =>
+    parts ? { owner, ...(countIn ? { countIn: COUNT_BEATS * countBeat(song?.bpm), countBeats: COUNT_BEATS } : {}),
+      steps: [{ kind: 'song', urls: parts.urls, from, gains: [gainOf(voice), gainOf(music)], loop: withLoop ?? undefined,
+        listen: withMic, record: true, monitor: hear ? MONITOR_GAIN : 0 }] } : null;
 
-  function startAt(ev: SyntheticEvent, from: number, withLoop = loop) {
-    const p = plan(from, withLoop);
+  function startAt(ev: SyntheticEvent, from: number, withLoop = loop, countIn = false) {
+    const p = plan(from, withLoop, countIn);
     if (!p) return;
     if (playing) c.stop();
     /* singing again is trying again: the take not kept goes (with Undo) */
@@ -186,7 +189,7 @@ export function SongScreen(props: { id: string }) {
       if (p != null) setPos(p);
       return;
     }
-    startAt(ev, pos >= shown - 0.25 ? 0 : pos);
+    startAt(ev, pos >= shown - 0.25 ? 0 : pos, loop, true);
   }
 
   function back10(ev: SyntheticEvent) {
@@ -287,7 +290,8 @@ export function SongScreen(props: { id: string }) {
 
       {voiceParts > 0 && (
         <>
-          <NoteMap lines={lines} range={singer?.range ?? null} now={now} live={playing} anyOctave={anyOctave} label={copy.song.map} />
+          <NoteMap lines={lines} range={singer?.range ?? null} now={now} live={playing} anyOctave={anyOctave} label={copy.song.map}
+            count={playing && snap.state === 'counting-in' ? snap.count : null} />
           <p className="hint map-line" id="map-line" role="status">
             {singer?.reading ? fill(copy.song.reading, { at: clock(singer.readTo), of: clock(singer.seconds) }) : ''}
           </p>
@@ -311,7 +315,7 @@ export function SongScreen(props: { id: string }) {
           <RotateCcw size={24} strokeWidth={2} aria-hidden="true" />
         </button>
         <button type="button" className="round play" id="song-play" disabled={!parts} onClick={toggle}>
-          {sounding ? copy.song.pause : playing ? copy.song.starting : copy.song.start}
+          {sounding || (playing && snap.state === 'counting-in') ? copy.song.pause : playing ? copy.song.starting : copy.song.start}
         </button>
         <button type="button" className="round" id="repeat-part" aria-label={copy.song.repeat} aria-pressed={!!loop}
           disabled={!parts} onClick={repeat}>

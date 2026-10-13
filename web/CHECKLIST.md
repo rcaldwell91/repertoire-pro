@@ -53,7 +53,8 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ Measure what actually leaves the app, not what was scheduled (6644-6654) — test: `browser:start`
 - ✓ One check of "working" used everywhere, so they can't disagree (6647-6648) — test: `unit:core/sound-check.test.ts:reads each row from what the phone says`
 - — The compressor, the loudness tuning and the keyboard levels (1003-1005, 6276-6280). The new app plays songs at their own level, and has no synth or keyboard.
-- — Test sound into a muted channel, the phone's call volume, "Test without mic" (6693-6696, 6737-6741, 6783-6824). See the decisions at the end.
+- ✓ "Test without mic": let the mic go, wait for the phone to settle, make the sound anew, and say plainly whether it came back (6783-6824; Robert, 13 Oct) — test: `android:test-without-mic`, `unit:audio/conductor/conductor.test.ts:"Test without mic": lets the mic go`
+- — Test sound into a muted channel, the phone's call volume (6693-6696, 6737-6741). Not in the new app: its Sound check plays one note at a fixed level.
 
 ### Playing notes and songs
 
@@ -74,7 +75,7 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ Nothing starts until Start is pressed (25710-25729) — test: `browser:nothing-before-start`
 - ✓ A stop during the start is a stop (25315, 15930-15956) — test: `unit:audio/conductor/conductor.test.ts:a count-in that ends after leaving plays nothing`
 - — Sleep pauses Learn a song and resumes it later (25088-25114). Replaced by RULEBOOK 2.1: hiding the app means silence, and nothing resumes by itself.
-- — A 3-2-1 count-in before the song (25310-25333). See the decisions at the end.
+- ✓ A 3-2-1 count-in on Start, shown on the note map, at the song's tempo when it is known, else one a second; back 10 s and repeat this part don't count in; the take's timing is unaffected (25310-25333; Robert, 13 Oct) — test: `android:count-in`, `unit:audio/conductor/conductor.test.ts:counts 3, 2, 1, a beat each`, `unit:core/song.test.ts:counts in at the song`, `takes:take-lines-up`
 
 ### Timing
 
@@ -107,8 +108,9 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ Nothing recorded means nothing kept (5020, 15356) — test: `unit:audio/conductor/conductor.test.ts:keeps nothing heard before the song`
 - ✓ A take not kept is thrown away only with Undo (15044-15045) — test: `takes:take-removed-undo`
 - ✓ The mic's own delay taken off at its source (2520-2539) — test: `notemap:placement`
-- ✗ "Device busy": one release and one retry after 400 ms, because Android hands the mic back a beat late (1405-1408, 1463-1469). Robert's Android rule 6 says no automatic mic retries, so the new app says "another app is using the microphone" at once. Needs Robert's decision.
-- — Choosing which microphone, and remembering one that crashed the phone (1429-1530, 5977-5980). Not built. See the decisions at the end.
+- ✓ "Device busy": let go and ask once more after 400 ms, because Android hands the mic back a beat late (1405-1408, 1463-1469). Robert, 13 Oct: only on the Start tap, once; never by itself (his Android rule 6 stands). Still held: "Another app is using the microphone. Tap Start to try again." — test: `android:held-retry`
+- ✓ The phone's own mic: chosen in the Sound check, for that visit only, and which mic is in use is said (1429-1530; Robert, 13 Oct) — test: `android:phone-mic`, `unit:audio/conductor/conductor.test.ts:"Use the phone's own mic" is only a choice for this visit`
+- — A mic picker anywhere else, and remembering a mic that crashed the phone (1429-1530, 5977-5980). Not in the new app: Robert, 13 Oct, no general mic setting.
 - — In-app browsers and plain http (1969-1997). Not in the new app: it is only served over https, and in-app browsers aren't tested.
 - — "Try another mode", the noise gate calibration, the mic chips (1548-1643, 6717-6727). Not in the new app.
 - — Timed exercises start at the first sound (9058-9137). Not in the new app yet: exercises aren't built.
@@ -163,11 +165,10 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - — Wait to start until reading is 8 s ahead; "Catching up…" (24515-24516, 25655-25679). In the new app the song plays straight away and the singer's line draws as it's read (`song:first30-early`).
 - — A stop resets to the beginning; scores at the end (25336-25434). Replaced by RULEBOOK 1b: Start and Pause on a play bar, and right notes on each take.
 - — Sleep pauses and resumes (25088-25114). Replaced by RULEBOOK 2.1: hiding the app means silence.
-- — A 3-2-1 count-in (25310-25333). See the decisions below.
+- ✓ A 3-2-1 count-in on Start, shown on the note map, at the song's tempo when it is known, else one a second; back 10 s and repeat this part don't count in; the take's timing is unaffected (25310-25333; Robert, 13 Oct) — test: `android:count-in`, `unit:audio/conductor/conductor.test.ts:counts 3, 2, 1, a beat each`, `unit:core/song.test.ts:counts in at the song`, `takes:take-lines-up`
 
-## Decisions for Robert
+## Decided by Robert, 13 Oct
 
-1. **"Device busy" retry.** When another app has just let go of the mic, the old app waited 400 ms and asked once more. Your Android rule 6 says no automatic mic retries, so the new app says "Another app is using the microphone." at once. Keep it that way, or allow one quick retry inside the same tap?
-2. **A count-in.** The old Learn a song counted 3-2-1 before the song, "so he knows when to come in". The new one starts straight away. Add one?
-3. **Choosing the microphone.** The old app let you pick the mic, and remembered one that once crashed the phone. The new one uses the phone's choice. Build the picker?
-4. **"Test without mic" in the Sound check.** On your S24, sound died when a USB-C headset with a mic went in. The old app had a button that checks the sound with the mic off, to tell whether the mic is the cause. Add it to the Sound check?
+1. A mic another app holds: no automatic retry. The Start tap lets go and asks once more, and if it is still held the app says "Another app is using the microphone. Tap Start to try again."
+2. A 3-2-1 count-in before the song on Learn a song, shown on the note map; back 10 s and repeat this part don't count in.
+3. The Sound check has "Test without mic" and "Use the phone's own mic" (for that visit only). No mic setting anywhere else.

@@ -71,6 +71,12 @@ export const LIMITS = {
 /** a clock that keeps less than this share of real time is stalled */
 export const STALL_PACE = 0.3;
 
+/** a beat before asking again for a mic another app had (the old app's 400 ms) */
+export const HELD_RETRY_MS = 400;
+
+/** names that mean the phone's own microphone */
+const BUILT_IN = /built-?in|internal|phone|bottom|speaker|handset|microphone array/i;
+
 /** names that mean headphones, in the phone's list of devices */
 const HEADPHONES = /headset|headphone|earphone|earbud|buds|airpods|bluetooth|usb|wired/i;
 
@@ -121,6 +127,8 @@ export class WebEngine implements AudioEngine {
   private out: GainNode | null = null;
   private outMeter: AnalyserNode | null = null;
   private watchTimer: ReturnType<typeof setInterval> | null = null;
+  /** the Sound check's choice of mic, for this visit only */
+  private choice: 'phone' | null = null;
 
   /** A new context, and its way out. Only from wake (or, if nothing has
       woken yet, to decode): never on its own. */
@@ -398,25 +406,50 @@ export class WebEngine implements AudioEngine {
     this.closeMic();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return { ok: false, why: 'unavailable' };
     const wait = await this.micWait();
+    let r = await this.ladder(sets, order, wait);
+    /* another app has it: on this same tap, let go, wait a beat (Android
+       hands it back a moment after the other app lets go), ask once more */
+    if ((r.ok && r.held) || (!r.ok && r.why === 'held')) {
+      this.closeMic();
+      await pause(HELD_RETRY_MS);
+      r = await this.ladder(sets, order, wait);
+    }
+    /* the phone's own mic, if the Sound check chose it for this visit */
+    if (r.ok && this.choice === 'phone') r = await this.phoneMic(sets[r.set], r, wait);
+    return r;
+  }
+
+  setMicChoice(choice: 'phone' | null): void {
+    this.choice = choice;
+  }
+
+  /** the phone's own built-in mic, once the open mic has made the list readable */
+  private async phoneMic(set: MicSet, r: MicResult & { ok: true }, wait: number): Promise<MicResult> {
+    let list: MediaDeviceInfo[] = [];
+    try {
+      const d = await race(navigator.mediaDevices.enumerateDevices(), 1000);
+      if (d !== LATE) list = d;
+    } catch {
+      /* the phone will not say */
+    }
+    const inputs = list.filter((d) => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const own = inputs.find((d) => BUILT_IN.test(d.label) && !HEADPHONES.test(d.label)) ?? inputs.find((d) => d.label && !HEADPHONES.test(d.label));
+    const now = (this.stream?.getAudioTracks()[0]?.getSettings() as { deviceId?: string } | undefined)?.deviceId;
+    if (!own || own.deviceId === now) return r;
+    this.closeMic();
+    const c = toConstraints(set);
+    const one = await this.open({ ...(c === true ? {} : c), deviceId: { exact: own.deviceId } }, r.set, wait);
+    /* that mic would not open: the phone's choice again */
+    return one ?? (await this.ladder([set], [0], wait).then((x) => (x.ok ? { ...x, set: r.set } : x)));
+  }
+
+  /** each rung in turn, until one opens or the answer is final */
+  private async ladder(sets: readonly MicSet[], order: readonly number[], wait: number): Promise<MicResult> {
     for (const i of order) {
       try {
-        const asked = navigator.mediaDevices.getUserMedia({ audio: toConstraints(sets[i]) });
-        const stream = await race(asked, wait);
-        if (stream === LATE) {
-          /* hung (Android 2): if it ever answers, close it at once */
-          void asked.then((s) => s.getTracks().forEach((t) => t.stop()), () => undefined);
-          return { ok: false, why: 'failed' };
-        }
-        this.stream = stream;
-        const track = stream.getAudioTracks()[0];
-        if (track) {
-          /* Android 9: another app took the mic, or gave it back */
-          track.onmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
-          track.onunmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(false));
-          track.onended = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
-        }
-        /* its nodes join the sound when the sound wakes (never a stalled one) */
-        return { ok: true, set: i, held: !!track && (track.muted || track.readyState === 'ended') };
+        const got = await this.open(toConstraints(sets[i]), i, wait);
+        if (got) return got;
+        return { ok: false, why: 'failed' };
       } catch (err) {
         const final = finalAnswer(err);
         if (final) return final;
@@ -424,6 +457,27 @@ export class WebEngine implements AudioEngine {
       }
     }
     return { ok: false, why: 'failed' };
+  }
+
+  /** one request; null if it hung (Android 2) */
+  private async open(audio: MediaTrackConstraints | true, set: number, wait: number): Promise<MicResult | null> {
+    const asked = navigator.mediaDevices.getUserMedia({ audio });
+    const stream = await race(asked, wait);
+    if (stream === LATE) {
+      /* hung: if it ever answers, close it at once */
+      void asked.then((s) => s.getTracks().forEach((t) => t.stop()), () => undefined);
+      return null;
+    }
+    this.stream = stream;
+    const track = stream.getAudioTracks()[0];
+    if (track) {
+      /* Android 9: another app took the mic, or gave it back */
+      track.onmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
+      track.onunmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(false));
+      track.onended = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
+    }
+    /* its nodes join the sound when the sound wakes (never a stalled one) */
+    return { ok: true, set, held: !!track && (track.muted || track.readyState === 'ended') };
   }
 
   /** the open mic's nodes, on this context (again, after a rebuild) */

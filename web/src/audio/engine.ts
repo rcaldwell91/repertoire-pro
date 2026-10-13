@@ -101,8 +101,13 @@ export interface AudioEngine {
   forget(url: string): void;
   /** how many sources are sounding right now */
   sounding(): number;
-  /** Tries the sets in the given order and keeps the first that opens. */
+  /** Tries the sets in the given order and keeps the first that opens. If
+      another app has the mic, it lets go and asks once more, a beat later:
+      this is still the one tap that asked (RULEBOOK 4, Sound, Android 6). */
   openMic(sets: readonly MicSet[], order: readonly number[]): Promise<MicResult>;
+  /** "phone": open the phone's own built-in mic, for this visit only (the
+      Sound check's button); null: the phone's choice. Opens nothing by itself. */
+  setMicChoice(choice: 'phone' | null): void;
   micOpen(): boolean;
   /** Close the mic only; sound already playing carries on. */
   closeMic(): void;

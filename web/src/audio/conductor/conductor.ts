@@ -48,6 +48,12 @@ export interface Plan {
   readonly owner: string;
   /** seconds of count-in before the first step; none if 0 */
   readonly countIn?: number;
+  /** the count-in in this many beats (3-2-1 is 3), each shown as it comes */
+  readonly countBeats?: number;
+  /** "Test without mic": seconds with the mic let go before the sound is
+      made anew (rebuild), so the phone can settle its route */
+  readonly quiet?: number;
+  readonly rebuild?: boolean;
   readonly steps: readonly Step[];
 }
 
@@ -63,6 +69,8 @@ export interface Snapshot {
   readonly takes: number;
   /** sound that would not start, or stopped by itself; null if none */
   readonly sound: SoundTrouble | null;
+  /** the beat of the count-in being shown (3, 2, 1); null when not counting */
+  readonly count: number | null;
 }
 
 /** A take, finished: what the mic heard while a song played, and whose. */
@@ -102,7 +110,7 @@ export const MIC_KEY = 'rp.mic.set';
 const ACTIVE: readonly State[] = ['armed', 'counting-in', 'running'];
 
 export class Conductor {
-  private snap: Snapshot = { state: 'idle', owner: null, step: 0, mic: 'closed', why: null, startedAt: null, takes: 0, sound: null };
+  private snap: Snapshot = { state: 'idle', owner: null, step: 0, mic: 'closed', why: null, startedAt: null, takes: 0, sound: null, count: null };
   /** the next tap makes the sound anew (after it stalled or would not start) */
   private rebuild = false;
   /** the one recorder, while a take is being made */
@@ -200,6 +208,12 @@ export class Conductor {
     return this.engine.report();
   }
 
+  /** "Use the phone's own mic": for this visit only, never kept. Opens
+      nothing by itself; the next Start opens it. */
+  usePhoneMic(): void {
+    this.engine.setMicChoice('phone');
+  }
+
   /** loudness of the voice right now, 0 to 1; 0 whenever the mic is not open */
   level(): number {
     return this.snap.mic === 'open' ? this.engine.micLevel() : 0;
@@ -290,6 +304,14 @@ export class Conductor {
 
   private async run(gen: number, plan: Plan): Promise<void> {
     try {
+      /* "Test without mic": the mic already let go (start halted it); a
+         moment for the phone's route to settle, then the sound made anew */
+      if (plan.quiet) {
+        this.engine.release();
+        await this.env.wait(plan.quiet);
+        if (gen !== this.gen) return;
+      }
+      if (plan.rebuild) this.rebuild = true;
       /* the mic first, so the sound is born on the route it chose */
       if (plan.steps.some((st) => st.kind === 'listen' || (st.kind === 'song' && st.listen))) {
         if (!(await this.openMic(gen))) return;
@@ -315,12 +337,16 @@ export class Conductor {
         }
         if (gen !== this.gen) return;
       }
+      /* the count-in comes only once the sound is proved and loaded, a beat at a time */
       if (plan.countIn && plan.countIn > 0) {
-        this.set({ state: 'counting-in' });
-        await this.env.wait(plan.countIn);
-        if (gen !== this.gen) return;
+        const beats = Math.max(1, Math.round(plan.countBeats ?? 1));
+        for (let k = beats; k >= 1; k--) {
+          this.set({ state: 'counting-in', count: beats > 1 ? k : null });
+          await this.env.wait(plan.countIn / beats);
+          if (gen !== this.gen) return;
+        }
       }
-      this.set({ state: 'running', startedAt: this.engine.now() });
+      this.set({ state: 'running', startedAt: this.engine.now(), count: null });
       for (let i = 0; i < plan.steps.length; i++) {
         const st = plan.steps[i];
         this.set({ step: i });
@@ -412,7 +438,7 @@ export class Conductor {
     }
     this.engine.release();
     const mic: MicState = this.snap.mic === 'open' || this.snap.mic === 'opening' || this.snap.mic === 'held' ? 'closed' : this.snap.mic;
-    this.set({ state, why, mic });
+    this.set({ state, why, mic, count: null });
   }
 
   private set(patch: Partial<Snapshot>): void {

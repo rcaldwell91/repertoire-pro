@@ -452,3 +452,11 @@ input[type='range'] {
 .report dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 12px 0 0; }
 .report dt { color: var(--muted); }
 .report dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+
+/* the count-in, over the note map */
+.count-in {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 5rem; font-weight: 700; color: var(--ink); pointer-events: none;
+}
+
+.sound-check-tools { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 4px; }

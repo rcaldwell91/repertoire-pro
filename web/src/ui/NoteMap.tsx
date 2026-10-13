@@ -49,7 +49,9 @@ function drawLine(g: CanvasRenderingContext2D, pts: Pt[], x: (t: number) => numb
   return drawn;
 }
 
-export function NoteMap(props: { lines: Lines; range: Range | null; now: () => number; live: boolean; anyOctave: boolean; label: string }) {
+export function NoteMap(props: { lines: Lines; range: Range | null; now: () => number; live: boolean; anyOctave: boolean; label: string;
+  /** the count-in's beat, shown over the map */
+  count?: number | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -159,6 +161,7 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
   return (
     <div className="notemap">
       <canvas ref={ref} id="note-map" role="img" aria-label={props.label} />
+      {props.count != null && <div className="count-in" id="count-in" aria-live="assertive">{props.count}</div>}
     </div>
   );
 }

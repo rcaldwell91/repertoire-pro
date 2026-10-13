@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
-import { gainOf, listLine, repeatPart, songLine, titleFrom, type SongHas } from './song';
+import { gainOf, listLine, repeatPart, songLine, titleFrom, type SongHas, countBeat } from './song';
 import { clock } from './time';
 
 const has = (over: Partial<SongHas> = {}): SongHas => ({ state: 'new', full: false, first30: false, ...over });
@@ -45,6 +45,13 @@ describe('the controls', () => {
   it('makes a title from the file name', () => {
     expect(titleFrom('All_of_Me.mp3')).toBe('All of Me');
     expect(titleFrom('Ride (live).m4a')).toBe('Ride (live)');
+  });
+  it('counts in at the song\'s own tempo when it is known, else once a second', () => {
+    expect(countBeat(undefined)).toBe(1);
+    expect(countBeat(120)).toBeCloseTo(0.5);
+    expect(countBeat(60)).toBeCloseTo(1);
+    expect(countBeat(0)).toBe(1);
+    expect(countBeat(900)).toBe(1);               /* not believable */
   });
   it('writes times as minutes and seconds', () => {
     expect(clock(0)).toBe('0:00');

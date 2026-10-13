@@ -34,7 +34,8 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 }
 
 const ALL = ['start-hangs', 'stall-rebuild', 'gesture-only', 'never-suspends', 'mic-first', 'ten-starts', 'hear-yourself-rebuilt', 'mic-held',
-  'clock-crawls', 'close-hangs', 'mic-hangs', 'load-fails', 'use-headphones', 'any-octave-kept', 'no-page-errors'];
+  'clock-crawls', 'close-hangs', 'mic-hangs', 'load-fails', 'use-headphones', 'any-octave-kept', 'held-retry', 'count-in',
+  'test-without-mic', 'phone-mic', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -69,6 +70,14 @@ async function open(android = {}) {
   await page.eval(`Object.assign(window.__android, ${JSON.stringify(android)})`);
   await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
 }
+/** a fresh page on the Sound check, with the phone's sound set up as asked */
+async function openCheck(android = {}) {
+  await page.goto(URL_APP + '?load=' + ++loads + '#/profile/sound-check');
+  await page.eval(`Object.assign(window.__android, ${JSON.stringify(android)})`);
+  await page.waitFor(`!!document.querySelector('#sound-check-go')`, 8000);
+}
+const MICS = [{ deviceId: 'headset-mic', label: 'USB-C headset microphone' }, { deviceId: 'phone-mic', label: 'Phone microphone (built-in)' }];
+
 /** what Start says, watched until `until` is true or `ms` pass */
 async function watchPlay(until, ms) {
   const seen = new Set();
@@ -365,6 +374,133 @@ try {
     await open();
     const off = await page.eval(`document.querySelector('#any-octave').checked`);
     check('any-octave-kept', before === false && after === true && off === false, `off at first ${!before}; switched on, then the app opened again: still on ${after}; switched off again: stays off ${!off}`);
+  }
+
+  /* 15. Another app has the mic: Start lets go and asks once more, a beat
+         later, on that same tap - never more, never by itself (Robert, 13 Oct) */
+  if (want('held-retry')) {
+    const HELD = copy.song.micHeld + ' ' + copy.song.tryStart;
+    await open({ busy: 1 });
+    await page.tap('#song-play');
+    const ok1 = await playing();
+    const mic1 = await page.waitFor(P('micLive() === 1'), 3000);
+    const asked1 = await page.eval(A('asked.length'));
+    const held1 = await page.eval(`document.querySelector('#mic-line')?.textContent.includes(${JSON.stringify(copy.song.micHeld)}) || false`);
+    await page.tap('#song-play');
+    await stopped();
+    await open({ busy: 9 });
+    await page.tap('#song-play');
+    const ok2 = await playing();
+    const said = await page.waitFor(`document.querySelector('#mic-line p')?.textContent === ${JSON.stringify(HELD)}`, 4000);
+    await sleep(2500);
+    const asked2 = await page.eval(A('asked.length'));
+    await page.tap('#song-play');
+    await stopped();
+    await page.eval(`window.__android.busy = 0`);
+    await page.tap('#song-play');
+    const ok3 = await playing();
+    const mic3 = await page.waitFor(P('micLive() === 1'), 3000);
+    const gone = await page.eval(`!document.querySelector('#mic-line')?.textContent.includes(${JSON.stringify(copy.song.micHeld)})`);
+    await page.tap('#song-play');
+    await stopped();
+    check('held-retry', ok1 && mic1 && asked1 === 2 && !held1 && ok2 && said && asked2 === 2 && ok3 && mic3 && gone,
+      `busy for a moment: one more ask on the same tap opened it ${mic1} (asked ${asked1} times), no message ${!held1}; ` +
+      `still busy: "${HELD}" ${said}, the song played on ${ok2}, asked ${asked2} times in all (once more, never again by itself); ` +
+      `once free, the next Start opened it ${mic3}, message gone ${gone}`);
+  }
+
+  /* 16. Start counts in 3-2-1 on the note map, a second each (no tempo known
+         yet); back 10 s and repeat this part carry straight on (Robert, 13 Oct) */
+  if (want('count-in')) {
+    await open();
+    const n0 = await page.eval(P('starts.length'));
+    await page.tap('#song-play');
+    const seen = [];
+    let firstAt = null, startAt = null, playedDuringCount = false;
+    const end = Date.now() + 9000;
+    while (Date.now() < end) {
+      const s = await page.eval(`({ c: document.querySelector('#count-in')?.textContent ?? null, n: window.__probe.starts.length, live: window.__probe.live.size,
+        on: !!document.querySelector('.notemap #count-in') })`);
+      if (s.c && seen[seen.length - 1] !== s.c) { seen.push(s.c); if (firstAt == null) firstAt = Date.now(); }
+      if (s.c && s.live > 0) playedDuringCount = true;
+      if (s.n >= n0 + 2) { startAt = Date.now(); break; }
+      await sleep(30);
+    }
+    const counted = startAt != null && firstAt != null ? (startAt - firstAt) / 1000 : null;
+    await sleep(2500);
+    const quick = async (sel) => {
+      const n = await page.eval(P('starts.length'));
+      const t = Date.now();
+      await page.tap(sel);
+      let shown = false;
+      while (Date.now() - t < 3000) {
+        if (await page.eval(`!!document.querySelector('#count-in')`)) shown = true;
+        if ((await page.eval(P('starts.length'))) >= n + 2) break;
+        await sleep(30);
+      }
+      return { ms: Date.now() - t, shown };
+    };
+    const b10 = await quick('#back-10');
+    await sleep(1200);
+    const rep = await quick('#repeat-part');
+    await page.tap('#song-play');
+    await stopped();
+    check('count-in', seen.join() === '3,2,1' && counted != null && counted > 2.6 && counted < 3.6 && !playedDuringCount &&
+      b10.ms < 1500 && !b10.shown && rep.ms < 1500 && !rep.shown,
+      `Start: ${seen.join(', ') || 'no count'} on the note map, the song after ${counted?.toFixed(2)} s, silent while counting ${!playedDuringCount}; ` +
+      `back 10 s carried on in ${b10.ms} ms without a count ${!b10.shown}; repeat this part in ${rep.ms} ms without a count ${!rep.shown}`);
+  }
+
+  /* 17. "Test without mic": the mic let go, a moment, the sound made anew,
+         and plainly whether it came back (Robert, 13 Oct) */
+  if (want('test-without-mic')) {
+    await openCheck();
+    await page.tap('#sound-check-go');
+    await page.waitFor(P('micLive() === 1'), 8000);
+    const n0 = await page.eval(A('contexts.length'));
+    await page.tap('#test-without-mic');
+    const let_go = await page.waitFor(P('micLive() === 0'), 1500);
+    const works = await page.waitFor(`document.querySelector('#no-mic-result')?.textContent === ${JSON.stringify(copy.soundCheck.noMicWorks + ' ' + copy.soundCheck.noMicCause)}`, 8000);
+    const made = (await page.eval(A('contexts.length'))) - n0;
+    const micAfter = await page.eval(P('micLive()'));
+    /* a phone where sound will not come back, even without the mic */
+    await page.waitFor(`document.querySelector('#sound-check-line')?.textContent === ${JSON.stringify(copy.soundCheck.again)}`, 8000);
+    await page.eval(`window.__android.bornFrozen = true`);
+    await page.tap('#test-without-mic');
+    const still = await page.waitFor(`document.querySelector('#no-mic-result')?.textContent === ${JSON.stringify(copy.soundCheck.noMicStill)}`, 9000);
+    await page.eval(`window.__android.bornFrozen = false`);
+    check('test-without-mic', let_go && works && made === 1 && micAfter === 0 && still,
+      `the mic let go ${let_go}; a new sound made ${made}; "${copy.soundCheck.noMicWorks} ${copy.soundCheck.noMicCause}" ${works}, mic still off ${micAfter === 0}; ` +
+      `where sound won't come back: "${copy.soundCheck.noMicStill}" ${still}`);
+  }
+
+  /* 18. "Use the phone's own mic": the built-in mic for this visit only, and
+         which mic is in use, said (Robert, 13 Oct) */
+  if (want('phone-mic')) {
+    await openCheck({ inputs: MICS });
+    await page.tap('#phone-mic');
+    const said = await page.waitFor(`document.querySelector('#mic-now')?.textContent === 'Now using Phone microphone (built-in).'`, 10000);
+    const row = await page.eval(`document.querySelector('#report-mic-name')?.textContent`);
+    const asked = await page.eval(A('asked.slice()'));
+    /* the rest of this visit: Learn a song opens it too */
+    await page.eval(`location.hash = '#/sing/learn/song/${ID}'`);
+    await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
+    await page.eval(`window.__android.asked.length = 0`);
+    await page.tap('#song-play');
+    await playing();
+    const onSong = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    /* opened again: the phone's choice, as before (nothing kept) */
+    await open({ inputs: MICS });
+    await page.tap('#song-play');
+    await playing();
+    const after = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    check('phone-mic', said && row === 'Phone microphone (built-in)' && asked.includes('phone-mic') && onSong.includes('phone-mic') && !after.includes('phone-mic'),
+      `"Now using Phone microphone (built-in)." ${said}, and the report says ${row}; on Learn a song in the same visit it asked for the built-in mic ${onSong.includes('phone-mic')}; ` +
+      `the app opened again: the phone's choice ${!after.includes('phone-mic')} (nothing kept)`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

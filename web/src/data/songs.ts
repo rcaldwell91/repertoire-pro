@@ -19,6 +19,8 @@ export interface Song {
   readonly music?: Blob;
   readonly voice30?: Blob;
   readonly music30?: Blob;
+  /** the song's tempo, beats a minute, if it is known (for the count-in) */
+  readonly bpm?: number;
 }
 
 export function hasOf(s: Song): SongHas {

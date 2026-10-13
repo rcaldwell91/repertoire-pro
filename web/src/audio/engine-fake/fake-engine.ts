@@ -137,6 +137,10 @@ export class FakeEngine implements AudioEngine {
   micOpen(): boolean {
     return this.mic;
   }
+  micChoice: 'phone' | null = null;
+  setMicChoice(choice: 'phone' | null): void {
+    this.micChoice = choice;
+  }
   closeMic(): void {
     if (this.mic) this.log.push('closeMic');
     this.mic = false;
@@ -229,7 +233,10 @@ export class FakeEnv implements Env {
       this.hiddenCbs.delete(cb);
     };
   }
-  wait(): Promise<void> {
+  /** how long each wait asked for, in seconds */
+  readonly waited: number[] = [];
+  wait(seconds: number): Promise<void> {
+    this.waited.push(seconds);
     return new Promise((r) => this.waits.push(r));
   }
   /** the count-in finishes */

@@ -116,6 +116,67 @@ describe('a tap starts it, in order', () => {
   });
 });
 
+describe('a count-in (Learn a song, as the old app did)', () => {
+  it('counts 3, 2, 1, a beat each, before the song, and only once the sound is proved', async () => {
+    engine.holdWake = true;
+    c.start(c.tap(tap), { ...noteOnly, countIn: 3, countBeats: 3 });
+    await flush();
+    expect(c.snapshot().count).toBeNull();          /* nothing counted before the clock has moved */
+    engine.answerWake();
+    await flush();
+    expect(c.snapshot()).toMatchObject({ state: 'counting-in', count: 3 });
+    expect(env.waited).toEqual([1]);
+    env.endWaits();
+    await flush();
+    expect(c.snapshot().count).toBe(2);
+    env.endWaits();
+    await flush();
+    expect(c.snapshot().count).toBe(1);
+    expect(engine.sounding()).toBe(0);
+    env.endWaits();
+    await flush();
+    expect(c.snapshot()).toMatchObject({ state: 'running', count: null });
+    expect(env.waited).toEqual([1, 1, 1]);
+    expect(engine.sounding()).toBe(1);
+  });
+
+  it('a stop during the count-in is a stop: nothing plays, the count goes', async () => {
+    c.start(c.tap(tap), { ...noteOnly, countIn: 3, countBeats: 3 });
+    await flush();
+    c.stop();
+    expect(c.snapshot()).toMatchObject({ state: 'stopped', count: null });
+    env.endWaits();
+    await flush();
+    expect(engine.log.some((l) => l.startsWith('play:'))).toBe(false);
+  });
+});
+
+describe('the Sound check\'s two buttons', () => {
+  it('"Test without mic": lets the mic go, waits, makes the sound anew, and plays, all from the one tap', async () => {
+    c.start(c.tap(tap), soundCheck);
+    await flush();
+    expect(engine.micOpen()).toBe(true);
+    engine.log.length = 0;
+    c.start(c.tap(tap), { owner: 'sound-check:no-mic', quiet: 0.8, rebuild: true, steps: [{ kind: 'note', url: NOTE }] });
+    expect(engine.micOpen()).toBe(false);            /* let go at once */
+    await flush();
+    expect(env.waited).toContain(0.8);
+    expect(engine.log).not.toContain('wake:rebuild'); /* not before the wait is over */
+    env.endWaits();
+    await flush();
+    expect(engine.log.filter((l) => l.startsWith('wake') || l.startsWith('openMic'))).toEqual(['wake:rebuild']);
+    expect(c.snapshot().state).toBe('running');
+    expect(engine.micOpen()).toBe(false);
+  });
+
+  it('"Use the phone\'s own mic" is only a choice for this visit: it opens nothing by itself', () => {
+    c.usePhoneMic();
+    expect(engine.micChoice).toBe('phone');
+    expect(engine.log).toEqual([]);
+    expect(store.map.size).toBe(0);                  /* never kept on the phone */
+  });
+});
+
 describe('one source at a time', () => {
   it('stops what was going before starting something else', async () => {
     c.start(c.tap(tap), noteOnly);

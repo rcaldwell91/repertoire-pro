@@ -242,11 +242,15 @@ export const MIRROR = `(() => {
      gumHangs: true      the mic is asked for, and never answers
      decodeFails: true   no sound file will decode
      headset: true       the phone lists a wired headset
+     busy: n             the next n asks for the mic fail: another app has it
+     inputs: [...]       the mics the phone lists ({ deviceId, label }); one
+                         asked for by its id comes back with that name
+     bornFrozen: true    new sound is born with its clock standing still
    It counts every suspend() the app makes, and notes the order of mic and
    sound events. */
 export const ANDROID = `(() => {
   const E = window.__android = { born: 'running', resume: 'ok', sticky: false, suspends: 0, refused: 0, contexts: [], order: [],
-    closeHangs: false, gumHangs: false, decodeFails: false, headset: false };
+    closeHangs: false, gumHangs: false, decodeFails: false, headset: false, busy: 0, inputs: null, bornFrozen: false, asked: [] };
   const AC = window.AudioContext;
   const base = Object.getPrototypeOf(AC.prototype);
   const get = (k) => (Object.getOwnPropertyDescriptor(AC.prototype, k) || Object.getOwnPropertyDescriptor(base, k)).get;
@@ -257,7 +261,7 @@ export const ANDROID = `(() => {
     constructor(...a) {
       super(...a);
       this.__held = E.born === 'suspended';
-      this.__frozen = null;
+      this.__frozen = E.bornFrozen ? 0.01 : null;
       this.__stuck = false;
       E.contexts.push(this);
       E.order.push('context');
@@ -286,7 +290,29 @@ export const ANDROID = `(() => {
   /* the newest sound's clock moves, over a quarter of a second */
   E.moving = () => new Promise((ok) => { const c = E.newest(); if (!c) return ok(false); const t = c.currentTime; setTimeout(() => ok(c.currentTime > t), 250); });
   const md = navigator.mediaDevices, gum = md.getUserMedia.bind(md);
-  md.getUserMedia = (c) => { E.order.push('mic-asked'); if (E.gumHangs) return new Promise(() => {}); return gum(c).then((s) => { E.order.push('mic-open'); return s; }); };
+  md.getUserMedia = (c) => {
+    E.order.push('mic-asked');
+    const want = c && c.audio && c.audio.deviceId ? (c.audio.deviceId.exact || c.audio.deviceId) : null;
+    E.asked.push(want);
+    if (E.gumHangs) return new Promise(() => {});
+    if (E.busy > 0) { E.busy--; return Promise.reject(new DOMException('Could not start audio source', 'NotReadableError')); }
+    const plain = c && c.audio && typeof c.audio === 'object' ? (({ deviceId, ...rest }) => ({ audio: Object.keys(rest).length ? rest : true }))(c.audio) : c;
+    return gum(want ? plain : c).then((s) => {
+      E.order.push('mic-open');
+      const mic = E.inputs && E.inputs.find((d) => d.deviceId === want) || (E.inputs && E.inputs[0]);
+      const t = s.getAudioTracks()[0];
+      if (mic && t) {
+        Object.defineProperty(t, 'label', { value: mic.label });
+        const gs = t.getSettings.bind(t);
+        t.getSettings = () => ({ ...gs(), deviceId: mic.deviceId });
+      }
+      return s;
+    });
+  };
   const list = md.enumerateDevices.bind(md);
-  md.enumerateDevices = () => list().then((d) => E.headset ? [...d, { kind: 'audiooutput', label: 'Wired headset', deviceId: 'headset', groupId: 'h' }] : d);
+  md.enumerateDevices = () => list().then((d) => {
+    let out = E.inputs ? [...d.filter((x) => x.kind !== 'audioinput'), ...E.inputs.map((m) => ({ kind: 'audioinput', groupId: m.deviceId, ...m }))] : d;
+    if (E.headset) out = [...out, { kind: 'audiooutput', label: 'Wired headset', deviceId: 'headset', groupId: 'h' }];
+    return out;
+  });
 })();`;
