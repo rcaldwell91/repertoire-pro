@@ -175,16 +175,26 @@ try {
        the song was still splitting at the time */
     const reading = [];
     const t0 = Date.now();
-    for (;;) {
+    /* one look at the screen: the line under the title, and the reading progress */
+    const look = async () => {
       const s = await page.eval(`({ line: ${LINE}, play: !document.querySelector('#song-play').disabled, map: document.querySelector('#map-line')?.textContent || '' })`);
       if (seen[seen.length - 1] !== s.line) seen.push(s.line);
       const r = /^Reading the singer's line… (\d+):(\d\d) of (\d+:\d\d)$/.exec(s.map);
       if (r && reading[reading.length - 1]?.text !== s.map) reading.push({ text: s.map, at: +r[1] * 60 + +r[2], of: r[3], splitting: /^Splitting/.test(s.line || '') });
+      return s;
+    };
+    for (;;) {
+      const s = await look();
       if (!early && s.play && s.line && s.line.startsWith('Splitting')) {
-        /* the first 30 seconds can be played while the rest is still splitting */
+        /* the first 30 seconds can be played while the rest is still splitting
+           (after Start's count-in), and the screen is watched all the while */
         const n = await page.eval(S('starts.length'));
         await page.tap('#song-play');
-        await page.waitFor(S(`starts.length >= ${n + 2}`), 5000);
+        const until = Date.now() + 8000;
+        while (Date.now() < until && !(await page.eval(S(`starts.length >= ${n + 2}`)))) {
+          await look();
+          await sleep(100);
+        }
         const st = await page.eval(S(`starts.slice(${n})`));
         const still = await page.eval(LINE);
         if (SHOTS) (await import('node:fs')).writeFileSync(join(SHOTS, 'song-first30.png'), await page.screenshot());
