@@ -84,6 +84,8 @@ export const MUTATIONS = [
     from: '      if (s == null) return;                 /* heard before the song began */\n      this.start = s;', to: '      this.start = s ?? 0;' },
   { rule: 'a take is placed without the speaker\'s delay', file: C,
     from: 'this.recorder?.push(b, (at) => this.songTime(at));', to: 'this.recorder?.push(b, (at) => this.songTime(at + this.engine.outputLatency()));' },
+  { rule: 'the last safety lets full scale through', file: W,
+    from: '  return a <= 0.9 ? u : Math.sign(u) * (0.9 + 0.098 * Math.tanh((a - 0.9) / 0.098));', to: '  return a <= 0.9 ? u : u;' },
   { rule: 'the raw mic is only wished for, not required (Android 11)', file: W,
     from: '  const v = (x: boolean) => (set.exact ? { exact: x } : { ideal: x });', to: '  const v = (x: boolean) => ({ ideal: x });' },
   { rule: 'the raw mic does not ask for the lowest latency', file: M,

@@ -36,7 +36,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 const ALL = ['start-hangs', 'stall-rebuild', 'gesture-only', 'never-suspends', 'mic-first', 'ten-starts', 'hear-yourself-rebuilt', 'mic-held',
   'clock-crawls', 'close-hangs', 'mic-hangs', 'load-fails', 'use-headphones', 'any-octave-kept', 'held-retry', 'count-in',
   'test-without-mic', 'phone-mic', 'mic-once-raw', 'no-ladder', 'mode-by-hand', 'rebuild-awaits-close', 'mic-crash', 'born-before-mic',
-  'no-page-errors'];
+  'no-clip', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -46,6 +46,13 @@ function check(name, ok, detail) {
 const tmp = mkdtempSync(join(tmpdir(), 'rp-android-'));
 const SILENCE = join(tmp, 'silence.wav');
 spawnSync(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-t', '30', SILENCE]);
+/* the same real voice and music, each made as loud as it can be without
+   clipping: together they must go past full scale unless the app holds them under */
+const LOUD = {};
+for (const p of ['voice30', 'music30']) {
+  LOUD[p] = join(tmp, `loud-${p}.wav`);
+  spawnSync(FFMPEG, ['-v', 'error', '-y', '-ss', '12', '-i', `${PREFIX}-${p}.mp3`, '-af', 'volume=4,alimiter=limit=0.95:level=false', '-ac', '2', '-ar', '44100', LOUD[p]]);
+}
 if (!existsSync(SILENCE)) {
   console.log('FAIL setup: could not make a silent recording for the mic (FFMPEG)');
   process.exit(1);
@@ -108,6 +115,8 @@ try {
   for (const p of ['voice30', 'music30']) {
     const b64 = readFileSync(`${PREFIX}-${p}.mp3`).toString('base64');
     await page.eval(`window.__parts[${JSON.stringify(p)}] = new Blob([Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))], { type: 'audio/mpeg' })`);
+    const loud = readFileSync(LOUD[p]).toString('base64');
+    await page.eval(`window.__parts[${JSON.stringify('loud-' + p)}] = new Blob([Uint8Array.from(atob(${JSON.stringify(loud)}), (c) => c.charCodeAt(0))], { type: 'audio/wav' })`);
   }
   await page.eval(`(async () => {
     const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app');
@@ -116,7 +125,8 @@ try {
     const P = window.__parts;
     const song = { id: ${JSON.stringify(ID)}, title: 'Android song', created: Date.now(), fileName: 'android.mp3', file: P.voice30, seconds: 30,
       state: 'ready', voice: P.voice30, music: P.music30, voice30: P.voice30, music30: P.music30 };
-    await new Promise((ok) => { const t = db.transaction('songs', 'readwrite'); t.objectStore('songs').put(song); t.oncomplete = ok; });
+    const loud = { ...song, id: 'loud-song', title: 'Loud song', voice: P['loud-voice30'], music: P['loud-music30'], voice30: P['loud-voice30'], music30: P['loud-music30'] };
+    await new Promise((ok) => { const t = db.transaction('songs', 'readwrite'); t.objectStore('songs').put(song); t.objectStore('songs').put(loud); t.oncomplete = ok; });
     db.close();
     delete window.__parts;
   })()`);
@@ -628,6 +638,20 @@ try {
     const i = (k) => order.indexOf(k);
     check('born-before-mic', ok && n1 === n0 + 1 && i('mic-open') >= 0 && i('mic-open') < i('close') && i('close') < i('context') && n2 === n1,
       `after Test without mic, Start: ${order.join(' > ')}; a new sound made once the mic was open ${n1 - n0}; the next Start kept it ${n2 === n1}`);
+  }
+
+  /* 25. The old app's limiter: parts that add up past full scale are held under it, never clipped */
+  if (want('no-clip')) {
+    await page.goto(URL_APP + '?load=' + ++loads + '#/sing/learn/song/loud-song');
+    await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
+    await page.tap('#song-play');
+    const ok = await playing();
+    await page.eval(`window.__probe.outPeak = 0`);
+    await sleep(6000);
+    const peak = await page.eval(P('outPeak'));
+    await page.tap('#song-play');
+    await stopped();
+    check('no-clip', ok && peak > 0.5 && peak <= 1.0, `voice and music each as loud as they go, together: the loudest sound sent to the speaker ${peak.toFixed(3)} (full scale is 1)`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

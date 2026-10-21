@@ -70,6 +70,20 @@ export const LIMITS = {
   micAsking: 60000,
 };
 
+/** The safety curve: its input is the sound at half level (so up to twice
+    full scale fits), its output the sound itself up to 0.9, then rounded
+    off, never reaching 1. */
+export function safety(u: number): number {
+  const a = Math.abs(u);
+  return a <= 0.9 ? u : Math.sign(u) * (0.9 + 0.098 * Math.tanh((a - 0.9) / 0.098));
+}
+const SAFETY_CURVE: Float32Array<ArrayBuffer> = (() => {
+  const n = 4097;
+  const c = new Float32Array(new ArrayBuffer(n * 4));
+  for (let i = 0; i < n; i++) c[i] = safety(2 * ((i / (n - 1)) * 2 - 1));
+  return c;
+})();
+
 /** a clock that keeps less than this share of real time is stalled */
 export const STALL_PACE = 0.3;
 
@@ -204,8 +218,18 @@ export class WebEngine implements AudioEngine {
     limit.attack.value = 0.002;
     limit.release.value = 0.15;
     this.out.connect(limit);
-    limit.connect(ctx.destination);
-    limit.connect(this.outMeter);
+    /* and a last safety, because the limiter reacts a moment late on a
+       sudden peak: nothing below 0.9 is touched, anything above is rounded
+       off short of full scale (measured: two loud parts reaching 1.85 came
+       out at 1.03 with the limiter alone) */
+    const half = ctx.createGain();
+    half.gain.value = 0.5;
+    const safe = ctx.createWaveShaper();
+    safe.curve = SAFETY_CURVE;
+    limit.connect(half);
+    half.connect(safe);
+    safe.connect(ctx.destination);
+    safe.connect(this.outMeter);
     return ctx;
   }
 

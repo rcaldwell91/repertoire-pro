@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heardDelay, toConstraints } from './web-engine';
+import { heardDelay, safety, toConstraints } from './web-engine';
 import { MIC_MODES, modeIndex } from '../mic-modes';
 
 /* RULEBOOK 4, Mic, and Sound, Android 11: "Ask for the mic once, raw." */
@@ -32,5 +32,19 @@ describe('the speaker\'s delay, as the phone reports it', () => {
     expect(heardDelay(0.8, 0)).toBe(0);
     expect(heardDelay(-0.1, 0)).toBe(0);
     expect(heardDelay(NaN, 0.01)).toBeCloseTo(0.01);
+  });
+});
+
+/* The old app's limiter, made safe: overlapping sound never reaches full scale. */
+describe('the last safety on the way out', () => {
+  it('leaves everything below 0.9 as it is', () => {
+    for (const u of [0, 0.1, -0.5, 0.89, -0.9]) expect(safety(u)).toBe(u);
+  });
+  it('rounds off anything louder, never reaching full scale', () => {
+    for (const u of [0.95, 1, 1.5, 2, -2, 10]) {
+      expect(Math.abs(safety(u))).toBeLessThan(1);
+      expect(Math.abs(safety(u))).toBeGreaterThan(0.9);
+    }
+    expect(safety(1.2)).toBeGreaterThan(safety(1.0));
   });
 });
