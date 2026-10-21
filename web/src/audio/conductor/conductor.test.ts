@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { Conductor, MIC_KEY, TOKEN_LIFE_MS, type LeaveReason, type Plan } from './conductor';
+import { Conductor, MODE_KEY, OLD_RUNG_KEY, TOKEN_LIFE_MS, type LeaveReason, type Plan } from './conductor';
 import { FakeEngine, FakeEnv, MemoryStore } from '../engine-fake/fake-engine';
 
 /* Every rule of the conductor (RULEBOOK 2.1), on the fake engine.
@@ -89,10 +89,10 @@ describe('a tap starts it, in order', () => {
     const seen: string[] = [];
     c.subscribe((s) => seen.push(s.state));
     expect(c.start(c.tap(tap), soundCheck)).toBe(true);
-    expect(engine.log[0]).toBe('openMic:0,1,2');    /* asked inside the tap, before anything else */
+    expect(engine.log[0]).toBe('openMic:raw');       /* asked inside the tap, before anything else */
     expect(c.snapshot().state).toBe('armed');
     await flush();
-    expect(engine.log.indexOf('wake')).toBeGreaterThan(engine.log.indexOf('try:0'));
+    expect(engine.log.indexOf('wake')).toBeGreaterThan(engine.log.indexOf('openMic:raw'));
     expect(c.snapshot().state).toBe('running');
     expect(engine.sounding()).toBe(1);
     engine.endNotes();
@@ -169,9 +169,9 @@ describe('the Sound check\'s two buttons', () => {
     expect(engine.micOpen()).toBe(false);
   });
 
-  it('"Use the phone\'s own mic" is only a choice for this visit: it opens nothing by itself', () => {
+  it('"Use the phone\'s own mic" is a choice: it opens nothing by itself', () => {
     c.usePhoneMic();
-    expect(engine.micChoice).toBe('phone');
+    expect(engine.choice).toBe('phone');
     expect(engine.log).toEqual([]);
     expect(store.map.size).toBe(0);                  /* never kept on the phone */
   });
@@ -340,39 +340,68 @@ describe('finished releases everything', () => {
   });
 });
 
-describe('the mic ladder', () => {
-  it('moves down the ladder past a set that fails, and remembers the one that worked', async () => {
-    engine.micPlan = ['busy', 'ok', 'ok'];
+describe('the mic: once, raw (RULEBOOK 4, Sound, Android 11)', () => {
+  it('asks once on each Start, for the raw mic, and nothing more when it opens', async () => {
     c.start(c.tap(tap), soundCheck);
     await flush();
     engine.endNotes();
     await flush();
-    expect(engine.micOpen()).toBe(true);
-    expect(store.get(MIC_KEY)).toBe('1');
+    expect(engine.log.filter((l) => l.startsWith('openMic'))).toEqual(['openMic:raw']);
     c.stop();
-    engine.log.length = 0;
     c.start(c.tap(tap), soundCheck);
     await flush();
-    engine.endNotes();
-    await flush();
-    expect(engine.log).toContain('openMic:1,0,2');   /* what worked, first */
+    expect(engine.log.filter((l) => l.startsWith('openMic'))).toEqual(['openMic:raw', 'openMic:raw']);
   });
 
-  it('a refusal stops the ladder, says so, and the note still plays', async () => {
-    engine.micPlan = ['refused', 'ok', 'ok'];
+  it('never moves to another mode by itself: a mic that fails is said, and asked for raw again next time', async () => {
+    engine.micPlan = ['busy'];
+    c.start(c.tap(tap), soundCheck);
+    await flush();
+    expect(c.snapshot().mic).toBe('failed');
+    expect(engine.log.filter((l) => l.startsWith('openMic'))).toEqual(['openMic:raw']);
+    c.stop();
+    engine.micPlan = ['ok'];
+    c.start(c.tap(tap), soundCheck);
+    await flush();
+    expect(engine.log.filter((l) => l.startsWith('openMic'))).toEqual(['openMic:raw', 'openMic:raw']);
+    expect(store.map.size).toBe(0);                  /* nothing remembered */
+  });
+
+  it('a refusal says so, and the note still plays', async () => {
+    engine.micPlan = ['refused'];
     c.start(c.tap(tap), soundCheck);
     await flush();
     expect(engine.sounding()).toBe(1);               /* the note */
     engine.endNotes();
     await flush();
-    expect(engine.log.filter((l) => l.startsWith('try:'))).toEqual(['try:0']);
     expect(c.snapshot().mic).toBe('refused');
     expect(c.snapshot().state).toBe('finished');
     expect(silentAndClosed()).toBe(true);
-    /* and Start plays the note again, without the mic */
     expect(c.start(c.tap(tap), soundCheck)).toBe(true);
     await flush();
     expect(engine.sounding()).toBe(1);
+  });
+
+  it('another mode only by a hand tap, and only that choice is remembered', async () => {
+    expect(c.tryAnotherMode()).toBe('phone');
+    expect(store.get(MODE_KEY)).toBe('1');
+    c.start(c.tap(tap), soundCheck);
+    await flush();
+    expect(engine.log.filter((l) => l.startsWith('openMic'))).toEqual(['openMic:phone']);
+    /* the app opened again: the hand choice stands */
+    const again = new Conductor(engine, env, store);
+    expect(again.micMode()).toBe('phone');
+    expect(again.tryAnotherMode()).toBe('processed');
+    expect(again.tryAnotherMode()).toBe('basic');
+    expect(again.tryAnotherMode()).toBe('raw');
+  });
+
+  it('forgets the rung the old ladder remembered', () => {
+    const s2 = new MemoryStore();
+    s2.set(OLD_RUNG_KEY, '2');
+    const c2 = new Conductor(new FakeEngine(), new FakeEnv(), s2);
+    expect(s2.get(OLD_RUNG_KEY)).toBeNull();
+    expect(c2.micMode()).toBe('raw');
   });
 });
 
@@ -486,7 +515,7 @@ describe('a song you sing along to', () => {
     engine.answerMic();
     await flush();
     const log = engine.log;
-    expect(log.indexOf('try:0')).toBeLessThan(log.indexOf('wake'));
+    expect(log.indexOf('opened')).toBeLessThan(log.indexOf('wake'));
     expect(log.indexOf('wake')).toBeLessThan(log.indexOf('together:voice+music@5'));
     expect(c.snapshot().mic).toBe('open');
     expect(engine.micOpen()).toBe(true);
@@ -686,7 +715,7 @@ describe('sound is proved by its clock (RULEBOOK 4, Sound, Android)', () => {
     engine.log.length = 0;
     c.start(c.tap(tap), { ...sing, steps: [{ ...sing.steps[0], from: at as number } as Plan['steps'][number]] });
     await flush();
-    expect(engine.log.slice(0, 3)).toEqual(['openMic:0,1,2', 'try:0', 'wake:rebuild']);
+    expect(engine.log.slice(0, 3)).toEqual(['openMic:raw', 'opened', 'wake:rebuild']);
     expect(engine.song?.opts.from).toBeCloseTo(15.5);
     expect(engine.monitorGain).toBe(0.6);            /* Hear yourself, on the new sound */
   });

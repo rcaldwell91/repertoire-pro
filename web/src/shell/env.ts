@@ -43,5 +43,12 @@ export function localStore(): Store {
         /* nothing to keep it in */
       }
     },
+    remove(key) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* nothing kept */
+      }
+    },
   };
 }

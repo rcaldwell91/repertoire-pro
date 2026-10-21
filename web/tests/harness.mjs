@@ -246,11 +246,16 @@ export const MIRROR = `(() => {
      inputs: [...]       the mics the phone lists ({ deviceId, label }); one
                          asked for by its id comes back with that name
      bornFrozen: true    new sound is born with its clock standing still
+     overconstrained: n  the next n asks for the mic are refused as impossible
+     closeDelay: ms      close() takes this long to answer
+   asked: what each ask for the mic wanted ({ device, audio }); stamps: when
+   each sound was made, and when each close was asked for and answered
    It counts every suspend() the app makes, and notes the order of mic and
    sound events. */
 export const ANDROID = `(() => {
   const E = window.__android = { born: 'running', resume: 'ok', sticky: false, suspends: 0, refused: 0, contexts: [], order: [],
-    closeHangs: false, gumHangs: false, decodeFails: false, headset: false, busy: 0, inputs: null, bornFrozen: false, asked: [] };
+    closeHangs: false, gumHangs: false, decodeFails: false, headset: false, busy: 0, inputs: null, bornFrozen: false, asked: [],
+    overconstrained: 0, closeDelay: 0, stamps: [] };
   const AC = window.AudioContext;
   const base = Object.getPrototypeOf(AC.prototype);
   const get = (k) => (Object.getOwnPropertyDescriptor(AC.prototype, k) || Object.getOwnPropertyDescriptor(base, k)).get;
@@ -265,6 +270,7 @@ export const ANDROID = `(() => {
       this.__stuck = false;
       E.contexts.push(this);
       E.order.push('context');
+      E.stamps.push(['context', performance.now()]);
     }
     get currentTime() {
       if (this.__held) return 0;
@@ -281,7 +287,12 @@ export const ANDROID = `(() => {
       return realResume.call(this);
     }
     suspend() { E.suspends++; if (E.sticky) this.__stuck = true; return realSuspend.call(this); }
-    close() { E.order.push('close'); if (E.closeHangs) return new Promise(() => {}); return realClose.call(this); }
+    close() {
+      E.order.push('close'); E.stamps.push(['close', performance.now()]);
+      if (E.closeHangs) return new Promise(() => {});
+      const done = () => realClose.call(this).then(() => { E.order.push('closed'); E.stamps.push(['closed', performance.now()]); });
+      return E.closeDelay ? new Promise((r) => setTimeout(r, E.closeDelay)).then(done) : done();
+    }
     decodeAudioData(...a) { if (E.decodeFails) return Promise.reject(new DOMException('cannot decode', 'EncodingError')); return realDecode.apply(this, a); }
   };
   E.crawl = (rate) => E.contexts.forEach((c) => { if (!c.__crawl) c.__crawl = { at: realTime.call(c), rate }; });
@@ -293,8 +304,9 @@ export const ANDROID = `(() => {
   md.getUserMedia = (c) => {
     E.order.push('mic-asked');
     const want = c && c.audio && c.audio.deviceId ? (c.audio.deviceId.exact || c.audio.deviceId) : null;
-    E.asked.push(want);
+    E.asked.push({ device: want, audio: JSON.stringify(c && c.audio) });
     if (E.gumHangs) return new Promise(() => {});
+    if (E.overconstrained > 0) { E.overconstrained--; return Promise.reject(Object.assign(new DOMException('impossible', 'OverconstrainedError'), { constraint: 'echoCancellation' })); }
     if (E.busy > 0) { E.busy--; return Promise.reject(new DOMException('Could not start audio source', 'NotReadableError')); }
     const plain = c && c.audio && typeof c.audio === 'object' ? (({ deviceId, ...rest }) => ({ audio: Object.keys(rest).length ? rest : true }))(c.audio) : c;
     return gum(want ? plain : c).then((s) => {

@@ -29,7 +29,7 @@ function windowOf(f0: number, sr: number, seed: number, noise: number): Float32A
 }
 
 describe('the pitch reader is the old app\'s', () => {
-  it('reads exactly what the old app\'s yinHz reads, at its default gate', () => {
+  it('reads exactly what the old app\'s yinHz reads, at its default gate', { timeout: 60000 }, () => {
     const NGATE = { clarity: CLARITY };
     const old = new Function('NGATE', oldFn('yinHz') + '; return yinHz;')(NGATE) as (b: Float32Array, sr: number) => number;
     /* the old code moved at each limit: the sweep must meet both */

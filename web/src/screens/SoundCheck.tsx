@@ -16,10 +16,12 @@ import { SoundTrouble } from '../ui/SoundTrouble';
    real piano note plays, then the bar shows how loud the mic hears you.
    While the note plays, the screen asks what the phone says about its
    sound and shows it in plain words, to screenshot if sound won't play.
-   Two more buttons: "Test without mic" lets the mic go, waits for the
-   phone to settle, makes the sound anew and says plainly whether it came
-   back; "Use the phone's own mic" switches to the built-in mic for this
-   visit and says which mic is in use.
+   More buttons: "Test without mic" lets the mic go, waits for the phone
+   to settle, makes the sound anew and says plainly whether it came back;
+   "Use the phone's own mic" picks the built-in mic by its id, used on the
+   first request from then on, and says which mic is in use; "Try another
+   mode" is the only way to another mic mode (RULEBOOK 4, Sound, Android
+   11), and only that hand choice is remembered.
    The conductor does all of it; this screen only asks and shows. */
 const OWNER = 'sound-check';
 const NO_MIC = 'sound-check:no-mic';
@@ -27,6 +29,7 @@ const NOTE = { kind: 'note', url: PIANO_C4.file, rate: rateFor(PIANO_C4) } as co
 const WITH_MIC: Plan = { owner: OWNER, steps: [NOTE, { kind: 'listen' }] };
 const NOTE_ONLY: Plan = { owner: OWNER, steps: [NOTE] };
 const NO_MIC_TEST: Plan = { owner: NO_MIC, quiet: 0.8, rebuild: true, steps: [NOTE] };
+const MODE_WORDS: Record<string, keyof typeof copy.soundCheck> = { raw: 'modeRaw', phone: 'modePhone', processed: 'modeProcessed', basic: 'modeBasic' };
 
 export function SoundCheck() {
   const c = useConductor();
@@ -36,7 +39,10 @@ export function SoundCheck() {
   const [fill, setFill] = useState(0);
   const [report, setReport] = useState<ReportWords | null>(null);
   /* what the last tap was: the check, the test without the mic, or the phone's own mic */
-  const [mode, setMode] = useState<'check' | 'no-mic' | 'phone'>('check');
+  const [mode, setMode] = useState<'check' | 'no-mic' | 'phone' | 'mode'>('check');
+  const [micMode, setMicMode] = useState(() => c.micMode());
+  const [phoneMic, setPhoneMic] = useState(() => c.micChoice() === 'phone');
+  const [crashed] = useState(() => c.micCrashed());
   const run = useRef(0);
 
   const ours = snap.owner === OWNER || snap.owner === NO_MIC;
@@ -79,7 +85,7 @@ export function SoundCheck() {
   }, [ask, c, snap.mic]);
 
   /* a press that starts nothing (a repeat press mid-note) changes nothing on screen */
-  function begin(ev: MouseEvent, plan: Plan, as: 'check' | 'no-mic' | 'phone') {
+  function begin(ev: MouseEvent, plan: Plan, as: 'check' | 'no-mic' | 'phone' | 'mode') {
     if (!c.start(c.tap(ev.nativeEvent), plan)) return;
     run.current++;
     setReport(null);
@@ -119,14 +125,27 @@ export function SoundCheck() {
       )}
       <div className="sound-check-tools">
         <button type="button" className="btn btn-quiet" id="test-without-mic" onClick={(e) => begin(e, NO_MIC_TEST, 'no-mic')}>{S.noMicTest}</button>
-        <button type="button" className="btn btn-quiet" id="phone-mic" onClick={(e) => { if (active) c.stop(); c.usePhoneMic(); begin(e, WITH_MIC, 'phone'); }}>{S.phoneMic}</button>
+        <button type="button" className="btn btn-quiet" id="phone-mic" onClick={(e) => {
+          if (active) c.stop();
+          if (phoneMic) c.letPhoneChoose();
+          else c.usePhoneMic();
+          setPhoneMic(!phoneMic);
+          begin(e, WITH_MIC, 'phone');
+        }}>{phoneMic ? S.letPhoneChoose : S.phoneMic}</button>
+        <button type="button" className="btn btn-quiet" id="another-mode" onClick={(e) => {
+          if (active) c.stop();
+          setMicMode(c.tryAnotherMode());
+          begin(e, WITH_MIC, 'mode');
+        }}>{S.anotherMode}</button>
       </div>
+      <p className="hint" id="mic-mode">{fillIn(S.modeLine, { mode: S[MODE_WORDS[micMode] ?? 'modeRaw'] })}</p>
+      {crashed && <p className="line problem" id="mic-crashed" role="status">{S.crashed} {S.crashedNot}</p>}
       {mode === 'no-mic' && mine && (
         <p className={'line' + (noMicDone && !cameBack ? ' problem' : '')} id="no-mic-result" role="status">
           {!noMicDone ? S.testing : cameBack ? S.noMicWorks : S.noMicStill}
         </p>
       )}
-      {mode === 'phone' && mine && report?.micName && (
+      {(mode === 'phone' || mode === 'mode') && mine && report?.micName && (
         <p className="line" id="mic-now" role="status">{fillIn(S.nowUsing, { mic: report.micName })}</p>
       )}
       <SoundTrouble sound={trouble} />

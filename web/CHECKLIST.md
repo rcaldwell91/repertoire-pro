@@ -35,7 +35,8 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ A clock that moves too slowly is a stall too: the old app wanted 40% of real time (3110-3117, 6661-6664) — test: `android:clock-crawls` (fixed 12 Oct: only a clock standing quite still was caught)
 - ✓ The watchdog runs only while something plays (2907-2910) — test: `unit:audio/conductor/conductor.test.ts:a stall when nothing plays is not this session`
 - ✓ A stall shows one message and does nothing heavy by itself; only a tap rebuilds (2864-2869, 3087-3088) — test: `unit:audio/conductor/conductor.test.ts:a clock that stops while playing is a stall`
-- ✓ The rebuild waits for the old sound to close before making the new one (3186-3192) — test: `android:stall-rebuild`
+- ✓ The rebuild awaits the old sound's close, then waits 800 ms, then makes the new one, kicks it with one silent sample and proves it by the clock (3186-3192; Robert, 21 Oct) — test: `android:rebuild-awaits-close`, `android:stall-rebuild`
+- ✓ A sound made before the mic opened (Test without mic, a take heard alone) is made anew on the next Start once the mic is open, so it is born on the headset's route (1421-1428; Robert, 21 Oct) — test: `android:born-before-mic`
 - ✓ ...and carries on from where it froze, on the new clock (3171-3178, 3215-3222) — test: `android:stall-rebuild`
 - ✓ ...with the volumes put back (3206-3210) — test: `android:stall-rebuild`
 - ✓ ...and the microphone re-attached to the new sound (3211-3214) — test: `android:hear-yourself-rebuilt`
@@ -85,9 +86,10 @@ For each part the new app has built, every rule the old app's code (next.html) e
 
 ## 2. The microphone
 
-- ✓ Ask for the raw microphone, as a wish, never a demand, down a ladder (1322-1333) — test: `unit:audio/engine-web/web-engine.test.ts:only ever asks, never requires`
-- ✓ Remember the setting that worked and try it first (1435-1438, 1473-1474) — test: `unit:audio/conductor/conductor.test.ts:remembers the one that worked`
-- ✓ Ask once; silence is not a reason to ask again (1410-1418) — test: `android:ten-starts`
+- ✓ Ask for the mic ONCE, raw: echo cancellation, noise suppression and auto gain off (exact), lowest latency (1322-1333, 1410-1418). Corrected 21 Oct: this list had ticked the v8.1 ladder ("ask down a ladder, remember what worked"), which the old app withdrew in v9.4; on Robert's Samsung with a USB-C headset the sound stopped — test: `android:mic-once-raw`, `unit:audio/engine-web/web-engine.test.ts:asks for the raw mic exactly`, `unit:audio/conductor/conductor.test.ts:asks once on each Start, for the raw mic`
+- ✓ No automatic ladder and no remembered mode: a mic that fails is said, and asked for raw again next time — test: `android:no-ladder`, `unit:audio/conductor/conductor.test.ts:never moves to another mode by itself`
+- ✓ Other modes only by a hand tap ("Try another mode" in the Sound check), and only that choice is remembered; the old ladder's remembered rung is forgotten (1326-1327, 1559-1574) — test: `android:mode-by-hand`, `unit:audio/conductor/conductor.test.ts:another mode only by a hand tap`, `unit:audio/conductor/conductor.test.ts:forgets the rung the old ladder remembered`
+- ✓ Ask once; silence is not a reason to ask again (1410-1418) — test: `android:ten-starts`, `android:mic-once-raw`
 - ✓ Release our own microphone before asking again (1393-1404) — test: `android:ten-starts`
 - ✓ Permission refused: say so, and "Carry on without it" (1998-2005, 572) — test: `browser:mic-refused`, `notemap:mic-refused`
 - ✓ Another app holding the mic, by error or by a muted track: said plainly (2007-2018, 1359-1370) — test: `android:mic-held`, `unit:audio/conductor/conductor.test.ts:says plainly when another app has the mic`
@@ -109,10 +111,11 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ A take not kept is thrown away only with Undo (15044-15045) — test: `takes:take-removed-undo`
 - ✓ The mic's own delay taken off at its source (2520-2539) — test: `notemap:placement`
 - ✓ "Device busy": let go and ask once more after 400 ms, because Android hands the mic back a beat late (1405-1408, 1463-1469). Robert, 13 Oct: only on the Start tap, once; never by itself (his Android rule 6 stands). Still held: "Another app is using the microphone. Tap Start to try again." — test: `android:held-retry`
-- ✓ The phone's own mic: chosen in the Sound check, for that visit only, and which mic is in use is said (1429-1530; Robert, 13 Oct) — test: `android:phone-mic`, `unit:audio/conductor/conductor.test.ts:"Use the phone's own mic" is only a choice for this visit`
-- — A mic picker anywhere else, and remembering a mic that crashed the phone (1429-1530, 5977-5980). Not in the new app: Robert, 13 Oct, no general mic setting.
+- ✓ The phone's own mic: chosen in the Sound check, picked by device id and used on the first request from then on (kept on the phone, as the old app's rep_micdev), so the capture device never switches when a headset goes in; which mic is in use is said; "Let the phone choose the mic" undoes it (1429-1450; Robert, 13 and 21 Oct) — test: `android:phone-mic`, `unit:audio/conductor/conductor.test.ts:"Use the phone's own mic" is a choice`
+- ✓ The chosen mic's id is written down before it is opened and cleared after; a mic that took the phone down is dropped, said once, and never chosen again by itself (1444-1449, 1512-1528) — test: `android:mic-crash`, `android:phone-mic`
+- — A mic picker anywhere else (5977-5980). Not in the new app: Robert, 13 Oct, no general mic setting.
 - — In-app browsers and plain http (1969-1997). Not in the new app: it is only served over https, and in-app browsers aren't tested.
-- — "Try another mode", the noise gate calibration, the mic chips (1548-1643, 6717-6727). Not in the new app.
+- — The noise gate calibration, the mic chips (1576-1643, 6717-6727). Not in the new app.
 - — Timed exercises start at the first sound (9058-9137). Not in the new app yet: exercises aren't built.
 - — Hold the mic while a take records in the background (2994-3013). Replaced by RULEBOOK 2.1: hiding ends the take, and it's kept to decide on (`takes:take-leave`).
 
@@ -171,4 +174,11 @@ For each part the new app has built, every rule the old app's code (next.html) e
 
 1. A mic another app holds: no automatic retry. The Start tap lets go and asks once more, and if it is still held the app says "Another app is using the microphone. Tap Start to try again."
 2. A 3-2-1 count-in before the song on Learn a song, shown on the note map; back 10 s and repeat this part don't count in.
-3. The Sound check has "Test without mic" and "Use the phone's own mic" (for that visit only). No mic setting anywhere else.
+3. The Sound check has "Test without mic" and "Use the phone's own mic". No mic setting anywhere else.
+
+## Decided by Robert, 21 Oct (the USB-C headset)
+
+1. Ask for the mic once, raw (exact); no automatic ladder, no remembered mode; "Try another mode" by hand only, remembered.
+2. Mic first, then the sound, for Start, Test without mic and Hear yourself; a sound made before the mic opened is made anew once it opens.
+3. A rebuild awaits the old sound's close, waits 800 ms, makes the new one, kicks it and proves it by the clock.
+4. "Use the phone's own mic" by device id, before the first request, kept; a mic that took the phone down is never chosen again by itself.

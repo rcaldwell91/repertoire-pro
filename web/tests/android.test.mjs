@@ -35,7 +35,8 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 
 const ALL = ['start-hangs', 'stall-rebuild', 'gesture-only', 'never-suspends', 'mic-first', 'ten-starts', 'hear-yourself-rebuilt', 'mic-held',
   'clock-crawls', 'close-hangs', 'mic-hangs', 'load-fails', 'use-headphones', 'any-octave-kept', 'held-retry', 'count-in',
-  'test-without-mic', 'phone-mic', 'no-page-errors'];
+  'test-without-mic', 'phone-mic', 'mic-once-raw', 'no-ladder', 'mode-by-hand', 'rebuild-awaits-close', 'mic-crash', 'born-before-mic',
+  'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -477,30 +478,156 @@ try {
   /* 18. "Use the phone's own mic": the built-in mic for this visit only, and
          which mic is in use, said (Robert, 13 Oct) */
   if (want('phone-mic')) {
+    await page.eval(`['choice', 'device', 'pending', 'bad', 'mode'].forEach((k) => localStorage.removeItem('rp.mic.' + k))`);
     await openCheck({ inputs: MICS });
     await page.tap('#phone-mic');
     const said = await page.waitFor(`document.querySelector('#mic-now')?.textContent === 'Now using Phone microphone (built-in).'`, 10000);
     const row = await page.eval(`document.querySelector('#report-mic-name')?.textContent`);
     const asked = await page.eval(A('asked.slice()'));
-    /* the rest of this visit: Learn a song opens it too */
+    const pending = await page.eval(`localStorage.getItem('rp.mic.pending')`);
+    /* opened again, the headset listed first: the first request is the phone's own mic, by its id */
+    await open({ inputs: [MICS[0], { deviceId: 'usb-2', label: 'USB-C earbuds microphone' }, MICS[1]] });
+    await page.tap('#song-play');
+    await playing();
+    const again = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    /* and back to the phone's choice, by hand */
+    await openCheck({ inputs: MICS });
+    const label = await page.eval(`document.querySelector('#phone-mic').textContent`);
+    await page.tap('#phone-mic');
+    await page.waitFor(`!!document.querySelector('#mic-now')`, 10000);
+    const back = await page.eval(A('asked.slice()'));
+    await page.tap('#sound-check-go');
+    await stopped().catch(() => false);
+    check('phone-mic', said && row === 'Phone microphone (built-in)' && asked.length === 1 && asked[0].device === 'phone-mic' && pending === null &&
+      again.length === 1 && again[0].device === 'phone-mic' && label === copy.soundCheck.letPhoneChoose && back.length === 1 && back[0].device === null,
+      `"Now using Phone microphone (built-in)." ${said} (report: ${row}), asked once, for it by id: ${JSON.stringify(asked.map((x) => x.device))}, its note cleared ${pending === null}; ` +
+      `opened again with the headset listed first: the first request ${JSON.stringify(again.map((x) => x.device))}; "${copy.soundCheck.letPhoneChoose}" then asks for no device ${JSON.stringify(back.map((x) => x.device))}`);
+  }
+
+  /* 19. Start asks for the mic once, raw (exact), and never again when it opens (Robert, 21 Oct) */
+  const RAW = JSON.stringify({ echoCancellation: { exact: false }, noiseSuppression: { exact: false }, autoGainControl: { exact: false }, latency: { ideal: 0 } });
+  if (want('mic-once-raw')) {
+    await page.eval(`['choice', 'device', 'pending', 'bad', 'mode'].forEach((k) => localStorage.removeItem('rp.mic.' + k))`);
+    await open();
+    await page.tap('#song-play');
+    await playing();
+    await sleep(1500);
+    const one = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    await page.tap('#song-play');
+    await playing();
+    await sleep(800);
+    const two = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    check('mic-once-raw', one.length === 1 && one[0].audio === RAW && two.length === 2 && two[1].audio === RAW,
+      `first Start: ${one.length} request(s), ${one[0]?.audio}; second Start: ${two.length - one.length} more, raw ${two[1]?.audio === RAW}`);
+  }
+
+  /* 20. No ladder: a mic the phone refuses is said, and no other mode is tried by itself */
+  if (want('no-ladder')) {
+    await open({ overconstrained: 1 });
+    await page.tap('#song-play');
+    const ok = await playing();
+    const said = await page.waitFor(`document.querySelector('#mic-line')?.textContent.includes(${JSON.stringify(copy.song.micFailed)})`, 4000);
+    await sleep(2500);
+    const asked = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    check('no-ladder', ok && said && asked.length === 1 && asked[0].audio === RAW,
+      `the phone refused the raw mic: "${copy.song.micFailed}" ${said}, the song played on ${ok}; asked ${asked.length} time(s), never another mode`);
+  }
+
+  /* 21. Another mode only by a hand tap, and only that choice remembered; the old ladder's rung forgotten */
+  if (want('mode-by-hand')) {
+    await page.goto(URL_APP + 'favicon.svg');
+    await page.eval(`localStorage.setItem('rp.mic.set', '2'); localStorage.removeItem('rp.mic.mode')`);
+    await openCheck();
+    const forgot = await page.eval(`localStorage.getItem('rp.mic.set') === null`);
+    const before = await page.eval(`document.querySelector('#mic-mode')?.textContent`);
+    await page.tap('#another-mode');
+    const after = await page.waitFor(`document.querySelector('#mic-mode')?.textContent === ${JSON.stringify(`Mic mode: ${copy.soundCheck.modePhone}.`)}`, 3000);
+    await page.waitFor(`window.__android.asked.length >= 1`, 8000);
+    const tapped = await page.eval(A('asked.slice()'));
+    await page.tap('#sound-check-go');
+    await open();
+    await page.tap('#song-play');
+    await playing();
+    const kept = await page.eval(A('asked.slice()'));
+    await page.tap('#song-play');
+    await stopped();
+    await page.eval(`localStorage.removeItem('rp.mic.mode')`);
+    check('mode-by-hand', forgot && before === `Mic mode: ${copy.soundCheck.modeRaw}.` && after && tapped.length === 1 && tapped[0].audio === 'true' && kept.length === 1 && kept[0].audio === 'true',
+      `the old ladder's remembered rung forgotten ${forgot}; "${before}" until the tap; after it "${copy.soundCheck.modePhone}" ${after}, asked ${tapped.map((x) => x.audio).join()}; ` +
+      `opened again, Start asked ${kept.map((x) => x.audio).join()} (the hand choice kept)`);
+  }
+
+  /* 22. A stall's rebuild awaits the old sound's close, waits 800 ms, then makes the new one */
+  if (want('rebuild-awaits-close')) {
+    await open({ closeDelay: 700 });
+    await page.tap('#song-play');
+    await playing();
+    await sleep(800);
+    await page.eval(A('freeze()'));
+    await page.waitFor(`(${TROUBLE}) === ${JSON.stringify(copy.song.soundStalled)}`, 5000);
+    await page.eval(`window.__android.stamps.length = 0`);
+    await page.tap('#song-play');
+    const ok = await playing();
+    const st = await page.eval(A('stamps.slice()'));
+    const at = (k) => st.find((x) => x[0] === k)?.[1];
+    const closeAt = at('close'), closedAt = at('closed'), madeAt = at('context');
+    await page.tap('#song-play');
+    await stopped();
+    const waited = closedAt != null && madeAt != null ? madeAt - closedAt : null;
+    check('rebuild-awaits-close', ok && closeAt != null && closedAt - closeAt >= 690 && waited != null && waited >= 790,
+      `the old sound took ${closedAt != null ? Math.round(closedAt - closeAt) : '?'} ms to close; the new one was made ${waited != null ? Math.round(waited) : '?'} ms after it closed (800 asked); playing again ${ok}`);
+  }
+
+  /* 23. A mic chosen by hand that took the phone down: dropped, said once, never chosen again by itself */
+  if (want('mic-crash')) {
+    await page.goto(URL_APP + 'favicon.svg');
+    await page.eval(`localStorage.setItem('rp.mic.choice', 'phone'); localStorage.setItem('rp.mic.device', 'phone-mic'); localStorage.setItem('rp.mic.pending', 'phone-mic')`);
+    await openCheck({ inputs: MICS });
+    const said = await page.waitFor(`document.querySelector('#mic-crashed')?.textContent === ${JSON.stringify(copy.soundCheck.crashed + ' ' + copy.soundCheck.crashedNot)}`, 3000);
+    await page.tap('#sound-check-go');
+    await page.waitFor(`window.__android.asked.length >= 1`, 8000);
+    const asked = await page.eval(A('asked.slice()'));
+    const note = await page.eval(`localStorage.getItem('rp.mic.pending')`);
+    await page.tap('#sound-check-go');
+    await openCheck({ inputs: MICS });
+    const once = await page.eval(`!document.querySelector('#mic-crashed')`);
+    await page.eval(`['choice', 'device', 'pending', 'bad'].forEach((k) => localStorage.removeItem('rp.mic.' + k))`);
+    check('mic-crash', said && asked.length === 1 && asked[0].device !== 'phone-mic' && note === null && once,
+      `the note left by a mic that took the phone down: said ${said}; the next request asked for ${asked[0]?.device ?? 'the phone\'s choice'}, not that mic; said only once ${once}`);
+  }
+
+  /* 24. Sound made before the mic opened (Test without mic) is made anew once the mic opens, on that tap; then kept */
+  if (want('born-before-mic')) {
+    await openCheck();
+    await page.tap('#test-without-mic');
+    await page.waitFor(`/works|Still/.test(document.querySelector('#no-mic-result')?.textContent || '')`, 10000);
+    await page.waitFor(`document.querySelector('#sound-check-line')?.textContent === ${JSON.stringify(copy.soundCheck.again)}`, 8000);
+    const n0 = await page.eval(A('contexts.length'));
+    await page.eval(`window.__android.order.length = 0`);
     await page.eval(`location.hash = '#/sing/learn/song/${ID}'`);
     await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
-    await page.eval(`window.__android.asked.length = 0`);
     await page.tap('#song-play');
-    await playing();
-    const onSong = await page.eval(A('asked.slice()'));
-    await page.tap('#song-play');
-    await stopped();
-    /* opened again: the phone's choice, as before (nothing kept) */
-    await open({ inputs: MICS });
-    await page.tap('#song-play');
-    await playing();
-    const after = await page.eval(A('asked.slice()'));
+    const ok = await playing();
+    const order = await page.eval(A('order.slice()'));
+    const n1 = await page.eval(A('contexts.length'));
     await page.tap('#song-play');
     await stopped();
-    check('phone-mic', said && row === 'Phone microphone (built-in)' && asked.includes('phone-mic') && onSong.includes('phone-mic') && !after.includes('phone-mic'),
-      `"Now using Phone microphone (built-in)." ${said}, and the report says ${row}; on Learn a song in the same visit it asked for the built-in mic ${onSong.includes('phone-mic')}; ` +
-      `the app opened again: the phone's choice ${!after.includes('phone-mic')} (nothing kept)`);
+    await page.tap('#song-play');
+    await playing();
+    const n2 = await page.eval(A('contexts.length'));
+    await page.tap('#song-play');
+    await stopped();
+    const i = (k) => order.indexOf(k);
+    check('born-before-mic', ok && n1 === n0 + 1 && i('mic-open') >= 0 && i('mic-open') < i('close') && i('close') < i('context') && n2 === n1,
+      `after Test without mic, Start: ${order.join(' > ')}; a new sound made once the mic was open ${n1 - n0}; the next Start kept it ${n2 === n1}`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

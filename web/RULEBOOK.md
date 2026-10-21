@@ -129,7 +129,8 @@ web/src/
 
 ### Mic
 
-- Never require raw capture. Walk a ladder of constraint sets and remember what worked.
+- Ask for the mic once, raw: echo cancellation, noise suppression and auto gain off (exact), lowest latency. No automatic ladder and no remembered mode: other modes only by a hand tap ("Try another mode" in the Sound check), and only that hand choice is remembered. (The old "walk a ladder of constraint sets and remember what worked" was the old app's v8.1 rule, withdrawn in v9.4: asking for processed sound flipped Samsung into call mode, sent sound out the wrong route and stalled the clock.)
+- A mic chosen by hand ("Use the phone's own mic") is picked by device id and used on the first request, so the capture device never switches when a headset is plugged in. Its id is written down before it is opened and cleared after; a device that took the phone down is never chosen again by itself.
 - Always offer "Carry on without it". The mic dialog never covers the tabs.
 - Timed exercises: start the clock at the first sound and stop after 1 s of silence.
 - Warn when headphones can't be confirmed.
@@ -187,6 +188,8 @@ Android (learned the hard way in the old app; the first phone test of this app f
 8. If sound can't start, say so on screen in plain words, with the steps in order: reload the app; unplug headphones and reload; close Chrome fully; restart the phone. Never sit in Pause silently.
 9. If another app holds the mic (the track is muted or ends), say so plainly.
 10. Test against silence, not a tone.
+11. Ask for the mic once, raw. Never walk a ladder of mic modes automatically; the ladder is what thrashed Robert's phone in September.
+12. A rebuild awaits the old sound's close, waits 800 ms, makes the new one, plays one silent sample and proves it by the clock. A sound made before the mic opened is made anew, on that tap, once the mic opens.
 
 ### Screens
 

@@ -4,14 +4,16 @@ import type { AudioEngine, Ensemble, EnsembleOptions, MicBlock, MicResult, MicSe
    conductor holds it. A native engine replaces this file later; nothing
    else changes (RULEBOOK 1). */
 
-/** A mic set as the browser takes it. Every value is "ideal": asked for,
-    never required (RULEBOOK 4, "Never require raw capture"). The last rung
-    asks for nothing at all. */
+/** A mic mode as the browser takes it. The raw mode requires its values
+    (RULEBOOK 4, Sound, Android 11); the others only ask. The phone's own
+    mode asks for nothing but a microphone. */
 export function toConstraints(set: MicSet): MediaTrackConstraints | true {
   const c: MediaTrackConstraints = {};
-  if (set.echoCancellation !== undefined) c.echoCancellation = { ideal: set.echoCancellation };
-  if (set.noiseSuppression !== undefined) c.noiseSuppression = { ideal: set.noiseSuppression };
-  if (set.autoGainControl !== undefined) c.autoGainControl = { ideal: set.autoGainControl };
+  const v = (x: boolean) => (set.exact ? { exact: x } : { ideal: x });
+  if (set.echoCancellation !== undefined) c.echoCancellation = v(set.echoCancellation);
+  if (set.noiseSuppression !== undefined) c.noiseSuppression = v(set.noiseSuppression);
+  if (set.autoGainControl !== undefined) c.autoGainControl = v(set.autoGainControl);
+  if (set.lowestLatency) (c as MediaTrackConstraints & { latency?: unknown }).latency = { ideal: 0 };
   return Object.keys(c).length ? c : true;
 }
 
@@ -71,6 +73,39 @@ export const LIMITS = {
 /** a clock that keeps less than this share of real time is stalled */
 export const STALL_PACE = 0.3;
 
+/* what is kept on the phone about the mic (the old app's rep_micdev and
+   rep_micpending): the hand choice, its device, a device being opened now,
+   and devices that took the phone down */
+const CHOICE_KEY = 'rp.mic.choice';
+const DEVICE_KEY = 'rp.mic.device';
+const PENDING_KEY = 'rp.mic.pending';
+const BAD_KEY = 'rp.mic.bad';
+function read(k: string): string | null {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+}
+function keep(k: string, v: string): void {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* nothing to keep it in */
+  }
+}
+function drop(k: string): void {
+  try {
+    localStorage.removeItem(k);
+  } catch {
+    /* nothing kept */
+  }
+}
+
+/** after the old sound has closed, a moment for the phone before the new
+    one (the old app's 800 ms; RULEBOOK 4, Sound, Android 12) */
+export const REBUILD_SETTLE_MS = 800;
+
 /** a beat before asking again for a mic another app had (the old app's 400 ms) */
 export const HELD_RETRY_MS = 400;
 
@@ -127,14 +162,29 @@ export class WebEngine implements AudioEngine {
   private out: GainNode | null = null;
   private outMeter: AnalyserNode | null = null;
   private watchTimer: ReturnType<typeof setInterval> | null = null;
-  /** the Sound check's choice of mic, for this visit only */
-  private choice: 'phone' | null = null;
+  /** a mic chosen by hand took the phone down last time */
+  private readonly crashed: boolean;
+  /** the sound now was made while the mic was open (on the mic's route) */
+  private bornWithMic = false;
+
+  constructor() {
+    /* a note left from opening a chosen mic means the page never came
+       through: that mic took the phone down, and is not used again by itself */
+    const pending = read(PENDING_KEY);
+    this.crashed = !!pending;
+    if (pending) {
+      drop(PENDING_KEY);
+      keep(BAD_KEY, [read(BAD_KEY), pending].filter(Boolean).join('\n'));
+      if (read(DEVICE_KEY) === pending) drop(DEVICE_KEY);
+    }
+  }
 
   /** A new context, and its way out. Only from wake (or, if nothing has
       woken yet, to decode): never on its own. */
   private make(): AudioContext {
     const ctx = new AudioContext({ latencyHint: 'interactive' });
     this.ctx = ctx;
+    this.bornWithMic = !!this.stream;
     ctx.addEventListener('statechange', () => {
       if (ctx !== this.ctx) return;               /* an old one, closing */
       const st = ctx.state as string;
@@ -166,6 +216,9 @@ export class WebEngine implements AudioEngine {
   async wake(rebuild: boolean): Promise<Wake> {
     const ua = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
     const tap = ua ? ua.isActive : true;
+    /* a sound made before the mic opened was made on the old route: on
+       this tap, make it anew now the mic has chosen the route (Android 12) */
+    if (!rebuild && this.ctx && this.ctx.state !== 'closed' && this.stream && !this.bornWithMic) rebuild = true;
     if (rebuild && this.ctx) {
       /* Android 5: close the old one, wait for it, then a new one */
       const old = this.ctx;
@@ -179,6 +232,7 @@ export class WebEngine implements AudioEngine {
       } catch {
         /* closed already */
       }
+      await pause(REBUILD_SETTLE_MS);
     }
     const ctx = this.context();
     /* Android 3: await resume (raced), one silent sample, then the clock */
@@ -402,29 +456,70 @@ export class WebEngine implements AudioEngine {
   /* Android 4: the mic opens before the sound is made or woken, so the
      sound is born on the route the mic chose. Here only the stream is
      opened; its nodes join the sound when it wakes, which always follows. */
-  async openMic(sets: readonly MicSet[], order: readonly number[]): Promise<MicResult> {
+  async openMic(set: MicSet): Promise<MicResult> {
     this.closeMic();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return { ok: false, why: 'unavailable' };
     const wait = await this.micWait();
-    let r = await this.ladder(sets, order, wait);
+    /* the mic chosen by hand, picked before the first request, so the
+       capture device never switches when a headset goes in */
+    const device = await this.chosenDevice();
+    let r = await this.ask(set, device, wait);
     /* another app has it: on this same tap, let go, wait a beat (Android
        hands it back a moment after the other app lets go), ask once more */
     if ((r.ok && r.held) || (!r.ok && r.why === 'held')) {
       this.closeMic();
       await pause(HELD_RETRY_MS);
-      r = await this.ladder(sets, order, wait);
+      r = await this.ask(set, device, wait);
     }
-    /* the phone's own mic, if the Sound check chose it for this visit */
-    if (r.ok && this.choice === 'phone') r = await this.phoneMic(sets[r.set], r, wait);
     return r;
   }
 
-  setMicChoice(choice: 'phone' | null): void {
-    this.choice = choice;
+  /** ONE request, this way, on this device if one was chosen */
+  private async ask(set: MicSet, device: string | null, wait: number): Promise<MicResult> {
+    const c = toConstraints(set);
+    const audio = device ? { ...(c === true ? {} : c), deviceId: { exact: device } } : c;
+    /* opening a chosen device is what once hung Robert's phone: write it
+       down before, clear it the moment we come through (the old app) */
+    if (device) keep(PENDING_KEY, device);
+    try {
+      const got = await this.open(audio, wait);
+      return got ?? { ok: false, why: 'failed' };
+    } catch (err) {
+      const name = (err as { name?: string } | null)?.name || '';
+      /* the chosen mic is not there now (unplugged): the phone's choice, once */
+      if (device && (name === 'OverconstrainedError' || name === 'NotFoundError')) {
+        drop(PENDING_KEY);
+        return this.ask(set, null, wait);
+      }
+      return finalAnswer(err) ?? { ok: false, why: 'failed' };
+    } finally {
+      if (device) drop(PENDING_KEY);
+    }
   }
 
-  /** the phone's own built-in mic, once the open mic has made the list readable */
-  private async phoneMic(set: MicSet, r: MicResult & { ok: true }, wait: number): Promise<MicResult> {
+  setMicChoice(choice: 'phone' | null): void {
+    drop(DEVICE_KEY);
+    if (choice) {
+      keep(CHOICE_KEY, choice);
+      drop(BAD_KEY);                    /* a hand tap may try any mic again */
+    } else drop(CHOICE_KEY);
+  }
+
+  micChoice(): 'phone' | null {
+    return read(CHOICE_KEY) === 'phone' ? 'phone' : null;
+  }
+
+  micCrashed(): boolean {
+    return this.crashed;
+  }
+
+  /** the phone's own built-in mic, by its id: the one kept, or picked now
+      from the phone's list (never one that took the phone down) */
+  private async chosenDevice(): Promise<string | null> {
+    if (this.micChoice() !== 'phone') return null;
+    const bad = (read(BAD_KEY) || '').split('\n').filter(Boolean);
+    const kept = read(DEVICE_KEY);
+    if (kept && !bad.includes(kept)) return kept;
     let list: MediaDeviceInfo[] = [];
     try {
       const d = await race(navigator.mediaDevices.enumerateDevices(), 1000);
@@ -432,35 +527,16 @@ export class WebEngine implements AudioEngine {
     } catch {
       /* the phone will not say */
     }
-    const inputs = list.filter((d) => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
+    const inputs = list.filter((d) => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications'
+      && !bad.includes(d.deviceId));
     const own = inputs.find((d) => BUILT_IN.test(d.label) && !HEADPHONES.test(d.label)) ?? inputs.find((d) => d.label && !HEADPHONES.test(d.label));
-    const now = (this.stream?.getAudioTracks()[0]?.getSettings() as { deviceId?: string } | undefined)?.deviceId;
-    if (!own || own.deviceId === now) return r;
-    this.closeMic();
-    const c = toConstraints(set);
-    const one = await this.open({ ...(c === true ? {} : c), deviceId: { exact: own.deviceId } }, r.set, wait);
-    /* that mic would not open: the phone's choice again */
-    return one ?? (await this.ladder([set], [0], wait).then((x) => (x.ok ? { ...x, set: r.set } : x)));
-  }
-
-  /** each rung in turn, until one opens or the answer is final */
-  private async ladder(sets: readonly MicSet[], order: readonly number[], wait: number): Promise<MicResult> {
-    for (const i of order) {
-      try {
-        const got = await this.open(toConstraints(sets[i]), i, wait);
-        if (got) return got;
-        return { ok: false, why: 'failed' };
-      } catch (err) {
-        const final = finalAnswer(err);
-        if (final) return final;
-        /* this rung failed for another reason: try the next */
-      }
-    }
-    return { ok: false, why: 'failed' };
+    if (!own) return null;
+    keep(DEVICE_KEY, own.deviceId);
+    return own.deviceId;
   }
 
   /** one request; null if it hung (Android 2) */
-  private async open(audio: MediaTrackConstraints | true, set: number, wait: number): Promise<MicResult | null> {
+  private async open(audio: MediaTrackConstraints | true, wait: number): Promise<MicResult | null> {
     const asked = navigator.mediaDevices.getUserMedia({ audio });
     const stream = await race(asked, wait);
     if (stream === LATE) {
@@ -477,7 +553,7 @@ export class WebEngine implements AudioEngine {
       track.onended = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
     }
     /* its nodes join the sound when the sound wakes (never a stalled one) */
-    return { ok: true, set, held: !!track && (track.muted || track.readyState === 'ended') };
+    return { ok: true, held: !!track && (track.muted || track.readyState === 'ended') };
   }
 
   /** the open mic's nodes, on this context (again, after a rebuild) */

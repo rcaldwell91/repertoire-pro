@@ -110,23 +110,21 @@ export class FakeEngine implements AudioEngine {
   sounding(): number {
     return this.sources.size;
   }
-  async openMic(_sets: readonly MicSet[], order: readonly number[]): Promise<MicResult> {
-    this.log.push('openMic:' + order.join(','));
+  async openMic(set: MicSet): Promise<MicResult> {
+    this.log.push('openMic:' + set.name);
     if (this.holdMic) await new Promise<void>((r) => this.heldMic.push(r));
-    for (const i of order) {
-      const what = this.micPlan[i] ?? 'busy';
-      this.log.push('try:' + i);
-      if (what === 'ok') {
-        this.mic = true;
-        return { ok: true, set: i };
-      }
-      if (what === 'refused') return { ok: false, why: 'refused' };
-      if (what === 'unavailable') return { ok: false, why: 'unavailable' };
-      if (what === 'held') return { ok: false, why: 'held' };
-      if (what === 'held-open') {
-        this.mic = true;
-        return { ok: true, set: i, held: true };
-      }
+    const what = this.micPlan[0] ?? 'ok';
+    if (what === 'ok') {
+      this.mic = true;
+      this.log.push('opened');
+      return { ok: true };
+    }
+    if (what === 'refused') return { ok: false, why: 'refused' };
+    if (what === 'unavailable') return { ok: false, why: 'unavailable' };
+    if (what === 'held') return { ok: false, why: 'held' };
+    if (what === 'held-open') {
+      this.mic = true;
+      return { ok: true, held: true };
     }
     return { ok: false, why: 'failed' };
   }
@@ -137,9 +135,16 @@ export class FakeEngine implements AudioEngine {
   micOpen(): boolean {
     return this.mic;
   }
-  micChoice: 'phone' | null = null;
+  choice: 'phone' | null = null;
   setMicChoice(choice: 'phone' | null): void {
-    this.micChoice = choice;
+    this.choice = choice;
+  }
+  micChoice(): 'phone' | null {
+    return this.choice;
+  }
+  crashed = false;
+  micCrashed(): boolean {
+    return this.crashed;
   }
   closeMic(): void {
     if (this.mic) this.log.push('closeMic');
@@ -259,5 +264,8 @@ export class MemoryStore implements Store {
   }
   set(key: string, value: string): void {
     this.map.set(key, value);
+  }
+  remove(key: string): void {
+    this.map.delete(key);
   }
 }

@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 
 const C = 'src/audio/conductor/conductor.ts';
 const W = 'src/audio/engine-web/web-engine.ts';
-const L = 'src/audio/mic-ladder.ts';
+const M = 'src/audio/mic-modes.ts';
 
 export const MUTATIONS = [
   { rule: 'starts without a token', file: C,
@@ -68,8 +68,12 @@ export const MUTATIONS = [
     from: "if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening' && this.snap.mic !== 'held') this.engine.closeMic();", to: ';' },
   { rule: 'finishing keeps hold of everything', file: C,
     from: "if (gen === this.gen) this.halt('finished', null);", to: "if (gen === this.gen) this.set({ state: 'finished' });" },
-  { rule: 'the mic set that worked is forgotten', file: C,
-    from: 'this.store.set(MIC_KEY, String(r.set));', to: ';' },
+  { rule: 'a mic mode is remembered without a hand tap', file: C,
+    from: '    /* once, raw (or the mode chosen by hand): never another by itself */', to: "    this.store.set('rp.mic.set', '1');" },
+  { rule: 'the hand-chosen mic mode is ignored', file: C,
+    from: '    const r: MicResult = await this.engine.openMic(MIC_MODES[modeIndex(this.store.get(MODE_KEY))]);', to: '    const r: MicResult = await this.engine.openMic(MIC_MODES[0]);' },
+  { rule: 'the old ladder\'s rung is kept', file: C,
+    from: '    store.remove(OLD_RUNG_KEY);', to: '' },
   { rule: 'a refused mic blocks the note', file: C,
     from: 'if (!this.spend(token)) return false;', to: "if (!this.spend(token)) return false;\n    if (this.snap.mic === 'refused') return false;" },
   { rule: 'leaving does not end the take', file: C,
@@ -80,10 +84,12 @@ export const MUTATIONS = [
     from: '      if (s == null) return;                 /* heard before the song began */\n      this.start = s;', to: '      this.start = s ?? 0;' },
   { rule: 'a take is placed without the speaker\'s delay', file: C,
     from: 'this.recorder?.push(b, (at) => this.songTime(at));', to: 'this.recorder?.push(b, (at) => this.songTime(at + this.engine.outputLatency()));' },
-  { rule: 'the ladder requires raw capture', file: W,
-    from: 'c.echoCancellation = { ideal: set.echoCancellation };', to: 'c.echoCancellation = { exact: set.echoCancellation };' },
-  { rule: 'the ladder forgets what worked', file: L,
-    from: 'return [remembered, ...all.filter((i) => i !== remembered)];', to: 'return all;' },
+  { rule: 'the raw mic is only wished for, not required (Android 11)', file: W,
+    from: '  const v = (x: boolean) => (set.exact ? { exact: x } : { ideal: x });', to: '  const v = (x: boolean) => ({ ideal: x });' },
+  { rule: 'the raw mic does not ask for the lowest latency', file: M,
+    from: "autoGainControl: false, exact: true, lowestLatency: true },", to: "autoGainControl: false, exact: true },"},
+  { rule: 'a mode chosen by hand cycles wrongly', file: M,
+    from: '  return Number.isInteger(n) && n >= 0 && n < MIC_MODES.length ? n : 0;', to: '  return Number.isInteger(n) && n >= 0 && n < MIC_MODES.length - 1 ? n : 0;' },
   /* RULEBOOK 4, Sound, Android */
   { rule: 'the sound wakes before the mic opens (Android 4)', file: C,
     from: '        if (!(await this.openMic(gen))) return;', to: '        void this.openMic(gen);' },

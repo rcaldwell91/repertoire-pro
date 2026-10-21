@@ -1,6 +1,6 @@
 import type { AudioEngine, Ensemble, MicBlock, MicResult, SoundReport, Source, Sample } from '../engine';
 import { Recorder, type Recording } from '../recorder';
-import { MIC_LADDER, ladderOrder } from '../mic-ladder';
+import { MIC_MODES, modeIndex } from '../mic-modes';
 
 /* THE CONDUCTOR - the only owner of sound and the microphone (RULEBOOK 2.1).
 
@@ -102,11 +102,15 @@ export interface Env {
 export interface Store {
   get(key: string): string | null;
   set(key: string, value: string): void;
+  remove(key: string): void;
 }
 
 const TAP_TYPES = new Set(['click', 'pointerup', 'touchend', 'keydown', 'keyup']);
 export const TOKEN_LIFE_MS = 1000;
-export const MIC_KEY = 'rp.mic.set';
+/** the mic mode chosen by hand in the Sound check (the only one remembered) */
+export const MODE_KEY = 'rp.mic.mode';
+/** what the old automatic ladder remembered: cleared, never read */
+export const OLD_RUNG_KEY = 'rp.mic.set';
 const ACTIVE: readonly State[] = ['armed', 'counting-in', 'running'];
 
 export class Conductor {
@@ -134,6 +138,7 @@ export class Conductor {
     this.engine = engine;
     this.env = env;
     this.store = store;
+    store.remove(OLD_RUNG_KEY);          /* the old ladder's rung: never used again */
     env.onHidden(() => this.leave('hidden'));
     /* the phone took the sound (a call, another app). While the sound is
        still being woken its state means nothing: the clock decides that */
@@ -208,10 +213,24 @@ export class Conductor {
     return this.engine.report();
   }
 
-  /** "Use the phone's own mic": for this visit only, never kept. Opens
-      nothing by itself; the next Start opens it. */
+  /** "Use the phone's own mic": its device picked by id and used on the
+      first request from now on. Opens nothing by itself; the next Start does. */
   usePhoneMic(): void {
     this.engine.setMicChoice('phone');
+  }
+
+  /** back to the phone's own choice of mic */
+  letPhoneChoose(): void {
+    this.engine.setMicChoice(null);
+  }
+
+  micChoice(): 'phone' | null {
+    return this.engine.micChoice();
+  }
+
+  /** a mic chosen by hand took the phone down last time (said once) */
+  micCrashed(): boolean {
+    return this.engine.micCrashed();
   }
 
   /** loudness of the voice right now, 0 to 1; 0 whenever the mic is not open */
@@ -295,11 +314,17 @@ export class Conductor {
 
   /* ---------------------------------------------------------------- */
 
-  private remembered(): number | null {
-    const v = this.store.get(MIC_KEY);
-    if (v == null) return null;
-    const n = Number(v);
-    return Number.isInteger(n) ? n : null;
+  /** the mic mode: raw, unless another was chosen by hand */
+  micMode(): string {
+    return MIC_MODES[modeIndex(this.store.get(MODE_KEY))].name;
+  }
+
+  /** "Try another mode", by hand only: the next of the old app's modes,
+      remembered; it opens nothing by itself (the next Start does) */
+  tryAnotherMode(): string {
+    const next = (modeIndex(this.store.get(MODE_KEY)) + 1) % MIC_MODES.length;
+    this.store.set(MODE_KEY, String(next));
+    return MIC_MODES[next].name;
   }
 
   private async run(gen: number, plan: Plan): Promise<void> {
@@ -401,14 +426,14 @@ export class Conductor {
       session ended meanwhile (and then a mic that opened is closed again). */
   private async openMic(gen: number): Promise<boolean> {
     this.set({ mic: 'opening' });
-    const r: MicResult = await this.engine.openMic(MIC_LADDER, ladderOrder(this.remembered()));
+    /* once, raw (or the mode chosen by hand): never another by itself */
+    const r: MicResult = await this.engine.openMic(MIC_MODES[modeIndex(this.store.get(MODE_KEY))]);
     if (gen !== this.gen) {
       /* it opened after its session ended: close it again, unless a
          newer session is using the mic itself */
       if (r.ok && this.snap.mic !== 'open' && this.snap.mic !== 'opening' && this.snap.mic !== 'held') this.engine.closeMic();
       return false;
     }
-    if (r.ok) this.store.set(MIC_KEY, String(r.set));
     /* refused or missing: the rest carries on without it */
     this.set({ mic: r.ok ? (r.held ? 'held' : 'open') : r.why });
     return true;

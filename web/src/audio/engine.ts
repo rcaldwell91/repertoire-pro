@@ -38,13 +38,16 @@ export interface EnsembleOptions {
   readonly starts?: readonly number[];
 }
 
-/** One rung of the mic ladder. Every value is a wish, never a demand:
-    RULEBOOK 4 "Never require raw capture." */
+/** One way of asking for the mic (core: mic-modes). */
 export interface MicSet {
-  readonly name: string;
+  readonly name: 'raw' | 'phone' | 'processed' | 'basic';
   readonly echoCancellation?: boolean;
   readonly noiseSuppression?: boolean;
   readonly autoGainControl?: boolean;
+  /** the values above are required, not just wished for */
+  readonly exact?: boolean;
+  /** the lowest latency the phone can give */
+  readonly lowestLatency?: boolean;
 }
 
 /** A stretch of what the mic heard. */
@@ -57,7 +60,7 @@ export interface MicBlock {
 }
 
 export type MicResult =
-  | { ok: true; set: number; held?: boolean }
+  | { ok: true; held?: boolean }
   /** held: another app has the microphone */
   | { ok: false; why: 'refused' | 'unavailable' | 'failed' | 'held' };
 
@@ -101,13 +104,19 @@ export interface AudioEngine {
   forget(url: string): void;
   /** how many sources are sounding right now */
   sounding(): number;
-  /** Tries the sets in the given order and keeps the first that opens. If
-      another app has the mic, it lets go and asks once more, a beat later:
-      this is still the one tap that asked (RULEBOOK 4, Sound, Android 6). */
-  openMic(sets: readonly MicSet[], order: readonly number[]): Promise<MicResult>;
-  /** "phone": open the phone's own built-in mic, for this visit only (the
-      Sound check's button); null: the phone's choice. Opens nothing by itself. */
+  /** Asks for the mic ONCE, this way (RULEBOOK 4, Sound, Android 11), on
+      the device chosen by hand if there is one. If another app has the mic,
+      it lets go and asks once more, a beat later: still the one tap that
+      asked (Android 6). Never another way by itself. */
+  openMic(set: MicSet): Promise<MicResult>;
+  /** "phone": the phone's own built-in mic, picked by device id and used on
+      the first request from now on (kept on the phone, as the old app did);
+      null: the phone's choice. Opens nothing by itself. */
   setMicChoice(choice: 'phone' | null): void;
+  micChoice(): 'phone' | null;
+  /** a mic chosen by hand took the phone down last time: it is no longer
+      used, and this says so once */
+  micCrashed(): boolean;
   micOpen(): boolean;
   /** Close the mic only; sound already playing carries on. */
   closeMic(): void;

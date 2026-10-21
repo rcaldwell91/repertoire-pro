@@ -1,27 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { heardDelay, toConstraints } from './web-engine';
-import { MIC_LADDER, ladderOrder } from '../mic-ladder';
+import { MIC_MODES, modeIndex } from '../mic-modes';
 
-/* RULEBOOK 4, Mic: "Never require raw capture. Walk a ladder of constraint
-   sets and remember what worked." */
-describe('the mic ladder', () => {
-  it('only ever asks, never requires', () => {
-    for (const set of MIC_LADDER) {
-      const c = toConstraints(set);
-      const text = JSON.stringify(c);
-      expect(text).not.toContain('exact');
-      if (c !== true) for (const v of Object.values(c)) expect(Object.keys(v as object)).toEqual(['ideal']);
-    }
+/* RULEBOOK 4, Mic, and Sound, Android 11: "Ask for the mic once, raw." */
+describe('the mic modes', () => {
+  it('asks for the raw mic exactly: echo, noise and gain off, the lowest latency', () => {
+    expect(toConstraints(MIC_MODES[0])).toEqual({
+      echoCancellation: { exact: false }, noiseSuppression: { exact: false }, autoGainControl: { exact: false }, latency: { ideal: 0 } });
   });
-
-  it('ends on a rung that asks for nothing but a microphone', () => {
-    expect(toConstraints(MIC_LADDER[MIC_LADDER.length - 1])).toBe(true);
+  it('offers the old app\'s other modes, for a hand tap only: the phone\'s own, processed, echo off', () => {
+    expect(MIC_MODES.map((m) => m.name)).toEqual(['raw', 'phone', 'processed', 'basic']);
+    expect(toConstraints(MIC_MODES[1])).toBe(true);
+    expect(JSON.stringify(toConstraints(MIC_MODES[2]))).not.toContain('exact');
   });
-
-  it('tries what worked last time first, then the rest in order', () => {
-    expect(ladderOrder(null)).toEqual([0, 1, 2]);
-    expect(ladderOrder(2)).toEqual([2, 0, 1]);
-    expect(ladderOrder(7)).toEqual([0, 1, 2]);
+  it('reads a remembered hand choice, and anything else as raw', () => {
+    expect(modeIndex('2')).toBe(2);
+    expect(modeIndex(null)).toBe(0);
+    expect(modeIndex('9')).toBe(0);
+    expect(modeIndex('x')).toBe(0);
   });
 });
 
