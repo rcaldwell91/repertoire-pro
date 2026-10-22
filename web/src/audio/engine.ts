@@ -127,9 +127,9 @@ export interface AudioEngine {
   micLevel(): number;
   /** what the mic hears, block by block, while it is open */
   onMic(cb: (block: MicBlock) => void): () => void;
-  /** Play the mic back to the person at this volume (0 is off; up to
-      about 4, +12 dB, rounded off before it can clip). Only while the mic
-      is open; closing the mic ends it. */
+  /** Play the mic back to the person at this volume (0 is off; up to 4,
+      though the slider stops at 3; rounded off before it can clip). Only
+      while the mic is open; closing the mic ends it. */
   monitor(gain: number): void;
   /** seconds from a sound's engine time to when it is heard */
   outputLatency(): number;

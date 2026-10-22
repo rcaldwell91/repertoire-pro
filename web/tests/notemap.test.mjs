@@ -318,15 +318,16 @@ try {
     await stopSong();
     await sleep(300);
     const afterStop = await page.eval(S('monitorNow() + window.__probe.micLive()'));
-    /* the next visit: the switch starts off, and the hint is not shown again */
+    /* the next visit: the switch is still on (Robert, 23 Oct: remembered, as
+       the old app did), the hint is not shown again, and nothing is heard
+       while not singing */
     await open(ID);
-    await page.tap('#hear-yourself');
     await sleep(300);
-    const again = await page.eval(`({ hint: !!document.querySelector('#headphones'), monitor: window.__probe.monitorNow() })`);
+    const again = await page.eval(`({ on: document.querySelector('#hear-yourself')?.checked, hint: !!document.querySelector('#headphones'), monitor: window.__probe.monitorNow() })`);
     await page.tap('#hear-yourself');
-    check('hear-yourself', offWhileSinging === 0 && levelShown && onWhileSinging > 0.1 && hint === copy.song.headphones && afterStop === 0 && !again.hint && again.monitor === 0,
+    check('hear-yourself', offWhileSinging === 0 && levelShown && onWhileSinging > 0.1 && hint === copy.song.headphones && afterStop === 0 && again.on === true && !again.hint && again.monitor === 0,
       `off by default while singing (${offWhileSinging}); your level shown ${levelShown}; switched on: your voice back at ${onWhileSinging.toFixed(2)} and "${hint}"; ` +
-      `after stopping: nothing back, mic closed ${afterStop === 0}; next visit: hint again ${again.hint}, heard while not singing ${again.monitor}`);
+      `after stopping: nothing back, mic closed ${afterStop === 0}; next visit: still on ${again.on}, hint again ${again.hint}, heard while not singing ${again.monitor}`);
   }
 
   if (want('mic-leave')) {

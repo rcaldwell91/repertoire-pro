@@ -62,11 +62,13 @@ describe('the controls', () => {
 });
 
 /* Robert, 22 Oct: a raw mic with no auto gain is quiet; the Hear yourself
-   slider, 0 to 100, reaches about +12 dB over the mic at 100. Default 70. */
+   slider, 0 to 100, lifts it at 100. Default 70. 23 Oct: four times was a
+   little too loud; three times (about +9.5 dB). */
 describe('the Hear yourself volume', () => {
-  it('is off at 0, about +12 dB over the mic at 100, by ear in between', () => {
+  it('is off at 0, three times the mic (about +9.5 dB) at 100, by ear in between', () => {
     expect(monitorOf(0)).toBe(0);
-    expect(20 * Math.log10(monitorOf(100))).toBeCloseTo(12, 1);
+    expect(monitorOf(100)).toBeCloseTo(3, 6);
+    expect(20 * Math.log10(monitorOf(100))).toBeCloseTo(9.54, 2);
     expect(monitorOf(50)).toBeCloseTo(monitorOf(100) / 4);
     expect(monitorOf(150)).toBe(monitorOf(100));
     expect(monitorOf(-5)).toBe(0);

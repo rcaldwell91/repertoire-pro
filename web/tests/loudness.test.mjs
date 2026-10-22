@@ -20,10 +20,11 @@ import { launch, sleep } from './chrome.mjs';
 import { ANDROID, PROBE, serve } from './harness.mjs';
 import { copy } from '../src/core/copy.ts';
 
-/* Robert's numbers, 22 Oct, written here as he said them (not read from the
-   app): Hear yourself at 100 about +12 dB over the mic, by ear (squared)
-   like the other sliders; a song's loudest moment at -1 dBFS. */
-const monitorOf = (v) => 10 ** (12 / 20) * (v / 100) ** 2;
+/* Robert's numbers, written here as he said them (not read from the app):
+   Hear yourself at 100 three times the mic (about +9.5 dB; 23 Oct, down
+   from four), by ear (squared) like the other sliders; a song's loudest
+   moment at -1 dBFS (22 Oct). */
+const monitorOf = (v) => 3 * (v / 100) ** 2;
 const SONG_PEAK = 10 ** (-1 / 20);
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
@@ -39,7 +40,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`)) || !e
   process.exit(1);
 }
 
-const ALL = ['monitor-before-start', 'monitor-count-in', 'monitor-after-rebuild', 'monitor-unmute', 'monitor-level', 'song-level',
+const ALL = ['monitor-before-start', 'monitor-count-in', 'monitor-after-rebuild', 'monitor-unmute', 'monitor-level', 'monitor-remembered', 'song-level',
   'song-full', 'chain-unity', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -134,9 +135,16 @@ const PLAY = `document.querySelector('#song-play')?.textContent`;
 const TROUBLE = `document.querySelector('#sound-trouble-line')?.textContent`;
 let loads = 0;
 
-async function open(id) {
+/** the song's page, with Hear yourself off unless asked for (it is remembered between visits) */
+async function open(id, hear = false) {
   await page.goto(URL_APP + '?load=' + ++loads + '#/sing/learn/song/' + id);
   await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
+  await hearOn(hear);
+}
+const hearIs = () => page.eval(`document.querySelector('#hear-yourself')?.checked ?? null`);
+/** Hear yourself switched on or off by hand, whichever it is now */
+async function hearOn(on) {
+  if ((await hearIs()) !== on) await page.tap('#hear-yourself');
 }
 const playing = () => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.pause)} && window.__probe.live.size >= 2`, 10000);
 const stopped = () => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 3000);
@@ -195,7 +203,7 @@ try {
   if (want('monitor-before-start')) {
     await open('loud-song');
     await songSilent();
-    await page.tap('#hear-yourself');
+    await hearOn(true);
     await page.tap('#song-play');
     const ok = await playing();
     await sleep(300);
@@ -211,7 +219,7 @@ try {
     await songSilent();
     await page.tap('#song-play');
     const counting = await page.waitFor(`!!document.querySelector('#count-in')`, 5000);
-    await page.tap('#hear-yourself');
+    await hearOn(true);
     const ok = await playing();
     await sleep(300);
     const m = await measure();
@@ -224,7 +232,7 @@ try {
   if (want('monitor-after-rebuild')) {
     await open('loud-song');
     await songSilent();
-    await page.tap('#hear-yourself');
+    await hearOn(true);
     await page.tap('#song-play');
     const ok1 = await playing();
     await sleep(300);
@@ -247,7 +255,7 @@ try {
   if (want('monitor-unmute')) {
     await open('loud-song');
     await songSilent();
-    await page.tap('#hear-yourself');
+    await hearOn(true);
     await page.tap('#song-play');
     const ok = await playing();
     const n0 = await page.eval(`window.__meter.sources.length`);
@@ -263,12 +271,13 @@ try {
   }
 
   /* 5. The Hear yourself slider: 70 at first, remembered, 0 is silent, 100
-        about +12 dB over the mic and louder than the music at 100, never clipping */
+        three times the mic (Robert, 23 Oct) and louder than the music at
+        100, never clipping */
   if (want('monitor-level')) {
     await open('loud-song');
     const first = await page.eval(`document.querySelector('#monitor-volume')?.value ?? null`);
     await songSilent();
-    await page.tap('#hear-yourself');
+    await hearOn(true);
     await page.tap('#song-play');
     const ok = await playing();
     await slide('#monitor-volume', 50);
@@ -293,10 +302,43 @@ try {
     await page.tap('#song-play');
     await stopped();
     const louder = 20 * Math.log10(m100.out / music.out);
-    check('monitor-level', first === '70' && ok && near(m50.ratio, monitorOf(50), 0.1) && m0.out < 1e-4 && m100.ratio >= 3.2 && m100.peak < 1 &&
+    check('monitor-level', first === '70' && ok && near(m50.ratio, monitorOf(50), 0.1) && m0.out < 1e-4 && near(m100.ratio, monitorOf(100), 0.1) && m100.peak < 1 &&
       kept === '100' && louder >= 3,
       `the slider first at ${first}; at 50: ${show(m50)}; at 0: ${dB(m0.out)}; at 100: ${show(m100)}, loudest ${m100.peak.toFixed(3)}; ` +
       `the music alone at 100 ${dB(music.out)}, so your voice is ${louder.toFixed(1)} dB louder; remembered after leaving: ${kept}`);
+  }
+
+  /* 5b. Robert, 23 Oct: whether Hear yourself is on is remembered between
+         visits, as the old app did (rep_monitor, 1318-1320): on again, it is
+         heard on the first Start; off again, nothing */
+  if (want('monitor-remembered')) {
+    await open('loud-song');
+    await songSilent();
+    await slide('#monitor-volume', 70);                /* the volume is remembered too: from 70 */
+    await hearOn(true);
+    await page.goto(URL_APP + '?load=' + ++loads + '#/sing/learn/song/loud-song');
+    await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
+    const on = await hearIs();
+    await songSilent();
+    await page.tap('#song-play');
+    const ok = await playing();
+    await sleep(300);
+    const m = await measure();
+    await page.tap('#song-play');
+    await stopped();
+    await hearOn(false);
+    await page.goto(URL_APP + '?load=' + ++loads + '#/sing/learn/song/loud-song');
+    await page.waitFor(`!!document.querySelector('#song-play') && !document.querySelector('#song-play').disabled`, 8000);
+    const off = await hearIs();
+    await songSilent();
+    await page.tap('#song-play');
+    await playing();
+    await sleep(300);
+    const quiet = await measure(1500);
+    await page.tap('#song-play');
+    await stopped();
+    check('monitor-remembered', on === true && ok && near(m.ratio, at70, 0.15) && off === false && quiet.out < 1e-4,
+      `switched on, then back to the song: on ${on}, ${show(m)}; switched off, then back: on ${off}, your voice at the speaker ${dB(quiet.out)}`);
   }
 
   /* 6. A quiet song comes out with its loudest moment at -1 dBFS; the level

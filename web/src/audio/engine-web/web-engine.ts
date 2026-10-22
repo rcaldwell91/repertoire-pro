@@ -96,9 +96,10 @@ export function makeupOf(thresholdDb: number, ratio: number): number {
   return 10 ** ((-fullDb / 20) * 0.6);
 }
 
-/** "Hear yourself": the mic is lifted up to MONITOR_ROOM times (+12 dB);
-    it goes in at a quarter so that fits, and comes out of this curve: as
-    it is up to 0.6, then rounded off short of 0.9, so it never clips. */
+/** "Hear yourself": the mic is lifted up to three times (MONITOR_MAX), and
+    the curve has room for four; it goes in at a quarter so that fits, and
+    comes out of this curve: as it is up to 0.6, then rounded off short of
+    0.9, so it never clips. */
 export const MONITOR_ROOM = 4;
 export function monitorSoft(u: number): number {
   const a = Math.abs(u);

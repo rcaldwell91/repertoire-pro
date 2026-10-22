@@ -107,11 +107,11 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ The microphone check on screen: on, hearing, which mic, held by another app (1531-1547) — test: `browser:start`
 - ✓ Hear yourself hangs off the one mic, straight to the speaker, off unless singing (1271-1293, 22510-22539) — test: `notemap:hear-yourself`, `unit:audio/conductor/conductor.test.ts:"Hear yourself" sounds only while singing`
 - ✓ Hear yourself is headphones only (1312, 7370-7371) — test: `notemap:hear-yourself`
-- ✓ Hear yourself has its own volume, remembered (22455-22500). Robert, 22 Oct: a slider under the switch, 0 to 100, 70 at first, about +12 dB over the raw mic at 100, rounded off so it can't clip (the old app went to 200%) — test: `loudness:monitor-level`, `unit:core/song.test.ts:is off at 0, about +12 dB over the mic at 100`
+- ✓ Hear yourself has its own volume, remembered (22455-22500). Robert, 22 Oct: a slider under the switch, 0 to 100, 70 at first, rounded off so it can't clip (the old app went to 200%); 23 Oct: three times the raw mic at 100 (about +9.5 dB), down from four — test: `loudness:monitor-level`, `unit:core/song.test.ts:is off at 0, three times the mic (about +9.5 dB) at 100`
 - ✓ Hear yourself is set whenever the switch moves, and kept while the song starts (22525-22532, the gate) — test: `loudness:monitor-count-in`, `loudness:monitor-before-start`, `unit:audio/conductor/conductor.test.ts:switched on during the 3-2-1 sounds as the song starts`
 - ✓ Hear yourself kept attached across rewires (1358, 3182) — test: `loudness:monitor-after-rebuild`, `android:hear-yourself-rebuilt`
 - ✓ The mic wired again a moment after the phone gives it back, or it can stay live and silent (1371-1374) — test: `loudness:monitor-unmute`
-- — The Hear yourself switch itself remembered between visits (1318-1320). Not in the new app: raised with Robert, 22 Oct.
+- ✓ The Hear yourself switch itself remembered between visits (1318-1320; Robert, 23 Oct) — test: `loudness:monitor-remembered`, `notemap:hear-yourself`
 - ✓ While singing, "Use headphones." unless the phone lists some (25216-25238; RULEBOOK 4, Mic) — test: `android:use-headphones` (fixed 12 Oct: it only showed once, the first time Hear yourself was switched on)
 - ✓ One microphone, one recorder (15052-15055) — test: `unit:audio/conductor/conductor.test.ts:keeps what the mic hears, from where in the song`
 - ✓ Nothing recorded means nothing kept (5020, 15356) — test: `unit:audio/conductor/conductor.test.ts:keeps nothing heard before the song`
@@ -196,3 +196,10 @@ For each part the new app has built, every rule the old app's code (next.html) e
 2. Hear yourself must sound on a rebuilt sound, and when switched on before Start.
 3. A Hear yourself slider under the switch: 0 to 100, remembered, 70 at first; 100 about +12 dB over the raw mic, rounded off so it can't clip, with low delay.
 4. Each song brought up once to its loudest moment at -1 dBFS, the same gain on voice and music, kept with the song; sliders at 100 play at that level. Nothing in the way out changes the sound below 0.9. (Done as "up, never down": the test song's parts together peak above full volume, and turning it down made it quieter than before; for Robert to confirm.)
+
+## Decided by Robert, 23 Oct (his phone test: everything sounds better, nothing crackled)
+
+1. Hear yourself at 100 a little too loud: three times the mic (about +9.5 dB), not four. Default 70 on the new scale; the soft limit kept.
+2. Whether Hear yourself is on is remembered between visits, as the old app did.
+3. Raise quiet songs, never turn loud ones down (agreed).
+4. Songs louder, porting the old app's v9.8 stage, about -14 LUFS: held, not built. Measured, the songs already play at -9.8 to -15.5 LUFS, so -14 would make most of them no louder; the v9.8 stage makes them 3 to 6 dB louder (-6.8 to -9.3 LUFS). Waiting on Robert's choice.

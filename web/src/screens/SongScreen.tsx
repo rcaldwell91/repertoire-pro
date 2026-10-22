@@ -28,6 +28,8 @@ const HEADPHONES_SEEN = 'rp.hint.headphones';
 const ANY_OCTAVE = 'rp.anyOctave';
 /** the Hear yourself volume, remembered on this phone (the old app's rep_monitor_vol) */
 const MONITOR_VOL = 'rp.monitor.vol';
+/** whether Hear yourself is on, remembered on this phone (the old app's rep_monitor; Robert, 23 Oct) */
+const MONITOR_ON = 'rp.monitor.on';
 
 /* Learn a song, one screen (RULEBOOK 1b): the note map with the singer's
    line and yours, the play bar, back 10 s, Start, repeat this part, and
@@ -84,7 +86,7 @@ export function SongScreen(props: { id: string }) {
     setAnyOctaveNow(on);
     localStore().set(ANY_OCTAVE, on ? '1' : '0');
   };
-  const [hear, setHear] = useState(false);
+  const [hear, setHear] = useState(() => localStore().get(MONITOR_ON) === '1');
   const [monitorVol, setMonitorVolNow] = useState(() => {
     const v = Number(localStore().get(MONITOR_VOL) ?? NaN);
     return Number.isFinite(v) && v >= 0 && v <= 100 ? v : MONITOR_DEFAULT;
@@ -260,6 +262,7 @@ export function SongScreen(props: { id: string }) {
 
   function hearYourself(on: boolean) {
     setHear(on);
+    localStore().set(MONITOR_ON, on ? '1' : '0');
     c.setMonitor(on ? monitorOf(monitorVol) : 0);
     if (on) {
       const store = localStore();

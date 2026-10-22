@@ -111,10 +111,10 @@ export function countBeat(bpm: number | undefined): number {
   return bpm && Number.isFinite(bpm) && bpm >= 40 && bpm <= 240 ? 60 / bpm : 1;
 }
 
-/** "Hear yourself" at 100: about +12 dB over the mic, because a raw mic
-    with no auto gain is quiet (Robert, 22 Oct). The engine rounds off
-    anything that would clip. */
-export const MONITOR_MAX = 10 ** (12 / 20);
+/** "Hear yourself" at 100: three times the mic (about +9.5 dB), because a
+    raw mic with no auto gain is quiet (Robert, 22 Oct: four times; 23 Oct:
+    a little too loud, three). The engine rounds off anything that would clip. */
+export const MONITOR_MAX = 3;
 /** the Hear yourself slider, the first time (Robert, 22 Oct) */
 export const MONITOR_DEFAULT = 70;
 

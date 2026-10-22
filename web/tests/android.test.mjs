@@ -269,7 +269,8 @@ try {
   /* 7. "Hear yourself" sounds while singing on a sound that was rebuilt */
   if (want('hear-yourself-rebuilt')) {
     await open();
-    await page.tap('#hear-yourself');
+    /* remembered between visits: switched on here whatever it was */
+    if (!(await page.eval(`document.querySelector('#hear-yourself').checked`))) await page.tap('#hear-yourself');
     await page.tap('#song-play');
     const ok1 = await playing();
     await sleep(1000);
@@ -284,6 +285,7 @@ try {
     const moving = await page.eval(A('moving()'));
     await page.tap('#song-play');
     await stopped();
+    await page.tap('#hear-yourself');                /* off again, for the checks after this */
     check('hear-yourself-rebuilt', ok1 && said && ok2 && m.onNew === 1 && m.on === 1 && moving && m.mic > 0,
       `stalled and said ${said}; after the tap: playing ${ok2}, your voice played back on the new sound ${m.onNew}, anywhere ${m.on}; ` +
       `new sound's clock moving ${moving}; mic open ${m.mic}`);
