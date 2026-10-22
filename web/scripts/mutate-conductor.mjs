@@ -14,6 +14,18 @@ const W = 'src/audio/engine-web/web-engine.ts';
 const M = 'src/audio/mic-modes.ts';
 
 export const MUTATIONS = [
+  { rule: 'a copied source doc is changed (RULEBOOK 2.8)', file: 'docs/android-samsung-headset.md',
+    from: 'Samsung', to: 'Samsong', all: true },
+  { rule: 'a copied source doc is summarised (RULEBOOK 2.8)', file: 'docs/android-audio-history.md',
+    from: ', then retries once with a 600 ms breath', to: '' },
+  { rule: 'the report for Robert has no taps (RULEBOOK 2.7)', file: '../REPORTS/latest.md',
+    from: '## Your taps\n', to: '## Taps\n' },
+  { rule: 'the report for Robert says nothing about the real phone (RULEBOOK 2.7)', file: '../REPORTS/latest.md',
+    from: '## Not tried on a real phone\n', to: '' },
+  { rule: 'the report for Robert has no commit (RULEBOOK 2.7)', file: '../REPORTS/latest.md',
+    from: ', commit ', to: ', ' },
+  { rule: 'the latest report is not in the log (RULEBOOK 2.7)', file: '../REPORTS/log.md',
+    from: '## What was measured\n', to: '## Measured\n', all: true },
   { rule: 'starts without a token', file: C,
     from: 'if (!this.spend(token)) return false;', to: 'this.spend(token);' },
   { rule: 'a press nobody made counts as a tap', file: C,
@@ -165,12 +177,12 @@ let survived = 0;
 for (const m of MUTATIONS) {
   const src = readFileSync(m.file, 'utf8');
   const n = src.split(m.from).length - 1;
-  if (n !== 1) {
+  if (m.all ? n < 1 : n !== 1) {
     console.log(`✗ ${m.rule}: the code to break was found ${n} times, not once`);
     survived++;
     continue;
   }
-  writeFileSync(m.file, src.replace(m.from, m.to));
+  writeFileSync(m.file, m.all ? src.split(m.from).join(m.to) : src.replace(m.from, m.to));
   let r;
   try { r = run(); } finally { writeFileSync(m.file, src); }
   if (r.code === 0 || !r.failed.length) {
