@@ -323,7 +323,12 @@ try {
        while not singing */
     await open(ID);
     await sleep(300);
-    const again = await page.eval(`({ on: document.querySelector('#hear-yourself')?.checked, hint: !!document.querySelector('#headphones'), monitor: window.__probe.monitorNow() })`);
+    const on = await page.eval(`document.querySelector('#hear-yourself')?.checked`);
+    /* switched off and on again: the line has been seen, so it stays away */
+    await page.tap('#hear-yourself');
+    await page.tap('#hear-yourself');
+    await sleep(300);
+    const again = await page.eval(`({ on: ${JSON.stringify(on)}, hint: !!document.querySelector('#headphones'), monitor: window.__probe.monitorNow() })`);
     await page.tap('#hear-yourself');
     check('hear-yourself', offWhileSinging === 0 && levelShown && onWhileSinging > 0.1 && hint === copy.song.headphones && afterStop === 0 && again.on === true && !again.hint && again.monitor === 0,
       `off by default while singing (${offWhileSinging}); your level shown ${levelShown}; switched on: your voice back at ${onWhileSinging.toFixed(2)} and "${hint}"; ` +
