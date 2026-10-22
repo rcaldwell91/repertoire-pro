@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
-import { gainOf, listLine, repeatPart, songLine, titleFrom, type SongHas, countBeat } from './song';
+import { gainOf, listLine, repeatPart, songLine, titleFrom, type SongHas, countBeat, monitorOf, songLevel, MAX_LIFT, MONITOR_DEFAULT, SONG_PEAK } from './song';
 import { clock } from './time';
 
 const has = (over: Partial<SongHas> = {}): SongHas => ({ state: 'new', full: false, first30: false, ...over });
@@ -58,5 +58,38 @@ describe('the controls', () => {
     expect(clock(30)).toBe('0:30');
     expect(clock(279.9)).toBe('4:39');
     expect(clock(723)).toBe('12:03');
+  });
+});
+
+/* Robert, 22 Oct: a raw mic with no auto gain is quiet; the Hear yourself
+   slider, 0 to 100, reaches about +12 dB over the mic at 100. Default 70. */
+describe('the Hear yourself volume', () => {
+  it('is off at 0, about +12 dB over the mic at 100, by ear in between', () => {
+    expect(monitorOf(0)).toBe(0);
+    expect(20 * Math.log10(monitorOf(100))).toBeCloseTo(12, 1);
+    expect(monitorOf(50)).toBeCloseTo(monitorOf(100) / 4);
+    expect(monitorOf(150)).toBe(monitorOf(100));
+    expect(monitorOf(-5)).toBe(0);
+  });
+  it('starts at 70', () => {
+    expect(MONITOR_DEFAULT).toBe(70);
+  });
+});
+
+/* Robert, 22 Oct: each song brought up to a proper level once, its loudest
+   moment at -1 dBFS, voice and music by the same amount. */
+describe('a song\'s level', () => {
+  it('puts the loudest moment of the song at -1 dBFS', () => {
+    expect(20 * Math.log10(SONG_PEAK)).toBeCloseTo(-1, 5);
+    expect(songLevel(0.2) * 0.2).toBeCloseTo(SONG_PEAK);
+    expect(songLevel(SONG_PEAK)).toBeCloseTo(1);
+  });
+  it('brings a song that is too loud down to it', () => {
+    expect(songLevel(1.6) * 1.6).toBeCloseTo(SONG_PEAK);
+  });
+  it('never lifts silence or a near-silent file without end', () => {
+    expect(songLevel(0)).toBe(1);
+    expect(songLevel(NaN)).toBe(1);
+    expect(songLevel(1e-6)).toBe(MAX_LIFT);
   });
 });

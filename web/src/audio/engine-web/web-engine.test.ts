@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heardDelay, safety, toConstraints } from './web-engine';
+import { heardDelay, LIMIT_DB, makeupOf, MONITOR_ROOM, monitorSoft, safety, toConstraints } from './web-engine';
 import { MIC_MODES, modeIndex } from '../mic-modes';
 
 /* RULEBOOK 4, Mic, and Sound, Android 11: "Ask for the mic once, raw." */
@@ -46,5 +46,32 @@ describe('the last safety on the way out', () => {
       expect(Math.abs(safety(u))).toBeGreaterThan(0.9);
     }
     expect(safety(1.2)).toBeGreaterThan(safety(1.0));
+  });
+});
+
+/* Robert, 22 Oct: below 0.9 the way out changes nothing; the limiter starts
+   there, and its own lift is taken off again (measured: loudness, chain-unity). */
+describe('the limiter', () => {
+  it('starts at 0.9', () => {
+    expect(10 ** (LIMIT_DB / 20)).toBeCloseTo(0.9, 6);
+  });
+  it('knows its own lift: none with no limiting, more the lower it starts', () => {
+    expect(makeupOf(0, 20)).toBeCloseTo(1);
+    expect(makeupOf(-2, 20)).toBeGreaterThan(makeupOf(LIMIT_DB, 20));
+    expect(makeupOf(LIMIT_DB, 20)).toBeCloseTo(10 ** ((-(LIMIT_DB + -LIMIT_DB / 20) / 20) * 0.6));
+  });
+});
+
+/* Hear yourself, lifted up to +12 dB, never clips. */
+describe('Hear yourself, rounded off', () => {
+  it('is as it is up to 0.6', () => {
+    for (const u of [0, 0.2, -0.45, 0.6, -0.6]) expect(monitorSoft(u)).toBe(u);
+  });
+  it('never reaches 0.9, however loud the mic', () => {
+    for (const u of [0.7, 1, 2, MONITOR_ROOM, -MONITOR_ROOM]) {
+      expect(Math.abs(monitorSoft(u))).toBeLessThan(0.9);
+      expect(Math.abs(monitorSoft(u))).toBeGreaterThan(0.6);
+    }
+    expect(monitorSoft(1.2)).toBeGreaterThan(monitorSoft(0.9));
   });
 });

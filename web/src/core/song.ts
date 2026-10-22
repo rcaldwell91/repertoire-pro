@@ -111,8 +111,31 @@ export function countBeat(bpm: number | undefined): number {
   return bpm && Number.isFinite(bpm) && bpm >= 40 && bpm <= 240 ? 60 / bpm : 1;
 }
 
-/** "Hear yourself": how loud your voice comes back, when it is on. */
-export const MONITOR_GAIN = 0.8;
+/** "Hear yourself" at 100: about +12 dB over the mic, because a raw mic
+    with no auto gain is quiet (Robert, 22 Oct). The engine rounds off
+    anything that would clip. */
+export const MONITOR_MAX = 10 ** (12 / 20);
+/** the Hear yourself slider, the first time (Robert, 22 Oct) */
+export const MONITOR_DEFAULT = 70;
+
+/** The Hear yourself slider (0-100) to how loud your voice comes back, by
+    ear like the others: 0 is silent, 100 is MONITOR_MAX. */
+export function monitorOf(slider: number): number {
+  return MONITOR_MAX * gainOf(slider);
+}
+
+/** where a song's loudest moment is put: -1 dBFS (Robert, 22 Oct) */
+export const SONG_PEAK = 10 ** (-1 / 20);
+/** the most a song is ever lifted (+24 dB), so a near-silent file is not blown up */
+export const MAX_LIFT = 10 ** (24 / 20);
+
+/** The gain that puts a song's loudest moment (voice and music together)
+    at -1 dBFS. The same for voice and music, so they still add up to the
+    song. 1 if the song is silent or its peak unknown. */
+export function songLevel(peak: number): number {
+  if (!Number.isFinite(peak) || peak <= 0) return 1;
+  return Math.min(MAX_LIFT, SONG_PEAK / peak);
+}
 
 /** What the song screen says about the mic, if anything: the song plays
     on whatever the mic does (RULEBOOK 3: "Carry on without it"). */

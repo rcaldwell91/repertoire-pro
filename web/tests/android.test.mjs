@@ -36,7 +36,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 const ALL = ['start-hangs', 'stall-rebuild', 'gesture-only', 'never-suspends', 'mic-first', 'ten-starts', 'hear-yourself-rebuilt', 'mic-held',
   'clock-crawls', 'close-hangs', 'mic-hangs', 'load-fails', 'use-headphones', 'any-octave-kept', 'held-retry', 'count-in',
   'test-without-mic', 'phone-mic', 'mic-once-raw', 'no-ladder', 'mode-by-hand', 'rebuild-awaits-close', 'mic-crash', 'born-before-mic',
-  'no-clip', 'no-page-errors'];
+  'no-clip', 'second-try', 'second-try-once', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -125,7 +125,9 @@ try {
     const P = window.__parts;
     const song = { id: ${JSON.stringify(ID)}, title: 'Android song', created: Date.now(), fileName: 'android.mp3', file: P.voice30, seconds: 30,
       state: 'ready', voice: P.voice30, music: P.music30, voice30: P.voice30, music30: P.music30 };
-    const loud = { ...song, id: 'loud-song', title: 'Loud song', voice: P['loud-voice30'], music: P['loud-music30'], voice30: P['loud-voice30'], music30: P['loud-music30'] };
+    /* kept at its own level (as if measured so), so together the parts go past full scale */
+    const loud = { ...song, id: 'loud-song', title: 'Loud song', voice: P['loud-voice30'], music: P['loud-music30'], voice30: P['loud-voice30'], music30: P['loud-music30'],
+      level: { full: 1, first30: 1 } };
     await new Promise((ok) => { const t = db.transaction('songs', 'readwrite'); t.objectStore('songs').put(song); t.objectStore('songs').put(loud); t.oncomplete = ok; });
     db.close();
     delete window.__parts;
@@ -153,6 +155,7 @@ try {
     await open({ sticky: true });
     await page.tap('#song-play');
     const ok1 = await playing();
+    const was = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
     await sleep(2500);
     const t0 = Date.now();
     await page.eval(A('freeze()'));
@@ -170,10 +173,10 @@ try {
     await stopped();
     check('stall-rebuild', ok1 && said && ms <= 4000 && quiet.play === copy.song.start && quiet.live === 0 && quiet.mic === 0 &&
       ok2 && froze > 2 && from !== null && Math.abs(from - froze) < 0.3 && moving && ctx.n === 2 && ctx.old === 'closed' && ctx.suspends === 0 && ctx.gone &&
-      gains.length === 2 && gains.every((g) => Math.abs(g - 1) < 0.01),
+      gains.length === 2 && was.length === 2 && gains.every((g, i) => Math.abs(g - was[i]) < 0.01),
       `stall said after ${(ms / 1000).toFixed(1)} s (${said}); then silent ${quiet.live === 0 && quiet.mic === 0}, Start shown ${quiet.play === copy.song.start}; ` +
       `froze at ${froze.toFixed(2)} s; after the tap: playing ${ok2} from ${from == null ? 'nowhere' : from.toFixed(2) + ' s'}, clock moving ${moving}, ` +
-      `sounds made ${ctx.n} (the old one ${ctx.old}), suspended by the app ${ctx.suspends} times; volumes on the new sound ${gains.join(' / ')}`);
+      `sounds made ${ctx.n} (the old one ${ctx.old}), suspended by the app ${ctx.suspends} times; volumes before ${was.map((g) => g.toFixed(3)).join(' / ')}, on the new sound ${gains.map((g) => g.toFixed(3)).join(' / ')}`);
   }
 
   /* 3. Resume works only inside a tap (Android's rule; desktop Chrome hides it) */
@@ -652,6 +655,47 @@ try {
     await page.tap('#song-play');
     await stopped();
     check('no-clip', ok && peak > 0.5 && peak <= 1.0, `voice and music each as loud as they go, together: the loudest sound sent to the speaker ${peak.toFixed(3)} (full scale is 1)`);
+  }
+
+  /* 16. Robert, 22 Oct: the old app's second try (3195-3204). A rebuilt
+         sound that will not start gets one more go on the same tap: the dead
+         one closed, 600 ms, then a new one. Never a third, never by itself. */
+  if (want('second-try')) {
+    await open({ sticky: true });
+    await page.tap('#song-play');
+    const ok1 = await playing();
+    await page.eval(A('freeze()'));
+    const said = await page.waitFor(`(${TROUBLE}) === ${JSON.stringify(copy.song.soundStalled)}`, 5000);
+    await page.eval(`window.__android.frozenBirths = 1`);
+    await page.tap('#song-play');
+    const ok2 = await page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.pause)} && ${P('live.size')} >= 2`, 12000);
+    const s = await page.eval(`(() => { const E = window.__android, st = E.stamps;
+      const made = st.filter((x) => x[0] === 'context').map((x) => x[1]);
+      const closed = st.filter((x) => x[0] === 'closed').map((x) => x[1]);
+      return { n: E.contexts.length, states: E.contexts.map((c) => c.state), gap: made[2] - closed[1] }; })()`);
+    const moving = await page.eval(A('moving()'));
+    const gone = await page.eval(`!document.querySelector('#sound-trouble')`);
+    await page.tap('#song-play');
+    await stopped();
+    check('second-try', ok1 && said && ok2 && moving && gone && s.n === 3 && s.states[1] === 'closed' && s.gap >= 600 && s.gap < 1500,
+      `stalled ${said}; the tap: the first new sound would not start, closed ${s.states[1] === 'closed'}, ` +
+      `${Math.round(s.gap)} ms later another (sounds made ${s.n}); playing ${ok2}, clock moving ${moving}, no trouble shown ${gone}`);
+  }
+  if (want('second-try-once')) {
+    await open({ sticky: true });
+    await page.tap('#song-play');
+    const ok1 = await playing();
+    await page.eval(A('freeze()'));
+    await page.waitFor(`(${TROUBLE}) === ${JSON.stringify(copy.song.soundStalled)}`, 5000);
+    await page.eval(`window.__android.frozenBirths = 5`);
+    await page.tap('#song-play');
+    const said = await page.waitFor(`!!document.querySelector('#sound-trouble')`, 12000);
+    const n1 = await page.eval(A('contexts.length'));
+    await sleep(4000);
+    const n2 = await page.eval(A('contexts.length'));
+    const play = await page.eval(PLAY);
+    check('second-try-once', ok1 && said && n1 === 3 && n2 === 3 && play === copy.song.start,
+      `both tries would not start: said ${said}, Start shown ${play === copy.song.start}; sounds made ${n1}, and ${n2} four seconds later (never a third by itself)`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

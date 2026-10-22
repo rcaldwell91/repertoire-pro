@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { Repeat, RotateCcw } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { countBeat, gainOf, micLine, repeatPart, songLine, COUNT_BEATS, MONITOR_GAIN } from '../core/song';
+import { countBeat, gainOf, micLine, monitorOf, repeatPart, songLine, COUNT_BEATS, MONITOR_DEFAULT } from '../core/song';
 import { barFill } from '../core/level';
 import { clock } from '../core/time';
 import { FIRST_SECONDS } from '../core/limits';
 import type { Plan, Take } from '../audio/conductor/conductor';
-import { hasOf } from '../data/songs';
+import { hasOf, keepLevel } from '../data/songs';
 import { startSplit } from '../data/split';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { useSingerLine, useSong, useSplit } from '../shell/hooks';
@@ -26,6 +26,8 @@ import { SoundTrouble } from '../ui/SoundTrouble';
 
 const HEADPHONES_SEEN = 'rp.hint.headphones';
 const ANY_OCTAVE = 'rp.anyOctave';
+/** the Hear yourself volume, remembered on this phone (the old app's rep_monitor_vol) */
+const MONITOR_VOL = 'rp.monitor.vol';
 
 /* Learn a song, one screen (RULEBOOK 1b): the note map with the singer's
    line and yours, the play bar, back 10 s, Start, repeat this part, and
@@ -83,6 +85,24 @@ export function SongScreen(props: { id: string }) {
     localStore().set(ANY_OCTAVE, on ? '1' : '0');
   };
   const [hear, setHear] = useState(false);
+  const [monitorVol, setMonitorVolNow] = useState(() => {
+    const v = Number(localStore().get(MONITOR_VOL) ?? NaN);
+    return Number.isFinite(v) && v >= 0 && v <= 100 ? v : MONITOR_DEFAULT;
+  });
+  const setMonitorVol = (v: number) => {
+    setMonitorVolNow(v);
+    localStore().set(MONITOR_VOL, String(v));
+    if (hear) c.setMonitor(monitorOf(v));
+  };
+  /* the song's level: as kept with it, or as measured the first time it
+     plays here (and then kept) */
+  const [measured, setMeasured] = useState<Partial<Record<'full' | 'first30', number>>>({});
+  const songLevel = which ? song?.level?.[which] ?? measured[which] : undefined;
+  const onLevel = (lv: number) => {
+    if (!which) return;
+    setMeasured((m) => ({ ...m, [which]: lv }));
+    void keepLevel(props.id, which, lv);
+  };
   const [headphones, setHeadphones] = useState(false);
   const [withMic, setWithMic] = useState(true);
   const [takeVol, setTakeVol] = useState(100);
@@ -153,7 +173,7 @@ export function SongScreen(props: { id: string }) {
   const plan = (from: number, withLoop = loop, countIn = false): Plan | null =>
     parts ? { owner, ...(countIn ? { countIn: COUNT_BEATS * countBeat(song?.bpm), countBeats: COUNT_BEATS } : {}),
       steps: [{ kind: 'song', urls: parts.urls, from, gains: [gainOf(voice), gainOf(music)], loop: withLoop ?? undefined,
-        listen: withMic, record: true, monitor: hear ? MONITOR_GAIN : 0 }] } : null;
+        listen: withMic, record: true, monitor: hear ? monitorOf(monitorVol) : 0, level: songLevel, onLevel }] } : null;
 
   function startAt(ev: SyntheticEvent, from: number, withLoop = loop, countIn = false) {
     const p = plan(from, withLoop, countIn);
@@ -176,7 +196,7 @@ export function SongScreen(props: { id: string }) {
     setHeard(t);
     setPos(t.songAt);
     c.start(c.tap(ev.nativeEvent), { owner, steps: [{ kind: 'song', urls: [...parts.urls, t.url], from: t.songAt,
-      gains: [gainOf(voice), gainOf(music), gainOf(takeVol)], starts: [0, 0, t.songAt] }] });
+      gains: [gainOf(voice), gainOf(music), gainOf(takeVol)], starts: [0, 0, t.songAt], level: songLevel, onLevel, songParts: 2 }] });
   }
   function playKept(ev: SyntheticEvent, t: StoredTake, url: string) {
     playTake(ev, { key: t.id, url, songAt: t.songAt, t: t.line.t, m: t.line.m });
@@ -240,7 +260,7 @@ export function SongScreen(props: { id: string }) {
 
   function hearYourself(on: boolean) {
     setHear(on);
-    c.setMonitor(on ? MONITOR_GAIN : 0);
+    c.setMonitor(on ? monitorOf(monitorVol) : 0);
     if (on) {
       const store = localStore();
       if (!store.get(HEADPHONES_SEEN)) {
@@ -385,6 +405,7 @@ export function SongScreen(props: { id: string }) {
           <span>{copy.song.hearYourself}</span>
           <input type="checkbox" role="switch" id="hear-yourself" checked={hear} onChange={(e) => hearYourself(e.target.checked)} />
         </label>
+        <Slider id="monitor-volume" label={copy.song.hearVolume} value={monitorVol} onChange={setMonitorVol} />
         <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
         {listening && noHeadphones && <p className="hint" id="use-headphones">{copy.song.useHeadphones}</p>}

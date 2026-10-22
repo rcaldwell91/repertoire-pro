@@ -102,6 +102,9 @@ export interface AudioEngine {
   playTogether(samples: readonly Sample[], opts: EnsembleOptions): Ensemble;
   /** drop a loaded sample, to give its memory back */
   forget(url: string): void;
+  /** the loudest moment of these loaded parts played together from the
+      start, as the speaker sums them */
+  songPeak(samples: readonly Sample[]): number;
   /** how many sources are sounding right now */
   sounding(): number;
   /** Asks for the mic ONCE, this way (RULEBOOK 4, Sound, Android 11), on
@@ -124,8 +127,9 @@ export interface AudioEngine {
   micLevel(): number;
   /** what the mic hears, block by block, while it is open */
   onMic(cb: (block: MicBlock) => void): () => void;
-  /** Play the mic back to the person at this volume (0 is off). Only
-      while the mic is open; closing the mic ends it. */
+  /** Play the mic back to the person at this volume (0 is off; up to
+      about 4, +12 dB, rounded off before it can clip). Only while the mic
+      is open; closing the mic ends it. */
   monitor(gain: number): void;
   /** seconds from a sound's engine time to when it is heard */
   outputLatency(): number;

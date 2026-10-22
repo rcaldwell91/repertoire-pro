@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { Conductor, MODE_KEY, OLD_RUNG_KEY, TOKEN_LIFE_MS, type LeaveReason, type Plan } from './conductor';
 import { FakeEngine, FakeEnv, MemoryStore } from '../engine-fake/fake-engine';
+import { SONG_PEAK } from '../../core/song';
 
 /* Every rule of the conductor (RULEBOOK 2.1), on the fake engine.
    scripts/mutate-conductor.mjs breaks each rule in turn and checks that at
@@ -480,6 +481,61 @@ describe('a song: voice and music together', () => {
   });
 });
 
+/* Robert, 22 Oct: every song at a proper level, once: its loudest moment
+   (voice and music together) at -1 dBFS, the same gain on both so they
+   still add up to the song, kept with the song and never measured again. */
+describe('a song at its proper level', () => {
+  const kept: number[] = [];
+  const song = (level?: number, over: Partial<{ urls: string[]; gains: number[]; songParts: number }> = {}): Plan => ({
+    owner: 'song:9',
+    steps: [{ kind: 'song', urls: over.urls ?? ['voice', 'music'], from: 0, gains: over.gains ?? [1, 0.25], level, songParts: over.songParts,
+      onLevel: (g: number) => kept.push(g) }],
+  });
+  beforeEach(() => {
+    kept.length = 0;
+  });
+
+  it('measures a song with no level kept, lifts voice and music alike, and hands the level back to keep', async () => {
+    engine.loudest = 0.2;
+    c.start(c.tap(tap), song());
+    await flush();
+    const g = SONG_PEAK / 0.2;
+    expect(engine.measured).toEqual([['voice', 'music']]);
+    expect(engine.song?.gains[0]).toBeCloseTo(g);
+    expect(engine.song?.gains[1]).toBeCloseTo(0.25 * g);
+    expect(kept.length).toBe(1);
+    expect(kept[0]).toBeCloseTo(g);
+  });
+
+  it('uses the level kept with the song, without measuring it again', async () => {
+    engine.loudest = 0.2;
+    c.start(c.tap(tap), song(3));
+    await flush();
+    expect(engine.measured).toEqual([]);
+    expect(engine.song?.gains).toEqual([3, 0.75]);
+    expect(kept).toEqual([]);
+  });
+
+  it('keeps the level when a volume changes while it plays', async () => {
+    c.start(c.tap(tap), song(2));
+    await flush();
+    c.setGain(1, 0.5);
+    expect(engine.song?.gains).toEqual([2, 1]);
+  });
+
+  it('a take over the song keeps its own level', async () => {
+    engine.loudest = 0.5;
+    c.start(c.tap(tap), song(undefined, { urls: ['voice', 'music', 'take'], gains: [1, 1, 1], songParts: 2 }));
+    await flush();
+    expect(engine.measured).toEqual([['voice', 'music']]);
+    const g = SONG_PEAK / 0.5;
+    expect(engine.song?.gains[2]).toBe(1);
+    expect(engine.song?.gains[0]).toBeCloseTo(g);
+    c.setGain(2, 0.5);
+    expect(engine.song?.gains[2]).toBe(0.5);
+  });
+});
+
 describe('a song that loads after it was left', () => {
   it('never plays, and stops loading', async () => {
     engine.holdLoads = true;
@@ -570,6 +626,39 @@ describe('a song you sing along to', () => {
     expect(c.snapshot().mic).toBe('open');
     c.setMonitor(0.9);
     expect(engine.monitorGain).toBe(0);
+  });
+
+  it('"Hear yourself" switched on during the 3-2-1 sounds as the song starts (Robert, 22 Oct)', async () => {
+    c.start(c.tap(tap), { ...sing(0), countIn: 3, countBeats: 3 });
+    await flush();
+    expect(c.snapshot().state).toBe('counting-in');
+    c.setMonitor(0.7);
+    for (let i = 0; i < 3; i++) {
+      env.endWaits();
+      await flush();
+    }
+    expect(c.snapshot().state).toBe('running');
+    expect(engine.monitorGain).toBe(0.7);
+  });
+
+  it('"Hear yourself" switched on while the mic opens sounds as the song starts', async () => {
+    engine.holdMic = true;
+    c.start(c.tap(tap), sing(0));
+    await flush();
+    c.setMonitor(0.4);
+    engine.answerMic();
+    await flush();
+    expect(c.snapshot().state).toBe('running');
+    expect(engine.monitorGain).toBe(0.4);
+  });
+
+  it('"Hear yourself" changed while another app holds the mic still takes', async () => {
+    engine.micPlan = ['held-open'];
+    c.start(c.tap(tap), sing(0.2));
+    await flush();
+    expect(c.snapshot().mic).toBe('held');
+    c.setMonitor(0.5);
+    expect(engine.monitorGain).toBe(0.5);
   });
 
   it('"Hear yourself" sounds only while singing, and stops with everything else', async () => {

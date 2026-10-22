@@ -177,6 +177,9 @@ web/src/
 - Record stops only its own playback.
 - Ignore a repeat press mid-note.
 - Measure the sample file that ships.
+- Below 0.9 the way out changes nothing: chain gain 1. The limiter starts at 0.9 with its own lift taken off, and a last safety rounds off anything above, short of full scale. Nothing in the chain halves the sound. (Robert, 22 Oct)
+- Every song is brought to a proper level once, the first time it plays: its loudest moment (voice and music together) at -1 dBFS, the same gain on voice and music so they still add up to the song. The level is kept with the song and never measured again. Sliders at 100 play at that level. (Robert, 22 Oct)
+- Hear yourself has its own slider in the sound card, under the switch: 0 to 100, remembered, 70 at first. At 100 it is about +12 dB over the raw mic, which is quiet with no auto gain, and rounded off so it can't clip. It joins the way out after the limiter, so it adds no delay. (Robert, 22 Oct)
 
 Android (learned the hard way in the old app; the first phone test of this app failed on every one):
 
@@ -191,7 +194,8 @@ Android (learned the hard way in the old app; the first phone test of this app f
 9. If another app holds the mic (the track is muted or ends), say so plainly.
 10. Test against silence, not a tone.
 11. Ask for the mic once, raw. Never walk a ladder of mic modes automatically; the ladder is what thrashed Robert's phone in September.
-12. A rebuild awaits the old sound's close, waits 800 ms, makes the new one, plays one silent sample and proves it by the clock. A sound made before the mic opened is made anew, on that tap, once the mic opens.
+12. A rebuild awaits the old sound's close, waits 800 ms, makes the new one, plays one silent sample and proves it by the clock. A sound made before the mic opened is made anew, on that tap, once the mic opens. If the new sound won't start, it is closed in turn and one more is made after 600 ms, on the same tap: never a third, never by itself (the old app's second try; Robert, 22 Oct).
+13. Hear yourself takes whenever it is switched on, even during the 3-2-1 or while the mic opens. It is wired again on every rebuilt sound, and when the phone gives the mic back (the old app re-wired the mic on unmute).
 
 ### Screens
 

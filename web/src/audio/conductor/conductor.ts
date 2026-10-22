@@ -1,6 +1,7 @@
 import type { AudioEngine, Ensemble, MicBlock, MicResult, SoundReport, Source, Sample } from '../engine';
 import { Recorder, type Recording } from '../recorder';
 import { MIC_MODES, modeIndex } from '../mic-modes';
+import { songLevel } from '../../core/song';
 
 /* THE CONDUCTOR - the only owner of sound and the microphone (RULEBOOK 2.1).
 
@@ -42,7 +43,14 @@ export type Step =
       /** with `listen`: keep what the mic hears as a take (not while looping) */
       record?: boolean;
       /** where in the song each part begins (a take begins where it was sung) */
-      starts?: readonly number[] };
+      starts?: readonly number[];
+      /** the song's level (its loudest moment to -1 dBFS), as kept with it;
+          if none is kept, it is measured once from the parts and handed to
+          `onLevel` to keep. It lifts the first `songParts` parts alike
+          (all of them, unless a take follows the song). */
+      level?: number;
+      onLevel?: (level: number) => void;
+      songParts?: number };
 
 export interface Plan {
   readonly owner: string;
@@ -124,7 +132,7 @@ export class Conductor {
   private readonly tokens = new WeakMap<object, number>();
   private source: Source | null = null;
   /** the song playing now, for its position and its volumes */
-  private song: { ensemble: Ensemble; from: number; loop?: { start: number; end: number } } | null = null;
+  private song: { ensemble: Ensemble; from: number; loop?: { start: number; end: number }; level: number; parts: number } | null = null;
   private readonly listeners = new Set<(s: Snapshot) => void>();
   private readonly micListeners = new Set<(b: MicBlock) => void>();
   /** "Hear yourself": only while a song is listening (RULEBOOK 4, Mic) */
@@ -190,10 +198,11 @@ export class Conductor {
   }
 
   /** "Hear yourself" at this volume (0 is off). It sounds only while a
-      song is playing and listening; the setting waits for the next one. */
+      song is playing and listening; set before then (while counting in,
+      or while the mic opens), it takes as the song starts. */
   setMonitor(gain: number): void {
     this.monitorGain = Math.max(0, gain);
-    if (this.monitoring && this.snap.mic === 'open') this.engine.monitor(this.monitorGain);
+    if (this.monitoring) this.engine.monitor(this.monitorGain);
   }
 
   snapshot(): Snapshot {
@@ -260,7 +269,8 @@ export class Conductor {
 
   /** Change one part's volume (0 to 1) on the song playing now. */
   setGain(part: number, gain: number): void {
-    this.song?.ensemble.setGain(part, gain);
+    const song = this.song;
+    song?.ensemble.setGain(part, part < song.parts ? gain * song.level : gain);
   }
 
   /** The screen is done with these parts: give their memory back. */
@@ -296,6 +306,10 @@ export class Conductor {
     if (this.env.hidden()) return false;                                /* nothing starts out of sight */
     if (this.active()) this.halt('stopped', null);                      /* one source at a time */
     const gen = ++this.gen;
+    /* Hear yourself as the screen has it now; a change from here on, even
+       before the song starts, is kept */
+    const sung = plan.steps.find((st) => st.kind === 'song' && st.listen);
+    this.monitorGain = sung && sung.kind === 'song' ? sung.monitor ?? 0 : 0;
     this.set({ state: 'armed', owner: plan.owner, step: 0, mic: 'closed', why: null, startedAt: null, sound: null });
     void this.run(gen, plan);                                           /* its first call is inside the tap */
     return true;
@@ -384,12 +398,19 @@ export class Conductor {
           continue;
         }
         if (st.kind === 'song') {
+          const parts = Math.min(st.songParts ?? st.urls.length, st.urls.length);
+          let level = st.level;
+          if (level == null) {
+            /* measured once, from what is loaded, and handed back to keep */
+            level = songLevel(this.engine.songPeak(st.urls.slice(0, parts).map((u) => samples.get(u) as Sample)));
+            st.onLevel?.(level);
+          }
+          const lv = level;
           const ensemble = this.engine.playTogether(st.urls.map((u) => samples.get(u) as Sample),
-            { from: st.from, gains: st.gains, loop: st.loop, starts: st.starts });
+            { from: st.from, gains: st.gains.map((g, k) => (k < parts ? g * lv : g)), loop: st.loop, starts: st.starts });
           this.source = ensemble;
-          this.song = { ensemble, from: st.from, loop: st.loop };
+          this.song = { ensemble, from: st.from, loop: st.loop, level: lv, parts };
           if (st.listen) {
-            if (st.monitor != null) this.monitorGain = st.monitor;
             if (st.record && !st.loop) this.recorder = new Recorder();
             this.listen(true);
           }

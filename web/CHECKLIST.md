@@ -45,7 +45,7 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ A call or interruption stops it (2875, 2879) — test: `unit:audio/conductor/conductor.test.ts:a call or interruption stops it by itself`
 - ✓ Restarting reports what is true now, never a blanket "rebuilt" (6769-6779) — test: `unit:audio/conductor/conductor.test.ts:after a failed start, only the next tap rebuilds`
 - — Only one rebuild at a time, "busy" (3166-3168). In the new app one tap starts one session, so two rebuilds can't overlap.
-- — A second try 600 ms after a failed rebuild (3195-3204). The new app gives a new sound 3 s to prove itself, and the next tap tries again (Robert's rule: a tap, or nothing).
+- ✓ A second try after a failed rebuild: the dead sound closed, 600 ms, one more; on the same tap, never a third (3195-3204; Robert, 22 Oct) — test: `android:second-try`, `android:second-try-once`
 - — The headset going in or out re-judges the clock at once (3240-3248). In the new app the watchdog judges every 250 ms while anything plays.
 
 ### What leaves the app
@@ -53,7 +53,9 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ Overlapping sounds never clip: the old app had a limiter, measured at 1.796 with three notes (992-1012) — test: `takes:take-no-clip` (fixed 12 Oct: a take at full voice over the voice and music measured 1.10 at the speaker, 2.1 in the files)
 - ✓ Measure what actually leaves the app, not what was scheduled (6644-6654) — test: `browser:start`
 - ✓ One check of "working" used everywhere, so they can't disagree (6647-6648) — test: `unit:core/sound-check.test.ts:reads each row from what the phone says`
-- — The compressor, the loudness tuning and the keyboard levels (1003-1005, 6276-6280). The new app plays songs at their own level, and has no synth or keyboard.
+- — The compressor, the loudness tuning and the keyboard levels (1003-1005, 6276-6280). The new app has no synth or keyboard; instead each song is brought to -1 dBFS once (Robert, 22 Oct).
+- ✓ Each song brought to a proper level once: its loudest moment at -1 dBFS, voice and music by the same gain, kept with the song (Robert, 22 Oct) — test: `loudness:song-level`, `unit:audio/conductor/conductor.test.ts:measures a song with no level kept`, `unit:audio/conductor/conductor.test.ts:uses the level kept with the song`
+- ✓ Nothing on the way out changes the sound below 0.9: the limiter starts at 0.9, its own lift taken off (Robert, 22 Oct) — test: `loudness:chain-unity`
 - ✓ "Test without mic": let the mic go, wait for the phone to settle, make the sound anew, and say plainly whether it came back (6783-6824; Robert, 13 Oct) — test: `android:test-without-mic`, `unit:audio/conductor/conductor.test.ts:"Test without mic": lets the mic go`
 - — Test sound into a muted channel, the phone's call volume (6693-6696, 6737-6741). Not in the new app: its Sound check plays one note at a fixed level.
 
@@ -105,6 +107,11 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ The microphone check on screen: on, hearing, which mic, held by another app (1531-1547) — test: `browser:start`
 - ✓ Hear yourself hangs off the one mic, straight to the speaker, off unless singing (1271-1293, 22510-22539) — test: `notemap:hear-yourself`, `unit:audio/conductor/conductor.test.ts:"Hear yourself" sounds only while singing`
 - ✓ Hear yourself is headphones only (1312, 7370-7371) — test: `notemap:hear-yourself`
+- ✓ Hear yourself has its own volume, remembered (22455-22500). Robert, 22 Oct: a slider under the switch, 0 to 100, 70 at first, about +12 dB over the raw mic at 100, rounded off so it can't clip (the old app went to 200%) — test: `loudness:monitor-level`, `unit:core/song.test.ts:is off at 0, about +12 dB over the mic at 100`
+- ✓ Hear yourself is set whenever the switch moves, and kept while the song starts (22525-22532, the gate) — test: `loudness:monitor-count-in`, `loudness:monitor-before-start`, `unit:audio/conductor/conductor.test.ts:switched on during the 3-2-1 sounds as the song starts`
+- ✓ Hear yourself kept attached across rewires (1358, 3182) — test: `loudness:monitor-after-rebuild`, `android:hear-yourself-rebuilt`
+- ✓ The mic wired again a moment after the phone gives it back, or it can stay live and silent (1371-1374) — test: `loudness:monitor-unmute`
+- — The Hear yourself switch itself remembered between visits (1318-1320). Not in the new app: raised with Robert, 22 Oct.
 - ✓ While singing, "Use headphones." unless the phone lists some (25216-25238; RULEBOOK 4, Mic) — test: `android:use-headphones` (fixed 12 Oct: it only showed once, the first time Hear yourself was switched on)
 - ✓ One microphone, one recorder (15052-15055) — test: `unit:audio/conductor/conductor.test.ts:keeps what the mic hears, from where in the song`
 - ✓ Nothing recorded means nothing kept (5020, 15356) — test: `unit:audio/conductor/conductor.test.ts:keeps nothing heard before the song`
@@ -182,3 +189,10 @@ For each part the new app has built, every rule the old app's code (next.html) e
 2. Mic first, then the sound, for Start, Test without mic and Hear yourself; a sound made before the mic opened is made anew once it opens.
 3. A rebuild awaits the old sound's close, waits 800 ms, makes the new one, kicks it and proves it by the clock.
 4. "Use the phone's own mic" by device id, before the first request, kept; a mic that took the phone down is never chosen again by itself.
+
+## Decided by Robert, 22 Oct (after the headset worked)
+
+1. Keep the old app's second rebuild try after 600 ms, only on the tap, never by itself.
+2. Hear yourself must sound on a rebuilt sound, and when switched on before Start.
+3. A Hear yourself slider under the switch: 0 to 100, remembered, 70 at first; 100 about +12 dB over the raw mic, rounded off so it can't clip, with low delay.
+4. Each song brought up once to its loudest moment at -1 dBFS, the same gain on voice and music, kept with the song; sliders at 100 play at that level. Nothing in the way out changes the sound below 0.9.

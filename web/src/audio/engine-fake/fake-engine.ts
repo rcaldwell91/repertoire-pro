@@ -103,6 +103,14 @@ export class FakeEngine implements AudioEngine {
   forget(url: string): void {
     this.forgotten.push(url);
   }
+  /** the loudest moment of any song, as measured; -1 dBFS unless a test says */
+  loudest = 10 ** (-1 / 20);
+  /** each song measured, by its parts */
+  readonly measured: string[][] = [];
+  songPeak(samples: readonly Sample[]): number {
+    this.measured.push(samples.map((x) => x.url));
+    return this.loudest;
+  }
   /** the notes playing reach their natural end */
   endNotes(): void {
     [...this.sources].forEach((s) => s.finish());

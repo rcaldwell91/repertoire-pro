@@ -116,6 +116,7 @@ export const copy = {
     reading: "Reading the singer's line… {at} of {of}",
     anyOctave: 'Any octave',
     hearYourself: 'Hear yourself',
+    hearVolume: 'Hear yourself volume',
     yourLevel: 'How loud the microphone hears you',
     headphones: 'Wired headphones work best.',
     micRefused: 'No microphone. The song still plays.',

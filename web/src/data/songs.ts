@@ -21,6 +21,10 @@ export interface Song {
   readonly music30?: Blob;
   /** the song's tempo, beats a minute, if it is known (for the count-in) */
   readonly bpm?: number;
+  /** what lifts the song (voice and music alike) so its loudest moment is
+      at -1 dBFS, measured once the first time it plays; for the whole
+      song, and for its first 30 seconds (Robert, 22 Oct) */
+  readonly level?: { readonly full?: number; readonly first30?: number };
 }
 
 export function hasOf(s: Song): SongHas {
@@ -70,6 +74,15 @@ export async function updateSong(id: string, patch: Partial<Song>): Promise<Song
   await tx('readwrite', (s) => s.put(next));
   changed();
   return next;
+}
+
+/** Keep a song's level, measured the first time it played. Quietly: the
+    screen already has it, and nothing else shows it. */
+export async function keepLevel(id: string, which: 'full' | 'first30', level: number): Promise<void> {
+  const now = await getSong(id);
+  if (!now) return;
+  const next: Song = { ...now, level: { ...now.level, [which]: level } };
+  await tx('readwrite', (s) => s.put(next));
 }
 
 /* The file picked on Add a song, held until the singer confirms it. */

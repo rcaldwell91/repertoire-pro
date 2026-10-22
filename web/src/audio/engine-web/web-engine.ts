@@ -84,6 +84,37 @@ const SAFETY_CURVE: Float32Array<ArrayBuffer> = (() => {
   return c;
 })();
 
+/** The limiter starts at 0.9, where the last safety starts: below it the
+    way out adds nothing and takes nothing (Robert, 22 Oct). */
+export const LIMIT_DB = 20 * Math.log10(0.9);
+const LIMIT_RATIO = 20;
+
+/** A compressor lifts everything by its own "makeup" gain, (1 / its gain
+    at full scale) ^ 0.6 (Web Audio). This is that lift, to take off again. */
+export function makeupOf(thresholdDb: number, ratio: number): number {
+  const fullDb = thresholdDb + (0 - thresholdDb) / ratio;
+  return 10 ** ((-fullDb / 20) * 0.6);
+}
+
+/** "Hear yourself": the mic is lifted up to MONITOR_ROOM times (+12 dB);
+    it goes in at a quarter so that fits, and comes out of this curve: as
+    it is up to 0.6, then rounded off short of 0.9, so it never clips. */
+export const MONITOR_ROOM = 4;
+export function monitorSoft(u: number): number {
+  const a = Math.abs(u);
+  return a <= 0.6 ? u : Math.sign(u) * (0.6 + 0.3 * Math.tanh((a - 0.6) / 0.3));
+}
+const MONITOR_CURVE: Float32Array<ArrayBuffer> = (() => {
+  const n = 8193;
+  const c = new Float32Array(new ArrayBuffer(n * 4));
+  for (let i = 0; i < n; i++) c[i] = monitorSoft(MONITOR_ROOM * ((i / (n - 1)) * 2 - 1));
+  return c;
+})();
+
+/** the old app's second try: a rebuilt sound that will not start gets one
+    more, on the same tap, after this long (Robert, 22 Oct) */
+export const SECOND_TRY_MS = 600;
+
 /** a clock that keeps less than this share of real time is stalled */
 export const STALL_PACE = 0.3;
 
@@ -119,6 +150,9 @@ function drop(k: string): void {
 /** after the old sound has closed, a moment for the phone before the new
     one (the old app's 800 ms; RULEBOOK 4, Sound, Android 12) */
 export const REBUILD_SETTLE_MS = 800;
+
+/** a moment after the mic is given back, before it is wired again (the old app's 120 ms) */
+export const REWIRE_MS = 120;
 
 /** a beat before asking again for a mic another app had (the old app's 400 ms) */
 export const HELD_RETRY_MS = 400;
@@ -169,7 +203,11 @@ export class WebEngine implements AudioEngine {
   private tapReady: { ctx: AudioContext; ready: Promise<boolean> } | null = null;
   private tap: AudioWorkletNode | null = null;
   private monitorGain: GainNode | null = null;
+  private monitorShape: WaveShaperNode | null = null;
   private monitorLevel = 0;
+  /** the last stage on the way out (the safety), for Hear yourself to join
+      after the limiter, which would add its delay */
+  private last: AudioNode | null = null;
   private inputLatency = 0;
   private readonly micCbs = new Set<(b: MicBlock) => void>();
   /** everything played goes out through here, so the Sound check can see it */
@@ -210,24 +248,30 @@ export class WebEngine implements AudioEngine {
     this.outMeter.fftSize = 2048;
     /* the old app's limiter: parts that add up past full scale (a take at
        full voice over the voice and the music) are held under it, never
-       clipped. Below its threshold it does nothing. */
+       clipped. It starts at 0.9, and its own lift is taken off again, so
+       below 0.9 nothing is changed (measured: tests/loudness, chain-unity) */
     const limit = ctx.createDynamicsCompressor();
-    limit.threshold.value = -2;
+    limit.threshold.value = LIMIT_DB;
     limit.knee.value = 0;
-    limit.ratio.value = 20;
+    limit.ratio.value = LIMIT_RATIO;
     limit.attack.value = 0.002;
     limit.release.value = 0.15;
     this.out.connect(limit);
+    const even = ctx.createGain();
+    even.gain.value = 1 / makeupOf(LIMIT_DB, LIMIT_RATIO);
+    limit.connect(even);
     /* and a last safety, because the limiter reacts a moment late on a
        sudden peak: nothing below 0.9 is touched, anything above is rounded
        off short of full scale (measured: two loud parts reaching 1.85 came
-       out at 1.03 with the limiter alone) */
+       out at 1.03 with the limiter alone). It takes the sound at half, as
+       its curve does, so twice full scale fits. */
     const half = ctx.createGain();
     half.gain.value = 0.5;
     const safe = ctx.createWaveShaper();
     safe.curve = SAFETY_CURVE;
-    limit.connect(half);
+    even.connect(half);
     half.connect(safe);
+    this.last = half;
     safe.connect(ctx.destination);
     safe.connect(this.outMeter);
     return ctx;
@@ -243,34 +287,54 @@ export class WebEngine implements AudioEngine {
     /* a sound made before the mic opened was made on the old route: on
        this tap, make it anew now the mic has chosen the route (Android 12) */
     if (!rebuild && this.ctx && this.ctx.state !== 'closed' && this.stream && !this.bornWithMic) rebuild = true;
-    if (rebuild && this.ctx) {
-      /* Android 5: close the old one, wait for it, then a new one */
-      const old = this.ctx;
-      this.stopAll();
-      this.detachMic();
-      this.ctx = null;
-      this.out = null;
-      this.outMeter = null;
-      try {
-        await race(old.close(), LIMITS.close);
-      } catch {
-        /* closed already */
-      }
-      await pause(REBUILD_SETTLE_MS);
+    const rebuilding = rebuild && !!this.ctx;
+    /* Android 5: close the old one, wait for it, then a new one */
+    if (rebuilding) await this.drop(REBUILD_SETTLE_MS);
+    let r = await this.prove();
+    /* the old app's second try (Robert, 22 Oct): a rebuilt sound that will
+       not start is closed in turn, and one more is made after a longer
+       breath, on this same tap. Never a third, never by itself. */
+    if (!r.ok && rebuilding && this.ctx) {
+      await this.drop(SECOND_TRY_MS);
+      r = await this.prove();
     }
+    if (!r.ok || !this.ctx) return { ok: false, why: r.ok ? 'blocked' : r.why, tap };
+    if (this.stream) await this.attachMic(this.ctx);
+    return { ok: true };
+  }
+
+  /** the sound now let go: its sources stopped, the mic's nodes off it,
+      closed (and waited for), then a moment for the phone */
+  private async drop(settle: number): Promise<void> {
+    const old = this.ctx;
+    this.stopAll();
+    this.detachMic();
+    this.ctx = null;
+    this.out = null;
+    this.outMeter = null;
+    this.last = null;
+    try {
+      if (old) await race(old.close(), LIMITS.close);
+    } catch {
+      /* closed already */
+    }
+    await pause(settle);
+  }
+
+  /** the sound, made if need be, proved: Android 3, await resume (raced),
+      one silent sample, then the clock must move */
+  private async prove(): Promise<{ ok: true } | { ok: false; why: 'blocked' | 'stalled' }> {
     const ctx = this.context();
-    /* Android 3: await resume (raced), one silent sample, then the clock */
     try {
       await race(ctx.resume(), LIMITS.resume);
     } catch {
       /* not allowed: the clock says so below */
     }
-    if (ctx !== this.ctx) return { ok: false, why: 'blocked', tap };
+    if (ctx !== this.ctx) return { ok: false, why: 'blocked' };
     this.kick(ctx);
     if (!(await this.clockMoves(ctx, LIMITS.clock)) || ctx !== this.ctx) {
-      return { ok: false, why: ctx.state === 'running' ? 'stalled' : 'blocked', tap };
+      return { ok: false, why: ctx.state === 'running' ? 'stalled' : 'blocked' };
     }
-    if (this.stream) await this.attachMic(ctx);
     return { ok: true };
   }
 
@@ -460,6 +524,28 @@ export class WebEngine implements AudioEngine {
     this.buffers.delete(url);
   }
 
+  /** The loudest moment of these parts played together from the start, as
+      the speaker sums them (a mono part goes to both sides). */
+  songPeak(samples: readonly Sample[]): number {
+    const bufs = samples.map((x) => this.buffers.get(x.url)).filter((b): b is AudioBuffer => !!b);
+    if (!bufs.length) return 0;
+    const sides = Math.max(...bufs.map((b) => b.numberOfChannels));
+    const n = Math.max(...bufs.map((b) => b.length));
+    let peak = 0;
+    for (let c = 0; c < sides; c++) {
+      const sum = new Float32Array(n);
+      for (const b of bufs) {
+        const d = b.getChannelData(Math.min(c, b.numberOfChannels - 1));
+        for (let i = 0; i < d.length; i++) sum[i] += d[i];
+      }
+      for (let i = 0; i < n; i++) {
+        const a = Math.abs(sum[i]);
+        if (a > peak) peak = a;
+      }
+    }
+    return peak;
+  }
+
   sounding(): number {
     return this.sources.size;
   }
@@ -573,7 +659,13 @@ export class WebEngine implements AudioEngine {
     if (track) {
       /* Android 9: another app took the mic, or gave it back */
       track.onmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
-      track.onunmute = () => this.stream === stream && this.heldCbs.forEach((f) => f(false));
+      track.onunmute = () => {
+        if (this.stream !== stream) return;
+        this.heldCbs.forEach((f) => f(false));
+        /* the old app (1371-1374): given back, the mic is wired again a
+           moment later, or it can stay live and silent */
+        setTimeout(() => void this.rewire(stream), REWIRE_MS);
+      };
       track.onended = () => this.stream === stream && this.heldCbs.forEach((f) => f(true));
     }
     /* its nodes join the sound when the sound wakes (never a stalled one) */
@@ -594,15 +686,30 @@ export class WebEngine implements AudioEngine {
     /* the mic's own delay, as the phone reports it, taken off at the source */
     const lat = (stream.getAudioTracks()[0]?.getSettings() as { latency?: number } | undefined)?.latency;
     this.inputLatency = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
+    /* Hear yourself: lifted, rounded off so it can't clip, and into the
+       last safety beside the song (not through the limiter, which would
+       add its delay) */
     this.monitorGain = ctx.createGain();
-    this.monitorGain.gain.value = this.monitorLevel;
+    this.monitorGain.gain.value = this.monitorLevel / MONITOR_ROOM;
+    const soft = ctx.createWaveShaper();
+    soft.curve = MONITOR_CURVE;
+    this.monitorShape = soft;
     micNode.connect(this.monitorGain);
-    this.monitorGain.connect(ctx.destination);
+    this.monitorGain.connect(soft);
+    soft.connect(this.last && this.last.context === ctx ? this.last : ctx.destination);
     await this.openTap(ctx, micNode);
   }
 
+  /** the mic's nodes made again on the sound now, from the same stream */
+  private async rewire(stream: MediaStream): Promise<void> {
+    const ctx = this.ctx;
+    if (this.stream !== stream || !ctx || this.attached !== ctx || ctx.state !== 'running') return;
+    this.attached = null;
+    await this.attachMic(ctx);
+  }
+
   private detachMic(): void {
-    for (const n of [this.micNode, this.tap, this.monitorGain]) {
+    for (const n of [this.micNode, this.tap, this.monitorGain, this.monitorShape]) {
       try {
         n?.disconnect();
       } catch {
@@ -614,6 +721,7 @@ export class WebEngine implements AudioEngine {
     this.analyser = null;
     this.tap = null;
     this.monitorGain = null;
+    this.monitorShape = null;
     this.attached = null;
   }
 
@@ -644,9 +752,9 @@ export class WebEngine implements AudioEngine {
   }
 
   monitor(gain: number): void {
-    this.monitorLevel = Math.max(0, gain);
+    this.monitorLevel = Math.min(MONITOR_ROOM, Math.max(0, gain));
     const g = this.monitorGain;
-    if (g && this.ctx) g.gain.setTargetAtTime(this.monitorLevel, this.ctx.currentTime, 0.015);
+    if (g && this.ctx) g.gain.setTargetAtTime(this.monitorLevel / MONITOR_ROOM, this.ctx.currentTime, 0.015);
   }
 
   outputLatency(): number {

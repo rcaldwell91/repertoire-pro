@@ -246,6 +246,8 @@ export const MIRROR = `(() => {
      inputs: [...]       the mics the phone lists ({ deviceId, label }); one
                          asked for by its id comes back with that name
      bornFrozen: true    new sound is born with its clock standing still
+     frozenBirths: n     the next n sounds made are born with their clocks
+                         standing still (a phone that needs a moment more)
      overconstrained: n  the next n asks for the mic are refused as impossible
      closeDelay: ms      close() takes this long to answer
    asked: what each ask for the mic wanted ({ device, audio }); stamps: when
@@ -255,7 +257,7 @@ export const MIRROR = `(() => {
 export const ANDROID = `(() => {
   const E = window.__android = { born: 'running', resume: 'ok', sticky: false, suspends: 0, refused: 0, contexts: [], order: [],
     closeHangs: false, gumHangs: false, decodeFails: false, headset: false, busy: 0, inputs: null, bornFrozen: false, asked: [],
-    overconstrained: 0, closeDelay: 0, stamps: [] };
+    overconstrained: 0, closeDelay: 0, stamps: [], frozenBirths: 0 };
   const AC = window.AudioContext;
   const base = Object.getPrototypeOf(AC.prototype);
   const get = (k) => (Object.getOwnPropertyDescriptor(AC.prototype, k) || Object.getOwnPropertyDescriptor(base, k)).get;
@@ -266,7 +268,8 @@ export const ANDROID = `(() => {
     constructor(...a) {
       super(...a);
       this.__held = E.born === 'suspended';
-      this.__frozen = E.bornFrozen ? 0.01 : null;
+      this.__frozen = E.bornFrozen || E.frozenBirths > 0 ? 0.01 : null;
+      if (E.frozenBirths > 0) E.frozenBirths--;
       this.__stuck = false;
       E.contexts.push(this);
       E.order.push('context');
