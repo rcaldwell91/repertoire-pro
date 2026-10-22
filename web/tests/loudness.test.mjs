@@ -64,9 +64,11 @@ for (const p of ['voice30', 'music30']) {
   QUIET[p] = join(tmp, `quiet-${p}.wav`);
   ff('-i', `${PREFIX}-${p}.mp3`, '-af', 'volume=0.2', '-ac', '2', '-ar', '44100', QUIET[p]);
 }
-/* a plain tone at half scale (ffmpeg's sine is at 1/8), and silence beside it, at the speaker's own rate */
+/* a plain tone at half scale (ffmpeg's sine is at 1/8), the same on both
+   sides (its own upmix would drop it 3 dB), and silence beside it, at the
+   speaker's own rate */
 const TONE = join(tmp, 'tone.wav'), HUSH = join(tmp, 'hush.wav');
-ff('-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=30', '-af', 'volume=4', '-ac', '2', TONE);
+ff('-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=30', '-af', 'volume=4,pan=stereo|c0=c0|c1=c0', TONE);
 ff('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30', HUSH);
 const micMean = meanOf(MIC_WAV);
 if (![MIC_WAV, TONE, HUSH, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5)) {
@@ -360,13 +362,14 @@ try {
       await page.tap('#song-play');
       await playing();
       await sleep(500);
+      /* what the song is sent at: the tone as decoded, at its level, at this slider */
+      const sent = await page.eval(`Math.max(...window.__probe.decoded.map((d) => d.peak)) * window.__probe.playing()[0].gain`);
       const m = await measure(2000);
       await page.tap('#song-play');
       await stopped();
-      const sent = SONG_PEAK * (v / 100) ** 2;
       rows.push({ v, sent, got: m.peak, gain: m.peak / sent });
     }
-    check('chain-unity', rows.every((r) => near(r.gain, 1, 0.01)),
+    check('chain-unity', rows.every((r) => near(r.sent, SONG_PEAK * (r.v / 100) ** 2, 0.01) && near(r.gain, 1, 0.01)),
       rows.map((r) => `slider ${r.v}: sent ${r.sent.toFixed(3)}, came out ${r.got.toFixed(3)} (gain ${r.gain.toFixed(3)})`).join('; '));
   }
 
