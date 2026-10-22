@@ -198,7 +198,10 @@ if (base.code !== 0) {
   process.exit(1);
 }
 let survived = 0;
-for (const m of MUTATIONS) {
+/* RP_MUTANTS=word,word runs only the broken rules whose names contain one */
+const pick = (process.env.RP_MUTANTS || '').split(',').filter(Boolean);
+const RUN = MUTATIONS.filter((m) => !pick.length || pick.some((w) => m.rule.includes(w)));
+for (const m of RUN) {
   const src = readFileSync(m.file, 'utf8');
   const n = src.split(m.from).length - 1;
   if (m.all ? n < 1 : n !== 1) {
@@ -216,5 +219,5 @@ for (const m of MUTATIONS) {
     console.log(`✓ ${m.rule}: caught by ${r.failed.length} — ${r.failed.slice(0, 3).join(' | ')}`);
   }
 }
-console.log(survived ? `\n${survived} broken rule(s) went unnoticed` : `\nall ${MUTATIONS.length} broken rules were caught`);
+console.log(survived ? `\n${survived} broken rule(s) went unnoticed` : `\nall ${RUN.length} broken rules were caught`);
 process.exit(survived ? 1 : 0);
