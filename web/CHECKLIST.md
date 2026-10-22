@@ -54,7 +54,7 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ Measure what actually leaves the app, not what was scheduled (6644-6654) — test: `browser:start`
 - ✓ One check of "working" used everywhere, so they can't disagree (6647-6648) — test: `unit:core/sound-check.test.ts:reads each row from what the phone says`
 - — The compressor, the loudness tuning and the keyboard levels (1003-1005, 6276-6280). The new app has no synth or keyboard; instead each song is brought to -1 dBFS once (Robert, 22 Oct).
-- ✓ Each song brought to a proper level once: its loudest moment at -1 dBFS, voice and music by the same gain, kept with the song (Robert, 22 Oct) — test: `loudness:song-level`, `unit:audio/conductor/conductor.test.ts:measures a song with no level kept`, `unit:audio/conductor/conductor.test.ts:uses the level kept with the song`
+- ✓ Each song brought up to a proper level once: its loudest moment lifted to -1 dBFS, voice and music by the same gain, kept with the song; up, never down (Robert, 22 Oct) — test: `loudness:song-level`, `loudness:song-full`, `unit:core/song.test.ts:brings a song up, never down`, `unit:audio/conductor/conductor.test.ts:measures a song with no level kept`, `unit:audio/conductor/conductor.test.ts:uses the level kept with the song`
 - ✓ Nothing on the way out changes the sound below 0.9: the limiter starts at 0.9, its own lift taken off (Robert, 22 Oct) — test: `loudness:chain-unity`
 - ✓ "Test without mic": let the mic go, wait for the phone to settle, make the sound anew, and say plainly whether it came back (6783-6824; Robert, 13 Oct) — test: `android:test-without-mic`, `unit:audio/conductor/conductor.test.ts:"Test without mic": lets the mic go`
 - — Test sound into a muted channel, the phone's call volume (6693-6696, 6737-6741). Not in the new app: its Sound check plays one note at a fixed level.
@@ -195,4 +195,4 @@ For each part the new app has built, every rule the old app's code (next.html) e
 1. Keep the old app's second rebuild try after 600 ms, only on the tap, never by itself.
 2. Hear yourself must sound on a rebuilt sound, and when switched on before Start.
 3. A Hear yourself slider under the switch: 0 to 100, remembered, 70 at first; 100 about +12 dB over the raw mic, rounded off so it can't clip, with low delay.
-4. Each song brought up once to its loudest moment at -1 dBFS, the same gain on voice and music, kept with the song; sliders at 100 play at that level. Nothing in the way out changes the sound below 0.9.
+4. Each song brought up once to its loudest moment at -1 dBFS, the same gain on voice and music, kept with the song; sliders at 100 play at that level. Nothing in the way out changes the sound below 0.9. (Done as "up, never down": the test song's parts together peak above full volume, and turning it down made it quieter than before; for Robert to confirm.)

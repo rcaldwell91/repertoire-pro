@@ -129,12 +129,15 @@ export const SONG_PEAK = 10 ** (-1 / 20);
 /** the most a song is ever lifted (+24 dB), so a near-silent file is not blown up */
 export const MAX_LIFT = 10 ** (24 / 20);
 
-/** The gain that puts a song's loudest moment (voice and music together)
-    at -1 dBFS. The same for voice and music, so they still add up to the
-    song. 1 if the song is silent or its peak unknown. */
+/** The gain that brings a song's loudest moment (voice and music together)
+    up to -1 dBFS. The same for voice and music, so they still add up to
+    the song. Never below 1: a song already at full volume is left as it
+    is, and the limiter holds its peaks (measured 22 Oct: the test song's
+    parts together peak at +0.4 dB, and turning it down made it 2.4 dB
+    quieter than before). 1 if the song is silent or its peak unknown. */
 export function songLevel(peak: number): number {
   if (!Number.isFinite(peak) || peak <= 0) return 1;
-  return Math.min(MAX_LIFT, SONG_PEAK / peak);
+  return Math.min(MAX_LIFT, Math.max(1, SONG_PEAK / peak));
 }
 
 /** What the song screen says about the mic, if anything: the song plays

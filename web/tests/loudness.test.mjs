@@ -40,7 +40,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`)) || !e
 }
 
 const ALL = ['monitor-before-start', 'monitor-count-in', 'monitor-after-rebuild', 'monitor-unmute', 'monitor-level', 'song-level',
-  'chain-unity', 'no-page-errors'];
+  'song-full', 'chain-unity', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -333,6 +333,21 @@ try {
       `loudest at the speaker, either side, ${peak.toFixed(3)} (${dB(peak)}; -1 dBFS is ${SONG_PEAK.toFixed(3)}); voice and music lifted alike ${same} ` +
       `(${gains.map((g) => g.toFixed(2)).join(', ')}); kept with the song: x${typeof level === 'number' ? level.toFixed(2) : level}; ` +
       `with the kept level halved: ${halved.toFixed(3)}`);
+  }
+
+  /* 6b. A song whose parts together already reach full volume is brought
+         up, never down: it plays as it is, and the limiter holds its peaks
+         (the real song: voice and music together peak at +0.4 dB) */
+  if (want('song-full')) {
+    await open('loud-song');
+    await page.tap('#song-play');
+    const ok = await playing();
+    await sleep(500);
+    const gains = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
+    await page.tap('#song-play');
+    await stopped();
+    check('song-full', ok && gains.length === 2 && gains.every((g) => Math.abs(g - 1) < 1e-6),
+      `a song already at full volume plays at ${gains.map((g) => g.toFixed(3)).join(' / ')} (1 is as it is)`);
   }
 
   /* 7. The way out adds nothing and takes nothing below 0.9: a tone at

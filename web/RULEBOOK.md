@@ -178,7 +178,7 @@ web/src/
 - Ignore a repeat press mid-note.
 - Measure the sample file that ships.
 - Below 0.9 the way out changes nothing: chain gain 1. The limiter starts at 0.9 with its own lift taken off, and a last safety rounds off anything above, short of full scale. Nothing in the chain halves the sound. (Robert, 22 Oct)
-- Every song is brought to a proper level once, the first time it plays: its loudest moment (voice and music together) at -1 dBFS, the same gain on voice and music so they still add up to the song. The level is kept with the song and never measured again. Sliders at 100 play at that level. (Robert, 22 Oct)
+- Every song is brought up to a proper level once, the first time it plays: its loudest moment (voice and music together) lifted to -1 dBFS, the same gain on voice and music so they still add up to the song. Up, never down: a song already at full volume plays as it is and the limiter holds its peaks (measured 22 Oct: the test song's parts together peak at +0.4 dB, and turning it down made it 2.4 dB quieter). The level is kept with the song and never measured again. Sliders at 100 play at that level. (Robert, 22 Oct)
 - Hear yourself has its own slider in the sound card, under the switch: 0 to 100, remembered, 70 at first. At 100 it is about +12 dB over the raw mic, which is quiet with no auto gain, and rounded off so it can't clip. It joins the way out after the limiter, so it adds no delay. (Robert, 22 Oct)
 
 Android (learned the hard way in the old app; the first phone test of this app failed on every one):

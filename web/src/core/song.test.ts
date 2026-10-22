@@ -84,8 +84,10 @@ describe('a song\'s level', () => {
     expect(songLevel(0.2) * 0.2).toBeCloseTo(SONG_PEAK);
     expect(songLevel(SONG_PEAK)).toBeCloseTo(1);
   });
-  it('brings a song that is too loud down to it', () => {
-    expect(songLevel(1.6) * 1.6).toBeCloseTo(SONG_PEAK);
+  it('brings a song up, never down: one already at full volume is left as it is (the limiter holds its peaks)', () => {
+    expect(songLevel(1.6)).toBe(1);
+    expect(songLevel(0.95)).toBe(1);
+    expect(songLevel(SONG_PEAK)).toBe(1);
   });
   it('never lifts silence or a near-silent file without end', () => {
     expect(songLevel(0)).toBe(1);
