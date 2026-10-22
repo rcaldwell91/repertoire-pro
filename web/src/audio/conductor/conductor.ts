@@ -376,6 +376,19 @@ export class Conductor {
         }
         if (gen !== this.gen) return;
       }
+      /* each song's level: as kept with it, or measured now, before the
+         count-in, from what is loaded, and handed back to keep */
+      const levels = new Map<Step, number>();
+      for (const st of plan.steps) {
+        if (st.kind !== 'song') continue;
+        const parts = Math.min(st.songParts ?? st.urls.length, st.urls.length);
+        let level = st.level;
+        if (level == null) {
+          level = songLevel(this.engine.songPeak(st.urls.slice(0, parts).map((u) => samples.get(u) as Sample)));
+          st.onLevel?.(level);
+        }
+        levels.set(st, level);
+      }
       /* the count-in comes only once the sound is proved and loaded, a beat at a time */
       if (plan.countIn && plan.countIn > 0) {
         const beats = Math.max(1, Math.round(plan.countBeats ?? 1));
@@ -399,13 +412,7 @@ export class Conductor {
         }
         if (st.kind === 'song') {
           const parts = Math.min(st.songParts ?? st.urls.length, st.urls.length);
-          let level = st.level;
-          if (level == null) {
-            /* measured once, from what is loaded, and handed back to keep */
-            level = songLevel(this.engine.songPeak(st.urls.slice(0, parts).map((u) => samples.get(u) as Sample)));
-            st.onLevel?.(level);
-          }
-          const lv = level;
+          const lv = levels.get(st) ?? 1;
           const ensemble = this.engine.playTogether(st.urls.map((u) => samples.get(u) as Sample),
             { from: st.from, gains: st.gains.map((g, k) => (k < parts ? g * lv : g)), loop: st.loop, starts: st.starts });
           this.source = ensemble;

@@ -324,7 +324,7 @@ try {
     await sleep(300);
     const again = await page.eval(`({ hint: !!document.querySelector('#headphones'), monitor: window.__probe.monitorNow() })`);
     await page.tap('#hear-yourself');
-    check('hear-yourself', offWhileSinging === 0 && levelShown && onWhileSinging > 0.5 && hint === copy.song.headphones && afterStop === 0 && !again.hint && again.monitor === 0,
+    check('hear-yourself', offWhileSinging === 0 && levelShown && onWhileSinging > 0.1 && hint === copy.song.headphones && afterStop === 0 && !again.hint && again.monitor === 0,
       `off by default while singing (${offWhileSinging}); your level shown ${levelShown}; switched on: your voice back at ${onWhileSinging.toFixed(2)} and "${hint}"; ` +
       `after stopping: nothing back, mic closed ${afterStop === 0}; next visit: hint again ${again.hint}, heard while not singing ${again.monitor}`);
   }

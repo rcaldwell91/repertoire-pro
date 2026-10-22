@@ -532,14 +532,13 @@ export class WebEngine implements AudioEngine {
     const sides = Math.max(...bufs.map((b) => b.numberOfChannels));
     const n = Math.max(...bufs.map((b) => b.length));
     let peak = 0;
+    /* summed a moment at a time: a whole song's sum would be a lot of memory on a phone */
     for (let c = 0; c < sides; c++) {
-      const sum = new Float32Array(n);
-      for (const b of bufs) {
-        const d = b.getChannelData(Math.min(c, b.numberOfChannels - 1));
-        for (let i = 0; i < d.length; i++) sum[i] += d[i];
-      }
+      const data = bufs.map((b) => b.getChannelData(Math.min(c, b.numberOfChannels - 1)));
       for (let i = 0; i < n; i++) {
-        const a = Math.abs(sum[i]);
+        let v = 0;
+        for (const d of data) if (i < d.length) v += d[i];
+        const a = v < 0 ? -v : v;
         if (a > peak) peak = a;
       }
     }
