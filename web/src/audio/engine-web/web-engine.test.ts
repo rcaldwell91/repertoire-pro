@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heardDelay, LIMIT_DB, makeupOf, MONITOR_ROOM, monitorSoft, safety, toConstraints } from './web-engine';
+import { CEILING, heardDelay, LOUD, safety, STAGE_DELAY, toConstraints, WebEngine } from './web-engine';
 import { MIC_MODES, modeIndex } from '../mic-modes';
 
 /* RULEBOOK 4, Mic, and Sound, Android 11: "Ask for the mic once, raw." */
@@ -35,43 +35,45 @@ describe('the speaker\'s delay, as the phone reports it', () => {
   });
 });
 
-/* The old app's limiter, made safe: overlapping sound never reaches full scale. */
-describe('the last safety on the way out', () => {
-  it('leaves everything below 0.9 as it is', () => {
-    for (const u of [0, 0.1, -0.5, 0.89, -0.9]) expect(safety(u)).toBe(u);
+/* Robert, 23 Oct: the old app's v9.8 loudness stage, as it was (next.html
+   991-1014): the numbers written here as they are there. */
+describe('the loudness stage', () => {
+  it('is the old app\'s v9.8 stage: 0.9 in, a compressor lifts the body, 1.4 raises it all, a limiter holds the peaks', () => {
+    expect(LOUD).toEqual({
+      in: 0.9,
+      body: { threshold: -12, knee: 6, ratio: 3, attack: 0.004, release: 0.22 },
+      raise: 1.4,
+      limit: { threshold: -3, knee: 0, ratio: 20, attack: 0.001, release: 0.06 },
+    });
   });
-  it('rounds off anything louder, never reaching full scale', () => {
-    for (const u of [0.95, 1, 1.5, 2, -2, 10]) {
-      expect(Math.abs(safety(u))).toBeLessThan(1);
-      expect(Math.abs(safety(u))).toBeGreaterThan(0.9);
+});
+
+/* And after it, a ceiling: peaks held under -1 dB (Robert, 23 Oct). */
+describe('the ceiling on the way out', () => {
+  it('leaves everything up to its knee as it is', () => {
+    for (const u of [0, 0.1, -0.5, CEILING.knee, -CEILING.knee]) expect(safety(u)).toBe(u);
+  });
+  it('rounds off anything louder, never reaching -1 dBFS', () => {
+    expect(CEILING.top).toBeLessThan(10 ** (-1 / 20));
+    for (const u of [0.7, 0.9, 1, 1.5, 2, -2, 10]) {
+      expect(Math.abs(safety(u))).toBeLessThanOrEqual(CEILING.top);
+      expect(Math.abs(safety(u))).toBeGreaterThan(CEILING.knee);
     }
     expect(safety(1.2)).toBeGreaterThan(safety(1.0));
   });
 });
 
-/* Robert, 22 Oct: below 0.9 the way out changes nothing; the limiter starts
-   there, and its own lift is taken off again (measured: loudness, chain-unity). */
-describe('the limiter', () => {
-  it('starts at 0.9', () => {
-    expect(10 ** (LIMIT_DB / 20)).toBeCloseTo(0.9, 6);
+/* The way out holds the sound back: each compressor looks 6 ms ahead, and
+   the ceiling, at twice the rate, adds 2.7 ms (measured offline, 23 Oct).
+   It is part of when a sound is heard. */
+describe('the way out\'s own delay', () => {
+  it('is the two compressors\' look-ahead and the ceiling\'s, as measured', () => {
+    expect(CEILING.oversample).toBe('2x');
+    expect(STAGE_DELAY).toBeCloseTo(2 * 0.006 + 0.0027, 4);
   });
-  it('knows its own lift: none with no limiting, more the lower it starts', () => {
-    expect(makeupOf(0, 20)).toBeCloseTo(1);
-    expect(makeupOf(-2, 20)).toBeGreaterThan(makeupOf(LIMIT_DB, 20));
-    expect(makeupOf(LIMIT_DB, 20)).toBeCloseTo(10 ** ((-(LIMIT_DB + -LIMIT_DB / 20) / 20) * 0.6));
-  });
-});
-
-/* Hear yourself, lifted up to +12 dB, never clips. */
-describe('Hear yourself, rounded off', () => {
-  it('is as it is up to 0.6', () => {
-    for (const u of [0, 0.2, -0.45, 0.6, -0.6]) expect(monitorSoft(u)).toBe(u);
-  });
-  it('never reaches 0.9, however loud the mic', () => {
-    for (const u of [0.7, 1, 2, MONITOR_ROOM, -MONITOR_ROOM]) {
-      expect(Math.abs(monitorSoft(u))).toBeLessThan(0.9);
-      expect(Math.abs(monitorSoft(u))).toBeGreaterThan(0.6);
-    }
-    expect(monitorSoft(1.2)).toBeGreaterThan(monitorSoft(0.9));
+  it('is counted in when a sound is heard, beside the phone\'s own delays', () => {
+    const e = new WebEngine();
+    (e as unknown as { ctx: unknown }).ctx = { outputLatency: 0.12, baseLatency: 0.01 };
+    expect(e.outputLatency()).toBeCloseTo(0.13 + STAGE_DELAY, 6);
   });
 });

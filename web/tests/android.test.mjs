@@ -656,7 +656,7 @@ try {
     const peak = await page.eval(P('outPeak'));
     await page.tap('#song-play');
     await stopped();
-    check('no-clip', ok && peak > 0.5 && peak <= 1.0, `voice and music each as loud as they go, together: the loudest sound sent to the speaker ${peak.toFixed(3)} (full scale is 1)`);
+    check('no-clip', ok && peak > 0.5 && peak < 0.891, `voice and music each as loud as they go, together: the loudest sound sent to the speaker ${peak.toFixed(3)} (held under -1 dB, 0.891; Robert, 23 Oct)`);
   }
 
   /* 16. Robert, 22 Oct: the old app's second try (3195-3204). A rebuilt

@@ -70,47 +70,42 @@ export const LIMITS = {
   micAsking: 60000,
 };
 
-/** The safety curve: its input is the sound at half level (so up to twice
-    full scale fits), its output the sound itself up to 0.9, then rounded
-    off, never reaching 1. */
+/** The old app's v9.8 loudness stage, as it was (next.html 991-1014;
+    Robert, 23 Oct): everything in at 0.9, a compressor lifts the body of
+    the sound, 1.4 raises it all, a limiter holds the peaks. Measured on his
+    song: -9.7 LUFS before, -6.8 after (tests/loudness, song-loudness). */
+export const LOUD = {
+  in: 0.9,
+  body: { threshold: -12, knee: 6, ratio: 3, attack: 0.004, release: 0.22 },
+  raise: 1.4,
+  limit: { threshold: -3, knee: 0, ratio: 20, attack: 0.001, release: 0.06 },
+};
+
+/** The ceiling after it: the sound as it is up to the knee, then rounded
+    off short of the top, so no peak reaches -1 dBFS (0.891), between the
+    samples too: the curve runs at twice the rate (Robert, 23 Oct). That
+    adds 2.7 ms (measured), which is all Hear yourself goes through. */
+export const CEILING = { knee: 0.66, top: 0.8, oversample: '2x' as OverSampleType };
+
+/** How long the way out holds the sound back, measured: each compressor
+    looks 6 ms ahead, and the ceiling adds 2.7 ms. Part of when a sound is
+    heard, so the song's place and a take's place allow for it. */
+export const STAGE_DELAY = 0.0147;
 export function safety(u: number): number {
   const a = Math.abs(u);
-  return a <= 0.9 ? u : Math.sign(u) * (0.9 + 0.098 * Math.tanh((a - 0.9) / 0.098));
+  const { knee, top } = CEILING;
+  return a <= knee ? u : Math.sign(u) * (knee + (top - knee) * Math.tanh((a - knee) / (top - knee)));
 }
+/* its input is the sound at half, so twice full scale fits */
 const SAFETY_CURVE: Float32Array<ArrayBuffer> = (() => {
-  const n = 4097;
+  const n = 8193;
   const c = new Float32Array(new ArrayBuffer(n * 4));
   for (let i = 0; i < n; i++) c[i] = safety(2 * ((i / (n - 1)) * 2 - 1));
   return c;
 })();
 
-/** The limiter starts at 0.9, where the last safety starts: below it the
-    way out adds nothing and takes nothing (Robert, 22 Oct). */
-export const LIMIT_DB = 20 * Math.log10(0.9);
-const LIMIT_RATIO = 20;
-
-/** A compressor lifts everything by its own "makeup" gain, (1 / its gain
-    at full scale) ^ 0.6 (Web Audio). This is that lift, to take off again. */
-export function makeupOf(thresholdDb: number, ratio: number): number {
-  const fullDb = thresholdDb + (0 - thresholdDb) / ratio;
-  return 10 ** ((-fullDb / 20) * 0.6);
-}
-
-/** "Hear yourself": the mic is lifted up to three times (MONITOR_MAX), and
-    the curve has room for four; it goes in at a quarter so that fits, and
-    comes out of this curve: as it is up to 0.6, then rounded off short of
-    0.9, so it never clips. */
-export const MONITOR_ROOM = 4;
-export function monitorSoft(u: number): number {
-  const a = Math.abs(u);
-  return a <= 0.6 ? u : Math.sign(u) * (0.6 + 0.3 * Math.tanh((a - 0.6) / 0.3));
-}
-const MONITOR_CURVE: Float32Array<ArrayBuffer> = (() => {
-  const n = 8193;
-  const c = new Float32Array(new ArrayBuffer(n * 4));
-  for (let i = 0; i < n; i++) c[i] = monitorSoft(MONITOR_ROOM * ((i / (n - 1)) * 2 - 1));
-  return c;
-})();
+/** "Hear yourself" is lifted at most this much (the slider stops at MONITOR_MAX) */
+export const MONITOR_ROOM = 8;
 
 /** the old app's second try: a rebuilt sound that will not start gets one
     more, on the same tap, after this long (Robert, 22 Oct) */
@@ -204,7 +199,6 @@ export class WebEngine implements AudioEngine {
   private tapReady: { ctx: AudioContext; ready: Promise<boolean> } | null = null;
   private tap: AudioWorkletNode | null = null;
   private monitorGain: GainNode | null = null;
-  private monitorShape: WaveShaperNode | null = null;
   private monitorLevel = 0;
   /** the last stage on the way out (the safety), for Hear yourself to join
       after the limiter, which would add its delay */
@@ -247,30 +241,36 @@ export class WebEngine implements AudioEngine {
     this.out = ctx.createGain();
     this.outMeter = ctx.createAnalyser();
     this.outMeter.fftSize = 2048;
-    /* the old app's limiter: parts that add up past full scale (a take at
-       full voice over the voice and the music) are held under it, never
-       clipped. It starts at 0.9, and its own lift is taken off again, so
-       below 0.9 nothing is changed (measured: tests/loudness, chain-unity) */
-    const limit = ctx.createDynamicsCompressor();
-    limit.threshold.value = LIMIT_DB;
-    limit.knee.value = 0;
-    limit.ratio.value = LIMIT_RATIO;
-    limit.attack.value = 0.002;
-    limit.release.value = 0.15;
-    this.out.connect(limit);
-    const even = ctx.createGain();
-    even.gain.value = 1 / makeupOf(LIMIT_DB, LIMIT_RATIO);
-    limit.connect(even);
-    /* and a last safety, because the limiter reacts a moment late on a
-       sudden peak: nothing below 0.9 is touched, anything above is rounded
-       off short of full scale (measured: two loud parts reaching 1.85 came
-       out at 1.03 with the limiter alone). It takes the sound at half, as
+    /* the old app's v9.8 loudness stage: the body of the sound lifted, the
+       whole raised, the peaks held by the limiter (parts that add up past
+       full scale, like a take at full voice over the song, too) */
+    const compressor = (c: typeof LOUD.body) => {
+      const n = ctx.createDynamicsCompressor();
+      n.threshold.value = c.threshold;
+      n.knee.value = c.knee;
+      n.ratio.value = c.ratio;
+      n.attack.value = c.attack;
+      n.release.value = c.release;
+      return n;
+    };
+    const gain = (v: number) => {
+      const g = ctx.createGain();
+      g.gain.value = v;
+      return g;
+    };
+    const into = gain(LOUD.in), body = compressor(LOUD.body), raise = gain(LOUD.raise), limit = compressor(LOUD.limit);
+    this.out.connect(into);
+    into.connect(body);
+    body.connect(raise);
+    raise.connect(limit);
+    /* and the ceiling, because the limiter reacts a moment late on a
+       sudden peak: no peak reaches -1 dBFS. It takes the sound at half, as
        its curve does, so twice full scale fits. */
-    const half = ctx.createGain();
-    half.gain.value = 0.5;
+    const half = gain(0.5);
     const safe = ctx.createWaveShaper();
     safe.curve = SAFETY_CURVE;
-    even.connect(half);
+    safe.oversample = CEILING.oversample;
+    limit.connect(half);
     half.connect(safe);
     this.last = half;
     safe.connect(ctx.destination);
@@ -686,17 +686,13 @@ export class WebEngine implements AudioEngine {
     /* the mic's own delay, as the phone reports it, taken off at the source */
     const lat = (stream.getAudioTracks()[0]?.getSettings() as { latency?: number } | undefined)?.latency;
     this.inputLatency = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
-    /* Hear yourself: lifted, rounded off so it can't clip, and into the
-       last safety beside the song (not through the limiter, which would
-       add its delay) */
+    /* Hear yourself: lifted, and into the ceiling beside the song, which
+       rounds it off so it can't clip (not through the compressors, which
+       would add their delay: the ceiling alone adds CEILING.delay) */
     this.monitorGain = ctx.createGain();
-    this.monitorGain.gain.value = this.monitorLevel / MONITOR_ROOM;
-    const soft = ctx.createWaveShaper();
-    soft.curve = MONITOR_CURVE;
-    this.monitorShape = soft;
+    this.monitorGain.gain.value = this.monitorLevel;
     micNode.connect(this.monitorGain);
-    this.monitorGain.connect(soft);
-    soft.connect(this.last && this.last.context === ctx ? this.last : ctx.destination);
+    this.monitorGain.connect(this.last && this.last.context === ctx ? this.last : ctx.destination);
     await this.openTap(ctx, micNode);
   }
 
@@ -709,7 +705,7 @@ export class WebEngine implements AudioEngine {
   }
 
   private detachMic(): void {
-    for (const n of [this.micNode, this.tap, this.monitorGain, this.monitorShape]) {
+    for (const n of [this.micNode, this.tap, this.monitorGain]) {
       try {
         n?.disconnect();
       } catch {
@@ -721,7 +717,6 @@ export class WebEngine implements AudioEngine {
     this.analyser = null;
     this.tap = null;
     this.monitorGain = null;
-    this.monitorShape = null;
     this.attached = null;
   }
 
@@ -754,13 +749,14 @@ export class WebEngine implements AudioEngine {
   monitor(gain: number): void {
     this.monitorLevel = Math.min(MONITOR_ROOM, Math.max(0, gain));
     const g = this.monitorGain;
-    if (g && this.ctx) g.gain.setTargetAtTime(this.monitorLevel / MONITOR_ROOM, this.ctx.currentTime, 0.015);
+    if (g && this.ctx) g.gain.setTargetAtTime(this.monitorLevel, this.ctx.currentTime, 0.015);
   }
 
   outputLatency(): number {
     const ctx = this.ctx;
     if (!ctx) return 0;
-    return heardDelay(ctx.outputLatency, ctx.baseLatency);
+    /* the phone's own delay, and the way out's */
+    return heardDelay(ctx.outputLatency, ctx.baseLatency) + STAGE_DELAY;
   }
 
   micOpen(): boolean {

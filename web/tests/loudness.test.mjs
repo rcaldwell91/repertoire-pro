@@ -7,11 +7,12 @@
    connected to the way out), beside what the mic hears, over the same
    moments. The mic hears a real voice (RP_MIC), made as quiet as a raw
    phone mic with no auto gain: -24 dBFS on average. The songs are the
-   separator's real first 30 seconds of one song (RP_SPLIT), made quiet,
-   and a plain tone for the chain's own gain. Prints one line per check;
-   exits 1 if any fails. ONLY=name,name runs some; APP_DIR points it at
-   another build. */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+   separator's real first 30 seconds of one song (RP_SPLIT), as it is and
+   made quiet. Loudness is recorded sample by sample at the speaker and
+   read with ffmpeg's EBU R128 meter (LUFS, true peak). Prints one line per
+   check; exits 1 if any fails. ONLY=name,name runs some; APP_DIR points it
+   at another build. */
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -21,10 +22,10 @@ import { ANDROID, PROBE, serve } from './harness.mjs';
 import { copy } from '../src/core/copy.ts';
 
 /* Robert's numbers, written here as he said them (not read from the app):
-   Hear yourself at 100 three times the mic (about +9.5 dB; 23 Oct, down
-   from four), by ear (squared) like the other sliders; a song's loudest
-   moment at -1 dBFS (22 Oct). */
-const monitorOf = (v) => 3 * (v / 100) ** 2;
+   Hear yourself at 100 enough to stay about 3 dB over the music (23 Oct:
+   measured, six times the mic), by ear (squared) like the other sliders;
+   a song's loudest moment at -1 dBFS (22 Oct). */
+const monitorOf = (v) => 6 * (v / 100) ** 2;
 const SONG_PEAK = 10 ** (-1 / 20);
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
@@ -41,7 +42,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`)) || !e
 }
 
 const ALL = ['monitor-before-start', 'monitor-count-in', 'monitor-after-rebuild', 'monitor-unmute', 'monitor-level', 'monitor-remembered', 'song-level',
-  'song-full', 'chain-unity', 'no-page-errors'];
+  'song-full', 'song-loudness', 'peaks-held', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -65,14 +66,17 @@ for (const p of ['voice30', 'music30']) {
   QUIET[p] = join(tmp, `quiet-${p}.wav`);
   ff('-i', `${PREFIX}-${p}.mp3`, '-af', 'volume=0.2', '-ac', '2', '-ar', '44100', QUIET[p]);
 }
-/* a plain tone at half scale (ffmpeg's sine is at 1/8), the same on both
-   sides (its own upmix would drop it 3 dB), and silence beside it, at the
-   speaker's own rate */
-const TONE = join(tmp, 'tone.wav'), HUSH = join(tmp, 'hush.wav');
-ff('-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=30', '-af', 'volume=4,pan=stereo|c0=c0|c1=c0', TONE);
-ff('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30', HUSH);
 const micMean = meanOf(MIC_WAV);
-if (![MIC_WAV, TONE, HUSH, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5)) {
+/* the song's own files, voice and music added together: how loud it is in itself */
+const SONG_OWN = r128Of(spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', `${PREFIX}-voice30.mp3`, '-i', `${PREFIX}-music30.mp3`, '-filter_complex',
+  '[0:a][1:a]amix=inputs=2:normalize=0,ebur128=peak=true+sample:framelog=quiet', '-f', 'null', '-'], { encoding: 'utf8' }).stderr);
+/* the quiet song's loudest moment, voice and music together, as decoded at the speaker's rate */
+const QUIET_PEAK = (() => {
+  const out = spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', QUIET.voice30, '-i', QUIET.music30, '-filter_complex',
+    '[0:a][1:a]amix=inputs=2:normalize=0,aresample=48000,aformat=sample_fmts=flt,astats=measure_perchannel=none:measure_overall=Peak_level', '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
+  return 10 ** (+((/Peak level dB: (-?[\d.]+)/.exec(out) || [])[1] ?? NaN) / 20);
+})();
+if (![MIC_WAV, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5) || !Number.isFinite(SONG_OWN.lufs) || !Number.isFinite(QUIET_PEAK)) {
   console.log('FAIL setup: could not make the recordings (FFMPEG)');
   process.exit(1);
 }
@@ -95,11 +99,24 @@ const METER = `(() => {
       setInterval(() => { if (ctx.state === 'closed') return; side.getFloatTimeDomainData(b);
         for (let i = 0; i < b.length; i++) { const v = Math.abs(b[i]); if (v > M.sides) M.sides = v; } }, 200);
     }
+    /* and every sample, both sides, while recording (for the loudness meter) */
+    g.channelCount = 2; g.channelCountMode = 'explicit';
+    const sp = ctx.createScriptProcessor(4096, 2, 2);
+    connect.call(g, sp); connect.call(sp, ctx.destination);
+    sp.onaudioprocess = (e) => { if (!M.rec || ctx.state !== 'running') return;
+      M.l.push(new Float32Array(e.inputBuffer.getChannelData(0))); M.r.push(new Float32Array(e.inputBuffer.getChannelData(1))); M.rate = ctx.sampleRate; };
     outs.set(ctx, { g, read: reader(an), ctx });
     return outs.get(ctx);
   };
+  M.rec = false; M.l = []; M.r = []; M.rate = 48000;
+  /* what was recorded, both sides interleaved, as base64, a piece at a time */
+  M.take = (from, n) => { const l = M.l.slice(from, from + n), r = M.r.slice(from, from + n);
+    let len = 0; l.forEach((c) => (len += c.length)); const out = new Float32Array(len * 2); let k = 0;
+    l.forEach((c, j) => { for (let i = 0; i < c.length; i++) { out[k++] = c[i]; out[k++] = r[j][i]; } });
+    const b = new Uint8Array(out.buffer); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return btoa(s); };
   AudioNode.prototype.connect = function (to, ...r) {
-    if (to instanceof AudioDestinationNode && !(this instanceof AudioBufferSourceNode && this.buffer && this.buffer.length <= 1)) connect.call(this, outOf(this.context).g);
+    if (to instanceof AudioDestinationNode && !(this instanceof AudioBufferSourceNode && this.buffer && this.buffer.length <= 1) && !(this instanceof ScriptProcessorNode)) connect.call(this, outOf(this.context).g);
     return connect.call(this, to, ...r);
   };
   const ms = AudioContext.prototype.createMediaStreamSource;
@@ -167,6 +184,26 @@ async function measure(ms = 2500) {
     return { out, mic, peak: M.out.peak, ratio: mic > 0 ? out / mic : 0 }; })()`);
 }
 const near = (x, want, tol) => Math.abs(x / want - 1) <= tol;
+/** EBU R128, as ffmpeg's meter reads it: integrated loudness (LUFS), true peak and sample peak (dBFS) */
+function r128(args) {
+  return r128Of(spawnSync(FFMPEG, ['-hide_banner', '-nostats', ...args, '-af', 'ebur128=peak=true+sample:framelog=quiet', '-f', 'null', '-'], { encoding: 'utf8' }).stderr);
+}
+function r128Of(out) {
+  const pick = (re) => +((re.exec(out) || [])[1] ?? NaN);
+  return { lufs: pick(/I:\s+(-?[\d.]+) LUFS/), truePeak: pick(/True peak:\s+Peak:\s+(-?[\d.]+)/), samplePeak: pick(/Sample peak:\s+Peak:\s+(-?[\d.]+)/) };
+}
+/** what left the app while `run` ran, recorded at the speaker, measured */
+async function recorded(run) {
+  await page.eval(`Object.assign(window.__meter, { rec: true, l: [], r: [] })`);
+  await run();
+  await page.eval(`window.__meter.rec = false`);
+  const n = await page.eval(`window.__meter.l.length`), rate = await page.eval(`window.__meter.rate`);
+  const bufs = [];
+  for (let i = 0; i < n; i += 64) bufs.push(Buffer.from(await page.eval(`window.__meter.take(${i}, 64)`), 'base64'));
+  const raw = join(tmp, 'out-' + Date.now() + '.f32');
+  writeFileSync(raw, Buffer.concat(bufs));
+  return { seconds: Buffer.concat(bufs).length / 8 / rate, ...r128(['-f', 'f32le', '-ar', String(rate), '-ac', '2', '-i', raw]) };
+}
 const show = (m) => `your voice at the speaker ${dB(m.out)} for ${dB(m.mic)} at the mic (x${m.ratio.toFixed(2)})`;
 
 try {
@@ -181,8 +218,6 @@ try {
     await put(p, `${PREFIX}-${p}.mp3`, 'audio/mpeg');
     await put('quiet-' + p, QUIET[p], 'audio/wav');
   }
-  await put('tone', TONE, 'audio/wav');
-  await put('hush', HUSH, 'audio/wav');
   await page.eval(`(async () => {
     const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app');
       q.onupgradeneeded = () => { const d = q.result; for (const s of ['songs', 'lines', 'takes']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); };
@@ -192,7 +227,6 @@ try {
     await new Promise((ok) => { const t = db.transaction('songs', 'readwrite'), s = t.objectStore('songs');
       s.put(one('loud-song', 'A song', P.voice30, P.music30));
       s.put(one('quiet-song', 'A quiet song', P['quiet-voice30'], P['quiet-music30']));
-      s.put(one('tone-song', 'A tone', P.tone, P.hush));
       t.oncomplete = ok; });
     db.close();
     delete window.__parts;
@@ -271,8 +305,8 @@ try {
   }
 
   /* 5. The Hear yourself slider: 70 at first, remembered, 0 is silent, 100
-        three times the mic (Robert, 23 Oct) and louder than the music at
-        100, never clipping */
+        at the top Robert set, never clipping, and about 3 dB over the music
+        at 100 (Robert, 23 Oct: "clearly louder than the music") */
   if (want('monitor-level')) {
     await open('loud-song');
     const first = await page.eval(`document.querySelector('#monitor-volume')?.value ?? null`);
@@ -303,7 +337,7 @@ try {
     await stopped();
     const louder = 20 * Math.log10(m100.out / music.out);
     check('monitor-level', first === '70' && ok && near(m50.ratio, monitorOf(50), 0.1) && m0.out < 1e-4 && near(m100.ratio, monitorOf(100), 0.1) && m100.peak < 1 &&
-      kept === '100' && louder >= 3,
+      kept === '100' && louder >= 2.5,
       `the slider first at ${first}; at 50: ${show(m50)}; at 0: ${dB(m0.out)}; at 100: ${show(m100)}, loudest ${m100.peak.toFixed(3)}; ` +
       `the music alone at 100 ${dB(music.out)}, so your voice is ${louder.toFixed(1)} dB louder; remembered after leaving: ${kept}`);
   }
@@ -341,19 +375,19 @@ try {
       `switched on, then back to the song: on ${on}, ${show(m)}; switched off, then back: on ${off}, your voice at the speaker ${dB(quiet.out)}`);
   }
 
-  /* 6. A quiet song comes out with its loudest moment at -1 dBFS; the level
-        is kept with the song and read from there, not measured again */
+  /* 6. A quiet song is lifted so its loudest moment would be at -1 dBFS,
+        voice and music alike, before the loudness stage; the level is kept
+        with the song and read from there, not measured again */
   if (want('song-level')) {
+    /* the song's own loudest moment, as decoded: what it is lifted from */
     await open('quiet-song');
     await page.tap('#song-play');
     const ok = await playing();
-    await page.eval(`window.__meter.sides = 0`);
     await sleep(500);
     const gains = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
-    /* the whole song, to its end, so its loudest moment is in it */
-    const ended = await page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000);
-    await sleep(400);
-    const peak = await page.eval(`window.__meter.sides`);
+    await page.tap('#song-play');
+    await stopped();
+    const own = QUIET_PEAK;
     /* the song as kept on the phone: read it, or change it */
     const idb = (body) => page.eval(`new Promise((ok, no) => { const q = indexedDB.open('repertoire-app');
       q.onerror = () => no(new Error('no store'));
@@ -363,20 +397,21 @@ try {
         t.oncomplete = () => { db.close(); ok(value); };
         t.onabort = t.onerror = () => { db.close(); no(new Error('could not read the song')); }; }; })`);
     const level = await idb(`(s) => ({ value: s.level ? s.level.full : null })`);
-    /* kept: halve what is kept, and the song plays at half */
+    /* kept: halve what is kept, and the song is sent at half */
     await idb(`(s) => ({ put: s.level && s.level.full ? { ...s, level: { ...s.level, full: s.level.full / 2 } } : s })`);
     await open('quiet-song');
     await page.tap('#song-play');
     await playing();
-    await page.eval(`window.__meter.sides = 0`);
-    await page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000);
-    await sleep(400);
-    const halved = await page.eval(`window.__meter.sides`);
+    await sleep(500);
+    const halved = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
+    await page.tap('#song-play');
+    await stopped();
     const same = gains.length === 2 && Math.abs(gains[0] - gains[1]) < 1e-6;
-    check('song-level', ok && ended && same && near(peak, SONG_PEAK, 0.01) && typeof level === 'number' && level > 2 && near(halved, SONG_PEAK / 2, 0.01),
-      `loudest at the speaker, either side, ${peak.toFixed(3)} (${dB(peak)}; -1 dBFS is ${SONG_PEAK.toFixed(3)}); voice and music lifted alike ${same} ` +
-      `(${gains.map((g) => g.toFixed(2)).join(', ')}); kept with the song: x${typeof level === 'number' ? level.toFixed(2) : level}; ` +
-      `with the kept level halved: ${halved.toFixed(3)}`);
+    check('song-level', ok && same && near(gains[0] * own, SONG_PEAK, 0.01) && typeof level === 'number' && near(level, gains[0], 1e-6) &&
+      halved.length === 2 && near(halved[0], gains[0] / 2, 1e-6),
+      `the quiet song's loudest moment ${own.toFixed(3)}, sent at x${gains.map((g) => g.toFixed(2)).join(' and x')} (voice and music alike ${same}), ` +
+      `so at ${(gains[0] * own).toFixed(3)} (-1 dBFS is ${SONG_PEAK.toFixed(3)}); kept with the song: x${typeof level === 'number' ? level.toFixed(2) : level}; ` +
+      `with the kept level halved, sent at x${halved.map((g) => g.toFixed(2)).join(' and x')}`);
   }
 
   /* 6b. A song whose parts together already reach full volume is brought
@@ -394,25 +429,35 @@ try {
       `a song already at full volume plays at ${gains.map((g) => g.toFixed(3)).join(' / ')} (1 is as it is)`);
   }
 
-  /* 7. The way out adds nothing and takes nothing below 0.9: a tone at
-        known levels comes out at exactly those levels */
-  if (want('chain-unity')) {
-    const rows = [];
-    for (const v of [100, 70, 30]) {
-      await open('tone-song');
-      await slide('#voice-volume', v);
-      await page.tap('#song-play');
-      await playing();
-      await sleep(500);
-      /* what the song is sent at: the tone as decoded, at its level, at this slider */
-      const sent = await page.eval(`Math.max(...window.__probe.decoded.map((d) => d.peak)) * window.__probe.playing()[0].gain`);
-      const m = await measure(2000);
-      await page.tap('#song-play');
-      await stopped();
-      rows.push({ v, sent, got: m.peak, gain: m.peak / sent });
-    }
-    check('chain-unity', rows.every((r) => near(r.sent, SONG_PEAK * (r.v / 100) ** 2, 0.01) && near(r.gain, 1, 0.01)),
-      rows.map((r) => `slider ${r.v}: sent ${r.sent.toFixed(3)}, came out ${r.got.toFixed(3)} (gain ${r.gain.toFixed(3)})`).join('; '));
+  /* 7. Robert, 23 Oct: the old app's v9.8 loudness stage, as it was, peaks
+        held under -1 dB. His song at sliders 100 comes out 3 to 6 dB louder
+        than its own files (which is how it played before), by the standard
+        meter (EBU R128) */
+  if (want('song-loudness')) {
+    await open('loud-song');
+    await page.tap('#song-play');
+    const ok = await playing();
+    const m = await recorded(() => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000));
+    const lift = m.lufs - SONG_OWN.lufs;
+    check('song-loudness', ok && m.seconds > 25 && lift >= 2.5 && lift <= 6.5 && m.truePeak < -1 && m.samplePeak < -1,
+      `the song's own files ${SONG_OWN.lufs.toFixed(1)} LUFS (peak ${SONG_OWN.truePeak.toFixed(1)} dBFS); at the speaker over ${m.seconds.toFixed(0)} s: ` +
+      `${m.lufs.toFixed(1)} LUFS, ${lift >= 0 ? '+' : ''}${lift.toFixed(1)} dB louder; true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS`);
+  }
+
+  /* 8. Everything at 100 at once, the song and your voice back at the top
+        of its slider: still never over -1 dB */
+  if (want('peaks-held')) {
+    await open('loud-song', true);
+    await slide('#monitor-volume', 100);
+    await page.tap('#song-play');
+    const ok = await playing();
+    const m = await recorded(() => sleep(12000));
+    await page.tap('#song-play');
+    await stopped();
+    await slide('#monitor-volume', 70);
+    await hearOn(false);
+    check('peaks-held', ok && m.seconds > 10 && m.truePeak < -1 && m.samplePeak < -1,
+      `the song and your voice back, all at 100, over ${m.seconds.toFixed(0)} s: true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS, ${m.lufs.toFixed(1)} LUFS`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

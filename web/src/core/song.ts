@@ -111,10 +111,12 @@ export function countBeat(bpm: number | undefined): number {
   return bpm && Number.isFinite(bpm) && bpm >= 40 && bpm <= 240 ? 60 / bpm : 1;
 }
 
-/** "Hear yourself" at 100: three times the mic (about +9.5 dB), because a
+/** "Hear yourself" at 100: six times the mic (about +15.6 dB), because a
     raw mic with no auto gain is quiet (Robert, 22 Oct: four times; 23 Oct:
-    a little too loud, three). The engine rounds off anything that would clip. */
-export const MONITOR_MAX = 3;
+    a little too loud, three; then, with the songs made louder by the old
+    app's v9.8 stage, enough to stay about 3 dB over the music at 100:
+    measured, six). The engine rounds off anything that would clip. */
+export const MONITOR_MAX = 6;
 /** the Hear yourself slider, the first time (Robert, 22 Oct) */
 export const MONITOR_DEFAULT = 70;
 

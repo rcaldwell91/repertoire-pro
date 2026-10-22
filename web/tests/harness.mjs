@@ -144,10 +144,13 @@ export const PROBE = `(() => {
    a phone reports them, so an app that leaves either uncorrected puts your
    line in the wrong place. The test's own route into the mic (a stream
    inside the browser) is measured first and taken off, so only the app's
-   timing is left to judge. Install BEFORE the PROBE, so the probe still
-   sees every mic track. Off until window.__mirror.on = true. */
+   timing is left to judge. The app's own way out holds the sound back as
+   well (its compressors look ahead, its ceiling runs at twice the rate):
+   measured offline, 23 Oct, 14.7 ms, and the singer hears that too.
+   Install BEFORE the PROBE, so the probe still sees every mic track. Off
+   until window.__mirror.on = true. */
 export const MIRROR = `(() => {
-  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, buffer: null, ctx: null, src: null, starts: [], at: null, pre: null, waiting: null };
+  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, stage: 0.0147, buffer: null, ctx: null, src: null, starts: [], at: null, pre: null, waiting: null };
   const AC = window.AudioContext;
   /* The app opens the mic before it makes its sound (RULEBOOK 4, Sound,
      Android 4). The mirror's mic has to come from the app's own sound, so
@@ -212,7 +215,7 @@ export const MIRROR = `(() => {
     M.waiting = async ({ when, offset, node }) => {
       if (M.src !== src) return;
       src.buffer = M.buffer || node.buffer;
-      const heard = when + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */
+      const heard = when + M.stage + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */
       const sing = heard + M.inLat - (M.loop || 0);          /* the mic has it */
       const at = Math.max(sing, ctx.currentTime + 0.02);
       start.call(src, at, offset + (at - sing));

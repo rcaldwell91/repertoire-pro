@@ -53,9 +53,10 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ Overlapping sounds never clip: the old app had a limiter, measured at 1.796 with three notes (992-1012) — test: `takes:take-no-clip` (fixed 12 Oct: a take at full voice over the voice and music measured 1.10 at the speaker, 2.1 in the files)
 - ✓ Measure what actually leaves the app, not what was scheduled (6644-6654) — test: `browser:start`
 - ✓ One check of "working" used everywhere, so they can't disagree (6647-6648) — test: `unit:core/sound-check.test.ts:reads each row from what the phone says`
-- — The compressor, the loudness tuning and the keyboard levels (1003-1005, 6276-6280). The new app has no synth or keyboard; instead each song is brought to -1 dBFS once (Robert, 22 Oct).
+- ✓ The v9.8 loudness stage, as it was: in at 0.9, a compressor lifts the body (-12 dB, knee 6, ratio 3, 4 ms, 220 ms), 1.4 raises it all, a limiter holds the peaks (-3 dB, ratio 20, 1 ms, 60 ms) (991-1014; Robert, 23 Oct). Its tuning tests, loud.js and test_loud.js, are not in the repo — test: `loudness:song-loudness`, `unit:audio/engine-web/web-engine.test.ts:is the old app's v9.8 stage`
+- — The keyboard levels (6276-6280). The new app has no synth or keyboard.
 - ✓ Each song brought up to a proper level once: its loudest moment lifted to -1 dBFS, voice and music by the same gain, kept with the song; up, never down (Robert, 22 Oct) — test: `loudness:song-level`, `loudness:song-full`, `unit:core/song.test.ts:brings a song up, never down`, `unit:audio/conductor/conductor.test.ts:measures a song with no level kept`, `unit:audio/conductor/conductor.test.ts:uses the level kept with the song`
-- ✓ Nothing on the way out changes the sound below 0.9: the limiter starts at 0.9, its own lift taken off (Robert, 22 Oct) — test: `loudness:chain-unity`
+- ✓ Peaks held under -1 dB, between the samples too, with everything at 100: a ceiling after the limiter (Robert, 23 Oct; it withdraws 22 Oct's "nothing changes below 0.9") — test: `loudness:peaks-held`, `android:no-clip`, `takes:take-no-clip`, `unit:audio/engine-web/web-engine.test.ts:never reaching -1 dBFS`
 - ✓ "Test without mic": let the mic go, wait for the phone to settle, make the sound anew, and say plainly whether it came back (6783-6824; Robert, 13 Oct) — test: `android:test-without-mic`, `unit:audio/conductor/conductor.test.ts:"Test without mic": lets the mic go`
 - — Test sound into a muted channel, the phone's call volume (6693-6696, 6737-6741). Not in the new app: its Sound check plays one note at a fixed level.
 
@@ -107,7 +108,7 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ The microphone check on screen: on, hearing, which mic, held by another app (1531-1547) — test: `browser:start`
 - ✓ Hear yourself hangs off the one mic, straight to the speaker, off unless singing (1271-1293, 22510-22539) — test: `notemap:hear-yourself`, `unit:audio/conductor/conductor.test.ts:"Hear yourself" sounds only while singing`
 - ✓ Hear yourself is headphones only (1312, 7370-7371) — test: `notemap:hear-yourself`
-- ✓ Hear yourself has its own volume, remembered (22455-22500). Robert, 22 Oct: a slider under the switch, 0 to 100, 70 at first, rounded off so it can't clip (the old app went to 200%); 23 Oct: three times the raw mic at 100 (about +9.5 dB), down from four — test: `loudness:monitor-level`, `unit:core/song.test.ts:is off at 0, three times the mic (about +9.5 dB) at 100`
+- ✓ Hear yourself has its own volume, remembered (22455-22500). Robert, 22 Oct: a slider under the switch, 0 to 100, 70 at first, rounded off so it can't clip (the old app went to 200%); 23 Oct: three times the raw mic at 100, down from four; then six (about +15.6 dB), to stay about 3 dB over the louder music — test: `loudness:monitor-level`, `unit:core/song.test.ts:is off at 0, six times the mic (about +15.6 dB) at 100`
 - ✓ Hear yourself is set whenever the switch moves, and kept while the song starts (22525-22532, the gate) — test: `loudness:monitor-count-in`, `loudness:monitor-before-start`, `unit:audio/conductor/conductor.test.ts:switched on during the 3-2-1 sounds as the song starts`
 - ✓ Hear yourself kept attached across rewires (1358, 3182) — test: `loudness:monitor-after-rebuild`, `android:hear-yourself-rebuilt`
 - ✓ The mic wired again a moment after the phone gives it back, or it can stay live and silent (1371-1374) — test: `loudness:monitor-unmute`
@@ -202,4 +203,9 @@ For each part the new app has built, every rule the old app's code (next.html) e
 1. Hear yourself at 100 a little too loud: three times the mic (about +9.5 dB), not four. Default 70 on the new scale; the soft limit kept.
 2. Whether Hear yourself is on is remembered between visits, as the old app did.
 3. Raise quiet songs, never turn loud ones down (agreed).
-4. Songs louder, porting the old app's v9.8 stage, about -14 LUFS: held, not built. Measured, the songs already play at -9.8 to -15.5 LUFS, so -14 would make most of them no louder; the v9.8 stage makes them 3 to 6 dB louder (-6.8 to -9.3 LUFS). Waiting on Robert's choice.
+4. Songs louder, porting the old app's v9.8 stage, about -14 LUFS: held, not built. Measured, the songs already play at -9.8 to -15.5 LUFS, so -14 would make most of them no louder; the v9.8 stage makes them 3 to 6 dB louder (-6.8 to -9.3 LUFS). Robert chose the v9.8 stage (below).
+
+## Decided by Robert, 23 Oct (later): option 2
+
+1. The old app's v9.8 loudness stage as it was, peaks held under -1 dB: songs 3 to 6 dB louder than before at sliders 100; his song near -7 LUFS. It withdraws "nothing changes below 0.9" (22 Oct).
+2. Hear yourself at 100 stays clearly louder than the music, about 3 dB over it; its top raised if the louder song swallows it.
