@@ -271,8 +271,9 @@ try {
     const peak = await page.eval(S('outPeak'));
     const parts = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
     await page.tap('#song-play');
-    check('take-no-clip', parts.length === 3 && parts.every((g) => g >= 0.99) && peak > 0.3 && peak <= 1.0,
-      `a take heard over the voice and music, all at 100% (${parts.map((g) => g.toFixed(2)).join(' / ')}): the loudest sound sent to the speaker ${peak.toFixed(3)} (full scale is 1)`);
+    /* the voice and music at their song's level (its loudest moment at -1 dBFS), the take at its own */
+    check('take-no-clip', parts.length === 3 && parts[0] === parts[1] && parts[0] > 0.5 && parts[2] >= 0.99 && peak > 0.3 && peak <= 1.0,
+      `a take heard over the voice and music, all sliders at 100 (${parts.map((g) => g.toFixed(2)).join(' / ')}): the loudest sound sent to the speaker ${peak.toFixed(3)} (full scale is 1)`);
   }
 
   /* 2. leaving ends it: silence, the mic closed; the take is still there to decide on */

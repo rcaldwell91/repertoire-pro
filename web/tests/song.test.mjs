@@ -274,7 +274,8 @@ try {
       const fmt = (g) => g.map((x) => x.gain?.toFixed(2)).join(' / ');
       const vOnly = Math.abs(g1[0].gain - g0[0].gain) > 0.5 && Math.abs(g1[1].gain - g0[1].gain) < 0.01;
       const mOnly = Math.abs(g2[1].gain - g1[1].gain) > 0.3 && Math.abs(g2[0].gain - g1[0].gain) < 0.01;
-      check('sliders', g0.length === 2 && g0.every((x) => x.gain === 1) && vOnly && mOnly && g0.every((x) => Math.abs(x.seconds - total) < 1),
+      /* at 100 both play at the song's own level (Robert, 22 Oct: its loudest moment at -1 dBFS), the same for both */
+      check('sliders', g0.length === 2 && g0[0].gain === g0[1].gain && g0[0].gain > 0.1 && vOnly && mOnly && g0.every((x) => Math.abs(x.seconds - total) < 1),
         `volumes voice / music: ${fmt(g0)} → voice slider down: ${fmt(g1)} → music slider down: ${fmt(g2)}`);
     }
 
