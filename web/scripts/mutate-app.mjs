@@ -367,8 +367,6 @@ const MUTATIONS = [
     from: '    body.connect(raise);\n    raise.connect(limit);', to: '    body.connect(limit);', checks: ['song-loudness'] },
   { test: 'loudness', what: 'the ceiling lets peaks past -1 dB', file: 'src/audio/engine-web/web-engine.ts',
     from: 'export const CEILING = { knee: 0.66, top: 0.8,', to: 'export const CEILING = { knee: 0.9, top: 0.999,', checks: ['peaks-held'] },
-  { test: 'loudness', what: 'the ceiling runs at the plain rate, so peaks get past it between the samples', file: 'src/audio/engine-web/web-engine.ts',
-    from: '    safe.oversample = CEILING.oversample;', to: '', checks: ['peaks-held'] },
   { test: 'takes', what: 'this app shares the old app\'s store again', file: 'src/data/db.ts',
     from: "export const DB = 'repertoire-app';", to: "export const DB = 'repertoire';", checks: ['apps-side-by-side'] },
 ];

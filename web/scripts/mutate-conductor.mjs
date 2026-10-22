@@ -92,6 +92,11 @@ export const MUTATIONS = [
     from: 'export const MONITOR_MAX = 6;', to: 'export const MONITOR_MAX = 3;' },
   { rule: 'the loudness stage is not the old app\'s v9.8', file: W,
     from: '  raise: 1.4,', to: '  raise: 1.2,' },
+  /* the ceiling at the plain rate: rendered offline, Ride's chorus then
+     reaches -0.7 dB between the samples (-1.3 dB at twice the rate); in the
+     browser check the difference is too small to see, so this guards it */
+  { rule: 'the ceiling runs at the plain rate', file: W,
+    from: "oversample: '2x' as OverSampleType", to: "oversample: 'none' as OverSampleType" },
   { rule: 'the ceiling reaches -1 dBFS', file: W,
     from: 'export const CEILING = { knee: 0.66, top: 0.8,', to: 'export const CEILING = { knee: 0.66, top: 0.95,' },
   { rule: 'the way out\'s delay is not counted when a sound is heard', file: W,
