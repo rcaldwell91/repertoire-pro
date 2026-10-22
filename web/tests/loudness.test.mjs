@@ -36,8 +36,10 @@ const want = (...names) => !ONLY.length || names.some((n) => ONLY.includes(n));
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 const PREFIX = process.env.RP_SPLIT || '';
 const MIC = process.env.RP_MIC || '';
-if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`)) || !existsSync(MIC)) {
-  console.log('FAIL setup: RP_SPLIT must name the separator\'s output for one song, and RP_MIC a WAV of a real voice (both kept outside the repo)');
+/* Ride, from RP_RECORDINGS ("Name:path,..."): its loud chorus has the sharp peaks a ceiling must hold between the samples */
+const RIDE = ((process.env.RP_RECORDINGS || '').split(',').map((x) => x.split(':')).find((x) => x[0] === 'Ride') || [])[1] || '';
+if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`)) || !existsSync(MIC) || !existsSync(RIDE)) {
+  console.log('FAIL setup: RP_SPLIT must name the separator\'s output for one song, RP_MIC a WAV of a real voice, and RP_RECORDINGS hold Ride (all kept outside the repo)');
   process.exit(1);
 }
 
@@ -66,6 +68,10 @@ for (const p of ['voice30', 'music30']) {
   QUIET[p] = join(tmp, `quiet-${p}.wav`);
   ff('-i', `${PREFIX}-${p}.mp3`, '-af', 'volume=0.2', '-ac', '2', '-ar', '44100', QUIET[p]);
 }
+/* Ride's chorus, 30 s from 3 minutes in, and silence beside it */
+const RIDE30 = join(tmp, 'ride30.wav'), HUSH = join(tmp, 'hush.wav');
+ff('-ss', '180', '-t', '30', '-i', RIDE, '-ac', '2', '-ar', '44100', RIDE30);
+ff('-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-t', '30', HUSH);
 const micMean = meanOf(MIC_WAV);
 /* the song's own files, voice and music added together: how loud it is in itself */
 const SONG_OWN = r128Of(spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', `${PREFIX}-voice30.mp3`, '-i', `${PREFIX}-music30.mp3`, '-filter_complex',
@@ -76,7 +82,7 @@ const QUIET_PEAK = (() => {
     '[0:a][1:a]amix=inputs=2:normalize=0,aresample=48000,aformat=sample_fmts=flt,astats=measure_perchannel=none:measure_overall=Peak_level', '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
   return 10 ** (+((/Peak level dB: (-?[\d.]+)/.exec(out) || [])[1] ?? NaN) / 20);
 })();
-if (![MIC_WAV, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5) || !Number.isFinite(SONG_OWN.lufs) || !Number.isFinite(QUIET_PEAK)) {
+if (![MIC_WAV, RIDE30, HUSH, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5) || !Number.isFinite(SONG_OWN.lufs) || !Number.isFinite(QUIET_PEAK)) {
   console.log('FAIL setup: could not make the recordings (FFMPEG)');
   process.exit(1);
 }
@@ -218,6 +224,8 @@ try {
     await put(p, `${PREFIX}-${p}.mp3`, 'audio/mpeg');
     await put('quiet-' + p, QUIET[p], 'audio/wav');
   }
+  await put('ride', RIDE30, 'audio/wav');
+  await put('hush', HUSH, 'audio/wav');
   await page.eval(`(async () => {
     const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app');
       q.onupgradeneeded = () => { const d = q.result; for (const s of ['songs', 'lines', 'takes']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id' }); };
@@ -227,6 +235,7 @@ try {
     await new Promise((ok) => { const t = db.transaction('songs', 'readwrite'), s = t.objectStore('songs');
       s.put(one('loud-song', 'A song', P.voice30, P.music30));
       s.put(one('quiet-song', 'A quiet song', P['quiet-voice30'], P['quiet-music30']));
+      s.put(one('ride-song', 'Ride', P.ride, P.hush));
       t.oncomplete = ok; });
     db.close();
     delete window.__parts;
@@ -439,14 +448,20 @@ try {
     const ok = await playing();
     const m = await recorded(() => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000));
     const lift = m.lufs - SONG_OWN.lufs;
-    check('song-loudness', ok && m.seconds > 25 && lift >= 2.5 && lift <= 6.5 && m.truePeak < -1 && m.samplePeak < -1,
+    check('song-loudness', ok && m.seconds > 25 && lift >= 3 && lift <= 6 && m.truePeak < -1 && m.samplePeak < -1,
       `the song's own files ${SONG_OWN.lufs.toFixed(1)} LUFS (peak ${SONG_OWN.truePeak.toFixed(1)} dBFS); at the speaker over ${m.seconds.toFixed(0)} s: ` +
       `${m.lufs.toFixed(1)} LUFS, ${lift >= 0 ? '+' : ''}${lift.toFixed(1)} dB louder; true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS`);
   }
 
   /* 8. Everything at 100 at once, the song and your voice back at the top
-        of its slider: still never over -1 dB */
+        of its slider: still never over -1 dB. And Ride's chorus, whose
+        sharp peaks get past a ceiling between the samples unless it runs
+        faster than the sound (measured offline: -0.7 dB at the plain rate) */
   if (want('peaks-held')) {
+    await open('ride-song');
+    await page.tap('#song-play');
+    const rideOk = await playing();
+    const ride = await recorded(() => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000));
     await open('loud-song', true);
     await slide('#monitor-volume', 100);
     await page.tap('#song-play');
@@ -456,7 +471,8 @@ try {
     await stopped();
     await slide('#monitor-volume', 70);
     await hearOn(false);
-    check('peaks-held', ok && m.seconds > 10 && m.truePeak < -1 && m.samplePeak < -1,
+    check('peaks-held', rideOk && ride.seconds > 25 && ride.truePeak < -1 && ride.samplePeak < -1 && ok && m.seconds > 10 && m.truePeak < -1 && m.samplePeak < -1,
+      `Ride's chorus at 100, over ${ride.seconds.toFixed(0)} s: true peak ${ride.truePeak.toFixed(1)} dBFS, sample peak ${ride.samplePeak.toFixed(1)} dBFS, ${ride.lufs.toFixed(1)} LUFS; ` +
       `the song and your voice back, all at 100, over ${m.seconds.toFixed(0)} s: true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS, ${m.lufs.toFixed(1)} LUFS`);
   }
 
