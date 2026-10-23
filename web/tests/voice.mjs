@@ -101,3 +101,18 @@ export function wav(x, file) {
   spawnSync('true');
   return { file, buffer: b };
 }
+
+/** the first steady stretch (at least `minSecs`): when it starts and its note */
+export function firstNote(x, minSecs = 0.1) {
+  const m = pitchTrack(x);
+  for (let i = 0; i < m.length; i++) {
+    if (!Number.isFinite(m[i])) continue;
+    let j = i;
+    while (j + 1 < m.length && Number.isFinite(m[j + 1]) && Math.abs(m[j + 1] - m[i]) < 0.3) j++;
+    if ((j - i) / 100 >= minSecs) {
+      const seg = m.slice(i, j + 1).sort((a, b) => a - b);
+      return { start: i / 100, secs: (j - i) / 100, m: seg[seg.length >> 1] };
+    }
+  }
+  return null;
+}

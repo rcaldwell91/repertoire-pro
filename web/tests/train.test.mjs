@@ -8,14 +8,14 @@
    Prints one line per check; exits 1 if any fails. ONLY=name,name runs
    some; APP_DIR points it at another build. RP_ONLINE=1 also checks a
    result reaches the account, signed in as the test singer (RULEBOOK 1d). */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
-import { pcm, singNotes, steadyNote } from './voice.mjs';
+import { firstNote, pcm, pitchTrack, singNotes, steadyNote } from './voice.mjs';
 import { copy, fill } from '../src/core/copy.ts';
 import { SUPABASE_KEY, SUPABASE_URL } from '../src/data/config.ts';
 import { EMAIL, password } from './test-account.mjs';
@@ -83,6 +83,23 @@ const { page } = env;
 await page.addInitScript(ANDROID);
 await page.addInitScript(MIRROR);
 await page.addInitScript(PROBE);
+/* what reaches the speaker, recorded while asked (to hear which note played) */
+await page.addInitScript(`(() => {
+  const R = window.__rec = { on: false, chunks: [], rate: 48000 };
+  const connect = AudioNode.prototype.connect, taps = new Map();
+  const tap = (ctx) => { if (taps.has(ctx)) return taps.get(ctx);
+    const g = ctx.createGain(), sp = ctx.createScriptProcessor(4096, 1, 1);
+    connect.call(g, sp); connect.call(sp, ctx.destination); R.rate = ctx.sampleRate;
+    sp.onaudioprocess = (e) => { if (R.on) R.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    taps.set(ctx, g); return g; };
+  AudioNode.prototype.connect = function (to, ...r) {
+    if (to instanceof AudioDestinationNode && !(this instanceof ScriptProcessorNode)) connect.call(this, tap(this.context));
+    return connect.call(this, to, ...r); };
+  R.take = () => { let n = 0; R.chunks.forEach((c) => (n += c.length)); const out = new Float32Array(n); let k = 0;
+    R.chunks.forEach((c) => { out.set(c, k); k += c.length; });
+    const b = new Uint8Array(out.buffer); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return btoa(s); };
+})();`);
 const P = (expr) => `window.__probe.${expr}`;
 let loads = 0;
 
@@ -311,22 +328,24 @@ try {
         `before: "${before}"; sung ${lowM} low and ${highM} high: kept ${kept ? kept.lo + '-' + kept.hi + ' by ' + kept.by : 'nothing'}; said "${said}"; Train now "${after}"`);
     }
     if (want('range-used') && kept) {
-      /* the ladder now climbs that range: its first note is one above the bottom */
+      /* the ladder now climbs that range: its first note, as heard at the
+         speaker and read by the test's own pitch reader, is one above the bottom */
       await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/mum');
       await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
-      const n = await page.eval(P('starts.length'));
       await noSinger();
+      await page.eval(`Object.assign(window.__rec, { on: true, chunks: [] })`);
       await page.tap('#ex-hear');
-      await page.waitFor(P(`starts.length > ${n}`), 5000);
-      const first = await page.eval(`(() => { const s = window.__probe.starts; return s[${n}]; })()`);
+      await page.waitFor(P('live.size > 0'), 5000);
+      await sleep(400);
+      await page.eval(`window.__rec.on = false`);
       await page.tap('#ex-hear');
-      const want1 = 440 * 2 ** ((kept.lo + 1 - 69) / 12);
-      /* the note heard: the sample it was played on, as measured, at the rate it was played */
-      const samples = Object.entries(JSON.parse(readFileSync(join(REPO, 'audio/piano/notes.json'), 'utf8'))).map(([m, hz]) => ({ m: +m, hz }));
-      const s = samples.reduce((a, b) => (Math.abs(b.m - (kept.lo + 1)) < Math.abs(a.m - (kept.lo + 1)) ? b : a));
-      const heardHz = first ? s.hz * first.rate : null;
-      check('range-used', heardHz != null && Math.abs(12 * Math.log2(heardHz / want1)) < 0.05,
-        `the range kept ${kept.lo}-${kept.hi}: the first note played at ${heardHz ? heardHz.toFixed(1) : '?'} Hz, one above the bottom is ${want1.toFixed(1)} Hz`);
+      const raw = join(tmp, 'heard.f32');
+      writeFileSync(raw, Buffer.from(await page.eval(`window.__rec.take()`), 'base64'));
+      const heardPcm = pcm(FFMPEG, raw, [], ['-f', 'f32le', '-ar', String(await page.eval(`window.__rec.rate`)), '-ac', '1']);
+      const heard = firstNote(heardPcm, 0.1);
+      if (process.env.DEBUG) console.log(pitchTrack(heardPcm).filter((_, i) => i % 5 === 0).map((v) => (Number.isFinite(v) ? v.toFixed(1) : '-')).join(' '));
+      check('range-used', !!heard && Math.abs(heard.m - (kept.lo + 1)) < 0.3,
+        `the range kept ${kept.lo}-${kept.hi}: the first note heard at ${heard ? heard.m.toFixed(2) : '?'}; one above the bottom is ${kept.lo + 1}`);
     }
   }
 
@@ -366,10 +385,10 @@ try {
     await sleep(1000);
     await page.eval(P('mark()'));
     await page.tap('#ex-close');
-    await page.waitFor(P('quietAt !== null'), 2000);
-    const ms = await page.eval(`Math.round(window.__probe.quietAt - window.__probe.actionAt)`);
+    const quiet = await page.waitFor(P('quietAt !== null'), 2000);
+    const ms = quiet ? await page.eval(`Math.round(window.__probe.quietAt - window.__probe.actionAt)`) : null;
     const preview = await page.eval(`!!document.querySelector('#ex-start')`);
-    check('close', ms <= 300 && preview, `silence and the mic closed in ${ms} ms; back to the preview ${preview}`);
+    check('close', quiet && ms >= 0 && ms <= 300 && preview, quiet ? `silence and the mic closed in ${ms} ms; back to the preview ${preview}` : 'still playing, or the mic still open, 2 s after closing');
   }
 
   /* 14. A routine never moves on by itself; each step opens paused; End session */
