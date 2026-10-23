@@ -50,7 +50,12 @@ export type Step =
           (all of them, unless a take follows the song). */
       level?: number;
       onLevel?: (level: number) => void;
-      songParts?: number };
+      songParts?: number;
+      /** an exercise's notes: each part's rate and length, and it ends with
+          its last part (EnsembleOptions) */
+      rates?: readonly number[];
+      lengths?: readonly number[];
+      untilLast?: boolean };
 
 export interface Plan {
   readonly owner: string;
@@ -414,7 +419,8 @@ export class Conductor {
           const parts = Math.min(st.songParts ?? st.urls.length, st.urls.length);
           const lv = levels.get(st) ?? 1;
           const ensemble = this.engine.playTogether(st.urls.map((u) => samples.get(u) as Sample),
-            { from: st.from, gains: st.gains.map((g, k) => (k < parts ? g * lv : g)), loop: st.loop, starts: st.starts });
+            { from: st.from, gains: st.gains.map((g, k) => (k < parts ? g * lv : g)), loop: st.loop, starts: st.starts,
+              rates: st.rates, lengths: st.lengths, untilLast: st.untilLast });
           this.source = ensemble;
           this.song = { ensemble, from: st.from, loop: st.loop, level: lv, parts };
           if (st.listen) {

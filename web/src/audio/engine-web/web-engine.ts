@@ -473,6 +473,7 @@ export class WebEngine implements AudioEngine {
         src.loopStart = opts.loop.start;
         src.loopEnd = opts.loop.end;
       }
+      src.playbackRate.value = opts.rates?.[i] ?? 1;
       const g = ctx.createGain();
       g.gain.value = opts.gains[i] ?? 1;
       src.connect(g);
@@ -495,10 +496,24 @@ export class WebEngine implements AudioEngine {
       nodes.push(src);
     });
     nodes.forEach((src, i) => {
-      /* a part that begins later in the song (a take) waits for its place */
+      /* a part that begins later in the song (a take, a note) waits for its place */
       const begins = opts.starts?.[i] ?? 0;
-      if (opts.from >= begins) src.start(when, opts.from - begins);
-      else src.start(when + (begins - opts.from), 0);
+      const len = opts.lengths?.[i];
+      if (len != null && opts.from >= begins + len) {
+        /* already over before the start point: never sounds */
+        src.start(when, 0, 0);
+        return;
+      }
+      const at = opts.from >= begins ? when : when + (begins - opts.from);
+      src.start(at, opts.from >= begins ? opts.from - begins : 0);
+      if (len != null) {
+        /* let go at its length, with a short fade so it does not click */
+        const off = at + len - Math.max(0, opts.from - begins);
+        const g = gains[i];
+        g.gain.setValueAtTime(opts.gains[i] ?? 1, off);
+        g.gain.setTargetAtTime(0, off, 0.04);
+        src.stop(off + 0.3);
+      }
     });
     this.watch();
     const stop = () =>
@@ -511,8 +526,9 @@ export class WebEngine implements AudioEngine {
       });
     return {
       startedAt: when,
-      /* the parts are the same length; when one ends, the song has ended */
-      ended: Promise.race(ends).then(() => stop()),
+      /* a song's parts are the same length: when one ends, the song has
+         ended. An exercise's notes end one by one: it ends with the last */
+      ended: (opts.untilLast ? Promise.all(ends).then(() => undefined) : Promise.race(ends)).then(() => stop()),
       stop,
       setGain: (part, gain) => {
         const g = gains[part];

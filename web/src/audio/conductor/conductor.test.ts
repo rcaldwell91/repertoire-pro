@@ -536,6 +536,31 @@ describe('a song at its proper level', () => {
   });
 });
 
+/* The Train tab: an exercise is the old app's ladder, its piano notes
+   scheduled on the one clock, each retuned to its note and cut at its
+   length; it ends when the last note does. */
+describe('an exercise: piano notes on the one clock', () => {
+  const ladder: Plan = {
+    owner: 'ex:mum', countIn: 1.5, countBeats: 3,
+    steps: [{ kind: 'song', urls: ['p60', 'p60', 'p64'], from: 0, gains: [0.8, 0.8, 0.8], starts: [0, 0.5, 1], rates: [1, 1.12, 1],
+      lengths: [0.5, 0.5, 1], untilLast: true, listen: true, level: 1 }],
+  };
+
+  it('plays each note at its own rate and length, from when it begins, and listens', async () => {
+    c.start(c.tap(tap), ladder);
+    await flush();
+    for (let i = 0; i < 3; i++) {
+      env.endWaits();
+      await flush();
+    }
+    expect(c.snapshot().state).toBe('running');
+    expect(engine.song?.opts).toMatchObject({ starts: [0, 0.5, 1], rates: [1, 1.12, 1], lengths: [0.5, 0.5, 1], untilLast: true });
+    expect(engine.song?.gains).toEqual([0.8, 0.8, 0.8]);
+    expect(engine.measured).toEqual([]);           /* an exercise is not a song: no level measured */
+    expect(c.snapshot().mic).toBe('open');
+  });
+});
+
 describe('a song that loads after it was left', () => {
   it('never plays, and stops loading', async () => {
     engine.holdLoads = true;

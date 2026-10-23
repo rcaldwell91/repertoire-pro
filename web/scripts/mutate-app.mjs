@@ -10,6 +10,9 @@ import { fileURLToPath } from 'node:url';
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
 
+/* the exercise screen (tests/train.test.mjs) */
+const E = 'src/screens/ExerciseScreen.tsx';
+
 const MUTATIONS = [
   {
     what: 'changing screen does not tell the conductor',
@@ -98,7 +101,7 @@ const MUTATIONS = [
     from: 'onChange={(v) => { setVoice(v); if (playing) c.setGain(0, gainOf(v)); }}',
     to: 'onChange={(v) => { setVoice(v); if (playing) { c.setGain(0, gainOf(v)); c.setGain(1, gainOf(v)); } }}', checks: ['sliders'] },
   { test: 'song', what: 'voice and music start apart', file: 'src/audio/engine-web/web-engine.ts',
-    from: 'if (opts.from >= begins) src.start(when, opts.from - begins);', to: 'if (opts.from >= begins) src.start(when + i * 0.02, opts.from - begins);', checks: ['sum-matches'] },
+    from: '      const at = opts.from >= begins ? when : when + (begins - opts.from);', to: '      const at = (opts.from >= begins ? when : when + (begins - opts.from)) + i * 0.02;', checks: ['sum-matches'] },
   { test: 'song', what: 'leaving the song screen keeps it playing', file: 'src/shell/App.tsx',
     from: 'props.conductor.leave(why);', to: '', checks: ['song-leave'] },
   { test: 'song', what: 'hiding the app during a song is not noticed', file: 'src/shell/env.ts',
@@ -367,6 +370,37 @@ const MUTATIONS = [
     from: '    body.connect(raise);\n    raise.connect(limit);', to: '    body.connect(limit);', checks: ['song-loudness'] },
   { test: 'loudness', what: 'the ceiling lets peaks past -1 dB', file: 'src/audio/engine-web/web-engine.ts',
     from: 'export const CEILING = { knee: 0.66, top: 0.8,', to: 'export const CEILING = { knee: 0.9, top: 0.999,', checks: ['peaks-held'] },
+  /* the Train tab (tests/train.test.mjs) */
+  { test: 'train', what: 'the tab bar shows on an exercise', file: 'src/shell/App.tsx',
+    from: '        {!isExercise(route) && <TabBar', to: '        {<TabBar', checks: ['tab-bar'] },
+  { test: 'train', what: 'the groups are not in their colours', file: 'src/ui/tokens.css',
+    from: ".train-cat[data-colour='breath'] h2 { color: var(--breath); }", to: ".train-cat[data-colour='breath'] h2 { color: var(--tone); }", checks: ['train-tab'] },
+  { test: 'train', what: 'the preview\'s notes open the mic', file: E,
+    from: '    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(first, false)] });', to: '    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(first, true)] });', checks: ['preview'] },
+  { test: 'train', what: 'no count-in', file: E,
+    from: '      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.notes, withMic)] }', to: '      ? { owner, steps: [notesStep(plan.notes, withMic)] }', checks: ['start-only'] },
+  { test: 'train', what: 'a second control while singing', file: E,
+    from: "        {(kind === 'cycle' || kind === 'guided' || kind === 'glide' || (kind === 'timed' && !withMic)) && (", to: '        {true && (', checks: ['start-only'] },
+  { test: 'train', what: 'the score folds octaves when Any octave is off', file: E,
+    from: '      const s = bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave);', to: '      const s = bubbleScore(plan.notes, line.t, line.m, HOP, true);', checks: ['any-octave'] },
+  { test: 'train', what: 'a result is not saved', file: E,
+    from: '    const where = await saveResult(resultRow(e, out));', to: "    const where = await Promise.resolve('phone' as const);", checks: ['progress-phone'] },
+  { test: 'train', what: 'a routine moves on by itself', file: E,
+    from: '    setShown((s) => (s ? { ...s, where } : s));', to: "    setShown((s) => (s ? { ...s, where } : s));\n    if (routine && nextId) setTimeout(() => navigate(routineRoute(routine, step + 1), 'screen'), 1000);", checks: ['routine'] },
+  { test: 'train', what: 'the range found is not kept', file: E,
+    from: "            void saveRange(r, 'test');", to: '', checks: ['range-check'] },
+  { test: 'train', what: 'exercises ignore your range', file: 'src/data/range.ts',
+    from: '  return k ? { lo: k.lo, hi: k.hi } : DEFAULT_RANGE;', to: '  return DEFAULT_RANGE;', checks: ['range-used'] },
+  { test: 'train', what: 'no Carry on without it on an exercise', file: E,
+    from: '<button type="button" className="btn btn-quiet" id="carry-on" onClick={() => setWithMic(false)}>{copy.song.carryOn}</button>', to: '<span />', checks: ['mic-refused'] },
+  { test: 'train', what: 'a score shown with no mic', file: E,
+    from: '    const noMic = usesMic && !heard.current;', to: '    const noMic = false;', checks: ['mic-refused'] },
+  { test: 'train', what: 'closing leaves the exercise playing', file: E,
+    from: '  function close() {\n    if (playing) c.stop();', to: '  function close() {', checks: ['close'] },
+  { test: 'train', what: 'the hiss never stops by itself', file: E,
+    from: '        if (st.done) {', to: '        if (false) {', checks: ['timed'] },
+  { test: 'train', what: 'the breath counts run at two a second', file: E,
+    from: '          const at = elapsed % total;', to: '          const at = (elapsed * 2) % total;', checks: ['cycle'] },
   { test: 'takes', what: 'this app shares the old app\'s store again', file: 'src/data/db.ts',
     from: "export const DB = 'repertoire-app';", to: "export const DB = 'repertoire';", checks: ['apps-side-by-side'] },
 ];
@@ -395,7 +429,7 @@ for (const m of RUN) {
     if (b.status !== 0) throw new Error('broken copy did not build: ' + b.stderr);
     /* the checks (from the real test file) against the broken build */
     const suite = { song: 'tests/song.test.mjs', notemap: 'tests/notemap.test.mjs', takes: 'tests/takes.test.mjs', android: 'tests/android.test.mjs',
-      library: 'tests/library.test.mjs', loudness: 'tests/loudness.test.mjs' }[m.test] || 'tests/browser.test.mjs';
+      library: 'tests/library.test.mjs', loudness: 'tests/loudness.test.mjs', train: 'tests/train.test.mjs' }[m.test] || 'tests/browser.test.mjs';
     const r = spawnSync('node', [join(WEB, suite)], {
       cwd: WEB,
       encoding: 'utf8',

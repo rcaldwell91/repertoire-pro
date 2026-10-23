@@ -178,6 +178,55 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - — Sleep pauses and resumes (25088-25114). Replaced by RULEBOOK 2.1: hiding the app means silence.
 - ✓ A 3-2-1 count-in on Start, shown on the note map, at the song's tempo when it is known, else one a second; back 10 s and repeat this part don't count in; the take's timing is unaffected (25310-25333; Robert, 13 Oct) — test: `android:count-in`, `unit:audio/conductor/conductor.test.ts:counts 3, 2, 1, a beat each`, `unit:core/song.test.ts:counts in at the song`, `takes:take-lines-up`
 
+## 5. Train (read 23 Oct: next.html 3672-4024, 7652-8134, 8992-9240; src/rp-train.js, rp-flow.js, rp-range.js, rp-sus.js, rp-cloud.js 870-905, rp-score.js)
+
+### The exercises and routines
+- ✓ Every exercise of the old app's library, as data, with its group, level and quiet flag (7686-8099) — test: `unit:core/exercises.test.ts:has every exercise of the old app`, `unit:core/exercises.test.ts:keeps each one's group, level and quiet flag`, `train:train-tab`
+- ✓ Each one runs as the old app ran it: its pattern and tempo, a held note's length, the hiss's target, the breath counts (7686-8099) — test: `unit:core/exercises.test.ts:runs each one the way the old app did`
+- ✓ The melodic patterns (8063-8075) — test: `unit:core/exercises.test.ts:runs each pattern as the old app did`
+- ✓ The routines and cool-down, in the warm-up order every source agrees on (8100-8125) — test: `unit:core/exercises.test.ts:has the old app's routines and cool-down`, `train:routine`
+- ✓ Every exercise says what the app can and cannot measure; nothing scored that was not measured (7672-7684, scoreNote) — test: `unit:core/exercises.test.ts:says what it measures, and only that`, `train:preview`, `train:cycle`, `train:guided`
+- ✓ Groups by colour (1b): Warm-up orange, Breath teal, Tone pink, Agility blue; Range in Agility's blue (Robert, 23 Oct) — test: `unit:core/exercises.test.ts:has its four groups by colour`, `train:train-tab`
+- — The why, watch-for, care and myth paragraphs (7686-8099). Replaced by 1b's preview: a one-line goal and a one-line how, each under the eight-word copy rule; the octave leaps' safety line is kept in its how.
+- — A level filter, and "never offer an empty level" (rp-train.js 66-76). Not in the new app: 1b shows groups, not levels; each exercise shows its level as a tag.
+- — The pitch tools and ear drills: Match the note, Keyboard, Hold the interval, the degree drills (rp-train.js 34-46). Not in this round: Robert asked for warm-ups, breath, tone and agility.
+
+### Running an exercise
+- ✓ Nothing starts until Start: no sound, clock or mic before the tap (rp-flow.js 1-20; Robert, 1 Oct) — test: `train:start-only`, `train:preview`
+- ✓ A routine never moves on by itself: after a step, "Next: ..." and End session; the next step opens paused; ending returns to where it began (rp-flow.js 1-20; Robert, 1 Oct) — test: `train:routine`
+- ✓ The ladder: from one note above the bottom of your range, a half step a rung, up to where the pattern fits, at most 14 rungs, two beats' rest (3700-3752) — test: `unit:core/exercises.test.ts:for every pattern, from one above your lowest`, `train:range-used`
+- ✓ Each rung's first note carries its note name and the syllable; the rest the syllable (3725-3730) — test: `unit:core/exercises.test.ts:carries each note's syllable`
+- ✓ The reference is the shipped piano, any note played on the nearest sample, retuned (7611-7616; Robert, 23 Oct) — test: `unit:core/piano.test.ts:plays any other note on the nearest sample`, `train:range-used`
+- ✓ The notes heard on the preview only on a tap, the piano alone, no mic — test: `train:preview`
+- ✓ A 3-2-1 count-in before singing (1b; Robert, 13 Oct) — test: `train:start-only`
+- ✓ The close button is the only control while singing; closing is silence and the mic closed at once (1b; RULEBOOK 2.1) — test: `train:start-only`, `train:close`
+- ✓ A held note: one long bubble at a time, scored by the same rule (3908-4022) — test: `unit:core/exercises.test.ts:holds five notes`, `train:hold`
+- — Hold a note's random notes, every third at the edge of your range (3909-3925). The new app holds five notes evenly through your range, so one run can be compared with the next.
+- ✓ The timed hiss times itself from the first sound and stops after a second of quiet; the result stays; nothing starts after it (9110-9135; Robert, 1 Oct) — test: `unit:core/exercises.test.ts:times itself from the first sound`, `train:timed`
+- ✓ The breath cycle: in, suspend, out, a count a second (9097-9110) — test: `train:cycle`
+- ✓ A guided exercise: the how and a clock, Done, no invented score (9047-9100) — test: `train:guided`
+- — The sirens' sine glide (9161-9180). The new app plays only the piano; sirens show your line, not scored.
+
+### Bubbles and the score
+- ✓ A hit is half the note within a semitone; the fill shows the same share (RULEBOOK 4, Bubbles; the old app used 60 cents, 3314-3330) — test: `unit:core/exercises.test.ts:a hit is half the note within a semitone`, `train:ladder-sung`, `train:ladder-wrong`
+- ✓ Within a semitone means the note itself, half a semitone either side, the note map's own rule — test: `unit:core/exercises.test.ts:within a semitone means the note itself`
+- ✓ Times rounded before comparing (RULEBOOK 4, Bubbles) — test: `unit:core/exercises.test.ts:rounds time before comparing`
+- ✓ Octave exact, with Any octave (2797-2848; RULEBOOK 4, Pitch) — test: `unit:core/exercises.test.ts:is octave exact, unless Any octave is on`, `train:any-octave`
+- ✓ Nothing sung, nothing scored — test: `unit:core/exercises.test.ts:scores nothing that was not sung`
+- — Cut at 1 semitone and 0.15 s; bubbles start where the voice starts (RULEBOOK 4, Bubbles). Not needed for exercises: their bubbles are the exercise's own notes, not cut from a sung line.
+- — The grade letter, points and combo (2309-2320, 3322-3332). Not in the new app: only the notes hit and the share are shown, as measured.
+
+### Your range
+- ✓ One source of truth; the old app's default A2-A4 until it is measured, shown as "Not measured yet" (rp-range.js 66-75) — test: `unit:core/exercises.test.ts:is A2 to A4 until it is measured`, `train:range-check`
+- ✓ Kept on the phone and on the account, with when and how it was found; the old app's range on this phone or on the account is used if this app has none (rp-range.js 40-140) — test: `train:range-check`
+- ✓ The range check: four seconds of singing at each end, the 5th and 95th percentiles, seven notes apart or an octave (3754-3790) — test: `unit:core/exercises.test.ts:measures four seconds of singing at each end`, `unit:core/exercises.test.ts:keeps at least seven notes between them`, `train:range-check`
+- — The voice-type presets (633-639). Not in this round: the range check measures it instead.
+
+### Results
+- ✓ Saved straight away: on the phone always, the newest 200; online when signed in, in the old app's results table (rp-cloud.js 870-905) — test: `train:progress-phone`, `train:progress-online`
+- ✓ Only what was measured: notes hit of notes and the %, or seconds held of the target; otherwise only that it was done (rp-score.js 1-10) — test: `unit:core/exercises.test.ts:a sung exercise: notes hit of notes`, `unit:core/exercises.test.ts:anything not measured`, `train:progress-phone`
+- ✓ The microphone refused: the exercise still plays, "Carry on without it", nothing scored (RULEBOOK 3) — test: `train:mic-refused`
+
 ## Decided by Robert, 13 Oct
 
 1. A mic another app holds: no automatic retry. The Start tap lets go and asks once more, and if it is still held the app says "Another app is using the microphone. Tap Start to try again."
@@ -209,3 +258,8 @@ For each part the new app has built, every rule the old app's code (next.html) e
 
 1. The old app's v9.8 loudness stage as it was, peaks held under -1 dB: songs 3 to 6 dB louder than before at sliders 100; his song near -7 LUFS. It withdraws "nothing changes below 0.9" (22 Oct).
 2. Hear yourself at 100 stays clearly louder than the music, about 3 dB over it; its top raised if the louder song swallows it.
+
+## Decided by Robert, 23 Oct (the Train tab)
+
+1. Range exercises use Agility's blue.
+2. Any note the piano samples do not cover is played on the nearest sample, retuned.

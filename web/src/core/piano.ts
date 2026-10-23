@@ -24,3 +24,18 @@ export function equalTempered(midi: number): number {
 export function rateFor(s: PianoSample, midi = s.midi): number {
   return equalTempered(midi) / s.measuredHz;
 }
+
+/* every shipped sample, as measured (audio/piano/notes.json): C2 to C7
+   every four semitones; any other note is played by the nearest, retuned
+   (Robert, 23 Oct) */
+export const PIANO: readonly PianoSample[] = ([
+  [36, 65.068], [40, 82.081], [44, 103.716], [48, 130.543], [52, 164.451], [56, 207.211], [60, 261.359], [64, 329.284],
+  [68, 414.913], [72, 523.04], [76, 659.731], [80, 831.498], [84, 1048.525], [88, 1319.141], [92, 1666.925], [96, 2109.326],
+] as const).map(([midi, measuredHz]) => ({ midi, file: `../audio/piano/${midi}.mp3`, measuredHz }));
+
+/** the sample to play a note on, and its rate */
+export function pianoFor(midi: number): { file: string; rate: number } {
+  const m = Math.round(midi);
+  const s = PIANO.reduce((a, b) => (Math.abs(b.midi - m) < Math.abs(a.midi - m) ? b : a));
+  return { file: s.file, rate: rateFor(s, m) };
+}

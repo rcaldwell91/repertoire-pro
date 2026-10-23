@@ -36,6 +36,14 @@ export interface EnsembleOptions {
   /** where in the song each part begins (a take begins where it was
       sung); 0 if not given */
   readonly starts?: readonly number[];
+  /** each part's playback rate (a piano note retuned to its pitch); 1 if not given */
+  readonly rates?: readonly number[];
+  /** how long each part sounds, in seconds, before it is let go; to its
+      end if not given */
+  readonly lengths?: readonly number[];
+  /** the ensemble ends when its last part does (an exercise's notes);
+      otherwise when the first does (a song's parts are the same length) */
+  readonly untilLast?: boolean;
 }
 
 /** One way of asking for the mic (core: mic-modes). */

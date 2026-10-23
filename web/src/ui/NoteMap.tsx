@@ -25,7 +25,7 @@ type Pt = { t: number; m: number };
 
 /** the one drawing function: a line through points, the pen lifted across
     gaps and big jumps */
-function drawLine(g: CanvasRenderingContext2D, pts: Pt[], x: (t: number) => number, y: (m: number) => number,
+export function drawLine(g: CanvasRenderingContext2D, pts: Pt[], x: (t: number) => number, y: (m: number) => number,
   width: number, stroke: string | CanvasGradient): number {
   g.lineWidth = width;
   g.lineCap = 'round';

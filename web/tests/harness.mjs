@@ -70,7 +70,8 @@ export const PROBE = `(() => {
     /* the one silent sample that opens the way out (RULEBOOK 4, Sound, Android 3): not a sound */
     if (this.buffer && this.buffer.length <= 1) { P.kicks++; note('kick'); return start.apply(this, a); }
     P.started++; P.live.add(this); note('play');
-    P.starts.push({ when: a[0] ?? 0, offset: a[1] ?? 0, seconds: this.buffer ? this.buffer.duration : 0, loop: this.loop, loopStart: this.loopStart, loopEnd: this.loopEnd });
+    P.starts.push({ when: a[0] ?? 0, offset: a[1] ?? 0, seconds: this.buffer ? this.buffer.duration : 0, loop: this.loop, loopStart: this.loopStart, loopEnd: this.loopEnd,
+      rate: this.playbackRate ? this.playbackRate.value : 1 });
     this.addEventListener('ended', () => { P.live.delete(this); checkQuiet(); });
     return start.apply(this, a);
   };
@@ -212,7 +213,10 @@ export const MIRROR = `(() => {
     src.connect(dest);
     if (M.src) try { M.src.stop(); } catch {}
     M.src = src;
-    M.waiting = async ({ when, offset, node }) => {
+    /* M.atOnce: sing the recording from the moment the mic opens (an
+       exercise that only listens: no song part for the singer to join) */
+    if (M.atOnce && M.buffer) { src.buffer = M.buffer; start.call(src, ctx.currentTime + 0.05, 0); M.at = { atOnce: ctx.currentTime + 0.05 }; }
+    M.waiting = M.atOnce ? null : async ({ when, offset, node }) => {
       if (M.src !== src) return;
       src.buffer = M.buffer || node.buffer;
       const heard = when + M.stage + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */

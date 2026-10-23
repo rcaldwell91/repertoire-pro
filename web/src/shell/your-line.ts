@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Conductor } from '../audio/conductor/conductor';
 import { livePitch } from '../audio/pitch/client';
 import type { LivePoint } from '../audio/pitch/core';
@@ -52,8 +52,15 @@ export function yourLine(owner: string): YourLine {
 }
 
 /** Your line while this screen's session is listening; kept after it ends. */
-export function useYourLine(c: Conductor, owner: string, listening: boolean, session: number | null): YourLine {
+export function useYourLine(c: Conductor, owner: string, listening: boolean, session: number | null,
+  /** where a point heard at engine time `at` goes; the song's place if not given
+      (an exercise with no notes uses time since it started) */
+  timeOf?: (at: number) => number | null): YourLine {
   const line = yourLine(owner);
+  const place = useRef(timeOf);
+  useEffect(() => {
+    place.current = timeOf;
+  });
   useEffect(() => {
     if (!listening) return;
     line.clear();
@@ -61,7 +68,7 @@ export function useYourLine(c: Conductor, owner: string, listening: boolean, ses
     const off = c.onMic((b) => {
       if (!started) {
         started = true;
-        livePitch.start(b.sampleRate, (pts) => pts.forEach((p) => line.add(p, c.songTime(p.at))));
+        livePitch.start(b.sampleRate, (pts) => pts.forEach((p) => line.add(p, (place.current ?? ((at) => c.songTime(at)))(p.at))));
       }
       livePitch.push(b.samples, b.end);
     });
