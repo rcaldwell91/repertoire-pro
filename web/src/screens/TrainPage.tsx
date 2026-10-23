@@ -31,11 +31,7 @@ export function TrainPage() {
 
       <section className="card routine" id="daily">
         <h2>{copy.routineNames[DAILY]}</h2>
-        <p className="hint">
-          <span>{fill(copy.train.mins, { n: daily.mins })}</span>
-          <span className="dot" aria-hidden="true" />
-          <span>{fill(copy.train.steps, { n: daily.steps.length })}</span>
-        </p>
+        <p className="hint">{fill(copy.train.minsSteps, { mins: daily.mins, n: daily.steps.length })}</p>
         <ol className="routine-steps">
           {daily.steps.map((id) => <li key={id}>{copy.ex[id].name}</li>)}
         </ol>
@@ -63,11 +59,7 @@ export function TrainPage() {
               onClick={() => navigate(exRoute(e.id), 'screen')}>
               <span className="ex-text">
                 <strong>{copy.ex[e.id].name}</strong>
-                <span className="ex-tags">
-                  <span>{copy.levels[e.level]}</span>
-                  <span className="dot" aria-hidden="true" />
-                  <span>{measureTag(e)}</span>
-                </span>
+                <span className="ex-tags">{fill(copy.train.tagLine, { level: copy.levels[e.level], measure: measureTag(e) })}</span>
               </span>
               <ChevronRight size={22} strokeWidth={2} aria-hidden="true" />
             </button>

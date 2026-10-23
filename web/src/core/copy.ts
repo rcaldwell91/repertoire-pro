@@ -247,6 +247,8 @@ export const copy = {
     routines: 'More routines',
     mins: '{n} min',
     steps: '{n} exercises',
+    minsSteps: '{mins} min · {n} exercises',
+    tagLine: '{level} · {measure}',
     start: 'Start',
     startRoutine: 'Start the warm-up',
     range: 'Your range',
