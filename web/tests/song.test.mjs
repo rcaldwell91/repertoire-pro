@@ -188,14 +188,16 @@ try {
       if (!early && s.play && s.line && s.line.startsWith('Splitting')) {
         /* the first 30 seconds can be played while the rest is still splitting
            (after Start's count-in), and the screen is watched all the while */
-        const n = await page.eval(S('starts.length'));
+        /* the song's two parts are long sounds; the count-in's beeps (Robert, 24 Oct) are not the song */
+        const SONG = 'starts.filter((x) => x.seconds > 1)';
+        const n = await page.eval(S(SONG + '.length'));
         await page.tap('#song-play');
-        const until = Date.now() + 8000;
-        while (Date.now() < until && !(await page.eval(S(`starts.length >= ${n + 2}`)))) {
+        const until = Date.now() + 10000;
+        while (Date.now() < until && !(await page.eval(S(`${SONG}.length >= ${n + 2}`)))) {
           await look();
           await sleep(100);
         }
-        const st = await page.eval(S(`starts.slice(${n})`));
+        const st = await page.eval(S(`${SONG}.slice(${n})`));
         const still = await page.eval(LINE);
         if (SHOTS) (await import('node:fs')).writeFileSync(join(SHOTS, 'song-first30.png'), await page.screenshot());
         await page.tap('#song-play');
