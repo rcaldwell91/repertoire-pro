@@ -429,14 +429,16 @@ try {
          yet); back 10 s and repeat this part carry straight on (Robert, 13 Oct) */
   if (want('count-in')) {
     await open();
-    const n0 = await page.eval(P('starts.length'));
+    /* the song's parts are long sounds; the count-in's beeps (Robert, 24 Oct) are not the song */
+    const SONG = 'starts.filter((x) => x.seconds > 1).length';
+    const n0 = await page.eval(P(SONG));
     await page.tap('#song-play');
     const seen = [];
     let firstAt = null, startAt = null, playedDuringCount = false;
     const end = Date.now() + 9000;
     while (Date.now() < end) {
-      const s = await page.eval(`({ c: document.querySelector('#count-in')?.textContent ?? null, n: window.__probe.starts.length, live: window.__probe.live.size,
-        on: !!document.querySelector('.notemap #count-in') })`);
+      const s = await page.eval(`({ c: document.querySelector('#count-in')?.textContent ?? null, n: window.__probe.${SONG},
+        live: [...window.__probe.live].filter((x) => x.buffer && x.buffer.duration > 1).length, on: !!document.querySelector('.notemap #count-in') })`);
       if (s.c && seen[seen.length - 1] !== s.c) { seen.push(s.c); if (firstAt == null) firstAt = Date.now(); }
       if (s.c && s.live > 0) playedDuringCount = true;
       if (s.n >= n0 + 2) { startAt = Date.now(); break; }
@@ -445,13 +447,13 @@ try {
     const counted = startAt != null && firstAt != null ? (startAt - firstAt) / 1000 : null;
     await sleep(2500);
     const quick = async (sel) => {
-      const n = await page.eval(P('starts.length'));
+      const n = await page.eval(P(SONG));
       const t = Date.now();
       await page.tap(sel);
       let shown = false;
       while (Date.now() - t < 3000) {
         if (await page.eval(`!!document.querySelector('#count-in')`)) shown = true;
-        if ((await page.eval(P('starts.length'))) >= n + 2) break;
+        if ((await page.eval(P(SONG))) >= n + 2) break;
         await sleep(30);
       }
       return { ms: Date.now() - t, shown };
@@ -463,7 +465,7 @@ try {
     await stopped();
     check('count-in', seen.join() === '3,2,1' && counted != null && counted > 2.6 && counted < 3.6 && !playedDuringCount &&
       b10.ms < 1500 && !b10.shown && rep.ms < 1500 && !rep.shown,
-      `Start: ${seen.join(', ') || 'no count'} on the note map, the song after ${counted?.toFixed(2)} s, silent while counting ${!playedDuringCount}; ` +
+      `Start: ${seen.join(', ') || 'no count'} on the note map, the song after ${counted?.toFixed(2)} s, no song while counting ${!playedDuringCount}; ` +
       `back 10 s carried on in ${b10.ms} ms without a count ${!b10.shown}; repeat this part in ${rep.ms} ms without a count ${!rep.shown}`);
   }
 
