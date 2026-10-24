@@ -137,6 +137,8 @@ async function signInAs(p, email) {
 }
 
 /** sing (the mirror) from a point for some seconds, then stop: one take */
+/* the song's parts and a take are long sounds; the count-in's beeps (Robert, 24 Oct) are not counted */
+const SONG = 'starts.filter((x) => x.seconds > 1)';
 async function singTake(from, seconds) {
   await page.eval(`window.__mirror.on = true`);
   await page.eval(`(() => { const r = document.querySelector('#song-position'); r.focus();
@@ -144,9 +146,9 @@ async function singTake(from, seconds) {
     r.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await page.key('ArrowLeft');
   await page.key('ArrowRight');
-  const n = await page.eval(S('starts.length'));
+  const n = await page.eval(S(SONG + '.length'));
   await page.tap('#song-play');
-  await page.waitFor(S(`starts.length >= ${n + 2} && window.__probe.micLive() === 1`), 8000);
+  await page.waitFor(S(`${SONG}.length >= ${n + 2} && window.__probe.micLive() === 1`), 8000);
   await sleep(seconds * 1000);
   await page.tap('#song-play');
   return page.waitFor(`!!document.querySelector('#take-review')`, 5000);
@@ -217,10 +219,10 @@ try {
   }
   if (want('take-lines-up')) {
     /* played back: the take starts exactly with the song's parts, at its own place */
-    const n = await page.eval(S('starts.length'));
+    const n = await page.eval(S(SONG + '.length'));
     await page.tap(`.take-row[data-take="${first.id}"] .take-hear`);
-    await page.waitFor(S(`starts.length >= ${n + 3}`), 8000);
-    const st = await page.eval(S(`starts.slice(${n})`));
+    await page.waitFor(S(`${SONG}.length >= ${n + 3}`), 8000);
+    const st = await page.eval(S(`${SONG}.slice(${n})`));
     await sleep(1500);
     await page.tap('#song-play');
     const sched = st.length === 3 ? Math.max(Math.abs(st[2].when - st[0].when), Math.abs(st[0].offset - sound.songAt), Math.abs(st[2].offset)) * 1000 : Infinity;
@@ -279,9 +281,9 @@ try {
   /* 2. leaving ends it: silence, the mic closed; the take is still there to decide on */
   if (want('take-leave')) {
     await page.eval(`window.__mirror.on = true`);
-    const n = await page.eval(S('starts.length'));
+    const n = await page.eval(S(SONG + '.length'));
     await page.tap('#song-play');
-    await page.waitFor(S(`starts.length >= ${n + 2} && window.__probe.micLive() === 1`), 8000);
+    await page.waitFor(S(`${SONG}.length >= ${n + 2} && window.__probe.micLive() === 1`), 8000);
     await sleep(4000);
     await page.tap('#tab-home');
     const q = await quietWithin();
@@ -290,9 +292,9 @@ try {
     await page.waitFor(`!!document.querySelector('#song-play')`, 5000);
     const kept = await page.waitFor(`!!document.querySelector('#take-review')`, 3000);
     /* hearing a take, then leaving */
-    const m2 = await page.eval(S('starts.length'));
+    const m2 = await page.eval(S(SONG + '.length'));
     await page.tap('#take-hear');
-    await page.waitFor(S(`starts.length >= ${m2 + 3}`), 8000);
+    await page.waitFor(S(`${SONG}.length >= ${m2 + 3}`), 8000);
     await sleep(800);
     await page.tap('#tab-home');
     const q2 = await quietWithin();
@@ -318,9 +320,9 @@ try {
     const back = await page.waitFor(`document.querySelector('#take-summary')?.textContent === ${JSON.stringify(pct1)}`, 2000);
     /* singing again throws it away too */
     await page.eval(`window.__mirror.on = true`);
-    const n = await page.eval(S('starts.length'));
+    const n = await page.eval(S(SONG + '.length'));
     await page.tap('#song-play');
-    await page.waitFor(S(`starts.length >= ${n + 2}`), 8000);
+    await page.waitFor(S(`${SONG}.length >= ${n + 2}`), 8000);
     const shown2 = await page.waitFor(`(${LINE}).includes(${JSON.stringify(copy.take.removed)})`, 2000);
     await sleep(1000);
     await page.tap('#undo-remove');
