@@ -1,3 +1,4 @@
+/* Goal: hear, keep or send a take of this song. */
 import { useEffect, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { MoreHorizontal, Play } from 'lucide-react';

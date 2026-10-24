@@ -49,6 +49,8 @@ export const MUTATIONS = [
     from: '        if (isRight(m[i], n.m, anyOctave)) fill[k] += hop / n.d;', to: '        if (isRight(m[i], n.m, true)) fill[k] += hop / n.d;' },
   { rule: 'something unsung is scored', file: X,
     from: '    sung = true;\n', to: '' },
+  { rule: 'a screen without its one stated goal (RULEBOOK 3)', file: 'src/screens/TrainPage.tsx',
+    from: "/* Goal: start today's warm-up in one tap. */\n", to: '' },
   { rule: 'the range is not the old app\'s default', file: 'src/core/range.ts',
     from: 'export const DEFAULT_RANGE: Range = { lo: 45, hi: 69 };', to: 'export const DEFAULT_RANGE: Range = { lo: 48, hi: 72 };' },
   { rule: 'the range check reads the lowest note sung, not the 5th percentile', file: 'src/core/range.ts',

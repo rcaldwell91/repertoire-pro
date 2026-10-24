@@ -32,7 +32,7 @@ if (songs.length < 2 || !MIC || !existsSync(MIC)) {
 }
 const [[SONG, SONG_PATH], [SONG2, SONG2_PATH]] = songs;
 
-const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'add-fails', 'server-off', 'split-progress', 'first30-early', 'line-first30', 'sliders',
+const ALL = ['signed-out-prompt', 'sign-in', 'too-big', 'too-long', 'add-fails', 'server-off', 'split-progress', 'first30-early', 'line-first30', 'sliders', 'count-in-sound',
   'controls', 'song-contrast', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'signed-out-again', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -165,7 +165,7 @@ try {
     check('server-off', said && retry, `said "${copy.song.offline}" ${said}; offers Try again ${retry}`);
   }
 
-  if (want('split-progress', 'first30-early', 'line-first30', 'sliders', 'controls', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'song-contrast')) {
+  if (want('split-progress', 'first30-early', 'line-first30', 'sliders', 'controls', 'count-in-sound', 'song-leave', 'song-hidden', 'sum-matches', 'reopen', 'song-contrast')) {
     const total = secondsOf(SONG_PATH);
     const before = await addSong(SONG_PATH, SONG);
     /* follow the line under the title, as the singer sees it */
@@ -317,6 +317,35 @@ try {
         `the play bar moved ${t0} s → ${t1} s in 3 s; repeat this part: "${repLine}", looping 0–10 s ${looped}; off again ${unlooped}; ` +
         `the play bar moved the song to ${seek.map((x) => x.offset.toFixed(1)).join(' + ')} s; ` +
         `back 10 s from ${before} s restarted at ${back.map((x) => x.offset.toFixed(1)).join(' + ')} s`);
+    }
+
+    /* the count-in sound (Robert, 24 Oct): one switch in the sound card, on
+       at first; a short beep on each of 3, 2, 1 before the song, none when off */
+    if (want('count-in-sound')) {
+      const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
+      const pause = async () => {
+        if (await page.eval(S('live.size > 0'))) {
+          await page.tap('#song-play');
+          await page.waitFor(S('live.size === 0'), 5000);
+        }
+      };
+      const countIn = async () => {
+        const n = await page.eval(S('starts.length'));
+        await page.tap('#song-play');
+        await page.waitFor(S(`starts.slice(${n}).some((x) => x.seconds > 1)`), 12000);
+        const st = await page.eval(S(`starts.slice(${n})`));
+        await pause();
+        const song = st.findIndex((x) => x.seconds > 1);
+        return { beeps: st.filter(isBeep).length, before: st.slice(0, song).filter(isBeep).length };
+      };
+      await pause();
+      const onAtFirst = await page.eval(`document.querySelector('#count-in-sound')?.checked ?? null`);
+      const withSound = await countIn();
+      await page.tap('#count-in-sound');
+      const without = await countIn();
+      await page.tap('#count-in-sound');
+      check('count-in-sound', onAtFirst === true && withSound.beeps === 3 && withSound.before === 3 && without.beeps === 0,
+        `the switch in the sound card, on at first ${onAtFirst}; beeps before the song with it on: ${withSound.before} of ${withSound.beeps}; with it off: ${without.beeps}`);
     }
 
     if (want('song-contrast')) {

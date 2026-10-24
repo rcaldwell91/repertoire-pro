@@ -1,3 +1,4 @@
+/* Goal: choose dark or light. */
 import { copy } from '../core/copy';
 import { useTheme } from '../shell/hooks';
 import { back } from '../shell/router';

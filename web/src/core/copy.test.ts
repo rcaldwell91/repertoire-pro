@@ -3,19 +3,21 @@ import { allCopy, copy } from './copy';
 
 /* RULEBOOK 2.4, the copy-lint: no "acapella" or "a cappella", no jargon
    ("stem", "separator", "latency", "f0"), and no instruction line over eight
-   words. Every string in core/copy is held to the eight-word cap. */
+   words. Every string in core/copy is held to the eight-word cap, except
+   the old app's explanations under copy.about (Robert, 24 Oct: "More about
+   this"), which are prose: their words are checked, not their length. */
 export const BANNED = ['acapella', 'a cappella', 'stem', 'stems', 'separator', 'latency', 'f0'];
 export const MAX_WORDS = 8;
 
-export function problems(lines: Array<{ at: string; text: string }>): string[] {
+export function problems(lines: Array<{ at: string; text: string; prose?: boolean }>): string[] {
   const out: string[] = [];
-  for (const { at, text } of lines) {
+  for (const { at, text, prose } of lines) {
     const low = text.toLowerCase();
     for (const w of BANNED) {
       if (new RegExp('(^|[^a-z0-9])' + w.replace(' ', '\\s+') + '([^a-z0-9]|$)').test(low)) out.push(`${at}: "${w}" in "${text}"`);
     }
     const words = text.trim().split(/\s+/).filter(Boolean).length;
-    if (words > MAX_WORDS) out.push(`${at}: ${words} words, "${text}"`);
+    if (words > MAX_WORDS && !prose) out.push(`${at}: ${words} words, "${text}"`);
   }
   return out;
 }
@@ -36,6 +38,20 @@ describe('copy-lint', () => {
       { at: 'g', text: 'one two three four five six seven eight nine' },
     ];
     expect(problems(bad).length).toBe(bad.length);
+  });
+
+  it('holds prose to the banned words, not to the eight-word cap (it can fail)', () => {
+    const long = 'one two three four five six seven eight nine';
+    expect(problems([{ at: 'copy.about.x.why', text: long, prose: true }])).toEqual([]);
+    expect(problems([{ at: 'copy.about.x.why', text: long + ' latency', prose: true }])).toHaveLength(1);
+    expect(problems([{ at: 'copy.train.x', text: long, prose: false }])).toHaveLength(1);
+  });
+
+  it('only the explanations under copy.about are prose', () => {
+    const prose = allCopy().filter((l) => l.prose);
+    expect(prose.length).toBeGreaterThan(50);
+    expect(prose.every((l) => l.at.startsWith('copy.about.'))).toBe(true);
+    expect(Object.keys(copy.about)).toEqual(Object.keys(copy.ex).filter((k) => k !== 'rangecheck'));
   });
 
   it('does not flag ordinary words that merely contain a banned one', () => {

@@ -1,3 +1,4 @@
+/* Goal: reach your account, the look and the Sound check. */
 import { ChevronRight } from 'lucide-react';
 import { copy } from '../core/copy';
 import { navigate, type Route } from '../shell/router';

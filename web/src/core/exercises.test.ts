@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
 import {
   CATEGORIES, EXERCISES, PATTERNS, ROUTINES, DAILY, exercise, measures, ladderNotes, holdNotes, bubbleScore, HOLD_NOTES,
-  MAX_RUNGS, REST_BEATS, type Exercise,
+  MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, type Exercise,
 } from './exercises';
 import { DEFAULT_RANGE, rangeFrom, RANGE_POINTS } from './range';
 import { SoundClock, LOUD_RMS, QUIET_END } from './timed';
@@ -263,5 +263,38 @@ describe('a result, with only what was measured (rp-cloud.js 870-905, rp-score.j
   it('anything not measured: that it was done, and no number', () => {
     expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Straw phonation', app_ex_id: 'straw' });
     expect(resultRow(exercise('mum') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Mum', app_ex_id: 'mum' });
+  });
+});
+
+describe('the rungs of an exercise (the progress dots, the pattern card)', () => {
+  const mum = EXERCISES.find((e) => e.id === 'mum') as Exercise;
+  const range = { lo: 50, hi: 62 };
+  const { notes } = ladderNotes(mum, range);
+  it('begin at the notes that carry a note name, one per run of the pattern', () => {
+    const starts = rungStarts(notes);
+    expect(starts.length).toBe(62 - 7 - 51 + 1);
+    expect(starts[0]).toBe(0);
+    expect(starts[1]).toBe(PATTERNS.five.deg.length);
+  });
+  it('the first rung is the pattern alone', () => {
+    expect(firstRung(notes).length).toBe(PATTERNS.five.deg.length);
+    expect(firstRung(notes).map((n) => n.m - 51)).toEqual([...PATTERNS.five.deg]);
+  });
+  it('knows which rung is being sung', () => {
+    expect(rungAt(notes, -1)).toBe(-1);
+    expect(rungAt(notes, 0)).toBe(0);
+    expect(rungAt(notes, notes[PATTERNS.five.deg.length].t)).toBe(1);
+    expect(rungAt(notes, notes[PATTERNS.five.deg.length].t - 0.01)).toBe(0);
+    const last = notes[notes.length - 1];
+    expect(rungAt(notes, last.t + last.d + 1)).toBe(rungStarts(notes).length);
+  });
+  it('a held note is a rung of its own', () => {
+    const sus = EXERCISES.find((e) => e.id === 'sustain') as Exercise;
+    expect(rungStarts(holdNotes(sus, range).notes)).toEqual([0, 1, 2, 3, 4]);
+  });
+  it('the syllable alone, without the note name', () => {
+    expect(sylOf(notes[0])).toBe('mum');
+    expect(sylOf(notes[1])).toBe('mum');
+    expect(notes[0].syl).not.toBe('mum');
   });
 });

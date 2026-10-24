@@ -1,14 +1,16 @@
+/* Goal: understand the exercise and start it; then sing its notes; then see what was measured. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
-import { X } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
-  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, measures, notesFor, type Exercise, type Note, type RoutineId,
+  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, firstRung, measures, notesFor, rungAt, rungStarts, type Exercise, type Note,
+  type RoutineId,
 } from '../core/exercises';
 import { keyName, type Range } from '../core/notemap';
 import { pianoFor } from '../core/piano';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
-import { micLine } from '../core/song';
+import { micLine, monitorOf } from '../core/song';
 import { clock as clockText } from '../core/time';
 import { resultRow, type Outcome } from '../core/results';
 import { SoundClock } from '../core/timed';
@@ -16,25 +18,34 @@ import type { Plan } from '../audio/conductor/conductor';
 import { onRange, rangeNow, saveRange } from '../data/range';
 import { saveResult } from '../data/results';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
-import { localStore, micBlockedBrowser } from '../shell/env';
+import { micBlockedBrowser } from '../shell/env';
 import { back, exRoute, navigate, routineRoute } from '../shell/router';
+import { anyOctaveFor, hearOn, hearVolume, setAnyOctaveFor, setHearOn, setHearVolume } from '../shell/settings';
 import { useYourLine } from '../shell/your-line';
 import { BackButton } from '../ui/BackButton';
 import { Bubbles } from '../ui/Bubbles';
+import { PatternCard } from '../ui/PatternCard';
+import { Slider } from '../ui/Slider';
 import { SoundTrouble } from '../ui/SoundTrouble';
-import { measureTag } from './TrainPage';
 
-/* One exercise (RULEBOOK 1b), on one screen, the tab bar hidden:
-   - its preview: name, tags, the notes heard only on a tap, a one-line
-     goal, a one-line how, a big Start;
-   - singing it: the bubbles and your line, a 3-2-1 count-in, and the
-     close button as the only control (a clock-only exercise has Done);
+/* One exercise (RULEBOOK 1b, 3; Robert, 24 Oct), on one screen, the tab
+   bar hidden:
+   - the page: back, the name, its group, the pattern card (the notes as
+     bars, played only on its button, the current bar lit and the syllable
+     under the card), Goal, How, Start. Behind one tap: the gear's sound
+     sheet (Any octave, remembered for this exercise; Count-in sound; Hear
+     yourself and its volume) and "More about this" (the old app's why,
+     watch for and care). The level, Quiet and what is measured stay on the
+     list rows, off this page;
+   - singing it: the note map filling the screen, the bubbles with their
+     syllables, a 3-2-1 count-in, the dots along the bottom one per rung,
+     and the close button as the only control (a clock-only exercise has
+     Done);
    - its result: only what was measured, Try again, Next. Saved at once.
    Nothing starts until Start is tapped, and a routine never moves on by
    itself (Robert, 1 Oct): its next step opens paused, with End session.
    The conductor plays and listens; this screen only asks and shows. */
 
-const ANY_OCTAVE = 'rp.anyOctave';
 /** the reference piano's volume */
 const PIANO_GAIN = 0.8;
 /** points of your line, a second */
@@ -42,12 +53,13 @@ const HOP = 0.05;
 
 type View = 'preview' | 'run' | 'result';
 type Shown = { o: Outcome; noMic: boolean; range?: Range; where: 'online' | 'phone' | null };
+type About = { why: string; watch?: string; care?: string };
 
 /** the piano notes of an exercise, as one step the conductor plays together */
-function notesStep(notes: readonly Note[], listen: boolean): Plan['steps'][number] {
+function notesStep(notes: readonly Note[], listen: boolean, monitor = 0): Plan['steps'][number] {
   const keys = notes.map((n) => pianoFor(n.m));
   return { kind: 'song', urls: keys.map((k) => k.file), from: 0, gains: notes.map(() => PIANO_GAIN), starts: notes.map((n) => n.t),
-    rates: keys.map((k) => k.rate), lengths: notes.map((n) => n.d), untilLast: true, listen, level: 1, monitor: 0 };
+    rates: keys.map((k) => k.rate), lengths: notes.map((n) => n.d), untilLast: true, listen, level: 1, monitor };
 }
 
 export function ExerciseScreen(props: { id?: string; routine?: string; step?: number }) {
@@ -75,15 +87,43 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   const kind = e.engine.kind;
   const sung = kind === 'ladder' || kind === 'hold';
   const usesMic = sung || kind === 'timed' || kind === 'glide' || kind === 'range';
+  /* a count-in, and so a count-in sound: everything the conductor runs */
+  const countsIn = kind !== 'cycle' && kind !== 'guided';
+  const about = (copy.about as Partial<Record<string, About>>)[e.id];
 
   const [range, setRange] = useState<Range>(rangeNow);
   useEffect(() => onRange(() => setRange(rangeNow())), []);
   const plan = useMemo(() => notesFor(e, range), [e, range]);
-  const [anyOctave, setAnyOctaveNow] = useState(() => localStore().get(ANY_OCTAVE) === '1');
+  const pattern = useMemo(() => firstRung(plan.notes), [plan]);
+  const rungs = useMemo(() => rungStarts(plan.notes).length, [plan]);
+
+  /* the sound sheet's settings: Any octave for this exercise alone; the
+     others shared with Learn a song (shell/settings; the conductor's count-in) */
+  const [anyOctave, setAnyOctaveNow] = useState(() => anyOctaveFor(e.id));
   const setAnyOctave = (on: boolean) => {
     setAnyOctaveNow(on);
-    localStore().set(ANY_OCTAVE, on ? '1' : '0');
+    setAnyOctaveFor(e.id, on);
   };
+  const [countSound, setCountSoundNow] = useState(() => c.countSound());
+  const setCountSound = (on: boolean) => {
+    setCountSoundNow(on);
+    c.setCountSound(on);
+  };
+  const [hear, setHearNow] = useState(hearOn);
+  const [hearVol, setHearVolNow] = useState(hearVolume);
+  const setHear = (on: boolean) => {
+    setHearNow(on);
+    setHearOn(on);
+    c.setMonitor(on ? monitorOf(hearVol) : 0);
+  };
+  const setHearVol = (v: number) => {
+    setHearVolNow(v);
+    setHearVolume(v);
+    if (hear) c.setMonitor(monitorOf(v));
+  };
+  const [sheet, setSheet] = useState(false);
+  const [more, setMore] = useState(false);
+
   const [withMic, setWithMic] = useState(true);
   const [view, setView] = useState<View>('preview');
   const [shown, setShown] = useState<Shown | null>(null);
@@ -95,6 +135,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   const running = playing && snap.state === 'running';
   const listening = running && snap.mic === 'open';
   const counting = playing && snap.state === 'counting-in' ? snap.count : null;
+  const previewing = c.active() && snap.owner === previewOwner;
   const trouble = snap.owner === owner && !playing ? snap.sound : null;
   const startedAt = snap.owner === owner ? snap.startedAt : null;
 
@@ -183,6 +224,15 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     return () => clearInterval(t);
   }, [clockFrom]);
 
+  /* the dots: which rung is being sung, from the conductor's clock */
+  const [rungNow, setRungNow] = useState(-1);
+  useEffect(() => {
+    if (!running || !sung) return;
+    const t = setInterval(() => setRungNow(rungAt(plan.notes, c.position() ?? -1)), 100);
+    return () => clearInterval(t);
+  }, [running, sung, plan, c]);
+  const rung = running ? rungNow : -1;
+
   function start(ev: SyntheticEvent) {
     heard.current = false;
     clock.current = null;
@@ -190,6 +240,8 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     setRangeProgress({ which: 'low', got: 0 });
     setHeldNow(0);
     setShown(null);
+    setSheet(false);
+    setMore(false);
     if (kind === 'cycle' || kind === 'guided') {
       setClockFrom(performance.now());
       setElapsed(0);
@@ -198,7 +250,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     }
     const beat = sung ? plan.beat : 1;
     const p: Plan = sung
-      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.notes, withMic)] }
+      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.notes, withMic, hear ? monitorOf(hearVol) : 0)] }
       : { owner, countIn: 3, countBeats: 3, steps: withMic ? [{ kind: 'listen' }] : [] };
     if (c.start(c.tap(ev.nativeEvent), p)) setView('run');
   }
@@ -215,14 +267,13 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     void finish({ kind: 'none' });
   }
 
-  function hearNotes(ev: SyntheticEvent) {
-    if (c.active() && snap.owner === previewOwner) {
+  /* the pattern card's button: the first rung, the piano alone, no mic */
+  function hearPattern(ev: SyntheticEvent) {
+    if (previewing) {
       c.stop();
       return;
     }
-    /* the first rung only, the piano alone: no mic */
-    const first = plan.notes.filter((n) => n.t < (plan.notes.find((q, i) => i > 0 && q.syl.includes(' · '))?.t ?? Infinity));
-    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(first, false)] });
+    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(pattern, false)] });
   }
 
   const mic = playing && withMic && usesMic ? micLine(snap.mic, micBlockedBrowser()) : null;
@@ -242,9 +293,22 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
             <X size={24} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
+        <div className="mic-line" id="mic-line">
+          {mic && <p className="problem" role="status">{mic}</p>}
+          {mic && (
+            <button type="button" className="btn btn-quiet" id="carry-on" onClick={() => setWithMic(false)}>{copy.song.carryOn}</button>
+          )}
+        </div>
         {(sung || kind === 'glide') && (
           <Bubbles notes={sung ? plan.notes : []} you={line} now={() => (sung ? c.position() ?? 0 : startedAt == null ? 0 : c.position() ?? 0)}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting} />
+        )}
+        {sung && (
+          <div className="dots" id="ex-dots" role="img" aria-label={copy.train.rungs}>
+            {Array.from({ length: rungs }, (_, i) => (
+              <span key={i} className="dot" data-done={i < rung ? 'true' : undefined} data-now={i === rung ? 'true' : undefined} />
+            ))}
+          </div>
         )}
         {!sung && kind !== 'glide' && counting != null && <div className="ex-big" id="count-in">{counting}</div>}
         {kind === 'glide' && <p className="hint">{copy.train.glide}</p>}
@@ -286,29 +350,52 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
         {(kind === 'cycle' || kind === 'guided' || kind === 'glide' || (kind === 'timed' && !withMic)) && (
           <button type="button" className="btn" id="ex-done" onClick={done}>{copy.train.done}</button>
         )}
-        <div className="mic-line" id="mic-line">
-          {mic && <p className="problem" role="status">{mic}</p>}
-          {mic && (
-            <button type="button" className="btn btn-quiet" id="carry-on" onClick={() => setWithMic(false)}>{copy.song.carryOn}</button>
-          )}
-        </div>
       </div>
     );
   }
 
   return (
     <>
-      <BackButton label={copy.tabs.train} onBack={() => back('/train')} />
+      <div className="ex-top">
+        <BackButton label={copy.tabs.train} onBack={() => back('/train')} />
+        {countsIn && view === 'preview' && (
+          <button type="button" className="round gear" id="ex-gear" aria-label={copy.train.soundSheet} aria-expanded={sheet}
+            onClick={() => setSheet((s) => !s)}>
+            <Settings size={22} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+      </div>
       {routine && steps && (
         <p className="hint" id="routine-step">{fill(copy.train.step, { name: copy.routineNames[routine], i: step + 1, n: steps.length })}</p>
       )}
       <h1 id="ex-name">{name}</h1>
       <div className="tags" id="ex-tags">
         <span className="tag" data-colour={cat.colour}>{copy.cats[e.category]}</span>
-        <span className="tag">{copy.levels[e.level]}</span>
-        {e.quiet && <span className="tag">{copy.train.tagQuiet}</span>}
-        <span className="tag" id="ex-measures">{measureTag(e)}</span>
       </div>
+
+      {sheet && view === 'preview' && (
+        <section className="card sheet" id="sound-sheet" aria-label={copy.train.soundSheet}>
+          {sung && (
+            <label className="switch-row">
+              <span>{copy.train.anyOctave}</span>
+              <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(ev) => setAnyOctave(ev.target.checked)} />
+            </label>
+          )}
+          <label className="switch-row">
+            <span>{copy.train.countSound}</span>
+            <input type="checkbox" role="switch" id="count-in-sound" checked={countSound} onChange={(ev) => setCountSound(ev.target.checked)} />
+          </label>
+          {sung && (
+            <>
+              <label className="switch-row">
+                <span>{copy.song.hearYourself}</span>
+                <input type="checkbox" role="switch" id="hear-yourself" checked={hear} onChange={(ev) => setHear(ev.target.checked)} />
+              </label>
+              <Slider id="monitor-volume" label={copy.song.hearVolume} value={hearVol} onChange={setHearVol} />
+            </>
+          )}
+        </section>
+      )}
 
       {view === 'result' && shown && (
         <section className="card ex-result" id="ex-result">
@@ -349,23 +436,40 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
 
       <SoundTrouble sound={trouble} onCheck={() => navigate('/profile/sound-check', 'screen')} />
 
-      <p className="ex-label">{copy.train.goal}</p>
-      <p className="ex-line" id="ex-goal">{copy.ex[e.id].goal}</p>
-      <p className="ex-label">{copy.train.how}</p>
-      <p className="ex-line" id="ex-how">{copy.ex[e.id].how}</p>
-
-      {sung && (
-        <button type="button" className="btn btn-quiet" id="ex-hear" onClick={hearNotes}>{copy.train.hear}</button>
-      )}
-      {sung && (
-        <label className="switch-row">
-          <span>{copy.train.anyOctave}</span>
-          <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(ev) => setAnyOctave(ev.target.checked)} />
-        </label>
-      )}
-
       {view === 'preview' && (
-        <button type="button" className="btn btn-start" id="ex-start" onClick={start}>{copy.train.start}</button>
+        <>
+          {sung && (
+            <PatternCard notes={pattern} syl={copy.ex[e.id].syl} colour={cat.colour} playing={previewing} now={() => c.position() ?? -1} onPlay={hearPattern} />
+          )}
+          <p className="ex-label">{copy.train.goal}</p>
+          <p className="ex-line" id="ex-goal">{copy.ex[e.id].goal}</p>
+          <p className="ex-label">{copy.train.how}</p>
+          <p className="ex-line" id="ex-how">{copy.ex[e.id].how}</p>
+          <button type="button" className="btn btn-start" id="ex-start" onClick={start}>{copy.train.start}</button>
+          {about && (
+            <button type="button" className="btn btn-quiet btn-link" id="ex-more" aria-expanded={more} onClick={() => setMore((m) => !m)}>
+              {copy.train.moreAbout}
+            </button>
+          )}
+          {about && more && (
+            <section className="card about" id="ex-about">
+              <p className="ex-label">{copy.train.why}</p>
+              <p>{about.why}</p>
+              {about.watch && (
+                <>
+                  <p className="ex-label">{copy.train.watchFor}</p>
+                  <p>{about.watch}</p>
+                </>
+              )}
+              {about.care && (
+                <>
+                  <p className="ex-label">{copy.train.care}</p>
+                  <p>{about.care}</p>
+                </>
+              )}
+            </section>
+          )}
+        </>
       )}
       {routine && (
         <button type="button" className="btn btn-quiet" id="end-session" onClick={() => navigate('/train', 'screen')}>{copy.train.endSession}</button>

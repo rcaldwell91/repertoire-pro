@@ -470,17 +470,10 @@ input[type='range'] {
 
 /* Train (1b): groups by colour, a daily routine on top */
 .btn-start { display: block; width: 100%; font-size: 1.15rem; min-height: 56px; margin: 16px 0 8px; }
-.routine h2, .train-cat h2, .train-more h2 { font-size: 1.15rem; margin: 0 0 2px; }
+.routine h2, .train-more h2 { font-size: 1.15rem; margin: 0 0 2px; }
 .routine-steps { margin: 10px 0 0; padding-left: 1.4em; }
 .routine-steps li { margin: 2px 0; }
 .dot { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: currentColor; margin: 0 8px; vertical-align: middle; }
-.range-row { margin: 16px 0 4px; }
-.range-row > span { display: flex; flex-direction: column; }
-.train-cat { margin: 22px 0 6px; }
-.train-cat[data-colour='warmup'] h2 { color: var(--warmup); }
-.train-cat[data-colour='breath'] h2 { color: var(--breath); }
-.train-cat[data-colour='tone'] h2 { color: var(--tone); }
-.train-cat[data-colour='pitch'] h2 { color: var(--pitch); }
 .train-more { margin: 22px 0 6px; }
 .train-more .btn-row > span { display: flex; flex-direction: column; }
 .ex-row {
@@ -510,9 +503,80 @@ input[type='range'] {
 .ex-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 
 /* singing it: the close button the only control (1b) */
-.ex-run { min-height: 80vh; }
 .ex-run-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.ex-run .bubbles canvas { height: 320px; }
 .ex-big { font-size: 4rem; font-weight: 700; text-align: center; margin: 24px 0 8px; }
 .range-bar { height: 12px; border-radius: 999px; background: var(--track); overflow: hidden; margin: 16px 0; }
 .range-bar > div { height: 100%; background: var(--voice); }
+
+/* Train (Robert, 24 Oct): one goal a screen. The main page is the warm-up
+   card and five group cards; a group's list keeps the rows */
+.btn-link { display: block; width: 100%; margin-top: 10px; border-width: 0; }
+.cat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.cat-card {
+  appearance: none;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 116px;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--pitch);
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.cat-card strong { font-size: 1.1rem; }
+.cat-card svg { color: var(--pitch); }
+.cat-card[data-colour='warmup'] { border-left-color: var(--warmup); }
+.cat-card[data-colour='warmup'] svg { color: var(--warmup); }
+.cat-card[data-colour='breath'] { border-left-color: var(--breath); }
+.cat-card[data-colour='breath'] svg { color: var(--breath); }
+.cat-card[data-colour='tone'] { border-left-color: var(--tone); }
+.cat-card[data-colour='tone'] svg { color: var(--tone); }
+.cat-page[data-colour='warmup'] h1 { color: var(--warmup); }
+.cat-page[data-colour='breath'] h1 { color: var(--breath); }
+.cat-page[data-colour='tone'] h1 { color: var(--tone); }
+.cat-page[data-colour='pitch'] h1 { color: var(--pitch); }
+
+/* the exercise page: back and the gear on one line; the pattern card; the
+   sound sheet and "More about this" open in place */
+.ex-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gear { width: var(--tap); height: var(--tap); }
+.gear[aria-expanded='true'] { border-color: var(--accent); color: var(--accent); }
+.sheet { margin: 4px 0 12px; }
+.pattern { display: flex; align-items: center; gap: 14px; margin: 12px 0 0; padding: 14px 16px; }
+.pbars { flex: 1; display: flex; align-items: flex-end; gap: 4px; height: 72px; }
+.pbar { flex: 1 1 0; min-width: 6px; border-radius: 4px; background: var(--pitch); opacity: 0.35; }
+.pbar[data-now='true'] { opacity: 1; }
+.pattern[data-colour='warmup'] .pbar { background: var(--warmup); }
+.pattern[data-colour='breath'] .pbar { background: var(--breath); }
+.pattern[data-colour='tone'] .pbar { background: var(--tone); }
+.pattern-play { flex: none; width: 56px; height: 56px; }
+.pattern-syl { min-height: 1.7em; margin: 6px 0 0; font-size: 1.25rem; font-weight: 700; text-align: center; }
+.about { margin: 12px 0; }
+.about p { margin: 2px 0 10px; }
+
+/* the singing screen fills the screen, top to bottom; the dots along the
+   bottom, one per rung */
+.ex-run {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+  padding: calc(8px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));
+}
+.ex-run .ex-run-top { flex: none; }
+.ex-run .bubbles { flex: 1; min-height: 0; margin: 0; }
+.ex-run .bubbles canvas { height: 100%; }
+.ex-run .mic-line { flex: none; }
+.dots { flex: none; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 10px 0 4px; }
+.dot { width: 10px; height: 10px; border-radius: 999px; background: var(--track); }
+.dot[data-done='true'] { background: var(--hit); }
+.dot[data-now='true'] { background: var(--now); transform: scale(1.4); }

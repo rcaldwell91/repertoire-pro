@@ -34,8 +34,14 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'tab-bar', 'preview', 'start-only', 'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle',
-  'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine', 'progress-phone', 'progress-online', 'no-page-errors'];
+const ALL = ['train-tab', 'tab-bar', 'category', 'routines-page', 'preview', 'sound-sheet', 'more-about', 'count-in-sound', 'start-only', 'singing-screen',
+  'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
+  'progress-phone', 'progress-online', 'no-page-errors'];
+/* the old app's groups, and how many exercises each has (CHECKLIST 5) */
+const GROUPS = { warmup: 4, breath: 5, tone: 10, agility: 5, range: 4 };
+const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch' };
+/** the count-in beep: the one short sound the app makes itself */
+const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -71,6 +77,8 @@ function ladder(pattern, bpm, range) {
   }
   return notes;
 }
+/** a key's name, as the app writes it (core/notemap) */
+const keyNameOf = (m) => ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'][((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 /** a recording of the singer, as base64, for the mirror */
 const b64 = (v) => v.buffer.toString('base64');
 const sing = (notes, opts) => b64(singNotes(FFMPEG, SOURCE, STEADY, notes, tmp, opts));
@@ -133,56 +141,197 @@ const scoreOf = async () => {
 const exLength = (notes) => Math.max(...notes.map((n) => n.t + n.d));
 
 try {
-  /* 1. Train: the daily routine on top, your range, the groups in their colours, every exercise */
+  /* 1. Train (Robert, 24 Oct): the warm-up card with Start and one line to
+        the other routines, then the five groups as cards in their colours.
+        Nothing else. */
   if (want('train-tab', 'tab-bar')) {
     await go('/train');
     await page.goto(URL_APP + '?load=' + ++loads + '#/train');
     await page.waitFor(`!!document.querySelector('#daily')`, 8000);
     const t = await page.eval(`(() => {
-      const cats = [...document.querySelectorAll('.train-cat')];
+      const cards = [...document.querySelectorAll('.cat-card')];
       const col = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
       const rgb = (c) => { const d = document.createElement('div'); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; };
+      const main = document.querySelector('main');
       return {
-        firstIsRoutine: document.querySelector('main').firstElementChild.nextElementSibling?.id === 'daily',
-        steps: document.querySelectorAll('#daily .routine-steps li').length,
-        cats: cats.map((c) => c.id.replace('cat-', '')),
-        colours: cats.map((c) => getComputedStyle(c.querySelector('h2')).color === rgb(col('--' + c.dataset.colour)) ? c.dataset.colour : 'wrong'),
-        exercises: document.querySelectorAll('.ex-row').length,
-        range: document.querySelector('#range-value')?.textContent,
+        order: [...main.children].map((el) => el.id || el.tagName.toLowerCase()),
+        start: document.querySelector('#daily #routine-start')?.textContent,
+        more: document.querySelector('#daily #more-routines')?.textContent,
+        cats: cards.map((c) => c.id.replace('cat-', '')),
+        colours: cards.map((c) => getComputedStyle(c.querySelector('svg')).color === rgb(col('--' + c.dataset.colour)) ? c.dataset.colour : 'wrong'),
+        pictures: cards.filter((c) => c.querySelector('svg')).length,
+        rows: document.querySelectorAll('.ex-row').length,
         tabs: !!document.querySelector('.tabs') };
     })()`);
     if (want('train-tab')) {
-      check('train-tab', t.firstIsRoutine && t.steps === 7 && JSON.stringify(t.cats) === JSON.stringify(['warmup', 'breath', 'tone', 'agility', 'range']) &&
-        JSON.stringify(t.colours) === JSON.stringify(['warmup', 'breath', 'tone', 'pitch', 'pitch']) && t.exercises === 28 && /\S/.test(t.range || ''),
-        `daily routine first ${t.firstIsRoutine} with ${t.steps} steps; groups ${t.cats.join(', ')} in ${t.colours.join(', ')}; ${t.exercises} exercises; range "${t.range}"`);
+      check('train-tab', JSON.stringify(t.order) === JSON.stringify(['h1', 'daily', 'cat-cards']) && t.start === copy.train.startRoutine && t.more === copy.train.routines &&
+        JSON.stringify(t.cats) === JSON.stringify(Object.keys(GROUPS)) && JSON.stringify(t.colours) === JSON.stringify(Object.values(COLOURS)) &&
+        t.pictures === 5 && t.rows === 0 && t.tabs,
+        `on the page: ${t.order.join(', ')}; "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')}, ${t.pictures} with a picture; ` +
+        `exercise rows on it: ${t.rows}`);
     }
     if (want('tab-bar')) {
+      await page.tap('#cat-tone');
+      await page.waitFor(`!!document.querySelector('#ex-mum')`, 5000);
+      const onList = await page.eval(`!!document.querySelector('.tabs')`);
       await page.tap('#ex-mum');
       await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
       const hidden = await page.eval(`!document.querySelector('.tabs')`);
       await page.tap('.back');
       await page.waitFor(`!!document.querySelector('#daily')`, 5000);
       const back = await page.eval(`!!document.querySelector('.tabs')`);
-      check('tab-bar', t.tabs && hidden && back, `on Train ${t.tabs}; hidden on an exercise ${hidden}; back on Train ${back}`);
+      check('tab-bar', t.tabs && onList && hidden && back, `on Train ${t.tabs}; on a group's list ${onList}; hidden on an exercise ${hidden}; back on Train ${back}`);
     }
   }
 
-  /* 2. The preview: name, tags, goal, how, a big Start; the notes play only on a tap, with no mic */
+  /* 1b. A group's list: its name in its colour, the rows with the level,
+         Quiet and what is measured; in Range, the range check's row shows your range */
+  if (want('category')) {
+    const seen = {};
+    for (const id of Object.keys(GROUPS)) {
+      await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/' + id);
+      await page.waitFor(`document.querySelectorAll('.ex-row').length > 0`, 5000);
+      seen[id] = await page.eval(`(() => {
+        const col = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+        const rgb = (c) => { const d = document.createElement('div'); d.style.color = c; document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; };
+        const page = document.querySelector('.cat-page');
+        return { title: page.querySelector('h1').textContent, coloured: getComputedStyle(page.querySelector('h1')).color === rgb(col('--' + page.dataset.colour)),
+          rows: [...page.querySelectorAll('.ex-row')].map((r) => r.querySelector('.ex-tags').textContent), range: document.querySelector('#range-value')?.textContent ?? null };
+      })()`);
+    }
+    const mum = seen.tone.rows[0];
+    const ok = Object.entries(GROUPS).every(([id, n]) => seen[id].title === copy.cats[id] && seen[id].coloured && seen[id].rows.length === n) &&
+      mum === fill(copy.train.tagLineQuiet, { level: copy.levels[1], measure: copy.train.tagPitch }) && seen.range.range === fill(copy.train.rangeIs, { lo: 'G♯3', hi: 'F4' }).replace('G♯3', keyNameOf(RANGE.lo)).replace('F4', keyNameOf(RANGE.hi));
+    check('category', ok, Object.entries(seen).map(([id, v]) => `${v.title} (${v.coloured ? 'in its colour' : 'wrong colour'}): ${v.rows.length} rows`).join('; ') +
+      `; Mum's row "${mum}"; the range check's row "${seen.range.range}"`);
+  }
+
+  /* 1c. More routines: one line on the warm-up card opens the other routines; a routine opens its first step paused */
+  if (want('routines-page')) {
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train');
+    await page.waitFor(`!!document.querySelector('#more-routines')`, 5000);
+    await page.tap('#more-routines');
+    await page.waitFor(`!!document.querySelector('#more-routines-list')`, 5000);
+    const rows = await page.eval(`[...document.querySelectorAll('#more-routines-list .btn-row')].map((r) => r.id.replace('routine-', ''))`);
+    const title = await text('main h1');
+    await page.tap('#routine-cooldown');
+    await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
+    await sleep(800);
+    const step = await text('#routine-step');
+    const quiet = await page.eval(`window.__probe.started === 0 && !!document.querySelector('#end-session')`);
+    check('routines-page', title === copy.train.routines && JSON.stringify(rows) === JSON.stringify(['intermediate', 'advanced', 'quiet', 'cooldown']) &&
+      step === fill(copy.train.step, { name: copy.routineNames.cooldown, i: 1, n: 3 }) && quiet,
+      `"${title}": ${rows.join(', ')}; the cool-down opened at "${step}", paused ${quiet}`);
+  }
+
+  /* 2. The exercise page (Robert, 24 Oct): back, the name, its group alone
+        as a tag, the pattern card, Goal, How, Start. The card's notes play
+        only on its button, with no mic; the current bar lights and the
+        syllable shows under the card; a second tap stops them */
   if (want('preview')) {
     await openEx('mum');
-    const v = await page.eval(`({ name: document.querySelector('#ex-name')?.textContent, tags: [...document.querySelectorAll('#ex-tags .tag')].map((t) => t.textContent),
+    const v = await page.eval(`({ back: !!document.querySelector('.back'), name: document.querySelector('#ex-name')?.textContent,
+      tags: [...document.querySelectorAll('#ex-tags .tag')].map((t) => t.textContent), bars: document.querySelectorAll('#pattern .pbar').length,
+      lit: document.querySelectorAll('#pattern .pbar[data-now]').length, syl: document.querySelector('#pattern-syl')?.textContent,
       goal: document.querySelector('#ex-goal')?.textContent, how: document.querySelector('#ex-how')?.textContent,
-      start: document.querySelector('#ex-start')?.textContent, started: window.__probe.started, gum: window.__probe.gum })`);
+      start: document.querySelector('#ex-start')?.textContent, more: document.querySelector('#ex-more')?.textContent,
+      sheet: !!document.querySelector('#sound-sheet'), anyOctave: !!document.querySelector('#any-octave'), started: window.__probe.started })`);
     await sleep(1500);
     const still = await page.eval(P('started'));
-    await page.tap('#ex-hear');
+    await page.tap('#pattern-play');
     const played = await page.waitFor(P('started > 0'), 5000);
+    const litUp = await page.waitFor(`document.querySelectorAll('#pattern .pbar[data-now]').length === 1`, 3000);
+    const sylShown = await text('#pattern-syl');
     const gum = await page.eval(P('gum'));
-    await page.tap('#ex-hear');
+    await page.tap('#pattern-play');
     const stopped = await page.waitFor(`window.__probe.live.size === 0`, 3000);
-    check('preview', v.name === copy.ex.mum.name && v.tags.join('|') === [copy.cats.tone, copy.levels[1], copy.train.tagQuiet, copy.train.tagPitch].join('|') &&
-      v.goal === copy.ex.mum.goal && v.how === copy.ex.mum.how && v.start === copy.train.start && v.started === 0 && still === 0 && played && gum === 0 && stopped,
-      `"${v.name}", tags ${v.tags.join(' / ')}; goal "${v.goal}"; how "${v.how}"; nothing played before the tap (${still}); the notes on a tap ${played}, mic asked ${gum}; a second tap stops them ${stopped}`);
+    await sleep(200);
+    const sylGone = await text('#pattern-syl');
+    check('preview', v.back && v.name === copy.ex.mum.name && v.tags.join('|') === copy.cats.tone && v.bars === 9 && v.lit === 0 && v.syl === '' &&
+      v.goal === copy.ex.mum.goal && v.how === copy.ex.mum.how && v.start === copy.train.start && v.more === copy.train.moreAbout && !v.sheet && !v.anyOctave &&
+      v.started === 0 && still === 0 && played && litUp && sylShown === copy.ex.mum.syl && gum === 0 && stopped && sylGone === '',
+      `"${v.name}", tags ${v.tags.join(' / ')}; ${v.bars} bars, none lit; goal "${v.goal}"; how "${v.how}"; "${v.start}", "${v.more}"; ` +
+      `the sheet closed ${!v.sheet}, Any octave off the page ${!v.anyOctave}; nothing played before the tap (${still}); on the button: played ${played}, a bar lit ${litUp}, ` +
+      `"${sylShown}" under the card, mic asked ${gum}; a second tap stops it ${stopped}, the syllable goes ${sylGone === ''}`);
+  }
+
+  /* 2b. The gear's sound sheet: Any octave (off at first, remembered for
+         this exercise alone), Count-in sound, Hear yourself and its volume */
+  if (want('sound-sheet')) {
+    await openEx('mum');
+    await page.eval(`Object.keys(localStorage).filter((k) => k.startsWith('rp.anyOctave')).forEach((k) => localStorage.removeItem(k))`);
+    await openEx('mum');
+    await page.tap('#ex-gear');
+    const opened = await page.waitFor(`!!document.querySelector('#sound-sheet')`, 3000);
+    const sheet = await page.eval(`({ any: document.querySelector('#sound-sheet #any-octave')?.checked ?? null, count: document.querySelector('#sound-sheet #count-in-sound')?.checked ?? null,
+      hear: document.querySelector('#sound-sheet #hear-yourself')?.checked ?? null, vol: document.querySelector('#sound-sheet #monitor-volume')?.value ?? null })`);
+    await page.tap('#any-octave');
+    await openEx('mum');
+    await page.tap('#ex-gear');
+    const mumAgain = await page.eval(`document.querySelector('#any-octave')?.checked ?? null`);
+    await openEx('mee');
+    await page.tap('#ex-gear');
+    const mee = await page.eval(`document.querySelector('#any-octave')?.checked ?? null`);
+    await page.tap('#ex-gear');
+    const closed = await page.eval(`!document.querySelector('#sound-sheet')`);
+    await openEx('mum');
+    await page.tap('#ex-gear');
+    await page.tap('#any-octave');
+    check('sound-sheet', opened && sheet.any === false && sheet.count === true && sheet.hear === false && sheet.vol === '70' && mumAgain === true && mee === false && closed,
+      `the gear opens it ${opened}: Any octave ${sheet.any}, Count-in sound ${sheet.count}, Hear yourself ${sheet.hear} at ${sheet.vol}; ` +
+      `Any octave on for Mum is remembered for Mum ${mumAgain} and not for Mee ${mee === false}; the gear closes it ${closed}`);
+  }
+
+  /* 2c. "More about this" opens the old app's why, watch for and care */
+  if (want('more-about')) {
+    await openEx('mum');
+    const before = await page.eval(`!!document.querySelector('#ex-about')`);
+    await page.tap('#ex-more');
+    const after = await page.waitFor(`!!document.querySelector('#ex-about')`, 3000);
+    const a = await page.eval(`({ labels: [...document.querySelectorAll('#ex-about .ex-label')].map((l) => l.textContent), text: document.querySelector('#ex-about').textContent })`);
+    await page.tap('#ex-more');
+    const gone = await page.eval(`!document.querySelector('#ex-about')`);
+    check('more-about', !before && after && JSON.stringify(a.labels) === JSON.stringify([copy.train.why, copy.train.watchFor, copy.train.care]) &&
+      a.text.includes(copy.about.mum.why) && a.text.includes(copy.about.mum.watch) && a.text.includes(copy.about.mum.care) && gone,
+      `closed at first ${!before}; opened ${after} with ${a.labels.join(', ')}, the old app's words ${a.text.includes(copy.about.mum.why)}; closed again ${gone}`);
+  }
+
+  /* 2d. The count-in sound (Robert, 24 Oct): a short beep on each of 3, 2,
+         1, before the notes; none when off; remembered; nothing after Close */
+  if (want('count-in-sound')) {
+    const countIn = async () => {
+      await noSinger();
+      await page.tap('#ex-start');
+      await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
+      const st = await page.eval(P('starts'));
+      const first = st.findIndex((x) => x.seconds > 1);
+      await page.tap('#ex-close');
+      await page.waitFor(P('live.size === 0'), 3000);
+      return { before: st.slice(0, first).filter(isBeep).length, all: st.filter(isBeep).length };
+    };
+    await openEx('mum');
+    const on = await countIn();
+    await openEx('mum');
+    await page.tap('#ex-gear');
+    await page.tap('#count-in-sound');
+    const off = await countIn();
+    await openEx('mum');
+    await page.tap('#ex-gear');
+    const remembered = await page.eval(`document.querySelector('#count-in-sound').checked`);
+    await page.tap('#count-in-sound');
+    await page.tap('#ex-gear');
+    /* Close during the count-in: no more beeps, nothing plays */
+    await page.tap('#ex-start');
+    await page.waitFor(P('starts.length >= 1'), 8000);
+    await page.eval(P('mark()'));
+    await page.tap('#ex-close');
+    const n = await page.eval(P('starts.length'));
+    await sleep(2500);
+    const later = await page.eval(P('starts.length'));
+    const quiet = await quietNow();
+    check('count-in-sound', on.before === 3 && on.all === 3 && off.all === 0 && remembered === false && n >= 1 && later === n && quiet,
+      `on: ${on.before} beeps before the first note (${on.all} in all); off: ${off.all}; off remembered ${remembered === false}; ` +
+      `after Close during the count-in: ${later - n} more sounds, quiet ${quiet}`);
   }
 
   /* 3. Robert, 1 Oct: nothing starts until Start; the 3-2-1 count-in; the close button the only control */
@@ -197,13 +346,39 @@ try {
     while (Date.now() < end) {
       const c = await text('#count-in');
       if (c) counts.add(c);
-      if (await page.eval(P('live.size > 0'))) break;
+      if (await page.eval(P('starts.some((x) => x.seconds > 1)'))) break;
       await sleep(60);
     }
     const controls = await page.eval(`[...document.querySelectorAll('#ex-run button')].map((b) => b.id)`);
     await page.tap('#ex-close');
     check('start-only', before.s === 0 && before.gum === 0 && ['3', '2', '1'].every((x) => counts.has(x)) && JSON.stringify(controls) === JSON.stringify(['ex-close']),
       `before Start: notes ${before.s}, mic asked ${before.gum}; counted ${[...counts].join(', ')}; controls while singing: ${controls.join(', ')}`);
+  }
+
+  /* 3b. The singing screen (Robert, 24 Oct): the note map fills the screen,
+         the ladder of note names at the left, every bubble with its syllable,
+         the current one bigger, the dots along the bottom one per rung */
+  if (want('singing-screen')) {
+    await openEx('mum');
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
+    await sleep(600);
+    const look = () => page.eval(`(() => {
+      const run = document.querySelector('#ex-run').getBoundingClientRect(), cv = document.querySelector('#bubbles'), c = cv.getBoundingClientRect();
+      return { top: run.top, height: run.height, inner: innerHeight, canvas: c.height, ...cv.dataset,
+        dots: document.querySelectorAll('#ex-dots .dot').length, done: document.querySelectorAll('#ex-dots .dot[data-done]').length,
+        now: [...document.querySelectorAll('#ex-dots .dot')].findIndex((d) => d.dataset.now) };
+    })()`);
+    const a = await look();
+    await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 12000);
+    const b = await look();
+    await page.tap('#ex-close');
+    const rungs = MUM.length / 9;
+    check('singing-screen', a.top <= 1 && a.height >= a.inner - 2 && a.canvas >= 0.6 * a.inner && +a.visible > 0 && a.labelled === a.visible && +a.names >= 8 &&
+      +a.bubble >= 18 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1,
+      `fills the screen: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
+      `${a.names} note names; bubbles ${a.bubble} px, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}`);
   }
 
   /* 4. Sung right, by a real voice: the bubbles fill and the score says so */
@@ -232,18 +407,21 @@ try {
   if (want('any-octave')) {
     const low = sing(MUM, { shift: -12 });
     await openEx('mum');
-    if (await page.eval(`document.querySelector('#any-octave').checked`)) await page.tap('#any-octave');
+    await page.eval(`localStorage.removeItem('rp.anyOctave.mum')`);
+    await openEx('mum');
     await singer(low);
     await page.tap('#ex-start');
     await result(exLength(MUM) * 1000 + 12000);
     const exact = await scoreOf();
     await openEx('mum');
+    await page.tap('#ex-gear');
     await page.tap('#any-octave');
+    await page.tap('#ex-gear');
     await singer(low);
     await page.tap('#ex-start');
     await result(exLength(MUM) * 1000 + 12000);
     const any = await scoreOf();
-    await page.tap('#any-octave');
+    await page.eval(`localStorage.removeItem('rp.anyOctave.mum')`);
     check('any-octave', exact && any && exact.hits <= Math.floor(0.2 * exact.n) && any.hits >= Math.ceil(0.8 * any.n),
       `an octave down: exact "${exact ? exact.hits + ' of ' + exact.n : '-'}", with Any octave "${any ? any.hits + ' of ' + any.n : '-'}"`);
   }
@@ -309,7 +487,7 @@ try {
     const voice = sing([{ m: lowM, t: 0, d: 5.5 }, { m: highM, t: 5.5, d: 6 }], { lead: 5, tail: 2 });
     await go('/train', null);
     await page.eval(`localStorage.removeItem('rp.range'); localStorage.removeItem('rp_range')`);
-    await page.goto(URL_APP + '?load=' + ++loads + '#/train');
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/range');
     await page.waitFor(`!!document.querySelector('#range-value')`, 5000);
     const before = await text('#range-value');
     await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/rangecheck');
@@ -319,7 +497,7 @@ try {
     const shown = await result(30000);
     const kept = await page.eval(`JSON.parse(localStorage.getItem('rp.range') || 'null')`);
     const said = await text('#ex-score');
-    await page.goto(URL_APP + '?load=' + ++loads + '#/train');
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/range');
     await page.waitFor(`!!document.querySelector('#range-value')`, 5000);
     const after = await text('#range-value');
     if (want('range-check')) {
@@ -334,11 +512,11 @@ try {
       await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
       await noSinger();
       await page.eval(`Object.assign(window.__rec, { on: true, chunks: [] })`);
-      await page.tap('#ex-hear');
+      await page.tap('#pattern-play');
       await page.waitFor(P('live.size > 0'), 5000);
       await sleep(400);
       await page.eval(`window.__rec.on = false`);
-      await page.tap('#ex-hear');
+      await page.tap('#pattern-play');
       const raw = join(tmp, 'heard.f32');
       writeFileSync(raw, Buffer.from(await page.eval(`window.__rec.take()`), 'base64'));
       const heardPcm = pcm(FFMPEG, raw, [], ['-f', 'f32le', '-ar', String(await page.eval(`window.__rec.rate`)), '-ac', '1']);

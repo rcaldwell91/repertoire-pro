@@ -2,6 +2,7 @@ import type { AudioEngine, Ensemble, MicBlock, MicResult, SoundReport, Source, S
 import { Recorder, type Recording } from '../recorder';
 import { MIC_MODES, modeIndex } from '../mic-modes';
 import { songLevel } from '../../core/song';
+import { BEEP_GAIN, BEEP_URL } from '../../core/beep';
 
 /* THE CONDUCTOR - the only owner of sound and the microphone (RULEBOOK 2.1).
 
@@ -124,6 +125,9 @@ export const TOKEN_LIFE_MS = 1000;
 export const MODE_KEY = 'rp.mic.mode';
 /** what the old automatic ladder remembered: cleared, never read */
 export const OLD_RUNG_KEY = 'rp.mic.set';
+/** "Count-in sound": one setting for every count-in in the app, remembered;
+    on unless switched off (Robert, 24 Oct) */
+export const COUNT_SOUND_KEY = 'rp.countin.sound';
 const ACTIVE: readonly State[] = ['armed', 'counting-in', 'running'];
 
 export class Conductor {
@@ -287,6 +291,15 @@ export class Conductor {
     return ACTIVE.includes(this.snap.state);
   }
 
+  /** whether the count-in beeps on each of 3, 2, 1 (Robert, 24 Oct) */
+  countSound(): boolean {
+    return this.store.get(COUNT_SOUND_KEY) !== '0';
+  }
+
+  setCountSound(on: boolean): void {
+    this.store.set(COUNT_SOUND_KEY, on ? '1' : '0');
+  }
+
   /** The only way to make a start token: from the press itself. */
   tap(ev: Tap | null | undefined): StartToken | null {
     if (!ev || ev.isTrusted !== true) return null;
@@ -371,6 +384,9 @@ export class Conductor {
       }
       this.rebuild = false;
       const samples = new Map<string, Sample>();
+      /* the count-in's beep, only if it will sound */
+      const beep = plan.countIn && plan.countIn > 0 && this.countSound() ? await this.engine.load(BEEP_URL) : null;
+      if (gen !== this.gen) return;
       for (const st of plan.steps) {
         if (st.kind === 'note' && !samples.has(st.url)) samples.set(st.url, await this.engine.load(st.url));
         if (st.kind === 'song') {
@@ -399,6 +415,10 @@ export class Conductor {
         const beats = Math.max(1, Math.round(plan.countBeats ?? 1));
         for (let k = beats; k >= 1; k--) {
           this.set({ state: 'counting-in', count: beats > 1 ? k : null });
+          /* a short, soft beep on each beat; it never counts toward a score
+             or a take (nothing is running yet), and Close silences it with
+             the rest (halt releases every source) */
+          if (beep) this.engine.play(beep, { gain: BEEP_GAIN });
           await this.env.wait(plan.countIn / beats);
           if (gen !== this.gen) return;
         }

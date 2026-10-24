@@ -14,22 +14,30 @@ export const ROUTES = [
   ...TABS.map((t) => '/' + t),
   '/profile/sound-check', '/profile/account', '/profile/look',
   '/sing/learn', '/sing/learn/add',
+  '/train/routines',
 ] as const;
 export type Route = string;
 export const SONG_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)$/;
 /** an exercise's own screen: its preview, then singing it, then its result */
 export const EX_ROUTE = /^\/train\/ex\/([a-z0-9]+)$/;
+/** one group of exercises (Warm-up, Breath...), its list */
+export const CAT_ROUTE = /^\/train\/cat\/([a-z]+)$/;
 /** a step of a routine, on the same screen */
 export const ROUTINE_ROUTE = /^\/train\/routine\/([a-z]+)\/(\d+)$/;
 /** sending a song's take to a coach */
 export const SEND_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)\/send(?:\/([A-Za-z0-9-]+))?$/;
 
 export function isRoute(r: string): boolean {
-  return (ROUTES as readonly string[]).includes(r) || SONG_ROUTE.test(r) || SEND_ROUTE.test(r) || EX_ROUTE.test(r) || ROUTINE_ROUTE.test(r);
+  return (ROUTES as readonly string[]).includes(r) || SONG_ROUTE.test(r) || SEND_ROUTE.test(r) || EX_ROUTE.test(r) || ROUTINE_ROUTE.test(r) ||
+    CAT_ROUTE.test(r);
 }
 
 export function exRoute(id: string): Route {
   return '/train/ex/' + id;
+}
+
+export function catRoute(id: string): Route {
+  return '/train/cat/' + id;
 }
 
 export function routineRoute(key: string, step: number): Route {

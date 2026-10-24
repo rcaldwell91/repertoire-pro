@@ -184,6 +184,42 @@ export function notesFor(e: Exercise, range: Range): { notes: Note[]; length: nu
   return e.engine.kind === 'hold' ? holdNotes(e, range) : ladderNotes(e, range);
 }
 
+/** where each rung begins (one run of the pattern, or one held note), as
+    indexes into the notes: the notes that carry a note name */
+export function rungStarts(notes: readonly Note[]): number[] {
+  const out: number[] = [];
+  notes.forEach((n, i) => {
+    if (n.syl.includes(' · ')) out.push(i);
+  });
+  return out;
+}
+
+/** the notes of the first rung alone: the pattern, for the preview */
+export function firstRung(notes: readonly Note[]): Note[] {
+  const starts = rungStarts(notes);
+  return notes.slice(0, starts.length > 1 ? starts[1] : notes.length);
+}
+
+/** which rung is being sung at time t (seconds from the start): the last
+    one begun by then; -1 before the first; the count after the last note */
+export function rungAt(notes: readonly Note[], t: number): number {
+  const starts = rungStarts(notes);
+  if (!notes.length || t < notes[0].t) return -1;
+  const last = notes[notes.length - 1];
+  if (t >= last.t + last.d) return starts.length;
+  let r = 0;
+  starts.forEach((i, k) => {
+    if (t >= notes[i].t) r = k;
+  });
+  return r;
+}
+
+/** the syllable alone, without the rung's note name */
+export function sylOf(n: Note): string {
+  const at = n.syl.indexOf(' · ');
+  return at < 0 ? n.syl : n.syl.slice(at + 3);
+}
+
 /** a hit: at least half of the note's time within a semitone of it
     (RULEBOOK 4, Bubbles); the fill shows that same share */
 export const HIT_SHARE = 0.5;

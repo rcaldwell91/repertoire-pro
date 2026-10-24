@@ -1,3 +1,4 @@
+/* Goal: send one take to one of your coaches. */
 import { useEffect, useState } from 'react';
 import { copy } from '../core/copy';
 import { myCoaches, saveTake, sendTake, takesFor, type Coach, type StoredTake } from '../data/takes';

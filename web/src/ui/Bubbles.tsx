@@ -1,18 +1,24 @@
 import { useEffect, useRef } from 'react';
 import type { Note } from '../core/exercises';
-import { bubbleScore } from '../core/exercises';
+import { bubbleScore, sylOf } from '../core/exercises';
 import { foldTo, keyName } from '../core/notemap';
 import { drawLine } from './NoteMap';
 
-/* The singing screen (RULEBOOK 1b): the old app's syllable bubbles,
-   smaller, a white ring on the note to sing now, your line with the voice
-   gradient on top. Each bubble fills green with the share of it you sang
-   on the note: the same rule as the score (RULEBOOK 4, Bubbles). With no
-   notes (a siren), only your line. */
+/* The singing screen (RULEBOOK 1b; Robert, 24 Oct): the note map fills the
+   screen, the ladder of note names at the left, the old app's syllable
+   bubbles with every syllable inside, the one to sing now bigger with a
+   white ring, your line with the voice gradient on top. Each bubble fills
+   green with the share of it you sang on the note: the same rule as the
+   score (RULEBOOK 4, Bubbles). With no notes (a siren), only your line. */
 
-const SPAN = 6;          /* seconds across */
+const SPAN = 4;          /* seconds across: wide enough for a syllable in a one-beat note */
 const NOW_AT = 0.3;
-const GUTTER = 40;
+const GUTTER = 44;
+/** a bubble's height, in px: never under this, never over that */
+const BUBBLE_MIN = 18;
+const BUBBLE_MAX = 36;
+/** the bubble to sing now, bigger than the rest */
+const NOW_SCALE = 1.3;
 
 export interface YouLine {
   readonly t: number[];
@@ -60,22 +66,29 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         lo = mid - 6;
         hi = mid + 6;
       }
-      const pad = 10;
+      const pad = 14;
+      const rowH = (H - 2 * pad) / (hi - lo);
       const y = (m: number) => pad + ((hi - m) / (hi - lo)) * (H - 2 * pad);
       const pxs = (W - GUTTER) / SPAN;
       const nowX = GUTTER + NOW_AT * (W - GUTTER);
       const x = (t: number) => nowX + (t - at) * pxs;
       const t0 = at - NOW_AT * SPAN, t1 = at + (1 - NOW_AT) * SPAN;
 
-      g.font = '600 11px Quicksand, system-ui, sans-serif';
+      /* the ladder of note names: every white key when there is room,
+         otherwise C, E, G and A, so no two names touch */
+      g.font = '600 12px Quicksand, system-ui, sans-serif';
       g.textBaseline = 'middle';
+      const roomy = rowH >= 14;
+      let names = 0;
       for (let m = Math.ceil(lo); m <= Math.floor(hi); m++) {
         const pc = ((m % 12) + 12) % 12;
         g.fillStyle = css.getPropertyValue(pc === 0 ? '--row-c' : '--row');
         g.fillRect(GUTTER, Math.round(y(m)), W - GUTTER, 1);
-        if ([0, 4, 7, 9].includes(pc)) {
+        const named = roomy ? ![1, 3, 6, 8, 10].includes(pc) : [0, 4, 7, 9].includes(pc);
+        if (named) {
           g.fillStyle = css.getPropertyValue('--muted');
           g.fillText(keyName(m), 6, y(m));
+          names++;
         }
       }
 
@@ -83,18 +96,19 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       g.beginPath();
       g.rect(GUTTER, 0, W - GUTTER, H);
       g.clip();
-      /* the bubbles: smaller than the old app's (1b), the share sung on the note filled green */
+      /* the bubbles: the share sung on the note filled green, every
+         syllable inside, the one to sing now bigger with a white ring */
       const score = bubbleScore(notes, you.t, you.m, 0.05, anyOctave);
-      const h = Math.max(9, Math.min(18, ((H - 2 * pad) / (hi - lo)) * 0.9));
+      const h = Math.max(BUBBLE_MIN, Math.min(BUBBLE_MAX, rowH * 0.95));
       const tint = css.getPropertyValue('--' + colour).trim();
-      let current = -1;
-      notes.forEach((n, i) => {
-        if (n.t + n.d < t0 || n.t > t1) return;
-        const bx = x(n.t), bw = Math.max(12, n.d * pxs - 3), by = y(n.m) - h / 2;
+      let current = -1, visible = 0, labelled = 0;
+      const bubble = (n: Note, i: number, isNow: boolean) => {
+        const bh = isNow ? h * NOW_SCALE : h;
+        const bx = x(n.t), bw = Math.max(14, n.d * pxs - 3), by = y(n.m) - bh / 2;
         const shape = () => {
           g.beginPath();
-          if (g.roundRect) g.roundRect(bx, by, bw, h, h / 2);
-          else g.rect(bx, by, bw, h);
+          if (g.roundRect) g.roundRect(bx, by, bw, bh, bh / 2);
+          else g.rect(bx, by, bw, bh);
         };
         shape();
         g.globalAlpha = 0.35;
@@ -106,21 +120,30 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
           shape();
           g.clip();
           g.fillStyle = css.getPropertyValue('--hit');
-          g.fillRect(bx, by, bw * score.fill[i], h);
+          g.fillRect(bx, by, bw * score.fill[i], bh);
           g.restore();
         }
-        const now = at >= n.t && at < n.t + n.d;
-        if (now) current = i;
         shape();
-        g.lineWidth = now ? 2.5 : 1;
-        g.strokeStyle = now ? '#ffffff' : tint;
+        /* the ring on the note to sing now: white in the dark, ink in the
+           light, so it shows on both (the --now token) */
+        g.lineWidth = isNow ? 3 : 1;
+        g.strokeStyle = isNow ? css.getPropertyValue('--now') : tint;
         g.stroke();
-        if (bw > 34) {
-          g.fillStyle = css.getPropertyValue('--ink');
-          g.font = '600 10px Quicksand, system-ui, sans-serif';
-          g.fillText(n.syl, bx + 7, by + h / 2, bw - 10);
-        }
+        g.fillStyle = css.getPropertyValue('--ink');
+        g.font = `700 ${isNow ? 14 : 12}px Quicksand, system-ui, sans-serif`;
+        g.textAlign = 'center';
+        g.fillText(sylOf(n), bx + bw / 2, by + bh / 2, bw + 8);
+        g.textAlign = 'left';
+        labelled++;
+      };
+      notes.forEach((n, i) => {
+        if (n.t + n.d < t0 || n.t > t1) return;
+        visible++;
+        const isNow = at >= n.t && at < n.t + n.d;
+        if (isNow) current = i;
+        else bubble(n, i, false);
       });
+      if (current >= 0) bubble(notes[current], current, true);   /* on top of its neighbours */
 
       /* your line, on top, in the voice gradient */
       const pts: Array<{ t: number; m: number }> = [];
@@ -150,6 +173,11 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.you = String(drawn);
       cv.dataset.hits = String(score.hits);
       cv.dataset.fill = score.fill.map((f) => f.toFixed(2)).join(',');
+      cv.dataset.visible = String(visible);
+      cv.dataset.labelled = String(labelled);
+      cv.dataset.names = String(names);
+      cv.dataset.bubble = h.toFixed(0);
+      cv.dataset.nowBubble = (h * NOW_SCALE).toFixed(0);
       if (propsRef.current.live) raf = requestAnimationFrame(draw);
     };
     draw();

@@ -12,10 +12,12 @@ import { SendTake } from '../screens/SendTake';
 import { SoundCheck } from '../screens/SoundCheck';
 import { TabPage } from '../screens/TabPage';
 import { TrainPage } from '../screens/TrainPage';
+import { TrainCategory } from '../screens/TrainCategory';
+import { TrainRoutines } from '../screens/TrainRoutines';
 import { ExerciseScreen } from '../screens/ExerciseScreen';
 import { TabBar } from '../ui/TabBar';
 import { ConductorContext } from './conductor-context';
-import { current, EX_ROUTE, isExercise, navigate, onRoute, ROUTINE_ROUTE, SEND_ROUTE, SONG_ROUTE, tabOf, type Route } from './router';
+import { CAT_ROUTE, current, EX_ROUTE, isExercise, navigate, onRoute, ROUTINE_ROUTE, SEND_ROUTE, SONG_ROUTE, tabOf, type Route } from './router';
 
 /* The one screen registry (RULEBOOK 4, Screens). */
 const SCREENS: Record<string, () => ReactNode> = {
@@ -31,6 +33,7 @@ const SCREENS: Record<string, () => ReactNode> = {
   '/profile/look': () => <Look />,
   '/sing/learn': () => <SongList />,
   '/sing/learn/add': () => <AddSong />,
+  '/train/routines': () => <TrainRoutines />,
 };
 
 function screenFor(route: Route): ReactNode {
@@ -40,6 +43,8 @@ function screenFor(route: Route): ReactNode {
   if (send) return <SendTake id={send[1]} takeId={send[2]} />;
   const ex = EX_ROUTE.exec(route);
   if (ex) return <ExerciseScreen id={ex[1]} />;
+  const cat = CAT_ROUTE.exec(route);
+  if (cat) return <TrainCategory id={cat[1]} />;
   const step = ROUTINE_ROUTE.exec(route);
   if (step) return <ExerciseScreen routine={step[1]} step={Number(step[2])} />;
   return SCREENS[route]();

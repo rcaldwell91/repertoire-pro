@@ -1,3 +1,4 @@
+/* Goal: prove the phone plays and listens, and see why if it does not. */
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { copy, fill as fillIn } from '../core/copy';

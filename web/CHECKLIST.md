@@ -186,9 +186,12 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ The melodic patterns (8063-8075) — test: `unit:core/exercises.test.ts:runs each pattern as the old app did`
 - ✓ The routines and cool-down, in the warm-up order every source agrees on (8100-8125) — test: `unit:core/exercises.test.ts:has the old app's routines and cool-down`, `train:routine`
 - ✓ Every exercise says what the app can and cannot measure; nothing scored that was not measured (7672-7684, scoreNote) — test: `unit:core/exercises.test.ts:says what it measures, and only that`, `train:preview`, `train:cycle`, `train:guided`
-- ✓ Groups by colour (1b): Warm-up orange, Breath teal, Tone pink, Agility blue; Range in Agility's blue (Robert, 23 Oct) — test: `unit:core/exercises.test.ts:has its four groups by colour`, `train:train-tab`
-- — The why, watch-for, care and myth paragraphs (7686-8099). Replaced by 1b's preview: a one-line goal and a one-line how, each under the eight-word copy rule; the octave leaps' safety line is kept in its how.
-- — A level filter, and "never offer an empty level" (rp-train.js 66-76). Not in the new app: 1b shows groups, not levels; each exercise shows its level as a tag.
+- ✓ Groups by colour (1b): Warm-up orange, Breath teal, Tone pink, Agility blue; Range in Agility's blue (Robert, 23 Oct) — test: `unit:core/exercises.test.ts:has its four groups by colour`, `train:train-tab`, `train:category`
+- ✓ Train's one goal is to start today's warm-up in one tap (RULEBOOK 3; Robert, 24 Oct): the warm-up card with Start and one line to the other routines, then the five groups as cards with a picture, nothing else; a group's list and the other routines one tap away — test: `train:train-tab`, `train:routines-page`, `unit:core/screens.test.ts:as the first line of its file`
+- ✓ A group's list: the rows with the level, Quiet and what is measured; the range check's row shows your range (Robert, 24 Oct) — test: `train:category`
+- ✓ The why, watch-for and care paragraphs (7686-8099), in the old app's words, behind "More about this" on the exercise page (Robert, 24 Oct); the preview itself keeps 1b's one-line goal and how — test: `train:more-about`, `unit:core/copy.test.ts:only the explanations under copy.about are prose`
+- — The myth, note and dispute paragraphs (7686-8099). Not in the new app: Robert asked for why, watch for and care.
+- — A level filter, and "never offer an empty level" (rp-train.js 66-76). Not in the new app: 1b shows groups, not levels; each exercise's level is on its row in the group's list (Robert, 24 Oct: off the exercise page).
 - — The pitch tools and ear drills: Match the note, Keyboard, Hold the interval, the degree drills (rp-train.js 34-46). Not in this round: Robert asked for warm-ups, breath, tone and agility.
 
 ### Running an exercise
@@ -197,8 +200,11 @@ For each part the new app has built, every rule the old app's code (next.html) e
 - ✓ The ladder: from one note above the bottom of your range, a half step a rung, up to where the pattern fits, at most 14 rungs, two beats' rest (3700-3752) — test: `unit:core/exercises.test.ts:for every pattern, from one above your lowest`, `train:range-used`
 - ✓ Each rung's first note carries its note name and the syllable; the rest the syllable (3725-3730) — test: `unit:core/exercises.test.ts:carries each note's syllable`
 - ✓ The reference is the shipped piano, any note played on the nearest sample, retuned (7611-7616; Robert, 23 Oct) — test: `unit:core/piano.test.ts:plays any other note on the nearest sample`, `train:range-used`
-- ✓ The notes heard on the preview only on a tap, the piano alone, no mic — test: `train:preview`
+- ✓ The exercise page (Robert, 24 Oct): back, the name, its group as the only tag, the pattern card, Goal, How, Start; the pattern's notes as bars, played only on the card's button, the piano alone, no mic; the current bar lights and the syllable shows under the card — test: `train:preview`, `unit:core/exercises.test.ts:the first rung is the pattern alone`
+- ✓ The gear's sound sheet: Any octave (off at first, remembered for this exercise alone), Count-in sound, Hear yourself and its volume (Robert, 24 Oct) — test: `train:sound-sheet`
 - ✓ A 3-2-1 count-in before singing (1b; Robert, 13 Oct) — test: `train:start-only`
+- ✓ The count-in sound: a short, soft beep on each of 3, 2, 1, through the conductor; one setting for every count-in in the app, on at first, remembered, in the exercise's sound sheet and the song's sound card; never after Close, never in a score or a take (Robert, 24 Oct) — test: `train:count-in-sound`, `song:count-in-sound`, `unit:audio/conductor/conductor.test.ts:beeps once on each of 3, 2, 1`, `unit:audio/conductor/conductor.test.ts:beeps not at all when switched off`, `unit:audio/conductor/conductor.test.ts:never sounds after Close`, `unit:core/beep.test.ts:is a short, soft sound file`
+- ✓ The singing screen (Robert, 24 Oct): the note map fills the screen, the ladder of note names at the left, every bubble with its syllable, the current one bigger with the ring, the dots along the bottom one per rung — test: `train:singing-screen`, `unit:core/exercises.test.ts:knows which rung is being sung`
 - ✓ The close button is the only control while singing; closing is silence and the mic closed at once (1b; RULEBOOK 2.1) — test: `train:start-only`, `train:close`
 - ✓ A held note: one long bubble at a time, scored by the same rule (3908-4022) — test: `unit:core/exercises.test.ts:holds five notes`, `train:hold`
 - — Hold a note's random notes, every third at the edge of your range (3909-3925). The new app holds five notes evenly through your range, so one run can be compared with the next.
@@ -263,3 +269,12 @@ For each part the new app has built, every rule the old app's code (next.html) e
 
 1. Range exercises use Agility's blue.
 2. Any note the piano samples do not cover is played on the nearest sample, retuned.
+
+## Decided by Robert, 24 Oct (the Train design pass)
+
+1. Every screen has ONE stated goal (RULEBOOK 3); its goal is the first line of its file, checked by a unit test.
+2. The exercise page: back, name, group tag, the pattern card (bars, one play button, the current bar lit, the syllable under the card), Goal, How, Start. The gear opens the sound sheet; "More about this" opens the old app's why, watch for and care. Level, Quiet and what is measured stay on the list rows.
+3. The singing screen: the note map fills the screen, note names at the left, every bubble with its syllable, the current one bigger with the ring, progress dots along the bottom. Close is the only control; no pause.
+4. Train: the warm-up card with Start and "More routines", then five group cards with a picture. A group's list, the other routines and the range check (in Range) are one tap away.
+5. The count-in sound: a soft beep on 3, 2, 1, on at first, one app-wide setting in the exercise sheet and the song's sound card; never in a score or a take, never after Close.
+6. Kept from the Train report: held notes spread evenly, sirens unscored, the long explanations behind "More about this"; the two test results left on the test account.

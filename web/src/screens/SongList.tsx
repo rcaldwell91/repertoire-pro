@@ -1,3 +1,4 @@
+/* Goal: open one of your songs, or add one. */
 import { useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { ChevronRight, Music, Plus } from 'lucide-react';

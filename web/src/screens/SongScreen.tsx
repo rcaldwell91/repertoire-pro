@@ -1,8 +1,9 @@
+/* Goal: learn this song by singing it: hear the voice, sing along, sing over the music. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { Repeat, RotateCcw } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { countBeat, gainOf, micLine, monitorOf, repeatPart, songLine, COUNT_BEATS, MONITOR_DEFAULT } from '../core/song';
+import { countBeat, gainOf, micLine, monitorOf, repeatPart, songLine, COUNT_BEATS } from '../core/song';
 import { barFill } from '../core/level';
 import { clock } from '../core/time';
 import { FIRST_SECONDS } from '../core/limits';
@@ -17,6 +18,7 @@ import { review, toStored } from '../shell/take-review';
 import { saveTake, UNDO_MS, type StoredTake } from '../data/takes';
 import { TakesList } from './TakesList';
 import { localStore, micBlockedBrowser } from '../shell/env';
+import { hearOn, hearVolume, setHearOn, setHearVolume } from '../shell/settings';
 import { back, navigate, sendRoute } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
 import { Slider } from '../ui/Slider';
@@ -26,10 +28,6 @@ import { SoundTrouble } from '../ui/SoundTrouble';
 
 const HEADPHONES_SEEN = 'rp.hint.headphones';
 const ANY_OCTAVE = 'rp.anyOctave';
-/** the Hear yourself volume, remembered on this phone (the old app's rep_monitor_vol) */
-const MONITOR_VOL = 'rp.monitor.vol';
-/** whether Hear yourself is on, remembered on this phone (the old app's rep_monitor; Robert, 23 Oct) */
-const MONITOR_ON = 'rp.monitor.on';
 
 /* Learn a song, one screen (RULEBOOK 1b): the note map with the singer's
    line and yours, the play bar, back 10 s, Start, repeat this part, and
@@ -86,15 +84,19 @@ export function SongScreen(props: { id: string }) {
     setAnyOctaveNow(on);
     localStore().set(ANY_OCTAVE, on ? '1' : '0');
   };
-  const [hear, setHear] = useState(() => localStore().get(MONITOR_ON) === '1');
-  const [monitorVol, setMonitorVolNow] = useState(() => {
-    const v = Number(localStore().get(MONITOR_VOL) ?? NaN);
-    return Number.isFinite(v) && v >= 0 && v <= 100 ? v : MONITOR_DEFAULT;
-  });
+  /* Hear yourself and its volume, shared with the exercises' sound sheet (shell/settings) */
+  const [hear, setHear] = useState(hearOn);
+  const [monitorVol, setMonitorVolNow] = useState(hearVolume);
   const setMonitorVol = (v: number) => {
     setMonitorVolNow(v);
-    localStore().set(MONITOR_VOL, String(v));
+    setHearVolume(v);
     if (hear) c.setMonitor(monitorOf(v));
+  };
+  /* the count-in sound: the conductor's one setting for every count-in (Robert, 24 Oct) */
+  const [countSound, setCountSoundNow] = useState(() => c.countSound());
+  const setCountSound = (on: boolean) => {
+    setCountSoundNow(on);
+    c.setCountSound(on);
   };
   /* the song's level: as kept with it, or as measured the first time it
      plays here (and then kept) */
@@ -262,7 +264,7 @@ export function SongScreen(props: { id: string }) {
 
   function hearYourself(on: boolean) {
     setHear(on);
-    localStore().set(MONITOR_ON, on ? '1' : '0');
+    setHearOn(on);
     c.setMonitor(on ? monitorOf(monitorVol) : 0);
     if (on) {
       const store = localStore();
@@ -409,6 +411,10 @@ export function SongScreen(props: { id: string }) {
           <input type="checkbox" role="switch" id="hear-yourself" checked={hear} onChange={(e) => hearYourself(e.target.checked)} />
         </label>
         <Slider id="monitor-volume" label={copy.song.hearVolume} value={monitorVol} onChange={setMonitorVol} />
+        <label className="switch-row">
+          <span>{copy.train.countSound}</span>
+          <input type="checkbox" role="switch" id="count-in-sound" checked={countSound} onChange={(e) => setCountSound(e.target.checked)} />
+        </label>
         <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
         {listening && noHeadphones && <p className="hint" id="use-headphones">{copy.song.useHeadphones}</p>}

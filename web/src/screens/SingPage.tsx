@@ -1,3 +1,4 @@
+/* Goal: pick how to sing today. */
 import { AudioLines, ListMusic, Mic, Music } from 'lucide-react';
 import { copy } from '../core/copy';
 import { navigate } from '../shell/router';

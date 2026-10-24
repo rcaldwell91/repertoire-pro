@@ -65,7 +65,8 @@ export class FakeEngine implements AudioEngine {
   load(url: string): Promise<Sample> {
     this.log.push('load:' + url);
     if (this.failLoads) return Promise.reject(new Error('could not decode'));
-    const sample = { url, seconds: 3 };
+    /* a sound made by the app itself (the count-in beep) is short; a file is 3 s */
+    const sample = { url, seconds: url.startsWith('data:') ? 0.08 : 3 };
     if (!this.holdLoads) return Promise.resolve(sample);
     return new Promise((res) => this.heldLoads.push(() => res(sample)));
   }
@@ -78,6 +79,8 @@ export class FakeEngine implements AudioEngine {
     const s = new FakeSource((x) => this.sources.delete(x));
     this.sources.add(s);
     this.peak = Math.max(this.peak, this.sources.size);
+    /* a beep is over before anything else happens */
+    if (sample.seconds < 0.5) s.finish();
     return s;
   }
   /** the last song started: its parts, options and volumes as they are now */

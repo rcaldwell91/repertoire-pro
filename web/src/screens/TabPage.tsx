@@ -1,3 +1,4 @@
+/* Goal: show the tab is here, until it is built. */
 import { copy } from '../core/copy';
 import type { Tab } from '../shell/router';
 

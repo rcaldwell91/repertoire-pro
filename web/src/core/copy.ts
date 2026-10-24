@@ -249,6 +249,19 @@ export const copy = {
     steps: '{n} exercises',
     minsSteps: '{mins} min · {n} exercises',
     tagLine: '{level} · {measure}',
+    tagLineQuiet: '{level} · Quiet · {measure}',
+    categories: 'Exercises',
+    pickOne: 'Pick an exercise.',
+    routinesLine: 'Each step waits for your Start.',
+    soundSheet: 'Sound settings',
+    countSound: 'Count-in sound',
+    hearPattern: 'Hear the pattern',
+    stopPattern: 'Stop',
+    moreAbout: 'More about this',
+    why: 'Why',
+    watchFor: 'Watch for',
+    care: 'Care',
+    rungs: 'How far through the exercise',
     start: 'Start',
     startRoutine: 'Start the warm-up',
     range: 'Your range',
@@ -319,6 +332,135 @@ export const copy = {
     quiet: 'Quiet session',
     cooldown: 'Cool-down',
   },
+  /* the old app's longer explanations (next.html 7686-8099), behind "More
+     about this" on an exercise (Robert, 24 Oct): prose, not instruction
+     lines, so the copy lint checks their words but not their length */
+  about: {
+    hiss: {
+      why: "The s is a tiny controlled leak, so almost no air escapes and you get a long, measurable exhale. More usefully, you can hear unevenness — a wobbly hiss means a wobbly airstream, which would have come out as a wobbly note. Silent breathing gives you no feedback at all; this does.",
+      watch: "Shoulders rising on the way in. The hiss starting loud and dying — that means the ribs collapsed early. Squeezing the last bit out with the stomach, which teaches exactly the clamping you are trying to avoid.",
+      care: "Not a competition. If you feel light-headed, stop.",
+    },
+    farinelli: {
+      why: "This trains the suspension — the moment between filling up and singing. Most breath problems are not lung capacity, they are the collapse that happens the instant you start. Holding the shape of the inhale while the air leaves is what singers mean by support.",
+      watch: "Holding instead of suspending. You will feel a click or pressure in the throat — that is a closed glottis and it is the wrong thing. Also collapsing the chest the moment the exhale starts.",
+      care: "Stop if you get dizzy.",
+    },
+    liptrill: {
+      why: "Narrowing the front of your vocal tract raises the pressure above your vocal folds, which means they need less push from below to vibrate. Measured result: it takes less pressure to start a note and the folds hit each other more gently. On top of that, the lips only keep fluttering if your airstream is steady — so the exercise polices your breath for you. And it makes register changes nearly inaudible, so you can cross your break without bracing for it.",
+      watch: "The trill stalling at the top. That means the air stopped or the throat gripped. Tensing the lips instead of relaxing them. Going so breathy there is air but no tone.",
+      care: "Very safe. Some people anatomically cannot trill — use a tongue trill, \"ng\", or a straw.",
+    },
+    straw: {
+      why: "The same idea as lip trills, but the straw sets the resistance for you. It is the best-researched exercise in the app.",
+      watch: "Air escaping around the straw, air escaping through the nose, and making the accents in your throat instead of from your belly.",
+      care: "A narrow straw into water is a heavy load — build up to it. If you have a diagnosed voice problem, do this with a professional, not an app.",
+    },
+    hum: {
+      why: "All three send the sound out through your nose instead of your mouth, which is the same gentle, low-pressure way of getting your folds going. They differ in where the block is: M at the lips is the mildest, NG at the back of the tongue is the strongest and is the classic siren sound. The strong buzz in your face makes resonance easy to feel.",
+      watch: "Clenching the jaw behind closed lips. Humming too loudly.",
+    },
+    siren: {
+      why: "By removing the note targets, you remove the place where singers brace for the break. Your voice is allowed to change gear gradually instead of jumping a cliff. It is the most common warm-up there is. What your voice does on a siren, it does everywhere else.",
+      watch: "Speeding up through the break to hide it. Getting louder as you go up. If it flips or cracks, that is too much air pressure for what the folds can hold — the fix is less push, not more.",
+    },
+    mum: {
+      why: "The M is a hum, so your lips are closed and the sound has to start gently — you physically cannot slam into an M. That sets your folds going in a low-pressure state and then hands that setup over to the vowel. The M at the end is the clever part: it lets you check the resonance is still there after the vowel, rather than using the M just to launch.",
+      watch: "The vowel drifting toward \"mam\" or \"mom\" as you go up. That drift is a sign the outer neck and jaw muscles have started gripping. Also pressing the lips hard, which chokes it.",
+      care: "Very safe. The best first exercise in most sessions.",
+    },
+    mee: {
+      why: "EE engages the muscles that stretch and thin your folds while keeping them nearly closed — so it is the vowel that most reliably finds a stretched, closed, bright setup. It also anchors your larynx down and back. That is why it appears first in almost every clinical voice protocol. The M in front keeps the start soft.",
+      watch: "Spreading into a shrill smile. Clamping the jaw to get the tongue high — the tongue should do that on its own. \"Ee\" is also the hardest vowel to start cleanly, so be patient with it.",
+    },
+    noo: {
+      why: "The N gets you going as gently as an M but with the tongue tip involved. The OO is the throat-opener — it pulls the larynx forward and down and relaxes the muscle that carries chest weight. So \"noo\" is a de-weighting exercise: it takes heaviness off the voice. Use it when you have been pushing.",
+      watch: "The \"oo\" spreading toward \"uh\" as you climb. Over-darkening it into a hooty, disconnected sound with no cord closure at all.",
+    },
+    loo: {
+      why: "L is made by the tongue tip alone — the rest of the tongue and the whole jaw should stay still. So a \"loo\" or \"lah\" scale is a continuous test of whether your tongue can work independently of your jaw, while the sound stays voiced the whole way through, which builds legato. \"Lah\" gets the fullest closure of any vowel; \"loo\" keeps it light.",
+      watch: "The jaw closing a little on every L. That is the exact habit the slack-jaw exercise exists to break, and it is universal at first.",
+    },
+    gee: {
+      why: "The G is made by the back of your tongue sealing against your soft palate, and it briefly builds pressure behind closed folds. That pop into the vowel encourages them to meet firmly — which is the fix for a breathy, leaky tone. The narrow \"ee\" also stops your larynx flying up.",
+      watch: "Making it loud and effortful. Letting the back of your tongue stay high for the vowel.",
+      care: "Only useful if your tone is actually airy. If it is not, this is not your exercise.",
+    },
+    staccato: {
+      why: "Short notes force your folds to come together and separate cleanly, over and over. A long note lets you hide a weak or sticky closure; a short one does not. It is also the standard preparation for runs, because every pitch has to be started individually rather than smeared through.",
+      watch: "Pressing hard instead of staying light. The jaw bouncing on every note. A click or grunt at the start of each one — that is a hard glottal attack; back off to \"hoo\".",
+    },
+    nay: {
+      why: "Two things at once. The N gets your folds vibrating easily and forward. The brat recruits twang — a narrowing right at the top of your larynx that bunches the sound energy into the 2.5–5 kHz band, exactly where the ear is most sensitive. The result is that your voice gets much louder to a listener without any more air pressure or effort. That is why it gets you across the break and into a mix without shouting.",
+      watch: "Making it heavy instead of bright — carrying chest weight up rather than letting the twang do the work. Forcing the nasal quality instead of letting it happen.",
+      care: "This is supposed to sound ugly. Sharp, piercing, whiny, annoying. It is not a finished sound and you should not sing songs like this — it is a temporary tool to find a coordination, and you drop it once you have found it.",
+    },
+    bay: {
+      why: "Identical twang mechanism to Nay, but B is a plosive — the lips close completely and release, which gives a bit of back pressure and lets you relax. So it is a shade more forgiving than Nay for people who tense up, and it is the usual alternative for belting with less strain.",
+      watch: "Same as Nay: heavy instead of bright.",
+      care: "Also deliberately ugly, and also temporary.",
+    },
+    wah: {
+      why: "W is a glide, not a stop — your lips start rounded and open smoothly, so the tone can only begin softly. Descending means you enter from the lighter register up top and carry that lightness down, instead of dragging weight up. The whimper quality finds a mix without any volume at all.",
+      watch: "Getting loud — it stops working as a mix exercise the moment you push. Dropping the jaw too far and losing the focus.",
+    },
+    octleap: {
+      why: "Trains the coordination for a big interval, and builds confidence at the top.",
+      watch: "Reaching up for it.",
+      care: "This is where people hurt themselves in a warm-up. Never do it first. If the top note cracks, go back to sirens rather than repeating the leap.",
+    },
+    laga: {
+      why: "L uses the tip of your tongue and G uses the back of it. Alternating them quickly demands that the front and back of your tongue move independently — and if your jaw is doing the work, it physically cannot keep up. So hanging the jaw still forces the tongue to do its own job. That matters because your tongue is attached to your larynx, so every jaw-driven tongue movement is stealing from your vowel and pitch control.",
+      watch: "The jaw closing slightly on every consonant — universal at first, and exactly the habit being broken. Jutting the jaw forward instead of letting it drop back. Clenching it open: rigid is not the same as relaxed.",
+      care: "If your jaw hinge clicks or aches, use a smaller opening. Never force it wide.",
+    },
+    tongueout: {
+      why: "Your tongue is attached to a bone that is attached to your larynx. A bunched, retracted tongue root physically pulls on your larynx. Sticking your tongue out and down stops the root bunching backward, so for the first time you get to hear what your voice sounds like without that interference.",
+      watch: "The tongue creeping back in as you go up. That creep is the diagnosis. Only the tip out, so the root is still bunched. Trying for a beautiful tone — it will sound odd, and that is fine.",
+      care: "Do not yank your tongue. It is a diagnostic posture, not a way to perform.",
+    },
+    tonguecresc: {
+      why: "Getting louder is precisely when people re-grip. Holding the release while you crescendo proves the tongue stays out of the way under load, not just when it is easy.",
+      watch: "If the tongue retracts as you get louder, you have gone past your usable dynamic today. Back off rather than pushing through.",
+    },
+    blah: {
+      why: "A tongue-release drill in the same family as La-Ga — deliberately sloppy, so nothing in the tongue or jaw gets a chance to hold.",
+      watch: "Doing it neatly. Neat is the opposite of the point.",
+    },
+    yawnsigh: {
+      why: "A yawn opens the throat and lowers the larynx. It is one of the first things a voice therapist gives to a voice that is working too hard.",
+      watch: "Over-yawning. An exaggerated yawn pulls the tongue root back and pushes the larynx down, giving a woofy, swallowed sound. Use it to release, not as a way to sing.",
+      care: "Some people simply cannot yawn on demand. That is normal.",
+    },
+    messa: {
+      why: "Getting louder and softer without the note changing is hard, because the natural coupling is that more pressure means higher pitch and a different quality. Learning to uncouple them is the best single test that your breath and your larynx are cooperating rather than compensating for each other. Only the volume should change — pitch, colour and vibrato all stay put.",
+      watch: "Going sharp on the way up and flat on the way down. The vibrato speeding up or vanishing. A lopsided shape — the quiet half on the way back down is the hard half. Breaking into a different register at the quiet end.",
+      care: "Do not take the loud part to maximum. This is about control at the edges, not peak volume.",
+    },
+    sustain: {
+      why: "It reveals everything — wobble, drift, air leak, fatigue — with nowhere to hide.",
+      watch: "Doing it loud, which is tiring and teaches nothing. The pitch sagging in the last third.",
+    },
+    ninetone: {
+      why: "Long enough to cross a register change and demand real coordination, fast enough that you cannot muscle each note individually.",
+      watch: "Smearing notes together. Slowing down at the top. Accenting each note from the throat.",
+    },
+    descend: {
+      why: "Under-used. Starting high and light trains the muscle that stretches your folds — the one everyday speech never trains — by keeping a light quality while the pitch comes down. The alternative, dragging heavy chest voice upward, is what most people do and it is why they hit a ceiling.",
+      watch: "Letting weight creep back in on the way down.",
+      care: "One of the safest patterns there is.",
+    },
+    octrep: {
+      why: "A stamina test. The first top note is easy. The question is whether the fourth is.",
+      watch: "Getting heavier or louder each repeat.",
+      care: "The classic overreach drill. Late in a session, and stop the half step before it gets effortful, not after.",
+    },
+    vfe: {
+      why: "Physical therapy for your voice, and very well researched. Doing it every day matters far more than doing it hard.",
+      watch: "Doing it loudly. It is meant to be soft and engaged.",
+      care: "Consistency over six weeks is the active ingredient. Two minutes twice a day beats twenty minutes on Sunday.",
+    },
+  },
   ex: {
     hiss: { name: 'Steady hiss', syl: 'sss', goal: 'One long, even hiss, timed.', how: 'Breathe in low, then hiss out evenly.' },
     farinelli: { name: 'Farinelli breath', syl: 'silent', goal: 'In for a count, suspend, out. Silent.', how: 'Suspend without closing your throat.' },
@@ -359,8 +501,10 @@ export function fill(template: string, values: Record<string, string | number>):
 }
 
 /** Every string in the copy, with where it lives, for the copy-lint test. */
-export function allCopy(node: unknown = copy, at = 'copy'): Array<{ at: string; text: string }> {
-  if (typeof node === 'string') return [{ at, text: node }];
+/** every line of copy; `prose` marks the explanations under copy.about,
+    held to the banned words but not to the eight-word cap */
+export function allCopy(node: unknown = copy, at = 'copy'): Array<{ at: string; text: string; prose: boolean }> {
+  if (typeof node === 'string') return [{ at, text: node, prose: at.startsWith('copy.about.') }];
   if (node && typeof node === 'object') {
     return Object.entries(node as Record<string, unknown>).flatMap(([k, v]) => allCopy(v, at + '.' + k));
   }

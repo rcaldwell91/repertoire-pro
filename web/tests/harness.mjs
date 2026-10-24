@@ -168,7 +168,9 @@ export const MIRROR = `(() => {
   window.AudioContext = MAC;
   const S = AudioBufferSourceNode.prototype, start = S.start;
   S.start = function (...a) {
-    const real = this.buffer && this.buffer.length > 1;
+    /* a sound the singer sings along to: not the one-sample kick, and not
+       the count-in's short beep (core/beep: 0.08 s) */
+    const real = this.buffer && this.buffer.length > 1 && this.buffer.duration >= 0.5;
     if (real) M.starts.push({ node: this, when: a[0] ?? 0, offset: a[1] ?? 0 });
     const r = start.apply(this, a);
     /* the first part of the song (the voice) starts: the singer joins in */

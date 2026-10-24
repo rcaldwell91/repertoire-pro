@@ -1,30 +1,19 @@
-import { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+/* Goal: start today's warm-up in one tap. */
+import { Flame, MoveVertical, Music2, Wind, Zap } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { CATEGORIES, DAILY, EXERCISES, ROUTINES, measures, type Exercise, type RoutineId } from '../core/exercises';
-import { keyName } from '../core/notemap';
-import { keptRange, onRange, pullRange } from '../data/range';
-import { exRoute, navigate, routineRoute } from '../shell/router';
+import { CATEGORIES, DAILY, ROUTINES, type CategoryId } from '../core/exercises';
+import { catRoute, navigate, routineRoute } from '../shell/router';
 
-/* Train (RULEBOOK 1b): a short daily routine at the top, your range, then
-   the exercises by group, each group in its colour. Tapping one opens its
-   preview; nothing plays here. */
+/* Train (RULEBOOK 1b, 3; Robert, 24 Oct). Tier one: the warm-up card with
+   Start and one line to the other routines, then the five groups as cards
+   in their colours. Nothing else. A group's list, the other routines and
+   the range check are each one tap away. Nothing plays here. */
 
-/** what the app measures about it, as a tag */
-export function measureTag(e: Exercise): string {
-  const m = measures(e);
-  return m === 'pitch' ? copy.train.tagPitch : m === 'time' ? copy.train.tagTime : m === 'range' ? copy.train.tagRange : copy.train.tagNone;
-}
+const PICTURE: Record<CategoryId, LucideIcon> = { warmup: Flame, breath: Wind, tone: Music2, agility: Zap, range: MoveVertical };
 
 export function TrainPage() {
-  const [range, setRange] = useState(keptRange);
-  useEffect(() => onRange(() => setRange(keptRange())), []);
-  useEffect(() => {
-    void pullRange();
-  }, []);
   const daily = ROUTINES[DAILY];
-  const more = (Object.keys(ROUTINES) as RoutineId[]).filter((k) => k !== DAILY);
-
   return (
     <>
       <h1>{copy.tabs.train}</h1>
@@ -32,53 +21,26 @@ export function TrainPage() {
       <section className="card routine" id="daily">
         <h2>{copy.routineNames[DAILY]}</h2>
         <p className="hint">{fill(copy.train.minsSteps, { mins: daily.mins, n: daily.steps.length })}</p>
-        <ol className="routine-steps">
-          {daily.steps.map((id) => <li key={id}>{copy.ex[id].name}</li>)}
-        </ol>
         <button type="button" className="btn btn-start" id="routine-start" onClick={() => navigate(routineRoute(DAILY, 0), 'screen')}>
           {copy.train.startRoutine}
         </button>
+        <button type="button" className="btn btn-quiet btn-link" id="more-routines" onClick={() => navigate('/train/routines', 'screen')}>
+          {copy.train.routines}
+        </button>
       </section>
 
-      <button type="button" className="btn btn-quiet btn-row range-row" id="range-line" onClick={() => navigate(exRoute('rangecheck'), 'screen')}>
-        <span>
-          <strong>{copy.train.range}</strong>
-          <span className="hint" id="range-value">
-            {range ? fill(copy.train.rangeIs, { lo: keyName(range.lo), hi: keyName(range.hi) }) : copy.train.notMeasured}
-          </span>
-        </span>
-        <ChevronRight size={24} strokeWidth={2} aria-hidden="true" />
-      </button>
-
-      {CATEGORIES.map((c) => (
-        <section key={c.id} className="train-cat" id={'cat-' + c.id} data-colour={c.colour}>
-          <h2>{copy.cats[c.id]}</h2>
-          <p className="hint">{copy.catLines[c.id]}</p>
-          {EXERCISES.filter((e) => e.category === c.id).map((e) => (
-            <button key={e.id} type="button" className="ex-row" id={'ex-' + e.id} data-colour={c.colour}
-              onClick={() => navigate(exRoute(e.id), 'screen')}>
-              <span className="ex-text">
-                <strong>{copy.ex[e.id].name}</strong>
-                <span className="ex-tags">{fill(copy.train.tagLine, { level: copy.levels[e.level], measure: measureTag(e) })}</span>
-              </span>
-              <ChevronRight size={22} strokeWidth={2} aria-hidden="true" />
+      <div className="cat-cards" id="cat-cards">
+        {CATEGORIES.map((c) => {
+          const Picture = PICTURE[c.id];
+          return (
+            <button key={c.id} type="button" className="cat-card" id={'cat-' + c.id} data-colour={c.colour}
+              onClick={() => navigate(catRoute(c.id), 'screen')}>
+              <Picture size={34} strokeWidth={2} aria-hidden="true" />
+              <strong>{copy.cats[c.id]}</strong>
             </button>
-          ))}
-        </section>
-      ))}
-
-      <section className="train-more" id="more-routines">
-        <h2>{copy.train.routines}</h2>
-        {more.map((k) => (
-          <button key={k} type="button" className="btn btn-quiet btn-row" id={'routine-' + k} onClick={() => navigate(routineRoute(k, 0), 'screen')}>
-            <span>
-              <strong>{copy.routineNames[k]}</strong>
-              <span className="hint">{fill(copy.train.mins, { n: ROUTINES[k].mins })}</span>
-            </span>
-            <ChevronRight size={24} strokeWidth={2} aria-hidden="true" />
-          </button>
-        ))}
-      </section>
+          );
+        })}
+      </div>
     </>
   );
 }

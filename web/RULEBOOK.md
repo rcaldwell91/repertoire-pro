@@ -114,6 +114,7 @@ web/src/
 
 ## 3. Product must-haves
 
+- Every screen has ONE stated goal. Everything on it must bring the person closer to that goal. Tier one is on the screen. Tier two is behind one tap (a card that opens, or a settings sheet). Tier three is off the page. Before adding anything, ask: who needs this here, and why? (Robert, 24 Oct.) Each screen's goal is the one-line comment at the top of its file; a unit test checks every screen file has one.
 - Nothing plays, times or listens until the person taps Start. Ending means ending.
 - Nothing plays after the person leaves a screen or hides the app.
 - One message per situation. App text says what to do in a few words.

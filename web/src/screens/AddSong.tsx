@@ -1,3 +1,4 @@
+/* Goal: add one song from your own files. */
 import { useState } from 'react';
 import { copy } from '../core/copy';
 import { titleFrom } from '../core/song';

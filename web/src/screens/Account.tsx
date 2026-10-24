@@ -1,3 +1,4 @@
+/* Goal: sign in or out of your account. */
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { copy, fill } from '../core/copy';

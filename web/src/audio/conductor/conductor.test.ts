@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { Conductor, MODE_KEY, OLD_RUNG_KEY, TOKEN_LIFE_MS, type LeaveReason, type Plan } from './conductor';
 import { FakeEngine, FakeEnv, MemoryStore } from '../engine-fake/fake-engine';
 import { SONG_PEAK } from '../../core/song';
+import { BEEP_URL } from '../../core/beep';
 
 /* Every rule of the conductor (RULEBOOK 2.1), on the fake engine.
    scripts/mutate-conductor.mjs breaks each rule in turn and checks that at
@@ -148,7 +149,75 @@ describe('a count-in (Learn a song, as the old app did)', () => {
     expect(c.snapshot()).toMatchObject({ state: 'stopped', count: null });
     env.endWaits();
     await flush();
-    expect(engine.log.some((l) => l.startsWith('play:'))).toBe(false);
+    expect(engine.log).not.toContain('play:' + NOTE);
+  });
+});
+
+describe('the count-in sound (Robert, 24 Oct)', () => {
+  const beeps = () => engine.log.filter((l) => l === 'play:' + BEEP_URL).length;
+
+  it('is on unless switched off, and remembered on the phone', () => {
+    expect(c.countSound()).toBe(true);
+    c.setCountSound(false);
+    expect(c.countSound()).toBe(false);
+    expect(new Conductor(new FakeEngine(), new FakeEnv(), store).countSound()).toBe(false);
+    c.setCountSound(true);
+    expect(new Conductor(new FakeEngine(), new FakeEnv(), store).countSound()).toBe(true);
+  });
+
+  it('beeps once on each of 3, 2, 1, through the engine, before the sound', async () => {
+    c.start(c.tap(tap), { ...noteOnly, countIn: 3, countBeats: 3 });
+    await flush();
+    expect(c.snapshot().count).toBe(3);
+    expect(beeps()).toBe(1);
+    env.endWaits();
+    await flush();
+    expect(c.snapshot().count).toBe(2);
+    expect(beeps()).toBe(2);
+    env.endWaits();
+    await flush();
+    expect(c.snapshot().count).toBe(1);
+    expect(beeps()).toBe(3);
+    env.endWaits();
+    await flush();
+    expect(c.snapshot().state).toBe('running');
+    expect(beeps()).toBe(3);                      /* none with the sound itself */
+    expect(engine.log.indexOf('play:' + BEEP_URL)).toBeLessThan(engine.log.indexOf('play:' + NOTE));
+  });
+
+  it('beeps not at all when switched off, and the beep is never loaded', async () => {
+    c.setCountSound(false);
+    c.start(c.tap(tap), { ...noteOnly, countIn: 3, countBeats: 3 });
+    await flush();
+    env.endWaits();
+    await flush();
+    env.endWaits();
+    await flush();
+    env.endWaits();
+    await flush();
+    expect(c.snapshot().state).toBe('running');
+    expect(beeps()).toBe(0);
+    expect(engine.log).not.toContain('load:' + BEEP_URL);
+  });
+
+  it('never sounds after Close: no more beeps come, and nothing plays', async () => {
+    c.start(c.tap(tap), { ...noteOnly, countIn: 3, countBeats: 3 });
+    await flush();
+    expect(beeps()).toBe(1);
+    c.stop();
+    expect(engine.sounding()).toBe(0);
+    env.endWaits();
+    await flush();
+    env.endWaits();
+    await flush();
+    expect(beeps()).toBe(1);
+    expect(engine.sounding()).toBe(0);
+  });
+
+  it('a plan without a count-in never beeps', async () => {
+    c.start(c.tap(tap), noteOnly);
+    await flush();
+    expect(beeps()).toBe(0);
   });
 });
 
@@ -310,7 +379,7 @@ describe('nothing resumes by itself', () => {
     c.leave('back');
     env.endWaits();
     await flush();
-    expect(engine.log.some((l) => l.startsWith('play:'))).toBe(false);
+    expect(engine.log).not.toContain('play:' + NOTE);
   });
 
   it('a mic that opens after leaving is closed again at once', async () => {
