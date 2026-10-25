@@ -249,7 +249,8 @@ try {
     const screens = [];
     for (const theme of THEMES) {
       await page.eval(`localStorage.setItem('rp.theme', '${theme}')`);
-      for (const hash of ['#/home', '#/train', '#/train/ex/mum', '#/sing', '#/sing/learn', '#/profile', '#/profile/account', '#/profile/look', '#/profile/sound-check']) {
+      for (const hash of ['#/home', '#/train', '#/train/cat/words', '#/train/ex/mum', '#/sing', '#/sing/learn', '#/profile', '#/profile/account', '#/profile/look',
+        '#/profile/sound-check']) {
         await fresh(env, hash);
         screens.push([theme + ' ' + hash, await page.eval(CONTRAST)]);
       }
@@ -269,7 +270,7 @@ try {
 
   if (want('words')) {
     const strays = [];
-    for (const hash of ['#/home', '#/train', '#/train/cat/tone', '#/train/cat/range', '#/train/routines', '#/train/ex/mum', '#/sing', '#/coach', '#/learn',
+    for (const hash of ['#/home', '#/train', '#/train/cat/tone', '#/train/cat/range', '#/train/cat/words', '#/train/routines', '#/train/ex/mum', '#/train/ex/vowels', '#/sing', '#/coach', '#/learn',
       '#/library', '#/profile', '#/profile/sound-check', '#/profile/account', '#/profile/look', '#/sing/learn', '#/sing/learn/add']) {
       await fresh(env, hash);
       for (const l of await strayWords(page)) strays.push(hash + ': ' + l);

@@ -1,22 +1,30 @@
 import { useEffect, useRef } from 'react';
 import type { Note } from '../core/exercises';
-import { bubbleScore, sylOf } from '../core/exercises';
+import { bubbleScore, rungAt, rungStarts, sylOf } from '../core/exercises';
 import { foldTo, keyName } from '../core/notemap';
 import { drawLine } from './NoteMap';
 
-/* The singing screen (RULEBOOK 1b; Robert, 24 Oct): the note map fills the
-   screen, the ladder of note names at the left, the old app's syllable
+/* The singing screen (RULEBOOK 1b; Robert, 24 and 25 Oct): the note map
+   fills the screen and is zoomed to the notes of the rung being sung, about
+   three semitones of room above and below, gliding smoothly as the pattern
+   climbs; the ladder of note names at the left; the old app's syllable
    bubbles with every syllable inside, the one to sing now bigger with a
-   white ring, your line with the voice gradient on top. Each bubble fills
-   green with the share of it you sang on the note: the same rule as the
-   score (RULEBOOK 4, Bubbles). With no notes (a siren), only your line. */
+   ring, your line with the voice gradient on top. Each bubble fills green
+   with the share of it you sang on the note: the same rule as the score
+   (RULEBOOK 4, Bubbles). With no notes (a siren), only your line. */
 
 const SPAN = 4;          /* seconds across: wide enough for a syllable in a one-beat note */
 const NOW_AT = 0.3;
 const GUTTER = 44;
+/** room above the highest and below the lowest note of the rung, in semitones */
+export const ROOM = 3;
+/** the view never shows fewer semitones than this (a single held note) */
+export const MIN_WINDOW = 10;
+/** the view glides to a new rung: this far toward it each second's quarter */
+export const GLIDE_SECONDS = 0.25;
 /** a bubble's height, in px: never under this, never over that */
 const BUBBLE_MIN = 18;
-const BUBBLE_MAX = 36;
+const BUBBLE_MAX = 48;
 /** the bubble to sing now, bigger than the rest */
 const NOW_SCALE = 1.3;
 
@@ -32,6 +40,9 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
   useEffect(() => {
     propsRef.current = props;
   });
+
+  /* where the view is now (it glides toward the rung being sung) */
+  const view = useRef<{ lo: number; hi: number; at: number; step: number } | null>(null);
 
   useEffect(() => {
     const cv = ref.current;
@@ -51,21 +62,42 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       const at = now();
-      /* pinned to the exercise's own notes, three either side, at least an octave */
-      let lo = notes.length ? Math.min(...notes.map((n) => n.m)) - 3 : 48;
-      let hi = notes.length ? Math.max(...notes.map((n) => n.m)) + 3 : 72;
-      if (!notes.length && you.m.length) {
+      /* the view's target: the notes of the rung being sung (the first before
+         it starts, the last after), ROOM either side, never under MIN_WINDOW;
+         with no notes (a siren), what has been sung */
+      let tlo = 48, thi = 72;
+      if (notes.length) {
+        const starts = rungStarts(notes);
+        const r = Math.max(0, Math.min(starts.length - 1, rungAt(notes, at)));
+        const from = starts[r] ?? 0, to = starts[r + 1] ?? notes.length;
+        const rung = notes.slice(from, to);
+        tlo = Math.min(...rung.map((n) => n.m)) - ROOM;
+        thi = Math.max(...rung.map((n) => n.m)) + ROOM;
+      } else if (you.m.length) {
         const sung = you.m.filter(Number.isFinite);
         if (sung.length) {
-          lo = Math.min(lo, Math.floor(Math.min(...sung)) - 2);
-          hi = Math.max(hi, Math.ceil(Math.max(...sung)) + 2);
+          tlo = Math.min(tlo, Math.floor(Math.min(...sung)) - 2);
+          thi = Math.max(thi, Math.ceil(Math.max(...sung)) + 2);
         }
       }
-      if (hi - lo < 12) {
-        const mid = (hi + lo) / 2;
-        lo = mid - 6;
-        hi = mid + 6;
+      if (thi - tlo < MIN_WINDOW) {
+        const mid = (thi + tlo) / 2;
+        tlo = mid - MIN_WINDOW / 2;
+        thi = mid + MIN_WINDOW / 2;
       }
+      /* glide there: the first frame jumps, every later one closes a share of the gap */
+      const wall = performance.now() / 1000;
+      let v = view.current;
+      if (!v) v = view.current = { lo: tlo, hi: thi, at: wall, step: 0 };
+      else {
+        const k = 1 - Math.exp(-(wall - v.at) / GLIDE_SECONDS);
+        const nlo = v.lo + (tlo - v.lo) * k, nhi = v.hi + (thi - v.hi) * k;
+        v.step = Math.max(v.step, Math.abs(nlo - v.lo), Math.abs(nhi - v.hi));
+        v.lo = nlo;
+        v.hi = nhi;
+        v.at = wall;
+      }
+      const lo = v.lo, hi = v.hi;
       const pad = 14;
       const rowH = (H - 2 * pad) / (hi - lo);
       const y = (m: number) => pad + ((hi - m) / (hi - lo)) * (H - 2 * pad);
@@ -178,8 +210,12 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.names = String(names);
       cv.dataset.bubble = h.toFixed(0);
       cv.dataset.nowBubble = (h * NOW_SCALE).toFixed(0);
+      cv.dataset.viewLo = lo.toFixed(2);
+      cv.dataset.viewHi = hi.toFixed(2);
+      cv.dataset.viewStep = v.step.toFixed(3);
       if (propsRef.current.live) raf = requestAnimationFrame(draw);
     };
+    view.current = null;
     draw();
     if (props.live) raf = requestAnimationFrame(draw);
     const t = props.live ? 0 : window.setInterval(draw, 250);

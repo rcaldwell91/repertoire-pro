@@ -19,7 +19,8 @@ const OLD_IDS = ['hiss', 'farinelli', 'liptrill', 'straw', 'hum', 'siren', 'mum'
 
 describe('the exercises, as data', () => {
   it('has every exercise of the old app, and the range check', () => {
-    expect(EXERCISES.map((e) => e.id).filter((id) => id !== 'rangecheck').sort()).toEqual([...OLD_IDS].sort());
+    const ours = EXERCISES.filter((e) => e.category === 'words').map((e) => e.id);
+    expect(EXERCISES.map((e) => e.id).filter((id) => id !== 'rangecheck' && !ours.includes(id)).sort()).toEqual([...OLD_IDS].sort());
     expect(exercise('rangecheck')?.engine.kind).toBe('range');
   });
 
@@ -84,10 +85,12 @@ describe('the exercises, as data', () => {
     expect(measures(exercise('rangecheck') as Exercise)).toBe('range');
   });
 
-  it('has its four groups by colour, and Range with Agility\'s blue (1b; Robert, 23 Oct)', () => {
-    expect(CATEGORIES.map((c) => c.id)).toEqual(['warmup', 'breath', 'tone', 'agility', 'range']);
+  it('has its six groups by colour: Range with Agility\'s blue, Articulation in a colour of its own (1b; Robert, 23 and 25 Oct)', () => {
+    expect(CATEGORIES.map((c) => c.id)).toEqual(['warmup', 'breath', 'tone', 'agility', 'range', 'words']);
     expect(Object.fromEntries(CATEGORIES.map((c) => [c.id, c.colour]))).toEqual({
-      warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch' });
+      warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words' });
+    const others = CATEGORIES.filter((c) => c.id !== 'words').map((c) => c.colour);
+    expect(others).not.toContain(CATEGORIES.find((c) => c.id === 'words')?.colour);
     for (const e of EXERCISES) expect(CATEGORIES.some((c) => c.id === e.category), e.id).toBe(true);
   });
 });
@@ -296,5 +299,53 @@ describe('the rungs of an exercise (the progress dots, the pattern card)', () =>
     expect(sylOf(notes[0])).toBe('mum');
     expect(sylOf(notes[1])).toBe('mum');
     expect(notes[0].syl).not.toBe('mum');
+  });
+});
+
+describe('Articulation: clear words while singing (Robert, 25 Oct)', () => {
+  const range = { lo: 50, hi: 62 };
+  it('has its exercises, each with notes and so scored on pitch', () => {
+    const ids = EXERCISES.filter((e) => e.category === 'words').map((e) => e.id);
+    expect(ids).toEqual(['vowels', 'redleather', 'uniqueny', 'peterpiper', 'pops', 'tonguetip', 'lipstongue']);
+    for (const id of ids) {
+      const e = exercise(id) as Exercise;
+      expect(e.engine.kind, id).toBe('ladder');
+      expect(measures(e), id).toBe('pitch');
+      expect((copy.ex[id] as { syls?: readonly string[] }).syls?.length, id).toBeGreaterThan(1);
+    }
+  });
+  it('the five vowels sit on one held note, then step up', () => {
+    const { notes } = ladderNotes(exercise('vowels') as Exercise, range);
+    const first = notes.slice(0, 5);
+    expect(first.map((n) => n.m)).toEqual([51, 51, 51, 51, 51]);
+    expect(first.map(sylOf)).toEqual(['mah', 'meh', 'mee', 'moh', 'moo']);
+    expect(notes[5].m).toBe(52);
+    expect(sylOf(notes[5])).toBe('mah');
+  });
+  it('a tongue twister runs on through the notes, up and down, rung after rung', () => {
+    const { notes } = ladderNotes(exercise('redleather') as Exercise, range);
+    const syls = copy.ex.redleather.syls as readonly string[];
+    expect(notes.slice(0, 9).map((n) => n.m - 51)).toEqual([...PATTERNS.five.deg]);
+    expect(notes.map(sylOf)).toEqual(notes.map((_, k) => syls[k % syls.length]));
+    expect(sylOf(notes[9])).not.toBe(syls[0]);            /* it carries on, not back to the start */
+  });
+  it('consonant pops are short repeated notes', () => {
+    const e = exercise('pops') as Exercise;
+    const { notes } = ladderNotes(e, range);
+    const rung = firstRung(notes);
+    expect(new Set(rung.map((n) => n.m)).size).toBe(1);
+    expect(rung.every((n) => n.d <= 0.35)).toBe(true);
+    expect(rung.map(sylOf).slice(0, 4)).toEqual(['puh', 'buh', 'tuh', 'duh']);
+  });
+  it('the tongue tip goes up on one sound and down on another; the lips and tongue carry the whole phrase', () => {
+    const tip = firstRung(ladderNotes(exercise('tonguetip') as Exercise, range).notes).map(sylOf);
+    expect(tip).toEqual(['la', 'la', 'la', 'la', 'la', 'ta', 'ta', 'ta', 'ta']);
+    const lips = firstRung(ladderNotes(exercise('lipstongue') as Exercise, range).notes).map(sylOf);
+    expect(lips.length).toBe(9);
+    expect(lips.join(' ')).toBe((copy.ex.lipstongue.syls as readonly string[]).join(' '));
+  });
+  it('an exercise with one syllable still carries it on every note', () => {
+    const { notes } = ladderNotes(exercise('mum') as Exercise, range);
+    expect(new Set(notes.map(sylOf))).toEqual(new Set(['mum']));
   });
 });

@@ -34,12 +34,12 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'tab-bar', 'category', 'routines-page', 'preview', 'sound-sheet', 'more-about', 'count-in-sound', 'start-only', 'singing-screen',
+const ALL = ['train-tab', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'sound-sheet', 'more-about', 'count-in-sound', 'start-only', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'progress-phone', 'progress-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
-const GROUPS = { warmup: 4, breath: 5, tone: 10, agility: 5, range: 4 };
-const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch' };
+const GROUPS = { warmup: 4, breath: 5, tone: 10, agility: 5, range: 4, words: 7 };
+const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words' };
 /** the count-in beep: the one short sound the app makes itself */
 const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
 const results = [];
@@ -160,15 +160,16 @@ try {
         cats: cards.map((c) => c.id.replace('cat-', '')),
         colours: cards.map((c) => getComputedStyle(c.querySelector('svg')).color === rgb(col('--' + c.dataset.colour)) ? c.dataset.colour : 'wrong'),
         pictures: cards.filter((c) => c.querySelector('svg')).length,
+        agility: document.querySelector('#cat-agility svg')?.dataset.picture ?? 'lucide',
         rows: document.querySelectorAll('.ex-row').length,
         tabs: !!document.querySelector('.tabs') };
     })()`);
     if (want('train-tab')) {
       check('train-tab', JSON.stringify(t.order) === JSON.stringify(['h1', 'daily', 'cat-cards']) && t.start === copy.train.startRoutine && t.more === copy.train.routines &&
         JSON.stringify(t.cats) === JSON.stringify(Object.keys(GROUPS)) && JSON.stringify(t.colours) === JSON.stringify(Object.values(COLOURS)) &&
-        t.pictures === 5 && t.rows === 0 && t.tabs,
-        `on the page: ${t.order.join(', ')}; "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')}, ${t.pictures} with a picture; ` +
-        `exercise rows on it: ${t.rows}`);
+        t.pictures === 6 && t.agility === 'hummingbird' && t.rows === 0 && t.tabs,
+        `on the page: ${t.order.join(', ')}; "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')}, ${t.pictures} with a picture, ` +
+        `Agility's a ${t.agility}; exercise rows on it: ${t.rows}`);
     }
     if (want('tab-bar')) {
       await page.tap('#cat-tone');
@@ -231,8 +232,10 @@ try {
   if (want('preview')) {
     await openEx('mum');
     const v = await page.eval(`({ back: !!document.querySelector('.back'), name: document.querySelector('#ex-name')?.textContent,
-      tags: [...document.querySelectorAll('#ex-tags .tag')].map((t) => t.textContent), bars: document.querySelectorAll('#pattern .pbar').length,
-      lit: document.querySelectorAll('#pattern .pbar[data-now]').length, syl: document.querySelector('#pattern-syl')?.textContent,
+      tags: [...document.querySelectorAll('#ex-tags .tag')].map((t) => t.textContent), bars: document.querySelectorAll('#pattern .pdash').length,
+      lit: document.querySelectorAll('#pattern .pdash[data-now]').length, syl: document.querySelector('#pattern-syl')?.textContent,
+      dashes: [...document.querySelectorAll('#pattern .pdash i')].map((d) => { const r = d.getBoundingClientRect(); return { top: r.top, h: r.height, w: r.width }; }),
+      gap: document.querySelector('.ex-label').getBoundingClientRect().top - document.querySelector('#pattern').getBoundingClientRect().bottom,
       goal: document.querySelector('#ex-goal')?.textContent, how: document.querySelector('#ex-how')?.textContent,
       start: document.querySelector('#ex-start')?.textContent, more: document.querySelector('#ex-more')?.textContent,
       sheet: !!document.querySelector('#sound-sheet'), anyOctave: !!document.querySelector('#any-octave'), started: window.__probe.started })`);
@@ -240,19 +243,45 @@ try {
     const still = await page.eval(P('started'));
     await page.tap('#pattern-play');
     const played = await page.waitFor(P('started > 0'), 5000);
-    const litUp = await page.waitFor(`document.querySelectorAll('#pattern .pbar[data-now]').length === 1`, 3000);
+    const litUp = await page.waitFor(`document.querySelectorAll('#pattern .pdash[data-now]').length === 1`, 3000);
     const sylShown = await text('#pattern-syl');
     const gum = await page.eval(P('gum'));
     await page.tap('#pattern-play');
     const stopped = await page.waitFor(`window.__probe.live.size === 0`, 3000);
     await sleep(200);
     const sylGone = await text('#pattern-syl');
-    check('preview', v.back && v.name === copy.ex.mum.name && v.tags.join('|') === copy.cats.tone && v.bars === 9 && v.lit === 0 && v.syl === '' &&
+    /* a melody line (Robert, 25 Oct): the top note's dash highest, the first and last (the same note) lowest and level,
+       every dash short, the two-beat last note's dash wider than the first's; nothing between the card and Goal */
+    const d = v.dashes;
+    const melody = d.length === 9 && d[4].top < Math.min(...d.filter((_, i) => i !== 4).map((x) => x.top)) && Math.abs(d[0].top - d[8].top) < 1 &&
+      d[0].top >= Math.max(...d.map((x) => x.top)) - 1 && d.every((x) => x.h <= 10) && d[8].w > 1.5 * d[0].w;
+    check('preview', v.back && v.name === copy.ex.mum.name && v.tags.join('|') === copy.cats.tone && melody && v.gap <= 30 && v.bars === 9 && v.lit === 0 && v.syl === '' &&
       v.goal === copy.ex.mum.goal && v.how === copy.ex.mum.how && v.start === copy.train.start && v.more === copy.train.moreAbout && !v.sheet && !v.anyOctave &&
       v.started === 0 && still === 0 && played && litUp && sylShown === copy.ex.mum.syl && gum === 0 && stopped && sylGone === '',
-      `"${v.name}", tags ${v.tags.join(' / ')}; ${v.bars} bars, none lit; goal "${v.goal}"; how "${v.how}"; "${v.start}", "${v.more}"; ` +
+      `"${v.name}", tags ${v.tags.join(' / ')}; ${v.bars} dashes as a melody line ${melody} (${v.gap.toFixed(0)} px to Goal), none lit; goal "${v.goal}"; how "${v.how}"; "${v.start}", "${v.more}"; ` +
       `the sheet closed ${!v.sheet}, Any octave off the page ${!v.anyOctave}; nothing played before the tap (${still}); on the button: played ${played}, a bar lit ${litUp}, ` +
       `"${sylShown}" under the card, mic asked ${gum}; a second tap stops it ${stopped}, the syllable goes ${sylGone === ''}`);
+  }
+
+  /* 2a. Articulation (Robert, 25 Oct): the five vowels on one held note (five
+         level dashes), the syllable under the dashes changing note by note */
+  if (want('articulation')) {
+    await openEx('vowels');
+    const v = await page.eval(`({ tag: document.querySelector('#ex-tags .tag')?.textContent, colour: document.querySelector('#ex-tags .tag')?.dataset.colour,
+      tops: [...document.querySelectorAll('#pattern .pdash i')].map((d) => d.getBoundingClientRect().top) })`);
+    await noSinger();
+    await page.tap('#pattern-play');
+    const seen = [];
+    const end = Date.now() + 6000;
+    while (Date.now() < end && seen.length < 5) {
+      const s = await text('#pattern-syl');
+      if (s && seen[seen.length - 1] !== s) seen.push(s);
+      await sleep(40);
+    }
+    await page.waitFor(P('live.size === 0'), 6000);
+    check('articulation', v.tag === copy.cats.words && v.colour === 'words' && v.tops.length === 5 && v.tops.every((t) => Math.abs(t - v.tops[0]) < 1) &&
+      JSON.stringify(seen) === JSON.stringify(copy.ex.vowels.syls),
+      `"${v.tag}" in its own colour ${v.colour === 'words'}; ${v.tops.length} level dashes ${v.tops.every((t) => Math.abs(t - v.tops[0]) < 1)}; under them, in turn: ${seen.join(', ')}`);
   }
 
   /* 2b. The gear's sound sheet: Any octave (off at first, remembered for
@@ -373,12 +402,22 @@ try {
     const a = await look();
     await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 12000);
     const b = await look();
+    await sleep(1500);
+    const c = await look();
     await page.tap('#ex-close');
     const rungs = MUM.length / 9;
-    check('singing-screen', a.top <= 1 && a.height >= a.inner - 2 && a.canvas >= 0.6 * a.inner && +a.visible > 0 && a.labelled === a.visible && +a.names >= 8 &&
-      +a.bubble >= 18 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1,
+    /* zoomed to the rung (Robert, 25 Oct): three semitones round the first rung's notes, then gliding up a
+       half step with the second, never in one jump */
+    const r0 = MUM.slice(0, 9), r1 = MUM.slice(9, 18);
+    const near = (x, y) => Math.abs(+x - y) <= 0.3;
+    const zoomed = near(a.viewLo, Math.min(...r0.map((n) => n.m)) - 3) && near(a.viewHi, Math.max(...r0.map((n) => n.m)) + 3) &&
+      near(c.viewLo, Math.min(...r1.map((n) => n.m)) - 3) && near(c.viewHi, Math.max(...r1.map((n) => n.m)) + 3);
+    const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
+    check('singing-screen', a.top <= 1 && a.height >= a.inner - 2 && a.canvas >= 0.6 * a.inner && +a.visible > 0 && a.labelled === a.visible && +a.names >= 6 &&
+      +a.bubble >= 40 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
       `fills the screen: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
-      `${a.names} note names; bubbles ${a.bubble} px, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}`);
+      `${a.names} note names; bubbles ${a.bubble} px, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
+      `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}`);
   }
 
   /* 4. Sung right, by a real voice: the bubbles fill and the score says so */

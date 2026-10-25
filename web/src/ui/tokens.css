@@ -6,7 +6,7 @@
      accent       something to press, or set
      brand        the gradient: only the active tab and the main play/Start
      songs        Your songs (purple)       pitch   Agility/pitch (blue), and Range
-     warmup / breath / tone   Train's groups: orange, teal, pink
+     warmup / breath / tone / words   Train's groups: orange, teal, pink, yellow
      voice        how loud the mic hears you, and nothing else */
 :root,
 :root[data-theme='dark'] {
@@ -26,6 +26,7 @@
   --warmup: #fb923c;
   --breath: #2dd4bf;
   --tone: #f472b6;
+  --words: #fde047;
   --voice: #22e0ff;
   --track: #2c2a4a;
   --problem: #ff9db8;
@@ -55,6 +56,7 @@
   --warmup: #c2410c;
   --breath: #0f766e;
   --tone: #be185d;
+  --words: #a16207;
   --voice: #0891b2;
   --track: #efe9df;
   --problem: #b4234f;
@@ -485,6 +487,7 @@ input[type='range'] {
 .ex-row[data-colour='warmup'] { border-left-color: var(--warmup); }
 .ex-row[data-colour='breath'] { border-left-color: var(--breath); }
 .ex-row[data-colour='tone'] { border-left-color: var(--tone); }
+.ex-row[data-colour='words'] { border-left-color: var(--words); }
 .ex-row svg { color: var(--muted); flex: none; }
 .ex-text { display: flex; flex-direction: column; }
 .ex-tags { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
@@ -496,6 +499,7 @@ input[type='range'] {
 .tag[data-colour='breath'] { color: var(--breath); border-color: var(--breath); }
 .tag[data-colour='tone'] { color: var(--tone); border-color: var(--tone); }
 .tag[data-colour='pitch'] { color: var(--pitch); border-color: var(--pitch); }
+.tag[data-colour='words'] { color: var(--words); border-color: var(--words); }
 .ex-label { color: var(--muted); font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
 .ex-line { margin: 2px 0 0; font-size: 1.05rem; }
 .ex-result { margin: 4px 0 12px; }
@@ -537,10 +541,13 @@ input[type='range'] {
 .cat-card[data-colour='breath'] svg { color: var(--breath); }
 .cat-card[data-colour='tone'] { border-left-color: var(--tone); }
 .cat-card[data-colour='tone'] svg { color: var(--tone); }
+.cat-card[data-colour='words'] { border-left-color: var(--words); }
+.cat-card[data-colour='words'] svg { color: var(--words); }
 .cat-page[data-colour='warmup'] h1 { color: var(--warmup); }
 .cat-page[data-colour='breath'] h1 { color: var(--breath); }
 .cat-page[data-colour='tone'] h1 { color: var(--tone); }
 .cat-page[data-colour='pitch'] h1 { color: var(--pitch); }
+.cat-page[data-colour='words'] h1 { color: var(--words); }
 
 /* the exercise page: back and the gear on one line; the pattern card; the
    sound sheet and "More about this" open in place */
@@ -548,15 +555,20 @@ input[type='range'] {
 .gear { width: var(--tap); height: var(--tap); }
 .gear[aria-expanded='true'] { border-color: var(--accent); color: var(--accent); }
 .sheet { margin: 4px 0 12px; }
-.pattern { display: flex; align-items: center; gap: 14px; margin: 12px 0 0; padding: 14px 16px; }
-.pbars { flex: 1; display: flex; align-items: flex-end; gap: 4px; height: 72px; }
-.pbar { flex: 1 1 0; min-width: 6px; border-radius: 4px; background: var(--pitch); opacity: 0.35; }
-.pbar[data-now='true'] { opacity: 1; }
-.pattern[data-colour='warmup'] .pbar { background: var(--warmup); }
-.pattern[data-colour='breath'] .pbar { background: var(--breath); }
-.pattern[data-colour='tone'] .pbar { background: var(--tone); }
+.pattern { display: flex; align-items: center; gap: 14px; margin: 12px 0 0; padding: 12px 16px 8px; }
+.pattern-notes { flex: 1; min-width: 0; }
+/* each note a short dash at its pitch height, wider for longer (Robert, 25 Oct) */
+.pdashes { display: flex; gap: 4px; height: 72px; }
+.pdash { flex: 1 1 0; min-width: 8px; position: relative; }
+.pdash i { position: absolute; left: 1px; right: 1px; height: 6px; border-radius: 3px; background: var(--pitch); opacity: 0.35; }
+.pdash[data-now='true'] i { opacity: 1; height: 8px; }
+.pattern[data-colour='warmup'] .pdash i { background: var(--warmup); }
+.pattern[data-colour='breath'] .pdash i { background: var(--breath); }
+.pattern[data-colour='tone'] .pdash i { background: var(--tone); }
+.pattern[data-colour='words'] .pdash i { background: var(--words); }
 .pattern-play { flex: none; width: 56px; height: 56px; }
-.pattern-syl { min-height: 1.7em; margin: 6px 0 0; font-size: 1.25rem; font-weight: 700; text-align: center; }
+/* the syllable, under the dashes inside the card, its room kept so nothing below moves */
+.pattern-syl { min-height: 1.5em; margin: 6px 0 0; font-size: 1.15rem; font-weight: 700; text-align: center; }
 .about { margin: 12px 0; }
 .about p { margin: 2px 0 10px; }
 

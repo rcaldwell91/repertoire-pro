@@ -8,18 +8,20 @@ import { isRight } from './takes';
    how it runs; its patterns (8063-8075) and routines (8100-8125). Its
    words live in core/copy (copy.ex), held to the copy lint. */
 
-export type CategoryId = 'warmup' | 'breath' | 'tone' | 'agility' | 'range';
-/** one colour means one thing (1b): Range shares Agility's blue (Robert, 23 Oct) */
-export type Colour = 'warmup' | 'breath' | 'tone' | 'pitch';
+export type CategoryId = 'warmup' | 'breath' | 'tone' | 'agility' | 'range' | 'words';
+/** one colour means one thing (1b): Range shares Agility's blue (Robert,
+    23 Oct); Articulation has its own, yellow (Robert, 25 Oct) */
+export type Colour = 'warmup' | 'breath' | 'tone' | 'pitch' | 'words';
 export const CATEGORIES: ReadonlyArray<{ id: CategoryId; colour: Colour }> = [
   { id: 'warmup', colour: 'warmup' },
   { id: 'breath', colour: 'breath' },
   { id: 'tone', colour: 'tone' },
   { id: 'agility', colour: 'pitch' },
   { id: 'range', colour: 'pitch' },
+  { id: 'words', colour: 'words' },
 ];
 
-export type PatternId = 'five' | 'down5' | 'down3' | 'arp' | 'oct' | 'octrep' | 'nine' | 'oct15';
+export type PatternId = 'five' | 'down5' | 'down3' | 'arp' | 'oct' | 'octrep' | 'nine' | 'oct15' | 'same5' | 'pops';
 /** degrees in semitones from the rung's root, and each note's beats */
 export interface Pattern {
   readonly deg: readonly number[];
@@ -37,6 +39,9 @@ export const PATTERNS: Record<PatternId, Pattern> = {
     dur: [1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2], span: 14 },
   oct15: { deg: [0, 4, 7, 12, 16, 19, 17, 14, 12, 9, 7, 5, 2, 0],
     dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 19 },
+  /* Articulation (Robert, 25 Oct): one held note sung five times; short repeated notes */
+  same5: { deg: [0, 0, 0, 0, 0], dur: [1, 1, 1, 1, 2], span: 0 },
+  pops: { deg: [0, 0, 0, 0, 0, 0, 0, 0], dur: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], span: 0 },
 };
 
 /** how an exercise runs. ladder: the pattern up your range, sung back over
@@ -94,6 +99,14 @@ export const EXERCISES: readonly Exercise[] = [
   ex('descend', 'range', 1, true, ladder('down5', 120)),
   ex('octrep', 'range', 3, false, ladder('octrep', 112)),
   ex('vfe', 'breath', 1, true, guided(5)),
+  /* Articulation: clear words while singing (Robert, 25 Oct), in our own words */
+  ex('vowels', 'words', 1, true, ladder('same5', 100)),
+  ex('redleather', 'words', 2, true, ladder('five', 120)),
+  ex('uniqueny', 'words', 2, true, ladder('five', 110)),
+  ex('peterpiper', 'words', 2, true, ladder('five', 120)),
+  ex('pops', 'words', 1, true, ladder('pops', 100)),
+  ex('tonguetip', 'words', 1, true, ladder('five', 120)),
+  ex('lipstongue', 'words', 2, true, ladder('five', 112)),
   /* the old app's range check (3754-3790), as its own exercise */
   ex('rangecheck', 'range', 1, true, { kind: 'range' }),
 ];
@@ -149,11 +162,15 @@ export function ladderNotes(e: Exercise, range: Range): { notes: Note[]; length:
     const step = Math.ceil(roots.length / MAX_RUNGS);
     roots = roots.filter((_, i) => i % step === 0);
   }
-  const syl = copy.ex[e.id].syl;
+  /* the syllable: one for the whole exercise, or a phrase carried on note
+     by note round the exercise (Articulation, Robert, 25 Oct) */
+  const words = copy.ex[e.id] as { syl: string; syls?: readonly string[] };
+  const sylAt = (k: number) => (words.syls?.length ? words.syls[k % words.syls.length] : words.syl);
   const notes: Note[] = [];
   let b = 0;
   for (const root of roots) {
     p.deg.forEach((dg, i) => {
+      const syl = sylAt(notes.length);
       notes.push({ m: root + dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl });
       b += p.dur[i];
     });

@@ -44,6 +44,7 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
   - Breath: teal
   - Tone: pink
   - Agility/pitch: blue
+  - Articulation: yellow (Robert, 25 Oct; dark #fde047, light #a16207)
   - Your songs: purple
   - Green: only a note you hit
   - In Learn: Theory blue, Your voice pink, Ear teal

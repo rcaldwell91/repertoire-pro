@@ -439,7 +439,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
       {view === 'preview' && (
         <>
           {sung && (
-            <PatternCard notes={pattern} syl={copy.ex[e.id].syl} colour={cat.colour} playing={previewing} now={() => c.position() ?? -1} onPlay={hearPattern} />
+            <PatternCard notes={pattern} colour={cat.colour} playing={previewing} now={() => c.position() ?? -1} onPlay={hearPattern} />
           )}
           <p className="ex-label">{copy.train.goal}</p>
           <p className="ex-line" id="ex-goal">{copy.ex[e.id].goal}</p>
