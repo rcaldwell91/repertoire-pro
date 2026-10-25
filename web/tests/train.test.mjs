@@ -159,16 +159,20 @@ try {
         more: document.querySelector('#daily #more-routines')?.textContent,
         cats: cards.map((c) => c.id.replace('cat-', '')),
         colours: cards.map((c) => getComputedStyle(c.querySelector('svg')).color === rgb(col('--' + c.dataset.colour)) ? c.dataset.colour : 'wrong'),
+        shades: cards.map((c) => getComputedStyle(c.querySelector('svg')).color),
         pictures: cards.filter((c) => c.querySelector('svg')).length,
         agility: document.querySelector('#cat-agility svg')?.dataset.picture ?? 'lucide',
         rows: document.querySelectorAll('.ex-row').length,
         tabs: !!document.querySelector('.tabs') };
     })()`);
     if (want('train-tab')) {
+      /* one colour means one thing: five colours for six groups, Range sharing Agility's blue and no other two alike */
+      const [warm, breath, tone, agility, range, words] = t.shades;
+      const distinct = new Set([warm, breath, tone, agility, words]).size === 5 && range === agility;
       check('train-tab', JSON.stringify(t.order) === JSON.stringify(['h1', 'daily', 'cat-cards']) && t.start === copy.train.startRoutine && t.more === copy.train.routines &&
         JSON.stringify(t.cats) === JSON.stringify(Object.keys(GROUPS)) && JSON.stringify(t.colours) === JSON.stringify(Object.values(COLOURS)) &&
-        t.pictures === 6 && t.agility === 'hummingbird' && t.rows === 0 && t.tabs,
-        `on the page: ${t.order.join(', ')}; "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')}, ${t.pictures} with a picture, ` +
+        distinct && t.pictures === 6 && t.agility === 'hummingbird' && t.rows === 0 && t.tabs,
+        `on the page: ${t.order.join(', ')}; "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')} (five colours, Range as Agility ${distinct}), ${t.pictures} with a picture, ` +
         `Agility's a ${t.agility}; exercise rows on it: ${t.rows}`);
     }
     if (want('tab-bar')) {
