@@ -9,7 +9,8 @@ import type { Note } from './exercises';
      semitone, octave exact unless Any octave. The level picks the jumps.
    - Match the note: the old app's (next.html 3790-3880): a note plays, the
      singer sings it back; ten notes a round, from one above the bottom of
-     the range to one below the top, never the same twice running; a hit is
+     the range to one below the top, never the same twice running (the old
+     app drew again once; here, until it differs); a hit is
      holding it 1.2 s within a semitone (here: half of a 2.4 s bubble).
    - Hold the note: the old app's Hold a note (3906-4010): ten notes, every
      third out at an edge of the range; each plays, then is held five
@@ -100,8 +101,10 @@ export function matchRound(range: Range, rand: () => number = Math.random): Roun
   const played: Note[] = [], notes: Note[] = [];
   let last = NaN;
   for (let k = 0; k < ROUND; k++) {
+    /* the old app drew again once if the note repeated; here, until it doesn't */
     let m = lo + Math.floor(rand() * (hi - lo + 1));
-    if (m === last) m = lo + Math.floor(rand() * (hi - lo + 1));
+    for (let i = 0; i < 20 && m === last && hi > lo; i++) m = lo + Math.floor(rand() * (hi - lo + 1));
+    if (m === last && hi > lo) m = m === hi ? m - 1 : m + 1;
     last = m;
     const t = k * TRIAL;
     played.push({ m, t, d: MATCH_PLAY, syl: keyName(m) + ' · ' + keyName(m) });

@@ -66,6 +66,10 @@ describe('Sing the interval', () => {
 
 describe('Match the note (the old app\'s)', () => {
   it('ten notes from one above the bottom to one below the top, never the same twice running', () => {
+    for (let s = 0; s < 200; s++) {
+      const r = matchRound({ lo: 59, hi: 63 }, seeded(s / 200));
+      r.notes.forEach((n, k) => k && expect(n.m, `seed ${s}, note ${k + 1}`).not.toBe(r.notes[k - 1].m));
+    }
     for (let s = 0; s < 10; s++) {
       const r = matchRound(range, seeded(s / 10));
       expect(r.notes.length).toBe(10);
