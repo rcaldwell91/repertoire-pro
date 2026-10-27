@@ -641,6 +641,8 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           <p className="ex-line" id="ex-how">{copy.ex[e.id].how}</p>
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
             data-round={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
+            data-played={kind === 'interval' ? JSON.stringify(plan.played.map((n) => n.m)) : undefined}
+            data-jumps={kind === 'interval' ? JSON.stringify(plan.notes.map(sylOf)) : undefined}
             data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
             {copy.train.start}
           </button>

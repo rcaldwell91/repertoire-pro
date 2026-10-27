@@ -745,8 +745,15 @@ try {
     await openEx('interval');
     await page.eval(`localStorage.setItem('rp.interval.level', '1')`);
     await openEx('interval');
+    /* the targets worked out by the test itself: each starting note moved by the jump its words name */
+    const SEMIS = { 'A step': 2, 'A third': 4, 'A fourth': 5, 'A fifth': 7, 'A sixth': 9, 'A seventh': 11, 'An octave': 12 };
     const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
-    const targets = round.map(([m, t, d]) => ({ m, t, d }));
+    const played = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.played)`);
+    const jumps = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.jumps)`);
+    const targets = round.map(([, t, d], k) => {
+      const [, name, dir] = /^(.+) (up|down)$/.exec(jumps[k]) || [];
+      return { m: played[k] + (dir === 'down' ? -1 : 1) * (SEMIS[name] ?? NaN), t, d };
+    });
     if (want('interval')) {
       await singer(sing(targets));
       await page.tap('#ex-start');
