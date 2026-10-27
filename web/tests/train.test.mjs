@@ -144,7 +144,7 @@ try {
   /* 1. Train (Robert, 24 Oct): the warm-up card with Start and one line to
         the other routines, then the five groups as cards in their colours.
         Nothing else. */
-  if (want('train-tab', 'tab-bar')) {
+  if (want('train-tab', 'today', 'tab-bar')) {
     await go('/train');
     await page.goto(URL_APP + '?load=' + ++loads + '#/train');
     await page.waitFor(`!!document.querySelector('#today')`, 8000);
@@ -174,7 +174,8 @@ try {
           const heights = new Set(dots.map((d) => d.getAttribute('cy')));
           const curve = svg.querySelectorAll('[data-part=run]').length === 1 && /C/.test(svg.querySelector('[data-part=run]').getAttribute('d'));
           const weight = parseFloat(getComputedStyle(svg).strokeWidth) === 2;
-          return lines.length === 5 && faint && dots.length === 5 && solid && heights.size === 5 && curve && weight ? 'run' : svg.dataset.picture || 'wrong';
+          return lines.length === 5 && faint && dots.length === 5 && solid && heights.size === 5 && curve && weight ? 'run'
+            : 'wrong (' + JSON.stringify({ lines: lines.length, faint, dots: dots.length, solid, heights: heights.size, curve, weight }) + ')';
         })(),
         rows: document.querySelectorAll('.ex-row').length,
         tabs: !!document.querySelector('.tabs') };
