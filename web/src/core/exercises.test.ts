@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
 import {
   CATEGORIES, EXERCISES, PATTERNS, ROUTINES, DAILY, exercise, measures, ladderNotes, holdNotes, bubbleScore, HOLD_NOTES,
-  MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, type Exercise,
+  MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, notesFor, type Exercise,
 } from './exercises';
 import { DEFAULT_RANGE, rangeFrom, RANGE_POINTS } from './range';
 import { SoundClock, LOUD_RMS, QUIET_END } from './timed';
@@ -264,7 +264,7 @@ describe('a result, with only what was measured (rp-cloud.js 870-905, rp-score.j
       { kind: 'practice', label: 'Steady hiss', app_ex_id: 'hiss', score: 12, out_of: 20, seconds: 12.3 });
   });
   it('anything not measured: that it was done, and no number', () => {
-    expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Straw phonation', app_ex_id: 'straw' });
+    expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.straw.name, app_ex_id: 'straw' });
     expect(resultRow(exercise('mum') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Mum', app_ex_id: 'mum' });
   });
 });
@@ -347,5 +347,45 @@ describe('Articulation: clear words while singing (Robert, 25 Oct)', () => {
   it('an exercise with one syllable still carries it on every note', () => {
     const { notes } = ladderNotes(exercise('mum') as Exercise, range);
     expect(new Set(notes.map(sylOf))).toEqual(new Set(['mum']));
+  });
+});
+
+/* Robert, 27 Oct: the syllables on each note follow the old app's syl
+   strings (next.html 7686-8099, copied here as they are). "la-ga la-ga"
+   alternates a syllable a note; "mmm / nnn / ng" are three hums, one a
+   repeat; "a · b" lists other ways to sing it, and the first is sung. */
+const OLD_SYL: Record<string, string> = {
+  liptrill: 'brrr', hum: 'mmm / nnn / ng', mum: 'mum', mee: 'mee', noo: 'noo', loo: 'loo · lah', gee: 'gee · kee', staccato: 'bah · hoo',
+  nay: 'nay', bay: 'bay · bae', wah: 'wah', octleap: 'ma', laga: 'la-ga la-ga', tongueout: 'ah · uh', messa: 'ah · oh · oo', sustain: 'ee · ah',
+  ninetone: 'lah · nay · numbers', descend: 'oo · ol', octrep: 'buh · mum · nay',
+};
+describe('the syllables on each note (Robert, 27 Oct)', () => {
+  const range = { lo: 50, hi: 64 };
+  const sung = (id: string) => {
+    const e = exercise(id) as Exercise;
+    const { notes } = notesFor(e, range);
+    const starts = rungStarts(notes);
+    return starts.map((s, k) => notes.slice(s, starts[k + 1] ?? notes.length).map(sylOf));
+  };
+  it('La-Ga alternates one syllable a note, la first on every repeat', () => {
+    const rungs = sung('laga');
+    expect(rungs[0]).toEqual(['la', 'ga', 'la', 'ga', 'la', 'ga', 'la', 'ga', 'la']);
+    for (const r of rungs) expect(r[0]).toBe('la');
+  });
+  it('the three hums change with each repeat: mmm, nnn, ng, and round again', () => {
+    const rungs = sung('hum');
+    expect(rungs.slice(0, 4).map((r) => [...new Set(r)])).toEqual([['mmm'], ['nnn'], ['ng'], ['mmm']]);
+  });
+  it('every sung syllable comes from the old app\'s string, and the first of a list of choices is the one sung', () => {
+    for (const [id, old] of Object.entries(OLD_SYL)) {
+      const tokens = old.split(/[\s·/-]+/).filter(Boolean);
+      const all = sung(id).flat();
+      for (const s of new Set(all)) expect(tokens, `${id}: "${s}" is not in "${old}"`).toContain(s);
+      if (/·/.test(old)) {
+        const first = old.split('·')[0].trim();
+        /* the one exception: tongue-out is sung on "uh", the old app's own how (its version 2) */
+        expect(new Set(all), id).toEqual(new Set([id === 'tongueout' ? 'uh' : first]));
+      }
+    }
   });
 });

@@ -53,7 +53,7 @@ const HOP = 0.05;
 
 type View = 'preview' | 'run' | 'result';
 type Shown = { o: Outcome; noMic: boolean; range?: Range; where: 'online' | 'phone' | null };
-type About = { why: string; watch?: string; care?: string };
+type About = { why: string; watch?: string; care?: string; aka?: string };
 
 /** the piano notes of an exercise, as one step the conductor plays together */
 function notesStep(notes: readonly Note[], listen: boolean, monitor = 0): Plan['steps'][number] {
@@ -453,6 +453,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           )}
           {about && more && (
             <section className="card about" id="ex-about">
+              {about.aka && <p className="hint" id="ex-aka">{fill(copy.train.alsoCalled, { name: about.aka })}</p>}
               <p className="ex-label">{copy.train.why}</p>
               <p>{about.why}</p>
               {about.watch && (

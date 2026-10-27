@@ -34,7 +34,7 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'sound-sheet', 'more-about', 'count-in-sound', 'start-only', 'singing-screen',
+const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'count-in-sound', 'start-only', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'progress-phone', 'progress-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
@@ -147,7 +147,7 @@ try {
   if (want('train-tab', 'tab-bar')) {
     await go('/train');
     await page.goto(URL_APP + '?load=' + ++loads + '#/train');
-    await page.waitFor(`!!document.querySelector('#daily')`, 8000);
+    await page.waitFor(`!!document.querySelector('#today')`, 8000);
     const t = await page.eval(`(() => {
       const cards = [...document.querySelectorAll('.cat-card')];
       const col = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -155,13 +155,27 @@ try {
       const main = document.querySelector('main');
       return {
         order: [...main.children].map((el) => el.id || el.tagName.toLowerCase()),
-        start: document.querySelector('#daily #routine-start')?.textContent,
-        more: document.querySelector('#daily #more-routines')?.textContent,
+        label: document.querySelector('#today .ex-label')?.textContent,
+        name: document.querySelector('#today-name')?.textContent,
+        length: document.querySelector('#today-length')?.textContent,
+        start: document.querySelector('#today #today-start')?.textContent,
+        more: document.querySelector('#today #more-routines')?.textContent,
         cats: cards.map((c) => c.id.replace('cat-', '')),
         colours: cards.map((c) => getComputedStyle(c.querySelector('svg')).color === rgb(col('--' + c.dataset.colour)) ? c.dataset.colour : 'wrong'),
         shades: cards.map((c) => getComputedStyle(c.querySelector('svg')).color),
         pictures: cards.filter((c) => c.querySelector('svg')).length,
-        agility: document.querySelector('#cat-agility svg')?.dataset.picture ?? 'lucide',
+        agility: (() => {
+          /* a quick run on a staff (Robert, 27 Oct): five faint lines, five solid dots on different heights, one curve */
+          const svg = document.querySelector('#cat-agility svg');
+          if (!svg) return 'none';
+          const lines = [...svg.querySelectorAll('[data-part=staff] line')], dots = [...svg.querySelectorAll('[data-part=dots] circle')];
+          const faint = lines.every((l) => Math.abs(parseFloat(getComputedStyle(l).strokeOpacity) - 0.35) < 0.01);
+          const solid = dots.every((d) => getComputedStyle(d).fill === getComputedStyle(svg).color && parseFloat(getComputedStyle(d).fillOpacity) === 1);
+          const heights = new Set(dots.map((d) => d.getAttribute('cy')));
+          const curve = svg.querySelectorAll('[data-part=run]').length === 1 && /C/.test(svg.querySelector('[data-part=run]').getAttribute('d'));
+          const weight = parseFloat(getComputedStyle(svg).strokeWidth) === 2;
+          return lines.length === 5 && faint && dots.length === 5 && solid && heights.size === 5 && curve && weight ? 'run' : svg.dataset.picture || 'wrong';
+        })(),
         rows: document.querySelectorAll('.ex-row').length,
         tabs: !!document.querySelector('.tabs') };
     })()`);
@@ -169,11 +183,30 @@ try {
       /* one colour means one thing: five colours for six groups, Range sharing Agility's blue and no other two alike */
       const [warm, breath, tone, agility, range, words] = t.shades;
       const distinct = new Set([warm, breath, tone, agility, words]).size === 5 && range === agility;
-      check('train-tab', JSON.stringify(t.order) === JSON.stringify(['h1', 'daily', 'cat-cards']) && t.start === copy.train.startRoutine && t.more === copy.train.routines &&
+      check('train-tab', JSON.stringify(t.order) === JSON.stringify(['h1', 'today', 'cat-cards']) && t.label === copy.train.today && t.name === copy.routineNames.daily &&
+        t.length === fill(copy.train.minsSteps, { mins: 9, n: 7 }) && t.start === copy.train.start && t.more === copy.train.routines &&
         JSON.stringify(t.cats) === JSON.stringify(Object.keys(GROUPS)) && JSON.stringify(t.colours) === JSON.stringify(Object.values(COLOURS)) &&
-        distinct && t.pictures === 6 && t.agility === 'hummingbird' && t.rows === 0 && t.tabs,
-        `on the page: ${t.order.join(', ')}; "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')} (five colours, Range as Agility ${distinct}), ${t.pictures} with a picture, ` +
+        distinct && t.pictures === 6 && t.agility === 'run' && t.rows === 0 && t.tabs,
+        `on the page: ${t.order.join(', ')}; "${t.label}": "${t.name}", "${t.length}", "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')} (five colours, Range as Agility ${distinct}), ${t.pictures} with a picture, ` +
         `Agility's a ${t.agility}; exercise rows on it: ${t.rows}`);
+    }
+    /* Today follows its one source: the singer's own plan, kept on the phone, then the daily warm-up */
+    if (want('today')) {
+      await page.tap('#today-start');
+      const daily = await page.waitFor(`location.hash === '#/train/routine/daily/0'`, 5000);
+      await page.eval(`localStorage.setItem('rp.plan', 'cooldown')`);
+      await page.goto(URL_APP + '?load=' + ++loads + '#/train');
+      await page.waitFor(`document.querySelector('#today-name')?.textContent === ${JSON.stringify(copy.routineNames.cooldown)}`, 5000);
+      const own = await page.eval(`({ name: document.querySelector('#today-name').textContent, length: document.querySelector('#today-length').textContent,
+        from: document.querySelector('#today').dataset.from })`);
+      await page.tap('#today-start');
+      const cool = await page.waitFor(`location.hash === '#/train/routine/cooldown/0'`, 5000);
+      await page.eval(`localStorage.removeItem('rp.plan')`);
+      await page.goto(URL_APP + '?load=' + ++loads + '#/train');
+      const back = await page.waitFor(`document.querySelector('#today-name')?.textContent === ${JSON.stringify(copy.routineNames.daily)}`, 5000);
+      check('today', daily && own.name === copy.routineNames.cooldown && own.length === fill(copy.train.minsSteps, { mins: 3, n: 3 }) && own.from === 'own' && cool && back,
+        `Start opened the daily warm-up ${daily}; with their own plan kept: "${own.name}", "${own.length}", from ${own.from}, Start opened it ${cool}; ` +
+        `with none, the daily warm-up again ${back}`);
     }
     if (want('tab-bar')) {
       await page.tap('#cat-tone');
@@ -183,7 +216,7 @@ try {
       await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
       const hidden = await page.eval(`!document.querySelector('.tabs')`);
       await page.tap('.back');
-      await page.waitFor(`!!document.querySelector('#daily')`, 5000);
+      await page.waitFor(`!!document.querySelector('#today')`, 5000);
       const back = await page.eval(`!!document.querySelector('.tabs')`);
       check('tab-bar', t.tabs && onList && hidden && back, `on Train ${t.tabs}; on a group's list ${onList}; hidden on an exercise ${hidden}; back on Train ${back}`);
     }
@@ -288,6 +321,25 @@ try {
       `"${v.tag}" in its own colour ${v.colour === 'words'}; ${v.tops.length} level dashes ${v.tops.every((t) => Math.abs(t - v.tops[0]) < 1)}; under them, in turn: ${seen.join(', ')}`);
   }
 
+  /* 2a'. Syllables per note (Robert, 27 Oct): La-Ga alternates la, ga a note, as the old app's "la-ga la-ga" */
+  if (want('syllables')) {
+    await openEx('laga');
+    await noSinger();
+    await page.tap('#pattern-play');
+    const seen = [];
+    const end = Date.now() + 6000;
+    while (Date.now() < end && seen.length < 9) {
+      const i = await page.eval(`[...document.querySelectorAll('#pattern .pdash')].findIndex((d) => d.dataset.now)`);
+      const s = await text('#pattern-syl');
+      if (i >= 0 && s && (seen.length === 0 || seen[seen.length - 1].i !== i)) seen.push({ i, s });
+      await sleep(30);
+    }
+    await page.waitFor(P('live.size === 0'), 6000);
+    const want9 = ['la', 'ga', 'la', 'ga', 'la', 'ga', 'la', 'ga', 'la'];
+    const ok = seen.length >= 7 && seen.every(({ i, s }) => s === want9[i]);
+    check('syllables', ok, `La-Ga's card, note by note: ${seen.map(({ i, s }) => i + 1 + ' ' + s).join(', ')}`);
+  }
+
   /* 2b. The gear's sound sheet: Any octave (off at first, remembered for
          this exercise alone), Count-in sound, Hear yourself and its volume */
   if (want('sound-sheet')) {
@@ -324,9 +376,17 @@ try {
     const a = await page.eval(`({ labels: [...document.querySelectorAll('#ex-about .ex-label')].map((l) => l.textContent), text: document.querySelector('#ex-about').textContent })`);
     await page.tap('#ex-more');
     const gone = await page.eval(`!document.querySelector('#ex-about')`);
+    /* a renamed one keeps the old app's name there, and only there (Robert, 27 Oct) */
+    await openEx('vfe');
+    const onPage = await page.eval(`document.querySelector('main').textContent.includes('Vocal Function')`);
+    await page.tap('#ex-more');
+    await page.waitFor(`!!document.querySelector('#ex-about')`, 3000);
+    const aka = await text('#ex-aka');
     check('more-about', !before && after && JSON.stringify(a.labels) === JSON.stringify([copy.train.why, copy.train.watchFor, copy.train.care]) &&
-      a.text.includes(copy.about.mum.why) && a.text.includes(copy.about.mum.watch) && a.text.includes(copy.about.mum.care) && gone,
-      `closed at first ${!before}; opened ${after} with ${a.labels.join(', ')}, the old app's words ${a.text.includes(copy.about.mum.why)}; closed again ${gone}`);
+      a.text.includes(copy.about.mum.why) && a.text.includes(copy.about.mum.watch) && a.text.includes(copy.about.mum.care) && gone &&
+      !onPage && aka === fill(copy.train.alsoCalled, { name: 'Vocal Function Exercises' }),
+      `closed at first ${!before}; opened ${after} with ${a.labels.join(', ')}, the old app's words ${a.text.includes(copy.about.mum.why)}; closed again ${gone}; ` +
+      `"${copy.ex.vfe.name}": the old name off the page ${!onPage}, and in More about this "${aka}"`);
   }
 
   /* 2d. The count-in sound (Robert, 24 Oct): a short beep on each of 3, 2,
@@ -580,7 +640,7 @@ try {
       await p.addInitScript(ANDROID);
       await p.addInitScript(PROBE);
       await p.goto(URL_APP + '#/train');
-      await p.waitFor(`!!document.querySelector('#daily')`, 8000);
+      await p.waitFor(`!!document.querySelector('#today')`, 8000);
       await p.eval(`localStorage.setItem('rp.range', ${JSON.stringify(JSON.stringify({ ...RANGE, at: '2026-10-23T00:00:00Z', by: 'test' }))})`);
       await p.goto(URL_APP + '?again=1#/train/ex/mum');
       await p.waitFor(`!!document.querySelector('#ex-start')`, 8000);

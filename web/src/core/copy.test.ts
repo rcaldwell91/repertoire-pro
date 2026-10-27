@@ -117,3 +117,40 @@ describe('How lines (Robert, 25 Oct)', () => {
     }).length).toBe(6);
   });
 });
+
+/* Robert, 27 Oct: no singer jargon a beginner wouldn't know, in an
+   exercise's name, goal or How. The old app's own names live on behind
+   "More about this" (copy.about[id].aka), never on the page. */
+export const JARGON = ['break', 'phonation', 'staccato', 'legato', 'crescendo', 'messa di voce', 'vocal function', 'farinelli', 'narrow vowel',
+  'engaged', 'the line', 'five-tone', 'nine-tone', 'register', 'passaggio', 'glottis', 'glottal', 'larynx', 'vocal folds', 'cords', 'belt',
+  'twang', 'resonance', 'onset', 'support', 'diaphragm', 'falsetto', 'head voice', 'chest voice', 'mix'];
+export function jargonProblems(ex: Record<string, { name: string; goal: string; how: string }>): string[] {
+  const out: string[] = [];
+  for (const [id, e] of Object.entries(ex)) {
+    for (const [field, text] of [['name', e.name], ['goal', e.goal], ['how', e.how]] as const) {
+      const low = ' ' + text.toLowerCase().replace(/[^a-z\- ]+/g, ' ') + ' ';
+      for (const w of JARGON) if (low.includes(' ' + w + ' ')) out.push(`${id}.${field}: "${w}"`);
+    }
+  }
+  return out;
+}
+
+describe('plain words (Robert, 27 Oct)', () => {
+  it('no singer jargon in a name, goal or How', () => {
+    expect(jargonProblems(copy.ex)).toEqual([]);
+  });
+
+  it('catches a word a beginner would not know (it can fail)', () => {
+    expect(jargonProblems({
+      a: { name: 'Messa di voce', goal: 'A legato scale.', how: 'Slide through your break.' },
+      b: { name: 'Breath counts', goal: 'In, hold, out.', how: 'Keep the ribs wide.' },
+    })).toEqual(['a.name: "messa di voce"', 'a.goal: "legato"', 'a.how: "break"']);
+  });
+
+  it('a renamed exercise keeps the old app\'s name behind More about this', () => {
+    const about = copy.about as Record<string, { aka?: string }>;
+    expect(about.vfe.aka).toBe('Vocal Function Exercises');
+    expect(copy.ex.vfe.name).toBe('Long soft notes');
+    for (const [id, a] of Object.entries(about)) if (a.aka) expect(copy.ex[id as keyof typeof copy.ex].name, id).not.toBe(a.aka);
+  });
+});

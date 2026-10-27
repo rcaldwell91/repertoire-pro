@@ -57,6 +57,13 @@ export type Engine =
   | { kind: 'guided'; mins: number }
   | { kind: 'range' };
 
+/** how an exercise's syllables (copy.ex[id].syls) fall on its notes
+    (Robert, 27 Oct): one a note, starting again each repeat ('note', the
+    old app's "la-ga la-ga"); one a note carried on round the exercise
+    ('carry', a tongue twister); or one a repeat ('rung', the old app's
+    "mmm / nnn / ng": three hums) */
+export type SylsBy = 'note' | 'carry' | 'rung';
+
 export interface Exercise {
   readonly id: keyof typeof copy.ex;
   readonly category: CategoryId;
@@ -64,10 +71,11 @@ export interface Exercise {
   /** works at hum or speaking volume */
   readonly quiet: boolean;
   readonly engine: Engine;
+  readonly sylsBy: SylsBy;
 }
 
-const ex = (id: Exercise['id'], category: CategoryId, level: 1 | 2 | 3, quiet: boolean, engine: Engine): Exercise =>
-  ({ id, category, level, quiet, engine });
+const ex = (id: Exercise['id'], category: CategoryId, level: 1 | 2 | 3, quiet: boolean, engine: Engine, sylsBy: SylsBy = 'note'): Exercise =>
+  ({ id, category, level, quiet, engine, sylsBy });
 const ladder = (pattern: PatternId, bpm: number): Engine => ({ kind: 'ladder', pattern, bpm });
 const guided = (mins: number): Engine => ({ kind: 'guided', mins });
 
@@ -76,7 +84,7 @@ export const EXERCISES: readonly Exercise[] = [
   ex('farinelli', 'breath', 1, true, { kind: 'cycle', counts: [4, 4, 4] }),
   ex('liptrill', 'warmup', 1, true, ladder('oct15', 100)),
   ex('straw', 'warmup', 1, true, guided(3)),
-  ex('hum', 'warmup', 1, true, ladder('five', 110)),
+  ex('hum', 'warmup', 1, true, ladder('five', 110), 'rung'),
   ex('siren', 'warmup', 1, true, { kind: 'glide' }),
   ex('mum', 'tone', 1, true, ladder('five', 120)),
   ex('mee', 'tone', 1, true, ladder('five', 120)),
@@ -101,9 +109,9 @@ export const EXERCISES: readonly Exercise[] = [
   ex('vfe', 'breath', 1, true, guided(5)),
   /* Articulation: clear words while singing (Robert, 25 Oct), in our own words */
   ex('vowels', 'words', 1, true, ladder('same5', 100)),
-  ex('redleather', 'words', 2, true, ladder('five', 120)),
-  ex('uniqueny', 'words', 2, true, ladder('five', 110)),
-  ex('peterpiper', 'words', 2, true, ladder('five', 120)),
+  ex('redleather', 'words', 2, true, ladder('five', 120), 'carry'),
+  ex('uniqueny', 'words', 2, true, ladder('five', 110), 'carry'),
+  ex('peterpiper', 'words', 2, true, ladder('five', 120), 'carry'),
   ex('pops', 'words', 1, true, ladder('pops', 100)),
   ex('tonguetip', 'words', 1, true, ladder('five', 120)),
   ex('lipstongue', 'words', 2, true, ladder('five', 112)),
@@ -162,21 +170,29 @@ export function ladderNotes(e: Exercise, range: Range): { notes: Note[]; length:
     const step = Math.ceil(roots.length / MAX_RUNGS);
     roots = roots.filter((_, i) => i % step === 0);
   }
-  /* the syllable: one for the whole exercise, or a phrase carried on note
-     by note round the exercise (Articulation, Robert, 25 Oct) */
-  const words = copy.ex[e.id] as { syl: string; syls?: readonly string[] };
-  const sylAt = (k: number) => (words.syls?.length ? words.syls[k % words.syls.length] : words.syl);
   const notes: Note[] = [];
   let b = 0;
-  for (const root of roots) {
+  roots.forEach((root, r) => {
     p.deg.forEach((dg, i) => {
-      const syl = sylAt(notes.length);
+      const syl = sylFor(e, notes.length, i, r);
       notes.push({ m: root + dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl });
       b += p.dur[i];
     });
     b += REST_BEATS;
-  }
+  });
   return { notes, length: (b - REST_BEATS) * beat, beat };
+}
+
+/** the syllable for a note: the exercise's one syllable, or one of its
+    list, a note at a time (from each repeat's start, or carried on), or a
+    repeat at a time. k counts every note, i the notes of this repeat, r
+    the repeats. */
+export function sylFor(e: Exercise, k: number, i: number, r: number): string {
+  const words = copy.ex[e.id] as { syl: string; syls?: readonly string[] };
+  const list = words.syls;
+  if (!list?.length) return words.syl;
+  const at = e.sylsBy === 'carry' ? k : e.sylsBy === 'rung' ? r : i;
+  return list[at % list.length];
 }
 
 /** a held note's pattern: five notes evenly through your range, three in
@@ -187,11 +203,10 @@ export function holdNotes(e: Exercise, range: Range): { notes: Note[]; length: n
   if (e.engine.kind !== 'hold') return { notes: [], length: 0, beat: 1 };
   const secs = e.engine.secs;
   const a = range.lo + 3, b = Math.max(range.lo + 3, range.hi - 3);
-  const syl = copy.ex[e.id].syl;
   const notes: Note[] = [];
   for (let i = 0; i < HOLD_NOTES; i++) {
     const m = Math.round(a + ((b - a) * i) / (HOLD_NOTES - 1));
-    notes.push({ m, t: i * (secs + HOLD_REST), d: secs, syl: keyName(m) + ' · ' + syl });
+    notes.push({ m, t: i * (secs + HOLD_REST), d: secs, syl: keyName(m) + ' · ' + sylFor(e, i, 0, i) });
   }
   return { notes, length: HOLD_NOTES * secs + (HOLD_NOTES - 1) * HOLD_REST, beat: 1 };
 }
