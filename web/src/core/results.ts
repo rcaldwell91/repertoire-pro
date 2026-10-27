@@ -8,6 +8,8 @@ import { exercise, measures, type Exercise } from './exercises';
 export type Outcome =
   | { kind: 'pitch'; hits: number; n: number }
   | { kind: 'time'; seconds: number }
+  /** Long soft notes: how long each timed hold lasted, steps 1 and 4 */
+  | { kind: 'holds'; step1: readonly number[]; step4: ReadonlyArray<{ m: number; s: number }> }
   | { kind: 'none' };
 
 export interface ResultRow {
@@ -26,6 +28,8 @@ export function resultRow(e: Exercise, o: Outcome): ResultRow {
   if (o.kind === 'time' && e.engine.kind === 'timed') {
     return { ...base, score: Math.round(o.seconds), out_of: e.engine.target, seconds: Math.round(o.seconds * 10) / 10 };
   }
+  /* Long soft notes: the longest hold on "ee" (step 1), the measure Stemple tracks */
+  if (o.kind === 'holds' && o.step1.length) return { ...base, seconds: Math.round(Math.max(...o.step1) * 10) / 10 };
   return base;
 }
 

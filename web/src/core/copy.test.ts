@@ -64,7 +64,8 @@ describe('copy-lint', () => {
     expect(prose.length).toBeGreaterThan(50);
     expect(prose.every((l) => l.at.startsWith('copy.about.'))).toBe(true);
     /* the old app's exercises have them; the range check and Articulation (ours) do not */
-    const ours = ['vowels', 'redleather', 'uniqueny', 'peterpiper', 'pops', 'tonguetip', 'lipstongue'];
+    const ours = ['vowels', 'redleather', 'uniqueny', 'peterpiper', 'pops', 'tonguetip', 'lipstongue', 'buzz', 'raspberry', 'tonguetrill', 'pulses',
+      'goo', 'guh', 'run5', 'minor5', 'penta', 'chrom', 'turns', 'arp19', 'interval', 'match', 'holdnote'];
     expect(Object.keys(copy.about)).toEqual(Object.keys(copy.ex).filter((k) => k !== 'rangecheck' && !ours.includes(k)));
   });
 

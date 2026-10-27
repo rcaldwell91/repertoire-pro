@@ -14,13 +14,18 @@ import { resultRow } from './results';
    (rp-cloud.js 870-905). Where the old code is quoted below, it is copied
    as it is there, so the new code is held to what it did. */
 
-const OLD_IDS = ['hiss', 'farinelli', 'liptrill', 'straw', 'hum', 'siren', 'mum', 'mee', 'noo', 'loo', 'gee', 'staccato', 'nay', 'bay',
+/* the old app's exercises; Bratty Bay was dropped (Robert, 28 Oct: Octave repeat sings its pattern) */
+const OLD_IDS = ['hiss', 'farinelli', 'liptrill', 'straw', 'hum', 'siren', 'mum', 'mee', 'noo', 'loo', 'gee', 'staccato', 'nay',
   'wah', 'octleap', 'laga', 'tongueout', 'tonguecresc', 'blah', 'yawnsigh', 'messa', 'sustain', 'ninetone', 'descend', 'octrep', 'vfe'];
+
+/* Robert, 28 Oct: new exercises, in our own words */
+const NEW_28 = ['buzz', 'raspberry', 'tonguetrill', 'pulses', 'goo', 'guh', 'run5', 'minor5', 'penta', 'chrom', 'turns', 'arp19'];
 
 describe('the exercises, as data', () => {
   it('has every exercise of the old app, and the range check', () => {
-    const ours = EXERCISES.filter((e) => e.category === 'words').map((e) => e.id);
+    const ours: string[] = [...EXERCISES.filter((e) => e.category === 'words' || e.category === 'pitch').map((e) => e.id), ...NEW_28];
     expect(EXERCISES.map((e) => e.id).filter((id) => id !== 'rangecheck' && !ours.includes(id)).sort()).toEqual([...OLD_IDS].sort());
+    expect(exercise('bay')).toBeUndefined();
     expect(exercise('rangecheck')?.engine.kind).toBe('range');
   });
 
@@ -28,7 +33,7 @@ describe('the exercises, as data', () => {
     const old: Record<string, [string, number, boolean]> = {
       hiss: ['breath', 1, true], farinelli: ['breath', 1, true], liptrill: ['warmup', 1, true], straw: ['warmup', 1, true],
       hum: ['warmup', 1, true], siren: ['warmup', 1, true], mum: ['tone', 1, true], mee: ['tone', 1, true], noo: ['tone', 1, true],
-      loo: ['agility', 1, true], gee: ['tone', 2, false], staccato: ['agility', 2, false], nay: ['tone', 2, false], bay: ['tone', 2, false],
+      loo: ['agility', 1, true], gee: ['tone', 2, false], staccato: ['agility', 2, false], nay: ['tone', 2, false],
       wah: ['tone', 1, true], octleap: ['range', 3, false], laga: ['agility', 1, true], tongueout: ['tone', 1, true],
       tonguecresc: ['tone', 2, false], blah: ['agility', 1, true], yawnsigh: ['tone', 1, true], messa: ['breath', 3, false],
       sustain: ['breath', 1, true], ninetone: ['agility', 2, false], descend: ['range', 1, true], octrep: ['range', 3, false], vfe: ['breath', 1, true],
@@ -41,7 +46,7 @@ describe('the exercises, as data', () => {
   it('runs each one the way the old app did', () => {
     const ladders: Record<string, [string, number]> = {
       liptrill: ['oct15', 100], hum: ['five', 110], mum: ['five', 120], mee: ['five', 120], noo: ['five', 120], loo: ['five', 130],
-      gee: ['five', 120], staccato: ['arp', 120], nay: ['oct', 120], bay: ['octrep', 118], wah: ['down3', 100], octleap: ['oct', 100],
+      gee: ['five', 120], staccato: ['arp', 120], nay: ['oct', 120], wah: ['down3', 100], octleap: ['leap', 100],
       laga: ['five', 132], tongueout: ['down5', 110], ninetone: ['nine', 160], descend: ['down5', 120], octrep: ['octrep', 112],
     };
     for (const [id, [pattern, bpm]] of Object.entries(ladders)) expect(exercise(id)?.engine, id).toEqual({ kind: 'ladder', pattern, bpm });
@@ -50,7 +55,9 @@ describe('the exercises, as data', () => {
     expect(exercise('hiss')?.engine).toEqual({ kind: 'timed', target: 20 });
     expect(exercise('farinelli')?.engine).toEqual({ kind: 'cycle', counts: [4, 4, 4] });
     expect(exercise('siren')?.engine).toEqual({ kind: 'glide' });
-    for (const [id, mins] of [['straw', 3], ['tonguecresc', 2], ['blah', 1], ['yawnsigh', 1], ['vfe', 5]] as const) {
+    /* Long soft notes is Stemple's four steps now (Robert, 28 Oct), not a clock */
+    expect(exercise('vfe')?.engine).toEqual({ kind: 'vfe' });
+    for (const [id, mins] of [['straw', 3], ['tonguecresc', 2], ['blah', 1], ['yawnsigh', 1]] as const) {
       expect(exercise(id)?.engine, id).toEqual({ kind: 'guided', mins });
     }
   });
@@ -72,7 +79,8 @@ describe('the exercises, as data', () => {
     for (const e of EXERCISES) {
       const c = copy.ex[e.id as keyof typeof copy.ex];
       expect(c, e.id).toBeDefined();
-      for (const k of ['name', 'syl', 'goal', 'how'] as const) expect(c[k], e.id + '.' + k).toMatch(/\S/);
+      /* the Pitch group sings note names and jumps, not a syllable */
+      for (const k of ['name', 'syl', 'goal', 'how'] as const) if (!(k === 'syl' && e.category === 'pitch')) expect(c[k], e.id + '.' + k).toMatch(/\S/);
     }
   });
 
@@ -85,10 +93,10 @@ describe('the exercises, as data', () => {
     expect(measures(exercise('rangecheck') as Exercise)).toBe('range');
   });
 
-  it('has its six groups by colour: Range with Agility\'s blue, Articulation in a colour of its own (1b; Robert, 23 and 25 Oct)', () => {
-    expect(CATEGORIES.map((c) => c.id)).toEqual(['warmup', 'breath', 'tone', 'agility', 'range', 'words']);
+  it('has its seven groups by colour: Range and Pitch with Agility\'s blue, Articulation in a colour of its own (1b; Robert, 23, 25 and 28 Oct)', () => {
+    expect(CATEGORIES.map((c) => c.id)).toEqual(['warmup', 'breath', 'tone', 'agility', 'range', 'words', 'pitch']);
     expect(Object.fromEntries(CATEGORIES.map((c) => [c.id, c.colour]))).toEqual({
-      warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words' });
+      warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' });
     const others = CATEGORIES.filter((c) => c.id !== 'words').map((c) => c.colour);
     expect(others).not.toContain(CATEGORIES.find((c) => c.id === 'words')?.colour);
     for (const e of EXERCISES) expect(CATEGORIES.some((c) => c.id === e.category), e.id).toBe(true);
@@ -101,7 +109,8 @@ describe('the routines', () => {
     expect(ROUTINES.intermediate).toEqual({ mins: 16,
       steps: ['hiss', 'farinelli', 'liptrill', 'descend', 'mum', 'mee', 'tongueout', 'laga', 'nay', 'wah', 'staccato', 'ninetone'] });
     expect(ROUTINES.advanced).toEqual({ mins: 20,
-      steps: ['farinelli', 'straw', 'liptrill', 'descend', 'hum', 'tongueout', 'laga', 'bay', 'ninetone', 'staccato', 'octleap', 'messa'] });
+      /* Bratty Bay dropped (Robert, 28 Oct): Octave repeat, its pattern, in its place */
+      steps: ['farinelli', 'straw', 'liptrill', 'descend', 'hum', 'tongueout', 'laga', 'octrep', 'ninetone', 'staccato', 'octleap', 'messa'] });
     expect(ROUTINES.quiet).toEqual({ mins: 10, steps: ['hiss', 'farinelli', 'liptrill', 'hum', 'siren', 'mum', 'noo', 'tongueout'] });
     expect(ROUTINES.cooldown).toEqual({ mins: 3, steps: ['straw', 'hum', 'descend'] });
     expect(DAILY).toBe('daily');
@@ -322,12 +331,17 @@ describe('Articulation: clear words while singing (Robert, 25 Oct)', () => {
     expect(notes[5].m).toBe(52);
     expect(sylOf(notes[5])).toBe('mah');
   });
-  it('a tongue twister runs on through the notes, up and down, rung after rung', () => {
-    const { notes } = ladderNotes(exercise('redleather') as Exercise, range);
-    const syls = copy.ex.redleather.syls as readonly string[];
-    expect(notes.slice(0, 9).map((n) => n.m - 51)).toEqual([...PATTERNS.five.deg]);
-    expect(notes.map(sylOf)).toEqual(notes.map((_, k) => syls[k % syls.length]));
-    expect(sylOf(notes[9])).not.toBe(syls[0]);            /* it carries on, not back to the start */
+  it('a tongue twister fits its pattern exactly: a syllable a note, ending on the last, the same every repeat (Robert, 28 Oct)', () => {
+    for (const id of ['redleather', 'uniqueny', 'peterpiper'] as const) {
+      const e = exercise(id) as Exercise;
+      const syls = copy.ex[id].syls as readonly string[];
+      expect(e.engine.kind === 'ladder' && PATTERNS[e.engine.pattern].deg.length, id).toBe(syls.length);
+      const { notes } = ladderNotes(e, range);
+      const starts = rungStarts(notes);
+      for (let r = 0; r < starts.length; r++) {
+        expect(notes.slice(starts[r], starts[r + 1] ?? notes.length).map(sylOf), `${id} repeat ${r + 1}`).toEqual([...syls]);
+      }
+    }
   });
   it('consonant pops are short repeated notes', () => {
     const e = exercise('pops') as Exercise;
@@ -356,7 +370,7 @@ describe('Articulation: clear words while singing (Robert, 25 Oct)', () => {
    repeat; "a · b" lists other ways to sing it, and the first is sung. */
 const OLD_SYL: Record<string, string> = {
   liptrill: 'brrr', hum: 'mmm / nnn / ng', mum: 'mum', mee: 'mee', noo: 'noo', loo: 'loo · lah', gee: 'gee · kee', staccato: 'bah · hoo',
-  nay: 'nay', bay: 'bay · bae', wah: 'wah', octleap: 'ma', laga: 'la-ga la-ga', tongueout: 'ah · uh', messa: 'ah · oh · oo', sustain: 'ee · ah',
+  nay: 'nay', wah: 'wah', octleap: 'ma', laga: 'la-ga la-ga', tongueout: 'ah · uh', messa: 'ah · oh · oo', sustain: 'ee · ah',
   ninetone: 'lah · nay · numbers', descend: 'oo · ol', octrep: 'buh · mum · nay',
 };
 describe('the syllables on each note (Robert, 27 Oct)', () => {
@@ -387,5 +401,54 @@ describe('the syllables on each note (Robert, 27 Oct)', () => {
         expect(new Set(all), id).toEqual(new Set([id === 'tongueout' ? 'uh' : first]));
       }
     }
+  });
+});
+
+describe('the content round (Robert, 28 Oct)', () => {
+  const range = { lo: 48, hi: 67 };
+  const rung = (id: string) => firstRung(ladderNotes(exercise(id) as Exercise, range).notes);
+  it('Octave leaps is a true leap: low note, straight to the octave, back down', () => {
+    expect(rung('octleap').map((n) => n.m - 49)).toEqual([0, 12, 0]);
+    expect(rung('octleap').map(sylOf)).toEqual(['ma', 'ma', 'ma']);
+  });
+  it('the new exercises: their groups, levels, patterns and syllables', () => {
+    const want: Record<string, [string, number, number[], string[]]> = {
+      buzz: ['warmup', 1, [0, 2, 4, 5, 7, 5, 4, 2, 0], ['vvv']],
+      tonguetrill: ['warmup', 2, [0, 2, 4, 5, 7, 5, 4, 2, 0], ['rrr']],
+      goo: ['tone', 1, [0, 4, 7, 4, 0], ['goo']],
+      guh: ['tone', 2, [0, 4, 7, 12, 7, 4, 0], ['guh']],
+      run5: ['agility', 1, [0, 2, 4, 5, 7, 5, 4, 2, 0], ['my']],
+      minor5: ['agility', 2, [0, 2, 3, 5, 7, 5, 3, 2, 0], ['my']],
+      penta: ['agility', 2, [0, 2, 4, 7, 9, 7, 4, 2, 0], ['my']],
+      chrom: ['agility', 3, [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0], ['my']],
+      turns: ['agility', 3, [4, 2, 0, 5, 4, 2, 7, 5, 4, 9, 7, 5], ['my']],
+      arp19: ['range', 3, [0, 4, 7, 12, 16, 19, 16, 12, 7, 4, 0], ['nay']],
+    };
+    for (const [id, [cat, level, deg, syls]] of Object.entries(want)) {
+      expect(exercise(id), id).toMatchObject({ category: cat, level });
+      const r = rung(id);
+      expect(r.map((n) => n.m - r[0].m + deg[0]), id).toEqual(deg);
+      expect([...new Set(r.map(sylOf))], id).toEqual(syls);
+      expect(measures(exercise(id) as Exercise), id).toBe('pitch');
+    }
+    expect(exercise('raspberry')).toMatchObject({ category: 'warmup', level: 1, engine: { kind: 'glide' } });
+    expect(measures(exercise('raspberry') as Exercise)).toBe('none');
+    expect(exercise('pulses')).toMatchObject({ category: 'breath', level: 1, engine: { kind: 'guided' } });
+  });
+  it('the buzz is a repeat on "vvv", then a repeat on "zzz"', () => {
+    const { notes } = ladderNotes(exercise('buzz') as Exercise, range);
+    const s = rungStarts(notes);
+    expect([sylOf(notes[s[0]]), sylOf(notes[s[1]]), sylOf(notes[s[2]])]).toEqual(['vvv', 'zzz', 'vvv']);
+  });
+  it('the runs go faster at higher levels', () => {
+    const bpm = (id: string) => { const e = exercise(id) as Exercise; return e.engine.kind === 'ladder' ? e.engine.bpm : 0; };
+    expect(bpm('run5')).toBeLessThan(bpm('minor5'));
+    expect(bpm('minor5')).toBe(bpm('penta'));
+    expect(bpm('penta')).toBeLessThan(bpm('chrom'));
+    expect(bpm('chrom')).toBe(bpm('turns'));
+  });
+  it('Loo is sung on "loo", by its plain name', () => {
+    expect(copy.ex.loo.name).toBe('Loo');
+    expect(new Set(rung('loo').map(sylOf))).toEqual(new Set(['loo']));
   });
 });

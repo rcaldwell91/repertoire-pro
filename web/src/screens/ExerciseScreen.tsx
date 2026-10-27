@@ -4,13 +4,17 @@ import type { SyntheticEvent } from 'react';
 import { Settings, X } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
-  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, firstRung, measures, notesFor, rungAt, rungStarts, type Exercise, type Note,
+  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, firstRung, measures, notesFor, rungAt, rungStarts, sylOf, type Exercise, type Note,
   type RoutineId,
 } from '../core/exercises';
 import { keyName, type Range } from '../core/notemap';
 import { pianoFor } from '../core/piano';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
 import { micLine, monitorOf } from '../core/song';
+import {
+  intervalRound, matchRound, partLine, seeded, steadyParts, steadyShare, vfeParts, STEADY_LEAD, STEADY_SHARE, type JumpLevel, type Part,
+} from '../core/pitch';
+import { isRight } from '../core/takes';
 import { clock as clockText } from '../core/time';
 import { resultRow, type Outcome } from '../core/results';
 import { SoundClock } from '../core/timed';
@@ -20,7 +24,7 @@ import { saveResult } from '../data/results';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { micBlockedBrowser } from '../shell/env';
 import { back, exRoute, navigate, routineRoute } from '../shell/router';
-import { anyOctaveFor, hearOn, hearVolume, setAnyOctaveFor, setHearOn, setHearVolume } from '../shell/settings';
+import { anyOctaveFor, hearOn, hearVolume, jumpLevel, setAnyOctaveFor, setHearOn, setHearVolume, setJumpLevel } from '../shell/settings';
 import { useYourLine } from '../shell/your-line';
 import { BackButton } from '../ui/BackButton';
 import { Bubbles } from '../ui/Bubbles';
@@ -48,6 +52,8 @@ import { SoundTrouble } from '../ui/SoundTrouble';
 
 /** the reference piano's volume */
 const PIANO_GAIN = 0.8;
+/** Long soft notes: how long the note plays before it is held */
+const LONG_LEAD = 1.5;
 /** points of your line, a second */
 const HOP = 0.05;
 
@@ -85,17 +91,43 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   const previewOwner = 'preview:' + e.id;
   const cat = CATEGORIES.find((x) => x.id === e.category) ?? CATEGORIES[0];
   const kind = e.engine.kind;
-  const sung = kind === 'ladder' || kind === 'hold';
-  const usesMic = sung || kind === 'timed' || kind === 'glide' || kind === 'range';
+  /* sung over the piano, bubble by bubble: the ladders, held notes, and a round of jumps or notes to match */
+  const sung = kind === 'ladder' || kind === 'hold' || kind === 'interval' || kind === 'match';
+  /* a part at a time, each started by a tap (Hold the note, Long soft notes) */
+  const inParts = kind === 'steady' || kind === 'vfe';
+  const usesMic = sung || inParts || kind === 'timed' || kind === 'glide' || kind === 'range';
   /* a count-in, and so a count-in sound: everything the conductor runs */
   const countsIn = kind !== 'cycle' && kind !== 'guided';
   const about = (copy.about as Partial<Record<string, About>>)[e.id];
 
   const [range, setRange] = useState<Range>(rangeNow);
   useEffect(() => onRange(() => setRange(rangeNow())), []);
-  const plan = useMemo(() => notesFor(e, range), [e, range]);
-  const pattern = useMemo(() => firstRung(plan.notes), [plan]);
+  /* Sing the interval's level, remembered; a round's notes drawn once a visit */
+  const [level, setLevelNow] = useState<JumpLevel>(jumpLevel);
+  const setLevel = (v: JumpLevel) => {
+    setLevelNow(v);
+    setJumpLevel(v);
+  };
+  const [seed] = useState(() => Math.random());
+  const plan = useMemo(() => {
+    const rand = seeded(seed);
+    if (kind === 'interval') return intervalRound(level, range, rand);
+    if (kind === 'match') return matchRound(range, rand);
+    const n = notesFor(e, range);
+    return { ...n, played: n.notes };
+  }, [e, kind, range, level, seed]);
+  /* the pattern card: one repeat; for a round, its first jump or note */
+  const pattern = useMemo(() => (kind === 'interval' ? [plan.played[0], { ...plan.notes[0], d: 1.2 }]
+    : kind === 'match' ? [plan.played[0]] : firstRung(plan.notes)), [kind, plan]);
   const rungs = useMemo(() => rungStarts(plan.notes).length, [plan]);
+  const parts = useMemo<Part[]>(() => {
+    const rand = seeded(seed);
+    return kind === 'steady' ? steadyParts(range, rand) : kind === 'vfe' ? vfeParts(range) : [];
+  }, [kind, range, seed]);
+  const [partAt, setPartAt] = useState(0);
+  /* what each part left: a share held steady, seconds held, a slide done; null if not measured */
+  const [partRes, setPartRes] = useState<Array<number | null>>([]);
+  const [partDone, setPartDone] = useState(false);
 
   /* the sound sheet's settings: Any octave for this exercise alone; the
      others shared with Learn a song (shell/settings; the conductor's count-in) */
@@ -217,6 +249,68 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, kind]);
 
+  /* a part at a time (Hold the note, Long soft notes): watched each frame
+     while it runs. A steady hold ends after its seconds; a long hold, and a
+     slide, after a second without the note (or any voice). Then it waits
+     for Next. */
+  const partClock = useRef<SoundClock | null>(null);
+  const partFrom = useRef(0);
+  useEffect(() => {
+    if (!running || !inParts || partDone) return;
+    const p = parts[partAt];
+    if (!p) return;
+    partFrom.current = performance.now();
+    partClock.current = new SoundClock();
+    let raf = 0;
+    const end = (res: number | null) => {
+      c.stop();
+      setPartRes((r) => {
+        const out = [...r];
+        out[partAt] = res;
+        return out;
+      });
+      setPartDone(true);
+    };
+    let seen = -1;
+    const frame = () => {
+      const at = (performance.now() - partFrom.current) / 1000;
+      if (p.kind === 'steady') {
+        if (at >= STEADY_LEAD + p.secs) return end(steadyShare(line.t, line.m, HOP, p.m, STEADY_LEAD, p.secs, anyOctave));
+      } else {
+        /* timed on the voice line's own clock, a point every 50 ms, silence
+           included: the note held (a long hold) or any voice (a slide) */
+        const lead = p.kind === 'long' ? LONG_LEAD : 0;
+        const clk = partClock.current as SoundClock;
+        for (let k = seen + 1; k < line.t.length; k++) {
+          seen = k;
+          if (line.t[k] < lead) continue;
+          const m = line.m[k];
+          const on = Number.isFinite(m) && (p.kind === 'slide' || isRight(m, p.m, anyOctave));
+          clk.feed(line.t[k], on ? 1 : 0);
+        }
+        const st = clk.state();
+        setHeldNow(st.held);
+        if (st.done) return end(p.kind === 'long' ? st.held : 1);
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, inParts, partAt, partDone]);
+
+  /* Sing the interval: the jump to sing now, or next */
+  const [jumpNow, setJumpNow] = useState('');
+  useEffect(() => {
+    if (!playing || kind !== 'interval') return;
+    const t = setInterval(() => {
+      const at = c.position() ?? 0;
+      const n = plan.notes.find((q) => at < q.t + q.d);
+      setJumpNow(n ? sylOf(n) : '');
+    }, 100);
+    return () => clearInterval(t);
+  }, [playing, kind, plan, c]);
+
   /* a clock-only exercise's clock */
   useEffect(() => {
     if (clockFrom == null) return;
@@ -248,11 +342,62 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
       setView('run');
       return;
     }
+    if (inParts) {
+      setPartRes([]);
+      startPart(ev, 0);
+      return;
+    }
     const beat = sung ? plan.beat : 1;
     const p: Plan = sung
-      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.notes, withMic, hear ? monitorOf(hearVol) : 0)] }
+      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.played, withMic, hear ? monitorOf(hearVol) : 0)] }
       : { owner, countIn: 3, countBeats: 3, steps: withMic ? [{ kind: 'listen' }] : [] };
     if (c.start(c.tap(ev.nativeEvent), p)) setView('run');
+  }
+
+  /* one part: the count-in, the note (not for a slide), then listening until it ends */
+  function startPart(ev: SyntheticEvent, i: number) {
+    const p = parts[i];
+    setHeldNow(0);
+    const lead = p.kind === 'steady' ? STEADY_LEAD : LONG_LEAD;
+    const steps: Array<Plan['steps'][number]> = p.kind === 'slide' ? [] : [notesStep([{ m: p.m, t: 0, d: lead, syl: '' }], withMic)];
+    if (withMic) steps.push({ kind: 'listen' });
+    if (c.start(c.tap(ev.nativeEvent), { owner, countIn: 3, countBeats: 3, steps })) {
+      setPartAt(i);
+      setPartDone(false);
+      setView('run');
+    }
+  }
+
+  /* after the last part: what was measured */
+  function finishParts(res: Array<number | null>) {
+    if (kind === 'steady') {
+      const n = parts.length;
+      return void finish({ kind: 'pitch', hits: res.filter((x) => x != null && x >= STEADY_SHARE).length, n });
+    }
+    const step1: number[] = [], step4: Array<{ m: number; s: number }> = [];
+    parts.forEach((p, i) => {
+      const v = res[i];
+      if (p.kind !== 'long' || v == null) return;
+      if (p.step === 1) step1.push(v);
+      else step4.push({ m: p.m, s: v });
+    });
+    void finish(step1.length || step4.length ? { kind: 'holds', step1, step4 } : { kind: 'none' });
+  }
+
+  function nextPart(ev: SyntheticEvent) {
+    if (partAt + 1 < parts.length) startPart(ev, partAt + 1);
+    else finishParts(partRes);
+  }
+
+  /* a part without the mic: nothing is timed, Done moves on */
+  function partByHand() {
+    if (playing) c.stop();
+    setPartRes((r) => {
+      const out = [...r];
+      out[partAt] = null;
+      return out;
+    });
+    setPartDone(true);
   }
 
   function close() {
@@ -299,6 +444,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
             <button type="button" className="btn btn-quiet" id="carry-on" onClick={() => setWithMic(false)}>{copy.song.carryOn}</button>
           )}
         </div>
+        {kind === 'interval' && <p className="ex-line ex-jump" id="ex-jump">{jumpNow}</p>}
         {(sung || kind === 'glide') && (
           <Bubbles notes={sung ? plan.notes : []} you={line} now={() => (sung ? c.position() ?? 0 : startedAt == null ? 0 : c.position() ?? 0)}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting} />
@@ -311,6 +457,33 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           </div>
         )}
         {!sung && kind !== 'glide' && counting != null && <div className="ex-big" id="count-in">{counting}</div>}
+        {inParts && parts[partAt] && (() => {
+          const p = parts[partAt];
+          const res = partRes[partAt];
+          return (
+            <div className="ex-part" id="ex-part" data-m={p.kind === 'slide' ? '' : p.m} data-kind={p.kind}>
+              <p className="hint" id="ex-part-at">
+                {p.kind === 'steady' ? fill(copy.train.noteOf, { i: partAt + 1, n: parts.length }) : fill(copy.train.stepOf, { step: p.step, k: p.round })}
+              </p>
+              {p.kind === 'steady' ? <div className="ex-big" id="ex-target">{partLine(p)}</div> : <p className="ex-line" id="ex-target">{partLine(p)}</p>}
+              {p.kind === 'long' && counting == null && withMic && (
+                <div className="ex-big" id="ex-held">{fill(copy.train.secs, { s: (partDone ? res ?? 0 : heldNow).toFixed(1) })}</div>
+              )}
+              {partDone && p.kind === 'steady' && res != null && (
+                <p className="ex-line" id="ex-part-result">
+                  {fill(res >= STEADY_SHARE ? copy.train.steadyYes : copy.train.steadyNo, { pct: Math.round(100 * res) })}
+                </p>
+              )}
+              {partDone && p.kind === 'slide' && res != null && <p className="ex-line" id="ex-part-result">{copy.train.slid}</p>}
+              {partDone && (
+                <button type="button" className="btn btn-start" id="ex-next-part" onClick={nextPart}>{copy.train.nextOne}</button>
+              )}
+              {!partDone && !withMic && counting == null && (
+                <button type="button" className="btn" id="ex-done" onClick={partByHand}>{copy.train.done}</button>
+              )}
+            </div>
+          );
+        })()}
         {kind === 'glide' && <p className="hint">{copy.train.glide}</p>}
         {kind === 'timed' && counting == null && (
           <>
@@ -372,10 +545,21 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
       <div className="tags" id="ex-tags">
         <span className="tag" data-colour={cat.colour}>{copy.cats[e.category]}</span>
       </div>
+      {'needs' in copy.ex[e.id] && <p className="ex-line" id="ex-needs">{(copy.ex[e.id] as { needs: string }).needs}</p>}
 
       {sheet && view === 'preview' && (
         <section className="card sheet" id="sound-sheet" aria-label={copy.train.soundSheet}>
-          {sung && (
+          {kind === 'interval' && (
+            <div className="choices" role="radiogroup" aria-label={copy.train.jumpLevel} id="jump-level">
+              <p className="ex-label">{copy.train.jumpLevel}</p>
+              {([1, 2, 3] as const).map((v) => (
+                <button key={v} type="button" className="choice" role="radio" id={'level-' + v} aria-checked={level === v} onClick={() => setLevel(v)}>
+                  {copy.levels[v]}
+                </button>
+              ))}
+            </div>
+          )}
+          {(sung || inParts) && (
             <label className="switch-row">
               <span>{copy.train.anyOctave}</span>
               <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(ev) => setAnyOctave(ev.target.checked)} />
@@ -409,6 +593,16 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
             <>
               <p className="ex-score" id="ex-score">{fill(copy.train.held, { s: shown.o.seconds.toFixed(1) })}</p>
               <p className="hint">{fill(copy.train.heldOf, { target: e.engine.target })}</p>
+            </>
+          )}
+          {shown.o.kind === 'holds' && (
+            <>
+              <p className="ex-line" id="ex-held1">
+                {fill(copy.train.vfeHeld1, { times: shown.o.step1.map((x) => fill(copy.train.secs, { s: x.toFixed(1) })).join(', ') })}
+              </p>
+              <p className="ex-line" id="ex-held4">
+                {fill(copy.train.vfeHeld4, { times: shown.o.step4.map((x) => fill(copy.train.noteSecs, { note: keyName(x.m), s: x.s.toFixed(1) })).join(', ') })}
+              </p>
             </>
           )}
           {shown.range && (
@@ -445,7 +639,11 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           <p className="ex-line" id="ex-goal">{copy.ex[e.id].goal}</p>
           <p className="ex-label">{copy.train.how}</p>
           <p className="ex-line" id="ex-how">{copy.ex[e.id].how}</p>
-          <button type="button" className="btn btn-start" id="ex-start" onClick={start}>{copy.train.start}</button>
+          <button type="button" className="btn btn-start" id="ex-start" onClick={start}
+            data-round={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
+            data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
+            {copy.train.start}
+          </button>
           {about && (
             <button type="button" className="btn btn-quiet btn-link" id="ex-more" aria-expanded={more} onClick={() => setMore((m) => !m)}>
               {copy.train.moreAbout}

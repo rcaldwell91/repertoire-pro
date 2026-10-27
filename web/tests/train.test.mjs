@@ -36,10 +36,11 @@ if (!existsSync(SOURCE)) {
 
 const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'count-in-sound', 'start-only', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
+  'content', 'interval', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'progress-phone', 'progress-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
-const GROUPS = { warmup: 4, breath: 5, tone: 10, agility: 5, range: 4, words: 7 };
-const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words' };
+const GROUPS = { warmup: 7, breath: 6, tone: 11, agility: 10, range: 5, words: 7, pitch: 3 };
+const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
 /** the count-in beep: the one short sound the app makes itself */
 const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
 const results = [];
@@ -173,7 +174,8 @@ try {
           const solid = dots.every((d) => getComputedStyle(d).fill === getComputedStyle(svg).color && parseFloat(getComputedStyle(d).fillOpacity) === 1);
           const heights = new Set(dots.map((d) => d.getAttribute('cy')));
           const curve = svg.querySelectorAll('[data-part=run]').length === 1 && /C/.test(svg.querySelector('[data-part=run]').getAttribute('d'));
-          const weight = parseFloat(getComputedStyle(svg).strokeWidth) === 2;
+          /* the run at the full stroke, the staff at half of it (Robert, 28 Oct) */
+          const weight = parseFloat(getComputedStyle(svg).strokeWidth) === 2 && lines.every((l) => parseFloat(getComputedStyle(l).strokeWidth) === 1);
           return lines.length === 5 && faint && dots.length === 5 && solid && heights.size === 5 && curve && weight ? 'run'
             : 'wrong (' + JSON.stringify({ lines: lines.length, faint, dots: dots.length, solid, heights: heights.size, curve, weight }) + ')';
         })(),
@@ -181,14 +183,14 @@ try {
         tabs: !!document.querySelector('.tabs') };
     })()`);
     if (want('train-tab')) {
-      /* one colour means one thing: five colours for six groups, Range sharing Agility's blue and no other two alike */
-      const [warm, breath, tone, agility, range, words] = t.shades;
-      const distinct = new Set([warm, breath, tone, agility, words]).size === 5 && range === agility;
+      /* one colour means one thing: five colours for seven groups, Range and Pitch sharing Agility's blue (blue is pitch) and no other two alike */
+      const [warm, breath, tone, agility, range, words, pitch] = t.shades;
+      const distinct = new Set([warm, breath, tone, agility, words]).size === 5 && range === agility && pitch === agility;
       check('train-tab', JSON.stringify(t.order) === JSON.stringify(['h1', 'today', 'cat-cards']) && t.label === copy.train.today && t.name === copy.routineNames.daily &&
         t.length === fill(copy.train.minsSteps, { mins: 9, n: 7 }) && t.start === copy.train.start && t.more === copy.train.routines &&
         JSON.stringify(t.cats) === JSON.stringify(Object.keys(GROUPS)) && JSON.stringify(t.colours) === JSON.stringify(Object.values(COLOURS)) &&
-        distinct && t.pictures === 6 && t.agility === 'run' && t.rows === 0 && t.tabs,
-        `on the page: ${t.order.join(', ')}; "${t.label}": "${t.name}", "${t.length}", "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')} (five colours, Range as Agility ${distinct}), ${t.pictures} with a picture, ` +
+        distinct && t.pictures === 7 && t.agility === 'run' && t.rows === 0 && t.tabs,
+        `on the page: ${t.order.join(', ')}; "${t.label}": "${t.name}", "${t.length}", "${t.start}", "${t.more}"; cards ${t.cats.join(', ')} in ${t.colours.join(', ')} (five colours, Range and Pitch as Agility ${distinct}), ${t.pictures} with a picture, ` +
         `Agility's a ${t.agility}; exercise rows on it: ${t.rows}`);
     }
     /* Today follows its one source: the singer's own plan, kept on the phone, then the daily warm-up */
@@ -696,6 +698,161 @@ try {
       stayed === '#/train/routine/cooldown/0' && paused.live === 0 && paused.start && paused.end && home,
       `"${step1}"; after it: "${next}", and three seconds later still on that step ${stayed === '#/train/routine/cooldown/0'}; ` +
       `the next step paused (playing ${paused.live}, Start ${paused.start}, End session ${paused.end}); End session back to Train ${home}`);
+  }
+
+  /* 14b. The content round (Robert, 28 Oct): the straw line, Loo, a true octave leap, twisters that fit, Bratty Bay gone */
+  if (want('content')) {
+    const card = async (id) => {
+      await openEx(id);
+      return page.eval(`({ n: document.querySelectorAll('#pattern .pdash').length, pitches: [...document.querySelectorAll('#pattern .pdash')].map((d) => +d.dataset.pitch),
+        needs: document.querySelector('#ex-needs')?.textContent ?? null, name: document.querySelector('#ex-name')?.textContent })`);
+    };
+    const sylsOn = async () => {
+      await noSinger();
+      await page.tap('#pattern-play');
+      const seen = [];
+      const end = Date.now() + 9000;
+      while (Date.now() < end) {
+        const i = await page.eval(`[...document.querySelectorAll('#pattern .pdash')].findIndex((d) => d.dataset.now)`);
+        const s = await text('#pattern-syl');
+        if (i >= 0 && s && seen[i] === undefined) seen[i] = s;
+        if (i < 0 && seen.length && !(await page.eval(P('live.size > 0')))) break;
+        await sleep(30);
+      }
+      await page.waitFor(P('live.size === 0'), 8000);
+      return seen;
+    };
+    await openEx('straw');
+    const straw = await page.eval(`document.querySelector('#ex-needs')?.textContent ?? null`);
+    const loo = await card('loo');
+    const leap = await card('octleap');
+    const red = await card('redleather');
+    const redSyls = await sylsOn();
+    const ny = await card('uniqueny');
+    const nySyls = await sylsOn();
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/bay');
+    await page.waitFor(`!!document.querySelector('main p.problem')`, 5000);
+    const bay = await text('main p.problem');
+    const ok = straw === copy.ex.straw.needs && loo.name === 'Loo' && leap.n === 3 && leap.pitches[1] - leap.pitches[0] === 12 && leap.pitches[2] === leap.pitches[0] &&
+      red.n === copy.ex.redleather.syls.length && JSON.stringify(redSyls) === JSON.stringify(copy.ex.redleather.syls) &&
+      ny.n === copy.ex.uniqueny.syls.length && JSON.stringify(nySyls) === JSON.stringify(copy.ex.uniqueny.syls) && bay === copy.train.missing;
+    check('content', ok, `straw: "${straw}"; "${loo.name}"; Octave leaps ${leap.pitches.join(', ')}; Red leather ${red.n} notes: ${redSyls.join(' ')}; ` +
+      `Unique New York ${ny.n} notes: ${nySyls.join(' ')}; Bratty Bay: "${bay}"`);
+  }
+
+  /* 14c. Sing the interval, by a real voice: a note plays, the jump is shown, the singer lands on it */
+  if (want('interval', 'interval-level')) {
+    await openEx('interval');
+    await page.eval(`localStorage.setItem('rp.interval.level', '1')`);
+    await openEx('interval');
+    const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    const targets = round.map(([m, t, d]) => ({ m, t, d }));
+    if (want('interval')) {
+      await singer(sing(targets));
+      await page.tap('#ex-start');
+      const shown = new Set();
+      const end = Date.now() + exLength(targets) * 1000 + 15000;
+      while (Date.now() < end && !(await page.eval(`!!document.querySelector('#ex-result')`))) {
+        const j = await text('#ex-jump');
+        if (j) shown.add(j);
+        await sleep(200);
+      }
+      const right = await scoreOf();
+      await openEx('interval');
+      await singer(sing(targets, { shift: 3 }));
+      await page.tap('#ex-start');
+      await result(exLength(targets) * 1000 + 15000);
+      const wrong = await scoreOf();
+      const names = [...shown];
+      check('interval', right && right.n === 10 && right.hits >= 8 && wrong && wrong.hits <= 2 &&
+        names.length >= 2 && names.every((n) => ['A step up', 'An octave up'].includes(n)),
+        `ten jumps (a step or an octave up) sung by a real voice: "${right ? right.hits + ' of ' + right.n : '-'}"; three semitones off: "${wrong ? wrong.hits + ' of ' + wrong.n : '-'}"; ` +
+        `shown: ${names.join(', ')}`);
+    }
+    if (want('interval-level')) {
+      await openEx('interval');
+      await page.tap('#ex-gear');
+      await page.tap('#level-3');
+      const r3 = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+      await openEx('interval');
+      await page.tap('#ex-gear');
+      const kept = await page.eval(`document.querySelector('#level-3').getAttribute('aria-checked')`);
+      const r3b = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+      await page.tap('#level-1');
+      check('interval-level', kept === 'true' && r3.length === 10 && r3b.length === 10,
+        `the level picked in the sound sheet: Advanced remembered ${kept === 'true'}; a round of ${r3b.length}`);
+    }
+  }
+
+  /* 14d. Match the note, by a real voice */
+  if (want('match')) {
+    await openEx('match');
+    const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    const targets = round.map(([m, t, d]) => ({ m, t, d }));
+    await singer(sing(targets));
+    await page.tap('#ex-start');
+    await result(exLength(targets) * 1000 + 15000);
+    const right = await scoreOf();
+    check('match', right && right.n === 10 && right.hits >= 8 && targets.every((n) => n.m >= RANGE.lo + 1 && n.m <= RANGE.hi - 1),
+      `ten notes in the range, sung back by a real voice: "${right ? right.hits + ' of ' + right.n : '-'}"`);
+  }
+
+  /* 14e. Hold the note, by a real voice: each note waits for Next */
+  if (want('hold-note')) {
+    await openEx('holdnote');
+    const parts = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.parts)`);
+    let waited = true;
+    for (let i = 0; i < parts.length; i++) {
+      await singer(sing([{ m: parts[i], t: 0, d: 6.4 }]));
+      await page.tap(i === 0 ? '#ex-start' : '#ex-next-part');
+      await page.waitFor(`!!document.querySelector('#ex-next-part')`, 20000);
+      if (i === 0) {
+        await sleep(2000);
+        waited = await page.eval(`!!document.querySelector('#ex-next-part') && window.__probe.live.size === 0`);
+      }
+    }
+    await page.tap('#ex-next-part');
+    await result(5000);
+    const s = await scoreOf();
+    check('hold-note', s && s.n === 10 && s.hits >= 7 && waited, `ten notes held by a real voice: "${await text('#ex-score')}"; after each, it waited for Next ${waited}`);
+  }
+
+  /* 14f. Long soft notes (Stemple's four steps), by a real voice: the holds timed */
+  if (want('long-soft')) {
+    await openEx('vfe');
+    const parts = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.parts)`);
+    const lower = parts[0] === 53;
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i] == null) {
+        /* a slide: sung from the moment the mic opens, after the count-in */
+        await singer(sing([{ m: HOME, t: 0, d: 2 }], { lead: 3.4 }), true);
+      } else {
+        await singer(sing([{ m: parts[i], t: 1.5, d: 3 }]));
+      }
+      await page.tap(i === 0 ? '#ex-start' : '#ex-next-part');
+      await page.waitFor(`!!document.querySelector('#ex-next-part')`, 25000);
+    }
+    await page.tap('#ex-next-part');
+    await result(5000);
+    const h1 = await text('#ex-held1'), h4 = await text('#ex-held4');
+    const secs = (s) => [...(s || '').matchAll(/(\d+\.\d) s/g)].map((m) => +m[1]);
+    const a = secs(h1), b = secs(h4);
+    check('long-soft', lower && parts.length === 16 && a.length === 2 && b.length === 10 && [...a, ...b].every((x) => Math.abs(x - 3) <= 0.7),
+      `for this range, the lower notes ${lower} (F3, from C3); ${parts.length} parts; "${h1}"; "${h4}"`);
+  }
+
+  /* 14g. Bratty Bay's saved results stay in the results list */
+  if (want('bay-results')) {
+    await go('/train');
+    await page.eval(`localStorage.setItem('rp.results', JSON.stringify([{ kind: 'practice', label: 'Bratty Bay', app_ex_id: 'bay', score: 9, out_of: 10, pct: 90,
+      created_at: '2026-10-20T10:00:00Z', online: false }, ...JSON.parse(localStorage.getItem('rp.results') || '[]')]))`);
+    await openEx('straw');
+    await page.tap('#ex-start');
+    await sleep(500);
+    await page.tap('#ex-done');
+    await page.waitFor(`!!document.querySelector('#ex-saved')`, 8000);
+    const kept = await page.eval(`JSON.parse(localStorage.getItem('rp.results') || '[]').filter((r) => r.app_ex_id === 'bay')`);
+    check('bay-results', kept.length === 1 && kept[0].score === 9, `a Bratty Bay result saved before: still in the results list after a new one ${kept.length === 1}`);
   }
 
   /* 15. Saved on the phone straight away, with only what was measured */

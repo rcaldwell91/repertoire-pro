@@ -33,3 +33,12 @@ export function anyOctaveFor(id: string): boolean {
 export function setAnyOctaveFor(id: string, on: boolean): void {
   localStore().set('rp.anyOctave.' + id, on ? '1' : '0');
 }
+
+/** Sing the interval's level (which jumps), remembered (Robert, 28 Oct) */
+export function jumpLevel(): 1 | 2 | 3 {
+  const v = Number(localStore().get('rp.interval.level'));
+  return v === 2 || v === 3 ? v : 1;
+}
+export function setJumpLevel(v: 1 | 2 | 3): void {
+  localStore().set('rp.interval.level', String(v));
+}

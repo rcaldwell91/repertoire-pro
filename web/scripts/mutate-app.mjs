@@ -394,7 +394,7 @@ const MUTATIONS = [
   { test: 'train', what: 'the pattern card plays with the mic open', file: E,
     from: '    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(pattern, false)] });', to: '    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(pattern, true)] });', checks: ['preview'] },
   { test: 'train', what: 'the pattern card shows the whole ladder', file: E,
-    from: '  const pattern = useMemo(() => firstRung(plan.notes), [plan]);', to: '  const pattern = useMemo(() => plan.notes, [plan]);', checks: ['preview'] },
+    from: '    : kind === \'match\' ? [plan.played[0]] : firstRung(plan.notes)), [kind, plan]);', to: '    : kind === \'match\' ? [plan.played[0]] : plan.notes), [kind, plan]);', checks: ['preview'] },
   { test: 'train', what: 'the syllable never shows under the card', file: 'src/ui/PatternCard.tsx',
     from: "{cur >= 0 ? sylOf(notes[cur]) : ''}", to: "{''}", checks: ['preview'] },
   { test: 'train', what: 'the card shows the first syllable for every note', file: 'src/ui/PatternCard.tsx',
@@ -412,11 +412,43 @@ const MUTATIONS = [
     from: 'const BUBBLE_MAX = 48;', to: 'const BUBBLE_MAX = 36;', checks: ['singing-screen'] },
   { test: 'train', what: 'Agility keeps the lightning bolt', file: 'src/screens/TrainPage.tsx',
     from: 'agility: QuickRun,', to: 'agility: Zap,',
-    and: { file: 'src/screens/TrainPage.tsx', from: "import { Flame, MoveVertical, Music2, Speech, Wind } from 'lucide-react';", to: "import { Flame, MoveVertical, Music2, Speech, Wind, Zap } from 'lucide-react';" },
+    and: { file: 'src/screens/TrainPage.tsx', from: "import { Ear, Flame, MoveVertical, Music2, Speech, Wind } from 'lucide-react';", to: "import { Ear, Flame, MoveVertical, Music2, Speech, Wind, Zap } from 'lucide-react';" },
     checks: ['train-tab'] },
+  /* Robert, 28 Oct: the content round */
+  { test: 'train', what: 'Octave leaps is an arpeggio again', file: 'src/core/exercises.ts',
+    from: "  ex('octleap', 'range', 3, false, ladder('leap', 100)),", to: "  ex('octleap', 'range', 3, false, ladder('oct', 100)),", checks: ['content'] },
+  { test: 'train', what: 'a tongue twister wraps into the next repeat', file: 'src/core/exercises.ts',
+    from: "  ex('redleather', 'words', 2, true, ladder('twist7', 120)),", to: "  ex('redleather', 'words', 2, true, ladder('five', 120)),", checks: ['content'] },
+  { test: 'train', what: 'no straw line', file: E,
+    from: "      {'needs' in copy.ex[e.id] && <p className=\"ex-line\" id=\"ex-needs\">{(copy.ex[e.id] as { needs: string }).needs}</p>}\n", to: '', checks: ['content'] },
+  { test: 'train', what: 'the interval is scored on its starting note', file: 'src/core/pitch.ts',
+    from: "    notes.push({ m: target, t: t + JUMP_AT, d: SING, syl: keyName(target) + ' · ' + name });",
+    to: "    notes.push({ m: start, t: t + JUMP_AT, d: SING, syl: keyName(target) + ' · ' + name });", checks: ['interval'] },
+  { test: 'train', what: 'the jump is never shown', file: E,
+    from: '        {kind === \'interval\' && <p className="ex-line ex-jump" id="ex-jump">{jumpNow}</p>}\n', to: '', checks: ['interval'] },
+  { test: 'train', what: 'the jump level is not remembered', file: 'src/shell/settings.ts',
+    from: "  localStore().set('rp.interval.level', String(v));", to: '  void v;', checks: ['interval-level'] },
+  { test: 'train', what: 'Match the note asks for the note above', file: 'src/core/pitch.ts',
+    from: "    notes.push({ m, t: t + MATCH_AT, d: SING, syl: keyName(m) + ' · ' + keyName(m) });",
+    to: "    notes.push({ m: m + 1, t: t + MATCH_AT, d: SING, syl: keyName(m) + ' · ' + keyName(m) });", checks: ['match'] },
+  { test: 'train', what: 'a held note must be perfect', file: 'src/core/pitch.ts',
+    from: 'export const STEADY_SHARE = 0.7;', to: 'export const STEADY_SHARE = 1.01;', checks: ['hold-note'] },
+  { test: 'train', what: 'Hold the note moves on by itself', file: E,
+    from: '      setPartDone(true);\n    };\n    let seen = -1;', to: "      setPartDone(true);\n      if (partAt + 1 < parts.length) setTimeout(() => document.querySelector<HTMLButtonElement>('#ex-next-part')?.click(), 300);\n    };\n    let seen = -1;",
+    checks: ['hold-note'] },
+  { test: 'train', what: 'a long hold is timed from the wrong moment', file: E,
+    from: 'const LONG_LEAD = 1.5;', to: 'const LONG_LEAD = 3.5;', checks: ['long-soft'] },
+  { test: 'train', what: 'a lower voice gets the higher notes', file: 'src/core/pitch.ts',
+    from: 'export const HIGHER_FROM = 62;', to: 'export const HIGHER_FROM = 50;', checks: ['long-soft'] },
+  { test: 'train', what: 'saving a result drops Bratty Bay\'s', file: 'src/data/results.ts',
+    from: '[r, ...keptResults()]', to: "[r, ...keptResults().filter((x) => x.app_ex_id !== 'bay')]", checks: ['bay-results'] },
+  { test: 'train', what: 'the staff lines at the full stroke again', file: 'src/ui/icons.tsx',
+    from: '<g data-part="staff" strokeOpacity={0.35} strokeWidth={1}>', to: '<g data-part="staff" strokeOpacity={0.35}>', checks: ['train-tab'] },
+  { test: 'train', what: 'Pitch borrows Warm-up\'s colour', file: 'src/core/exercises.ts',
+    from: "  { id: 'pitch', colour: 'pitch' },", to: "  { id: 'pitch', colour: 'warmup' },", checks: ['train-tab'] },
   /* Robert, 27 Oct */
   { test: 'train', what: 'the staff lines at full strength', file: 'src/ui/icons.tsx',
-    from: '<g data-part="staff" strokeOpacity={0.35}>', to: '<g data-part="staff" strokeOpacity={1}>', checks: ['train-tab'] },
+    from: '<g data-part="staff" strokeOpacity={0.35} strokeWidth={1}>', to: '<g data-part="staff" strokeOpacity={1} strokeWidth={1}>', checks: ['train-tab'] },
   { test: 'train', what: 'the run\'s dots are hollow', file: 'src/ui/icons.tsx',
     from: '<g data-part="dots" fill="currentColor" stroke="none">', to: '<g data-part="dots" fill="none">', checks: ['train-tab'] },
   { test: 'train', what: 'two of the run\'s dots sit on the same line', file: 'src/ui/icons.tsx',
@@ -458,7 +490,7 @@ const MUTATIONS = [
   { test: 'train', what: 'beeps keep coming after Close', file: 'src/audio/conductor/conductor.ts',
     from: '          await this.env.wait(plan.countIn / beats);\n          if (gen !== this.gen) return;', to: '          await this.env.wait(plan.countIn / beats);', checks: ['count-in-sound'] },
   { test: 'train', what: 'no count-in', file: E,
-    from: '      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.notes, withMic, hear ? monitorOf(hearVol) : 0)] }',
+    from: '      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.played, withMic, hear ? monitorOf(hearVol) : 0)] }',
     to: '      ? { owner, steps: [notesStep(plan.notes, withMic, hear ? monitorOf(hearVol) : 0)] }', checks: ['start-only'] },
   { test: 'train', what: 'the singing screen does not fill the screen', file: 'src/ui/tokens.css',
     from: '.ex-run {\n  position: fixed;', to: '.ex-run {\n  position: static;', checks: ['singing-screen'] },
@@ -509,7 +541,9 @@ function edit(dir, { file, from, to }) {
 let caught = 0;
 /* RP_MUTANTS=word,word runs only the broken builds whose names contain one */
 const pick = (process.env.RP_MUTANTS || '').split(',').filter(Boolean);
-const RUN = MUTATIONS.filter((m) => !pick.length || pick.some((w) => m.what.includes(w)));
+/* RP_SLICE=from:to runs only those, by their place in the list (a long run in parts) */
+const [sliceFrom, sliceTo] = (process.env.RP_SLICE || '0:').split(':').map((x) => (x === '' ? Infinity : Number(x)));
+const RUN = MUTATIONS.filter((m, i) => (!pick.length || pick.some((w) => m.what.includes(w))) && i >= sliceFrom && i < sliceTo);
 for (const m of RUN) {
   const dir = mkdtempSync(join(tmpdir(), 'rp-mutant-'));
   try {

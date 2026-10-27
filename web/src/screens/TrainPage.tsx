@@ -1,6 +1,6 @@
 /* Goal: start what to sing today in one tap. */
 import { useEffect, useState } from 'react';
-import { Flame, MoveVertical, Music2, Speech, Wind } from 'lucide-react';
+import { Ear, Flame, MoveVertical, Music2, Speech, Wind } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { copy, fill } from '../core/copy';
 import { CATEGORIES, DAILY, type CategoryId } from '../core/exercises';
@@ -18,9 +18,10 @@ import { QuickRun } from '../ui/icons';
    group's list, the other routines and the range check are each one tap
    away. Nothing plays here. */
 
-/* each group's simple picture; Agility's is a quick run on a staff (Robert, 27 Oct) */
+/* each group's simple picture; Agility's is a quick run on a staff (Robert,
+   27 Oct); Pitch's an ear: hearing a note, then landing on it (28 Oct) */
 const PICTURE: Record<CategoryId, ComponentType<{ size?: number; strokeWidth?: number }>> = {
-  warmup: Flame, breath: Wind, tone: Music2, agility: QuickRun, range: MoveVertical, words: Speech };
+  warmup: Flame, breath: Wind, tone: Music2, agility: QuickRun, range: MoveVertical, words: Speech, pitch: Ear };
 
 export function TrainPage() {
   /* the daily warm-up until the source answers */

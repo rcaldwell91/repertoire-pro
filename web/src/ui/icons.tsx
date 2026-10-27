@@ -13,9 +13,10 @@ export const TAB_ICONS: Record<Tab, LucideIcon> = {
 };
 
 /* Agility's picture (Robert, 27 Oct): a quick run on a staff. Five faint
-   staff lines (35%), five solid dots each on a different line or space,
-   rising, and one smooth curve through them; Lucide's stroke style (24
-   across, stroke 2, round caps), in Agility's blue */
+   staff lines (35%, half the stroke: Robert, 28 Oct, so the run reads
+   clearly), five solid dots each on a different line or space, rising, and
+   one smooth curve through them; Lucide's stroke style (24 across, stroke
+   2, round caps), in Agility's blue */
 const STAFF = [4, 8, 12, 16, 20];
 const RUN: ReadonlyArray<readonly [number, number]> = [[4, 18], [8.5, 14], [12.5, 12], [16.5, 8], [20.5, 6]];
 
@@ -35,7 +36,7 @@ export function QuickRun(props: { size?: number }) {
   return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden="true" data-picture="run">
-      <g data-part="staff" strokeOpacity={0.35}>
+      <g data-part="staff" strokeOpacity={0.35} strokeWidth={1}>
         {STAFF.map((y) => <line key={y} x1={2} y1={y} x2={22} y2={y} />)}
       </g>
       <path data-part="run" d={through(RUN)} />
