@@ -26,6 +26,12 @@ describe('joinTakes', () => {
     expect(s.slice(0, 200).every((x) => x === 1)).toBe(true);
     expect(s.slice(200).every((x) => x === 2)).toBe(true);
   });
+  it('a resume sung shorter than what it replaces: the take ends where the later stretch ends', () => {
+    /* sung 0 to 5 s, resumed from 2 s, paused again at 3 s and saved: what came after 2 s the first time is gone */
+    const s = flat(joinTakes([rec(0, 500, 1), rec(2, 100, 2)]) as Recording);
+    expect(s.length).toBe(300);
+    expect(s.slice(200).every((x) => x === 2)).toBe(true);
+  });
   it('a gap between stretches is silence, in time', () => {
     const s = flat(joinTakes([rec(1, 100, 1), rec(3, 100, 2)]) as Recording);
     expect(s.length).toBe(300);

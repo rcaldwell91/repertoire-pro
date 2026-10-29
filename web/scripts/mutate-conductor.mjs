@@ -92,7 +92,7 @@ export const MUTATIONS = [
     from: "syl: i ? keyName(m) : keyName(m) + ' · ' + keyName(m) });", to: "syl: keyName(m) + ' · ' + keyName(m) });" },
   /* Robert, 28 Oct: a take paused and resumed */
   { rule: 'a resumed stretch does not replace what it was sung over', file: 'src/audio/recorder.ts',
-    from: '    next.set(out.subarray(0, Math.min(at, out.length, next.length)));', to: '    next.set(out.subarray(0, Math.min(out.length, next.length)));' },
+    from: '    const next = new Int16Array(Math.min(at + n, TAKE_MAX_S * rate));', to: '    const next = new Int16Array(Math.min(Math.max(at + n, out.length), TAKE_MAX_S * rate));\n    next.set(out.subarray(0, Math.min(out.length, next.length)));' },
   { rule: 'a gap between stretches is closed up', file: 'src/audio/recorder.ts',
     from: '    const at = Math.round((r.songAt - base) * rate);', to: '    const at = Math.min(out.length, Math.round((r.songAt - base) * rate));' },
   /* Robert, 28 Oct: one layout for every singing screen */
