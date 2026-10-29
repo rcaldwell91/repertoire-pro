@@ -500,14 +500,15 @@ input[type='range'] {
 .tag[data-colour='tone'] { color: var(--tone); border-color: var(--tone); }
 .tag[data-colour='pitch'] { color: var(--pitch); border-color: var(--pitch); }
 .tag[data-colour='words'] { color: var(--words); border-color: var(--words); }
+.ex-plain { display: block; margin: 0; color: var(--muted); font-size: 1rem; }
+h1 + .ex-plain { margin: -6px 0 6px; }
 .ex-label { color: var(--muted); font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
 .ex-line { margin: 2px 0 0; font-size: 1.05rem; }
 .ex-result { margin: 4px 0 12px; }
 .ex-score { font-size: 1.6rem; font-weight: 700; margin: 0; }
 .ex-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 
-/* singing it: the close button the only control (1b) */
-.ex-run-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+/* singing it: the controls along the bottom (1b; Robert, 28 Oct) */
 .ex-big { font-size: 4rem; font-weight: 700; text-align: center; margin: 24px 0 8px; }
 .range-bar { height: 12px; border-radius: 999px; background: var(--track); overflow: hidden; margin: 16px 0; }
 .range-bar > div { height: 100%; background: var(--voice); }
@@ -572,22 +573,36 @@ input[type='range'] {
 .about { margin: 12px 0; }
 .about p { margin: 2px 0 10px; }
 
-/* the singing screen fills the screen, top to bottom; the dots along the
-   bottom, one per rung */
-.ex-run {
+/* The singing screen's one layout (RULEBOOK 1b; Robert, 28 Oct): every
+   singing screen is drawn through SingLayout, and where each part sits is
+   set by this one rule's areas (and the one below it, for a screen with no
+   map). Move a part here, and only here. The map takes what is left: it
+   is smaller by the controls along the bottom; the dots stay under it. */
+.sing {
   position: fixed;
   inset: 0;
   z-index: 5;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: 'top' 'status' 'sheet' 'prompt' 'map' 'dots' 'body' 'bar';
   background: var(--bg);
   padding: calc(8px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));
 }
-.ex-run .ex-run-top { flex: none; }
-.ex-run .bubbles { flex: 1; min-height: 0; margin: 0; }
-.ex-run .bubbles canvas { height: 100%; }
-.ex-run .mic-line { flex: none; }
+.sing:not(:has(.sing-map)) { grid-template-rows: auto auto auto auto auto auto minmax(0, 1fr) auto; }
+.sing-top { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.sing-status { grid-area: status; }
+.sing-sheet { grid-area: sheet; max-height: 45vh; overflow: auto; }
+.sing-prompt { grid-area: prompt; }
+.sing-map { grid-area: map; min-height: 0; }
+.sing-map .bubbles { height: 100%; margin: 0; }
+.sing-map .bubbles canvas { height: 100%; }
+.sing .dots { grid-area: dots; }
+.sing-body { grid-area: body; min-height: 0; overflow: auto; }
+.sing-bar { grid-area: bar; display: flex; align-items: center; justify-content: center; gap: 10px; padding-top: 8px; }
+.sing-btn { display: inline-flex; align-items: center; gap: 6px; }
+.ex-readout { text-align: center; margin: 8px 0 0; }
+.ex-readout strong { font-size: 2rem; display: block; }
 .dots { flex: none; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 10px 0 4px; }
 .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--track); }
 .dot[data-done='true'] { background: var(--hit); }

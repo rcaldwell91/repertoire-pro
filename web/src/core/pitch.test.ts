@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sylOf, rungStarts } from './exercises';
 import { keyName } from './notemap';
 import {
-  intervalRound, jumpName, matchRound, seeded, steadyParts, steadyShare, vfeParts, higherVoice, JUMPS, ROUND, SING, STEADY_SECS,
+  intervalRound, matchRound, seeded, shapeName, steadyParts, steadyShare, vfeParts, higherVoice, LEVEL_SHAPES, ROUND, SHAPES, SING, STEADY_SECS,
   STEADY_SHARE, STEADY_CENTS,
 } from './pitch';
 
@@ -11,51 +11,58 @@ import {
    (next.html 3790-3880, 3906-4010). */
 const range = { lo: 48, hi: 67 };
 
-describe('Sing the interval', () => {
-  it('ten jumps a round, each played from a starting note and sung to its target', () => {
+describe('Sing the interval (shapes, Robert 28 Oct)', () => {
+  const wide = { lo: 48, hi: 72 };
+  it('a note plays, then the shape is sung from it: every sung note is the starting note plus its shape', () => {
     for (const level of [1, 2, 3] as const) {
-      const r = intervalRound(level, range, seeded(0.3));
-      expect(r.notes.length).toBe(ROUND);
-      expect(r.played.length).toBe(ROUND);
-      r.notes.forEach((n, k) => {
-        const jump = n.m - r.played[k].m;
-        expect(JUMPS[level].semis, `level ${level} jump ${jump}`).toContain(Math.abs(jump));
-        if (!JUMPS[level].down) expect(jump).toBeGreaterThan(0);
-        expect(n.d).toBe(SING);
-        expect(n.t).toBeGreaterThan(r.played[k].t + r.played[k].d);
-      });
-    }
-  });
-
-  it('a step and an octave up; then a third and a fifth; then a fourth, sixth, seventh and jumps down', () => {
-    expect(JUMPS[1]).toEqual({ semis: [2, 12], down: false });
-    expect(JUMPS[2]).toEqual({ semis: [2, 4, 7, 12], down: false });
-    expect(JUMPS[3]).toEqual({ semis: [2, 4, 5, 7, 9, 11, 12], down: true });
-    const two = intervalRound(2, range, seeded(0.7));
-    const all = new Set(two.notes.map((n, k) => n.m - two.played[k].m));
-    expect([...all].sort((a, b) => a - b)).toEqual([2, 4, 7, 12]);
-    const downs = intervalRound(3, range, seeded(0.1));
-    expect(downs.notes.some((n, k) => n.m < downs.played[k].m)).toBe(true);
-  });
-
-  it('both notes of every jump sit in the singer\'s range', () => {
-    for (let s = 0; s < 20; s++) {
-      const r = intervalRound(3, range, seeded(s / 20));
-      for (let k = 0; k < ROUND; k++) {
-        for (const m of [r.played[k].m, r.notes[k].m]) {
-          expect(m).toBeGreaterThanOrEqual(range.lo);
-          expect(m).toBeLessThanOrEqual(range.hi);
-        }
+      for (let s = 0; s < 10; s++) {
+        const r = intervalRound(level, wide, seeded(s / 10));
+        expect(r.shapes.length).toBe(ROUND);
+        expect(r.played.length).toBe(ROUND);
+        const sungAt = rungStarts(r.notes);
+        expect(sungAt.length).toBe(ROUND);
+        r.shapes.forEach((sh, k) => {
+          const degs = SHAPES[sh.id].map((d) => (sh.down ? -d : d));
+          const from = sungAt[k], to = sungAt[k + 1] ?? r.notes.length;
+          const got = r.notes.slice(from, to).map((n) => n.m - r.played[k].m);
+          expect(got, `level ${level} ${sh.id}${sh.down ? ' down' : ''}`).toEqual(sh.id === 'chord' && sh.down ? [-3, -7] : degs);
+          expect(r.notes[from].t).toBeGreaterThan(r.played[k].t + r.played[k].d);
+        });
       }
     }
   });
 
-  it('shows each jump in words, each a round of its own', () => {
-    expect(jumpName(7, false)).toBe('A fifth up');
-    expect(jumpName(12, true)).toBe('An octave down');
-    const r = intervalRound(1, range, seeded(0.5));
-    expect(rungStarts(r.notes).length).toBe(ROUND);
-    for (const n of r.notes) expect(['A step up', 'An octave up']).toContain(sylOf(n));
+  it('shapes by level: a step, 1-5 and an octave; then a third and 1-3-5; then a fourth, sixth, seventh and shapes down', () => {
+    expect(LEVEL_SHAPES[1]).toEqual({ up: ['step', 'fifth', 'octave'], down: [] });
+    expect(LEVEL_SHAPES[2]).toEqual({ up: ['step', 'third', 'fifth', 'chord', 'octave'], down: [] });
+    expect(LEVEL_SHAPES[3]).toEqual({ up: ['step', 'third', 'fourth', 'fifth', 'chord', 'sixth', 'seventh', 'octave'],
+      down: ['step', 'third', 'fifth', 'chord', 'octave'] });
+    expect(SHAPES.chord).toEqual([4, 7]);
+    for (const level of [1, 2, 3] as const) {
+      const seen = new Set<string>();
+      for (let s = 0; s < 20; s++) intervalRound(level, wide, seeded(s / 20)).shapes.forEach((sh) => seen.add(sh.id + (sh.down ? '-' : '+')));
+      const want = new Set([...LEVEL_SHAPES[level].up.map((x) => x + '+'), ...LEVEL_SHAPES[level].down.map((x) => x + '-')]);
+      expect(seen, `level ${level}`).toEqual(want);
+    }
+  });
+
+  it('every note of every shape sits in the singer\'s range', () => {
+    for (let s = 0; s < 20; s++) {
+      const r = intervalRound(3, wide, seeded(s / 20));
+      for (const n of [...r.played, ...r.notes]) {
+        expect(n.m).toBeGreaterThanOrEqual(wide.lo);
+        expect(n.m).toBeLessThanOrEqual(wide.hi);
+      }
+    }
+  });
+
+  it('shows each shape in words', () => {
+    expect(shapeName('fifth', false)).toBe('A fifth up');
+    expect(shapeName('octave', true)).toBe('An octave down');
+    expect(shapeName('chord', false)).toBe('Up the chord: 1, 3, 5');
+    expect(shapeName('chord', true)).toBe('Down the chord: 5, 3, 1');
+    const r = intervalRound(2, wide, seeded(0.5));
+    r.shapes.forEach((sh, k) => expect(r.labels[k]).toBe(shapeName(sh.id, sh.down)));
   });
 
   it('the same seed draws the same round; another draws another', () => {

@@ -119,16 +119,20 @@ describe('How lines (Robert, 25 Oct)', () => {
   });
 });
 
-/* Robert, 27 Oct: no singer jargon a beginner wouldn't know, in an
-   exercise's name, goal or How. The old app's own names live on behind
-   "More about this" (copy.about[id].aka), never on the page. */
+/* Robert, 27 and 28 Oct: no singer jargon a beginner wouldn't know. The
+   proper name is the title (Vocal Function Exercises, Messa di voce); where
+   it is jargon, a plain name sits as a small line under it (Long soft
+   notes). The title is exempt; the plain name, Goal and How are not. */
 export const JARGON = ['break', 'phonation', 'staccato', 'legato', 'crescendo', 'messa di voce', 'vocal function', 'farinelli', 'narrow vowel',
   'engaged', 'the line', 'five-tone', 'nine-tone', 'register', 'passaggio', 'glottis', 'glottal', 'larynx', 'vocal folds', 'cords', 'belt',
-  'twang', 'resonance', 'onset', 'support', 'diaphragm', 'falsetto', 'head voice', 'chest voice', 'mix'];
-export function jargonProblems(ex: Record<string, { name: string; goal: string; how: string }>): string[] {
+  'twang', 'resonance', 'onset', 'support', 'diaphragm', 'falsetto', 'head voice', 'chest voice', 'mix', 'pentatonic', 'chromatic', 'arpeggio'];
+export function jargonProblems(ex: Record<string, { name: string; plain?: string; goal: string; how: string }>): string[] {
   const out: string[] = [];
   for (const [id, e] of Object.entries(ex)) {
-    for (const [field, text] of [['name', e.name], ['goal', e.goal], ['how', e.how]] as const) {
+    const fields: Array<[string, string]> = [['goal', e.goal], ['how', e.how]];
+    /* the title may be the proper name; what a beginner reads to know it is plain */
+    fields.unshift(['plain', e.plain ?? e.name]);
+    for (const [field, text] of fields) {
       const low = ' ' + text.toLowerCase().replace(/[^a-z\- ]+/g, ' ') + ' ';
       for (const w of JARGON) if (low.includes(' ' + w + ' ')) out.push(`${id}.${field}: "${w}"`);
     }
@@ -136,22 +140,34 @@ export function jargonProblems(ex: Record<string, { name: string; goal: string; 
   return out;
 }
 
-describe('plain words (Robert, 27 Oct)', () => {
-  it('no singer jargon in a name, goal or How', () => {
-    expect(jargonProblems(copy.ex)).toEqual([]);
+describe('plain words (Robert, 27 and 28 Oct)', () => {
+  it('no singer jargon in a plain name, goal or How; a jargon title has a plain name under it', () => {
+    expect(jargonProblems(copy.ex as Record<string, { name: string; plain?: string; goal: string; how: string }>)).toEqual([]);
   });
 
-  it('catches a word a beginner would not know (it can fail)', () => {
+  it('catches a word a beginner would not know, and a jargon title with no plain name (it can fail)', () => {
     expect(jargonProblems({
       a: { name: 'Messa di voce', goal: 'A legato scale.', how: 'Slide through your break.' },
-      b: { name: 'Breath counts', goal: 'In, hold, out.', how: 'Keep the ribs wide.' },
-    })).toEqual(['a.name: "messa di voce"', 'a.goal: "legato"', 'a.how: "break"']);
+      b: { name: 'Messa di voce', plain: 'Soft, loud, soft', goal: 'In, hold, out.', how: 'Keep the ribs wide.' },
+    })).toEqual(['a.plain: "messa di voce"', 'a.goal: "legato"', 'a.how: "break"']);
   });
 
-  it('a renamed exercise keeps the old app\'s name behind More about this', () => {
-    const about = copy.about as Record<string, { aka?: string }>;
-    expect(about.vfe.aka).toBe('Vocal Function Exercises');
-    expect(copy.ex.vfe.name).toBe('Long soft notes');
-    for (const [id, a] of Object.entries(about)) if (a.aka) expect(copy.ex[id as keyof typeof copy.ex].name, id).not.toBe(a.aka);
+  it('the proper names are the titles again, the plain names under them', () => {
+    const want: Record<string, [string, string]> = {
+      vfe: ['Vocal Function Exercises', 'Long soft notes'], messa: ['Messa di voce', 'Soft, loud, soft'], penta: ['Pentatonic run', 'Skipping run'],
+      chrom: ['Chromatic run', 'Half-step run'], arp19: ['Octave-and-a-half arpeggio', 'Big climb'], staccato: ['Staccato', 'Short bouncy notes'],
+      farinelli: ['Farinelli breath', 'Breath counts'], ninetone: ['Nine-tone scale', 'Nine-note scale'], straw: ['Straw phonation', 'Straw singing'],
+      tonguecresc: ['Tongue-out with a crescendo', 'Tongue out, getting louder'], descend: ['Descending five-tone', 'Five notes down'],
+      turns: ['Three-note turns', 'Little turns'],
+    };
+    for (const [id, [name, plain]] of Object.entries(want)) {
+      const e = copy.ex[id as keyof typeof copy.ex] as { name: string; plain?: string };
+      expect([e.name, e.plain], id).toEqual([name, plain]);
+    }
+  });
+
+  it('no "Also called" lines: the proper name is on the page itself', () => {
+    expect('alsoCalled' in copy.train).toBe(false);
+    for (const [id, a] of Object.entries(copy.about)) expect('aka' in a, id).toBe(false);
   });
 });

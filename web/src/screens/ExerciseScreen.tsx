@@ -1,14 +1,13 @@
 /* Goal: understand the exercise and start it; then sing its notes; then see what was measured. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
-import { Settings, X } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
-  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, firstRung, measures, notesFor, rungAt, rungStarts, sylOf, type Exercise, type Note,
+  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, firstRung, measures, notesFor, rungAt, rungStarts, type Exercise, type Note,
   type RoutineId,
 } from '../core/exercises';
 import { keyName, type Range } from '../core/notemap';
-import { pianoFor } from '../core/piano';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
 import { micLine, monitorOf } from '../core/song';
 import {
@@ -18,18 +17,24 @@ import { isRight } from '../core/takes';
 import { clock as clockText } from '../core/time';
 import { resultRow, type Outcome } from '../core/results';
 import { SoundClock } from '../core/timed';
-import type { Plan } from '../audio/conductor/conductor';
+import type { Plan, Take } from '../audio/conductor/conductor';
+import { joinTakes } from '../audio/recorder';
 import { onRange, rangeNow, saveRange } from '../data/range';
 import { saveResult } from '../data/results';
+import { exerciseKey, saveTake } from '../data/takes';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { micBlockedBrowser } from '../shell/env';
-import { back, exRoute, navigate, routineRoute } from '../shell/router';
+import { useTakes } from '../shell/hooks';
+import { pianoStep } from '../shell/piano-step';
+import { back, exRoute, exTakesRoute, navigate, routineRoute } from '../shell/router';
 import { anyOctaveFor, hearOn, hearVolume, jumpLevel, setAnyOctaveFor, setHearOn, setHearVolume, setJumpLevel } from '../shell/settings';
+import { review, toStored, type Review } from '../shell/take-review';
 import { useYourLine } from '../shell/your-line';
 import { BackButton } from '../ui/BackButton';
 import { Bubbles } from '../ui/Bubbles';
 import { PatternCard } from '../ui/PatternCard';
-import { Slider } from '../ui/Slider';
+import { SingLayout } from '../ui/SingLayout';
+import { SoundSheet } from '../ui/SoundSheet';
 import { SoundTrouble } from '../ui/SoundTrouble';
 
 /* One exercise (RULEBOOK 1b, 3; Robert, 24 Oct), on one screen, the tab
@@ -41,17 +46,20 @@ import { SoundTrouble } from '../ui/SoundTrouble';
      yourself and its volume) and "More about this" (the old app's why,
      watch for and care). The level, Quiet and what is measured stay on the
      list rows, off this page;
-   - singing it: the note map filling the screen, the bubbles with their
-     syllables, a 3-2-1 count-in, the dots along the bottom one per rung,
-     and the close button as the only control (a clock-only exercise has
-     Done);
-   - its result: only what was measured, Try again, Next. Saved at once.
+   - singing it, through the one singing layout (ui/SingLayout): the note
+     map, the bubbles with their syllables, a 3-2-1 count-in, the dots one
+     per rung, and the controls (Robert, 28 Oct): Pause (sound and mic
+     stop; Resume carries on from the start of the repeat it was in, with
+     the count-in, and nothing scored is lost), Restart (from the first
+     repeat, the score cleared), the gear (the sound sheet, paused or not)
+     and Close. A clock-only exercise also has Done;
+   - its result: only what was measured, Save take (a sung one: the voice
+     alone, recorded while singing, Robert 28 Oct), Try again, Next. The
+     result is saved at once; the take when Save take is tapped.
    Nothing starts until Start is tapped, and a routine never moves on by
    itself (Robert, 1 Oct): its next step opens paused, with End session.
    The conductor plays and listens; this screen only asks and shows. */
 
-/** the reference piano's volume */
-const PIANO_GAIN = 0.8;
 /** Long soft notes: how long the note plays before it is held */
 const LONG_LEAD = 1.5;
 /** points of your line, a second */
@@ -59,14 +67,9 @@ const HOP = 0.05;
 
 type View = 'preview' | 'run' | 'result';
 type Shown = { o: Outcome; noMic: boolean; range?: Range; where: 'online' | 'phone' | null };
-type About = { why: string; watch?: string; care?: string; aka?: string };
-
-/** the piano notes of an exercise, as one step the conductor plays together */
-function notesStep(notes: readonly Note[], listen: boolean, monitor = 0): Plan['steps'][number] {
-  const keys = notes.map((n) => pianoFor(n.m));
-  return { kind: 'song', urls: keys.map((k) => k.file), from: 0, gains: notes.map(() => PIANO_GAIN), starts: notes.map((n) => n.t),
-    rates: keys.map((k) => k.rate), lengths: notes.map((n) => n.d), untilLast: true, listen, level: 1, monitor };
-}
+type About = { why: string; watch?: string; care?: string };
+/** Long soft notes' readout: on the note within half a semitone, as the old app's interval card (next.html 23146) */
+const READ_ON = 0.5;
 
 export function ExerciseScreen(props: { id?: string; routine?: string; step?: number }) {
   const routine = props.routine && props.routine in ROUTINES ? (props.routine as RoutineId) : null;
@@ -109,7 +112,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     setJumpLevel(v);
   };
   const [seed] = useState(() => Math.random());
-  const plan = useMemo(() => {
+  const plan = useMemo<{ notes: Note[]; played: Note[]; beat: number; labels?: readonly string[]; shapes?: ReadonlyArray<{ id: string; down: boolean }> }>(() => {
     const rand = seeded(seed);
     if (kind === 'interval') return intervalRound(level, range, rand);
     if (kind === 'match') return matchRound(range, rand);
@@ -117,7 +120,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     return { ...n, played: n.notes };
   }, [e, kind, range, level, seed]);
   /* the pattern card: one repeat; for a round, its first jump or note */
-  const pattern = useMemo(() => (kind === 'interval' ? [plan.played[0], { ...plan.notes[0], d: 1.2 }]
+  const pattern = useMemo(() => (kind === 'interval' ? [plan.played[0], ...firstRung(plan.notes).map((n) => ({ ...n, d: 1.2 }))]
     : kind === 'match' ? [plan.played[0]] : firstRung(plan.notes)), [kind, plan]);
   const rungs = useMemo(() => rungStarts(plan.notes).length, [plan]);
   const parts = useMemo<Part[]>(() => {
@@ -158,6 +161,17 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
 
   const [withMic, setWithMic] = useState(true);
   const [view, setView] = useState<View>('preview');
+  /* paused while singing: nothing sounds or listens until Resume */
+  const [paused, setPaused] = useState(false);
+  /* a sung exercise resumes from the start of the rung it was in */
+  const resumeRung = useRef(0);
+  /* where a resumed session begins: your line before it is kept */
+  const keepFrom = useRef<number | null>(null);
+  /* what the mic recorded, a stretch between each pause (a sung exercise) */
+  const segments = useRef<Take[]>([]);
+  const [take, setTake] = useState<Review | null>(null);
+  const [takeSaved, setTakeSaved] = useState(false);
+  const takes = useTakes(sung ? exerciseKey(e.id) : '-');
   const [shown, setShown] = useState<Shown | null>(null);
   /* the clock for a clock-only exercise (a breath cycle, guided), started by Start */
   const [clockFrom, setClockFrom] = useState<number | null>(null);
@@ -177,7 +191,8 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   useEffect(() => {
     since.current = startedAt;
   }, [startedAt]);
-  const line = useYourLine(c, owner, listening, startedAt, sung ? undefined : (at) => (since.current == null ? null : at - since.current));
+  const line = useYourLine(c, owner, listening, startedAt, sung ? undefined : (at) => (since.current == null ? null : at - since.current),
+    () => keepFrom.current);
   /* was the mic ever open while it ran: a score needs it */
   const heard = useRef(false);
   useEffect(() => {
@@ -193,14 +208,26 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     setShown((s) => (s ? { ...s, where } : s));
   };
 
-  /* a sung exercise ends with its last note: score it */
+  /* the recording of the stretch just sung, kept for the take */
+  const keepStretch = () => {
+    const t = c.take(owner);
+    if (t) segments.current.push(t);
+    c.dropTake();
+  };
+
+  /* a sung exercise ends with its last note: score it, and the take is
+     every stretch sung, joined */
   const lastState = useRef(snap.state);
   useEffect(() => {
     const was = lastState.current;
     lastState.current = snap.state;
     if (snap.owner !== owner || view !== 'run') return;
     if (snap.state === 'finished' && was !== 'finished' && sung) {
+      keepStretch();
       const s = bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave);
+      const joined = joinTakes(segments.current);
+      setTake(joined ? review({ ...joined, owner }, null, HOP, anyOctave) : null);
+      setTakeSaved(false);
       void finish(s.sung ? { kind: 'pitch', hits: s.hits, n: s.n } : { kind: 'none' });
     }
     /* stopped by leaving, hiding, a call or a stall: back to the preview */
@@ -255,6 +282,8 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
      for Next. */
   const partClock = useRef<SoundClock | null>(null);
   const partFrom = useRef(0);
+  /* Long soft notes: the note being sung while holding, and how close (Robert, 28 Oct) */
+  const [readout, setReadout] = useState<{ m: number; d: number } | null>(null);
   useEffect(() => {
     if (!running || !inParts || partDone) return;
     const p = parts[partAt];
@@ -290,6 +319,14 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
         }
         const st = clk.state();
         setHeldNow(st.held);
+        if (p.kind === 'long') {
+          const m = line.m[line.m.length - 1];
+          if (!Number.isFinite(m)) setReadout(null);
+          else {
+            const d = anyOctave ? ((((m - p.m) % 12) + 18) % 12) - 6 : m - p.m;
+            setReadout({ m, d });
+          }
+        }
         if (st.done) return end(p.kind === 'long' ? st.held : 1);
       }
       raf = requestAnimationFrame(frame);
@@ -299,17 +336,22 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, inParts, partAt, partDone]);
 
-  /* Sing the interval: the jump to sing now, or next */
+  /* Sing the interval: the shape of this turn, in words, from the note heard first */
   const [jumpNow, setJumpNow] = useState('');
   useEffect(() => {
-    if (!playing || kind !== 'interval') return;
+    const labels = plan.labels;
+    if (!playing || !labels) return;
     const t = setInterval(() => {
-      const at = c.position() ?? 0;
-      const n = plan.notes.find((q) => at < q.t + q.d);
-      setJumpNow(n ? sylOf(n) : '');
+      const at = c.position();
+      if (at == null) return;
+      let k = 0;
+      plan.played.forEach((n, i) => {
+        if (n.t <= at) k = i;
+      });
+      setJumpNow(labels[k] ?? '');
     }, 100);
     return () => clearInterval(t);
-  }, [playing, kind, plan, c]);
+  }, [playing, plan, c]);
 
   /* a clock-only exercise's clock */
   useEffect(() => {
@@ -325,17 +367,25 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     const t = setInterval(() => setRungNow(rungAt(plan.notes, c.position() ?? -1)), 100);
     return () => clearInterval(t);
   }, [running, sung, plan, c]);
-  const rung = running ? rungNow : -1;
+  /* paused: the repeat it will carry on from */
+  const rung = running ? rungNow : paused && sung ? resumeRung.current : -1;
 
+  /* Start, Try again and Restart: from the first repeat, nothing kept */
   function start(ev: SyntheticEvent) {
     heard.current = false;
     clock.current = null;
     phase.current = { which: 'low', from: 0, low: [] };
     setRangeProgress({ which: 'low', got: 0 });
     setHeldNow(0);
+    setReadout(null);
     setShown(null);
     setSheet(false);
     setMore(false);
+    setPaused(false);
+    resumeRung.current = 0;
+    keepFrom.current = null;
+    segments.current = [];
+    setTake(null);
     if (kind === 'cycle' || kind === 'guided') {
       setClockFrom(performance.now());
       setElapsed(0);
@@ -347,23 +397,87 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
       startPart(ev, 0);
       return;
     }
+    run(ev, 0);
+  }
+
+  /* the conductor's session: a sung exercise from `from` seconds in (its
+     notes before then silent, the timeline the same), anything else
+     listening from its start */
+  function run(ev: SyntheticEvent, from: number) {
     const beat = sung ? plan.beat : 1;
     const p: Plan = sung
-      ? { owner, countIn: 3 * beat, countBeats: 3, steps: [notesStep(plan.played, withMic, hear ? monitorOf(hearVol) : 0)] }
+      ? { owner, countIn: 3 * beat, countBeats: 3,
+        steps: [pianoStep(plan.played, { listen: withMic, record: withMic, monitor: hear ? monitorOf(hearVol) : 0, from })] }
       : { owner, countIn: 3, countBeats: 3, steps: withMic ? [{ kind: 'listen' }] : [] };
-    if (c.start(c.tap(ev.nativeEvent), p)) setView('run');
+    if (c.start(c.tap(ev.nativeEvent), p)) {
+      setPaused(false);
+      setView('run');
+    }
+  }
+
+  /* where a sung exercise's rung begins: its first note, or the note heard before it */
+  function rungTime(r: number): number {
+    const i = rungStarts(plan.notes)[r] ?? 0;
+    return plan.labels || kind === 'match' ? plan.played[r]?.t ?? 0 : plan.notes[i]?.t ?? 0;
+  }
+
+  /* Pause (Robert, 28 Oct): sound and mic stop, the screen stays */
+  function pause() {
+    if (kind === 'cycle' || kind === 'guided') {
+      setClockFrom(null);
+      setPaused(true);
+      return;
+    }
+    if (sung) {
+      const at = c.position();
+      if (at != null) resumeRung.current = Math.max(0, Math.min(rungs - 1, rungAt(plan.notes, at)));
+    }
+    c.stop();
+    if (sung) keepStretch();
+    setPaused(true);
+  }
+
+  /* Resume: a sung exercise from the start of the rung it was in, with the
+     count-in, its score kept; a part, a hiss or a range step again from
+     its own start; a clock carries on */
+  function resume(ev: SyntheticEvent) {
+    if (kind === 'cycle' || kind === 'guided') {
+      setClockFrom(performance.now() - elapsed * 1000);
+      setPaused(false);
+      return;
+    }
+    if (inParts) return startPart(ev, partAt);
+    if (sung) {
+      keepFrom.current = rungTime(resumeRung.current);
+      return run(ev, keepFrom.current);
+    }
+    clock.current = null;
+    setHeldNow(0);
+    phase.current = { ...phase.current, from: 0 };
+    setRangeProgress({ which: phase.current.which, got: 0 });
+    run(ev, 0);
+  }
+
+  /* Restart: from the first repeat, the score cleared */
+  function restart(ev: SyntheticEvent) {
+    if (playing) c.stop();
+    c.dropTake();
+    line.clear();
+    start(ev);
   }
 
   /* one part: the count-in, the note (not for a slide), then listening until it ends */
   function startPart(ev: SyntheticEvent, i: number) {
     const p = parts[i];
     setHeldNow(0);
+    setReadout(null);
     const lead = p.kind === 'steady' ? STEADY_LEAD : LONG_LEAD;
-    const steps: Array<Plan['steps'][number]> = p.kind === 'slide' ? [] : [notesStep([{ m: p.m, t: 0, d: lead, syl: '' }], withMic)];
+    const steps: Array<Plan['steps'][number]> = p.kind === 'slide' ? [] : [pianoStep([{ m: p.m, t: 0, d: lead }], { listen: withMic })];
     if (withMic) steps.push({ kind: 'listen' });
     if (c.start(c.tap(ev.nativeEvent), { owner, countIn: 3, countBeats: 3, steps })) {
       setPartAt(i);
       setPartDone(false);
+      setPaused(false);
       setView('run');
     }
   }
@@ -402,7 +516,10 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
 
   function close() {
     if (playing) c.stop();
+    c.dropTake();
     setClockFrom(null);
+    setPaused(false);
+    setSheet(false);
     setView('preview');
   }
 
@@ -412,13 +529,24 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     void finish({ kind: 'none' });
   }
 
+  /* Save take: on the phone now, online when it can, the singer's alone;
+     with the piano notes it was sung over, to hear it over them again */
+  function saveIt() {
+    if (!take || takeSaved) return;
+    const o = shown?.o;
+    const pct = o?.kind === 'pitch' ? Math.round((100 * o.hits) / Math.max(1, o.n)) : null;
+    void saveTake({ ...toStored(take, exerciseKey(e.id), name), rightPct: pct,
+      exercise: { id: e.id, notes: plan.played.map((n) => [n.m, n.t, n.d] as const) } });
+    setTakeSaved(true);
+  }
+
   /* the pattern card's button: the first rung, the piano alone, no mic */
   function hearPattern(ev: SyntheticEvent) {
     if (previewing) {
       c.stop();
       return;
     }
-    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [notesStep(pattern, false)] });
+    c.start(c.tap(ev.nativeEvent), { owner: previewOwner, steps: [pianoStep(pattern)] });
   }
 
   const mic = playing && withMic && usesMic ? micLine(snap.mic, micBlockedBrowser()) : null;
@@ -427,35 +555,45 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
     const list = EXERCISES.filter((x) => x.category === e.category);
     return list[(list.indexOf(e) + 1) % list.length].id;
   })();
+  /* the proper name is the title; the plain words under it (Robert, 28 Oct) */
   const name = copy.ex[e.id].name;
+  const plain = (copy.ex[e.id] as { plain?: string }).plain;
+
+  /* the sound sheet's rows: the same behind the gear on the page and while singing */
+  const sheetRows = {
+    anyOctave: sung || inParts ? { value: anyOctave, set: setAnyOctave } : undefined,
+    countSound: countsIn ? { value: countSound, set: setCountSound } : undefined,
+    hear: sung ? { value: hear, set: setHear } : undefined,
+    hearVolume: sung ? { value: hearVol, set: setHearVol } : undefined,
+  };
 
   if (view === 'run') {
+    const waiting = inParts && partDone;
     return (
-      <div className="ex-run" data-colour={cat.colour} id="ex-run">
-        <div className="ex-run-top">
-          <strong>{name}</strong>
-          <button type="button" className="round close" id="ex-close" aria-label={copy.train.close} onClick={close}>
-            <X size={24} strokeWidth={2} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="mic-line" id="mic-line">
-          {mic && <p className="problem" role="status">{mic}</p>}
-          {mic && (
+      <SingLayout colour={cat.colour} title={name}
+        controls={{ paused, pause: waiting ? undefined : pause, resume, restart, close,
+          gear: countsIn ? { open: sheet, toggle: () => setSheet((x) => !x) } : undefined }}
+        status={mic && (
+          <>
+            <p className="problem" role="status">{mic}</p>
             <button type="button" className="btn btn-quiet" id="carry-on" onClick={() => setWithMic(false)}>{copy.song.carryOn}</button>
-          )}
-        </div>
-        {kind === 'interval' && <p className="ex-line ex-jump" id="ex-jump">{jumpNow}</p>}
-        {(sung || kind === 'glide') && (
-          <Bubbles notes={sung ? plan.notes : []} you={line} now={() => (sung ? c.position() ?? 0 : startedAt == null ? 0 : c.position() ?? 0)}
-            live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting} />
+          </>
         )}
-        {sung && (
+        sheet={sheet && <SoundSheet {...sheetRows} />}
+        prompt={kind === 'interval' ? <p className="ex-line ex-jump" id="ex-jump">{jumpNow}</p> : undefined}
+        map={(sung || kind === 'glide') && (
+          <Bubbles notes={sung ? plan.notes : []} you={line}
+            now={() => c.position() ?? (!sung ? 0 : paused ? rungTime(resumeRung.current) : keepFrom.current ?? 0)}
+            live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
+            heard={kind === 'interval' ? plan.played : undefined} />
+        )}
+        dots={sung && (
           <div className="dots" id="ex-dots" role="img" aria-label={copy.train.rungs}>
             {Array.from({ length: rungs }, (_, i) => (
               <span key={i} className="dot" data-done={i < rung ? 'true' : undefined} data-now={i === rung ? 'true' : undefined} />
             ))}
           </div>
-        )}
+        )}>
         {!sung && kind !== 'glide' && counting != null && <div className="ex-big" id="count-in">{counting}</div>}
         {inParts && parts[partAt] && (() => {
           const p = parts[partAt];
@@ -468,6 +606,12 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
               {p.kind === 'steady' ? <div className="ex-big" id="ex-target">{partLine(p)}</div> : <p className="ex-line" id="ex-target">{partLine(p)}</p>}
               {p.kind === 'long' && counting == null && withMic && (
                 <div className="ex-big" id="ex-held">{fill(copy.train.secs, { s: (partDone ? res ?? 0 : heldNow).toFixed(1) })}</div>
+              )}
+              {p.kind === 'long' && running && !partDone && withMic && (
+                <p className="ex-readout" id="ex-readout" aria-live="polite" data-d={readout ? readout.d.toFixed(2) : ''}>
+                  <strong>{readout ? keyName(Math.round(readout.m)) : '–'}</strong>
+                  <span>{readout ? (Math.abs(readout.d) <= READ_ON ? copy.train.readOn : readout.d > 0 ? copy.train.readHigh : copy.train.readLow) : ''}</span>
+                </p>
               )}
               {partDone && p.kind === 'steady' && res != null && (
                 <p className="ex-line" id="ex-part-result">
@@ -523,7 +667,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
         {(kind === 'cycle' || kind === 'guided' || kind === 'glide' || (kind === 'timed' && !withMic)) && (
           <button type="button" className="btn" id="ex-done" onClick={done}>{copy.train.done}</button>
         )}
-      </div>
+      </SingLayout>
     );
   }
 
@@ -542,44 +686,13 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
         <p className="hint" id="routine-step">{fill(copy.train.step, { name: copy.routineNames[routine], i: step + 1, n: steps.length })}</p>
       )}
       <h1 id="ex-name">{name}</h1>
+      {plain && <p className="ex-plain" id="ex-plain">{plain}</p>}
       <div className="tags" id="ex-tags">
         <span className="tag" data-colour={cat.colour}>{copy.cats[e.category]}</span>
       </div>
       {'needs' in copy.ex[e.id] && <p className="ex-line" id="ex-needs">{(copy.ex[e.id] as { needs: string }).needs}</p>}
 
-      {sheet && view === 'preview' && (
-        <section className="card sheet" id="sound-sheet" aria-label={copy.train.soundSheet}>
-          {kind === 'interval' && (
-            <div className="choices" role="radiogroup" aria-label={copy.train.jumpLevel} id="jump-level">
-              <p className="ex-label">{copy.train.jumpLevel}</p>
-              {([1, 2, 3] as const).map((v) => (
-                <button key={v} type="button" className="choice" role="radio" id={'level-' + v} aria-checked={level === v} onClick={() => setLevel(v)}>
-                  {copy.levels[v]}
-                </button>
-              ))}
-            </div>
-          )}
-          {(sung || inParts) && (
-            <label className="switch-row">
-              <span>{copy.train.anyOctave}</span>
-              <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(ev) => setAnyOctave(ev.target.checked)} />
-            </label>
-          )}
-          <label className="switch-row">
-            <span>{copy.train.countSound}</span>
-            <input type="checkbox" role="switch" id="count-in-sound" checked={countSound} onChange={(ev) => setCountSound(ev.target.checked)} />
-          </label>
-          {sung && (
-            <>
-              <label className="switch-row">
-                <span>{copy.song.hearYourself}</span>
-                <input type="checkbox" role="switch" id="hear-yourself" checked={hear} onChange={(ev) => setHear(ev.target.checked)} />
-              </label>
-              <Slider id="monitor-volume" label={copy.song.hearVolume} value={hearVol} onChange={setHearVol} />
-            </>
-          )}
-        </section>
-      )}
+      {sheet && view === 'preview' && <SoundSheet {...sheetRows} level={kind === 'interval' ? { value: level, set: setLevel } : undefined} />}
 
       {view === 'result' && shown && (
         <section className="card ex-result" id="ex-result">
@@ -615,6 +728,11 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           )}
           {shown.where && <p className="hint" id="ex-saved">{shown.where === 'online' ? copy.train.saved : copy.train.savedPhone}</p>}
           <div className="ex-actions">
+            {take && (
+              <button type="button" className="btn" id="ex-take-save" disabled={takeSaved} onClick={saveIt}>
+                {takeSaved ? copy.train.takeSaved : copy.train.saveTake}
+              </button>
+            )}
             <button type="button" className="btn btn-quiet" id="ex-again" onClick={start}>{copy.train.tryAgain}</button>
             {nextId ? (
               <button type="button" className="btn" id="ex-next"
@@ -641,11 +759,16 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           <p className="ex-line" id="ex-how">{copy.ex[e.id].how}</p>
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
             data-round={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
-            data-played={kind === 'interval' ? JSON.stringify(plan.played.map((n) => n.m)) : undefined}
-            data-jumps={kind === 'interval' ? JSON.stringify(plan.notes.map(sylOf)) : undefined}
+            data-played={kind === 'interval' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
+            data-shapes={plan.shapes ? JSON.stringify(plan.shapes) : undefined}
             data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
             {copy.train.start}
           </button>
+          {!!takes?.length && (
+            <button type="button" className="btn btn-quiet btn-link" id="ex-takes" onClick={() => navigate(exTakesRoute(e.id), 'screen')}>
+              {copy.train.yourTakes}
+            </button>
+          )}
           {about && (
             <button type="button" className="btn btn-quiet btn-link" id="ex-more" aria-expanded={more} onClick={() => setMore((m) => !m)}>
               {copy.train.moreAbout}
@@ -653,7 +776,6 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           )}
           {about && more && (
             <section className="card about" id="ex-about">
-              {about.aka && <p className="hint" id="ex-aka">{fill(copy.train.alsoCalled, { name: about.aka })}</p>}
               <p className="ex-label">{copy.train.why}</p>
               <p>{about.why}</p>
               {about.watch && (

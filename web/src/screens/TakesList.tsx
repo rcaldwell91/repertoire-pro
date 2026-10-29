@@ -26,6 +26,8 @@ function where(t: StoredTake, signedIn: boolean): string {
 }
 
 export function TakesList(props: { songId: string | null; title?: string; playing: string | null; showSong?: boolean;
+  /** the menu to send or delete; an exercise's takes are only heard for now (Robert, 28 Oct) */
+  menu?: boolean;
   onPlay: (ev: SyntheticEvent, t: StoredTake, url: string) => void }) {
   const takes = useTakes(props.songId, props.title);
   /* where each take can be heard from, ready before it is tapped (a take
@@ -92,7 +94,7 @@ export function TakesList(props: { songId: string | null; title?: string; playin
                 <span className="sub take-where">{where(t, !!me)}</span>
               </span>
             </button>
-            {menu === t.id ? (
+            {props.menu === false ? null : menu === t.id ? (
               <span className="take-menu">
                 <button type="button" className="btn btn-quiet take-send" onClick={() => { setMenu(null); navigate(sendRoute(t.songId, t.id), 'screen'); }}>
                   {copy.takes.send}

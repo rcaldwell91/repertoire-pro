@@ -11,7 +11,10 @@ import { drawLine } from './NoteMap';
    bubbles with every syllable inside, the one to sing now bigger with a
    ring, your line with the voice gradient on top. Each bubble fills green
    with the share of it you sang on the note: the same rule as the score
-   (RULEBOOK 4, Bubbles). With no notes (a siren), only your line. */
+   (RULEBOOK 4, Bubbles). With no notes (a siren), only your line.
+   Sing the interval (Robert, 28 Oct): the note that plays before each turn
+   is drawn hollow, and the view fits the whole turn, that note and every
+   note to sing, so the next note is seen before it comes. */
 
 const SPAN = 4;          /* seconds across: wide enough for a syllable in a one-beat note */
 const NOW_AT = 0.3;
@@ -34,7 +37,9 @@ export interface YouLine {
 }
 
 export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () => number; live: boolean; anyOctave: boolean;
-  colour: string; label: string; count?: number | null }) {
+  colour: string; label: string; count?: number | null;
+  /** the note heard before each rung, one per rung: drawn hollow, the view fitted to the turn */
+  heard?: readonly Note[] }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -49,7 +54,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
     if (!cv) return;
     let raf = 0;
     const draw = () => {
-      const { notes, you, now, anyOctave, colour } = propsRef.current;
+      const { notes, you, now, anyOctave, colour, heard } = propsRef.current;
       const css = getComputedStyle(cv);
       const dpr = window.devicePixelRatio || 1;
       const W = cv.clientWidth, H = cv.clientHeight;
@@ -66,13 +71,24 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
          it starts, the last after), ROOM either side, never under MIN_WINDOW;
          with no notes (a siren), what has been sung */
       let tlo = 48, thi = 72;
+      /* a turn heard then sung: its whole time across the view */
+      let turn: { a: number; b: number; heard: Note } | null = null;
       if (notes.length) {
         const starts = rungStarts(notes);
-        const r = Math.max(0, Math.min(starts.length - 1, rungAt(notes, at)));
+        let r = Math.max(0, Math.min(starts.length - 1, rungAt(notes, at)));
+        if (heard?.length) {
+          r = 0;
+          heard.forEach((h, k) => {
+            if (h.t <= at && k < starts.length) r = k;
+          });
+        }
         const from = starts[r] ?? 0, to = starts[r + 1] ?? notes.length;
         const rung = notes.slice(from, to);
-        tlo = Math.min(...rung.map((n) => n.m)) - ROOM;
-        thi = Math.max(...rung.map((n) => n.m)) + ROOM;
+        const h = heard?.[r];
+        const all = h ? [h, ...rung] : rung;
+        tlo = Math.min(...all.map((n) => n.m)) - ROOM;
+        thi = Math.max(...all.map((n) => n.m)) + ROOM;
+        if (h) turn = { a: h.t - 0.3, b: Math.max(...rung.map((n) => n.t + n.d)) + 0.3, heard: h };
       } else if (you.m.length) {
         const sung = you.m.filter(Number.isFinite);
         if (sung.length) {
@@ -101,10 +117,10 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       const pad = 14;
       const rowH = (H - 2 * pad) / (hi - lo);
       const y = (m: number) => pad + ((hi - m) / (hi - lo)) * (H - 2 * pad);
-      const pxs = (W - GUTTER) / SPAN;
-      const nowX = GUTTER + NOW_AT * (W - GUTTER);
-      const x = (t: number) => nowX + (t - at) * pxs;
-      const t0 = at - NOW_AT * SPAN, t1 = at + (1 - NOW_AT) * SPAN;
+      const t0 = turn ? turn.a : at - NOW_AT * SPAN, t1 = turn ? turn.b : at + (1 - NOW_AT) * SPAN;
+      const pxs = (W - GUTTER) / (t1 - t0);
+      const x = (t: number) => GUTTER + (t - t0) * pxs;
+      const nowX = x(at);
 
       /* the ladder of note names: every white key when there is room,
          otherwise C, E, G and A, so no two names touch */
@@ -176,6 +192,25 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         else bubble(n, i, false);
       });
       if (current >= 0) bubble(notes[current], current, true);   /* on top of its neighbours */
+      /* the note heard first: hollow, its name inside, never scored */
+      let heardShown = 0;
+      if (turn) {
+        const n = turn.heard, bx = x(n.t), bw = Math.max(14, n.d * pxs - 3), by = y(n.m) - h / 2;
+        g.beginPath();
+        if (g.roundRect) g.roundRect(bx, by, bw, h, h / 2);
+        else g.rect(bx, by, bw, h);
+        g.setLineDash([5, 4]);
+        g.lineWidth = 2;
+        g.strokeStyle = tint;
+        g.stroke();
+        g.setLineDash([]);
+        g.fillStyle = css.getPropertyValue('--muted');
+        g.font = '700 12px Quicksand, system-ui, sans-serif';
+        g.textAlign = 'center';
+        g.fillText(sylOf(n), bx + bw / 2, by + h / 2, bw + 8);
+        g.textAlign = 'left';
+        heardShown++;
+      }
 
       /* your line, on top, in the voice gradient */
       const pts: Array<{ t: number; m: number }> = [];
@@ -213,6 +248,9 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.viewLo = lo.toFixed(2);
       cv.dataset.viewHi = hi.toFixed(2);
       cv.dataset.viewStep = v.step.toFixed(3);
+      cv.dataset.viewT0 = t0.toFixed(2);
+      cv.dataset.viewT1 = t1.toFixed(2);
+      cv.dataset.heardShown = String(heardShown);
       if (propsRef.current.live) raf = requestAnimationFrame(draw);
     };
     view.current = null;

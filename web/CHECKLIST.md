@@ -199,11 +199,12 @@ For each part the new app has built, every rule the old app's code (next.html) e
 
 ### The Pitch group (Robert, 28 Oct; read next.html 3790-4010, 19626-19629, 22998-23140)
 - ✓ A seventh group, Pitch, in Agility's blue (blue means pitch, RULEBOOK 1b), with its card, its picture and its list — test: `unit:core/exercises.test.ts:has its seven groups by colour`, `train:train-tab`, `train:category`
-- ✓ Sing the interval: a note plays, the jump is shown in words ("A fifth up"), the singer sings the note it lands on; ten jumps a round, both notes in the singer's range; scored like every bubble, octave exact unless Any octave — test: `unit:core/pitch.test.ts:ten jumps a round`, `unit:core/pitch.test.ts:both notes of every jump sit in the singer`, `unit:core/pitch.test.ts:shows each jump in words`, `train:interval`
-- ✓ Its levels: a step and an octave up; then a third and a fifth; then a fourth, sixth, seventh and jumps down; picked in the sound sheet and remembered — test: `unit:core/pitch.test.ts:a step and an octave up`, `train:interval-level`
+- ✓ Sing the interval: a note plays, then a shape is sung from it, shown in words ("A fifth up", "Up the chord: 1, 3, 5"); ten shapes a round, every note in the singer's range; scored like every bubble, octave exact unless Any octave (Robert, 28 Oct) — test: `unit:core/pitch.test.ts:a note plays, then the shape is sung from it`, `unit:core/pitch.test.ts:every note of every shape sits in the singer`, `unit:core/pitch.test.ts:shows each shape in words`, `train:interval`
+- ✓ Its levels: a step, 1-5 and an octave; then a third and 1-3-5 as well; then a fourth, sixth, seventh and the shapes downward too; picked in the sound sheet and remembered (Robert, 28 Oct) — test: `unit:core/pitch.test.ts:shapes by level`, `train:interval-level`
+- ✓ The note map shows the whole turn at once: the note heard first (hollow, never scored) and every note to sing, so the next note is seen before it comes; fitted to the turn as the ladders fit the rung (Robert, 28 Oct) — test: `train:interval-view`
 - ✓ Match the note, as the old app had it: ten notes, from one above the bottom of the range to one below the top, never the same twice running; the note plays, then is sung back (3800-3816) — test: `unit:core/pitch.test.ts:ten notes from one above the bottom`, `train:match`
 - ✓ Match the note's hit: held 1.2 s within a semitone (3790, 3850-3856); here, half of a 2.4 s bubble, the bubbles' own rule — test: `unit:core/pitch.test.ts:a hit is holding it 1.2 s within a semitone`, `train:match`
-- — Match the note's any octave always, its Replay and Skip buttons, its moving on 0.9 s after a hit, and its "Nearly every one" messages (3840-3880). The new app: octave exact unless Any octave (RULEBOOK 4, Pitch); the close button the only control while singing (1b); a fixed time per note; only what was measured.
+- — Match the note's any octave always, its Replay and Skip buttons, its moving on 0.9 s after a hit, and its "Nearly every one" messages (3840-3880). The new app: octave exact unless Any octave (RULEBOOK 4, Pitch); the singing screen's own controls (1b); a fixed time per note; only what was measured.
 - ✓ Hold the note, as the old app's Hold a note: ten notes, every third out at an edge of the range, the others three in from each end, never the same twice running (3909-3925) — test: `unit:core/pitch.test.ts:ten notes, held five seconds each`, `unit:core/pitch.test.ts:every third note out at an edge`
 - ✓ Its rule: the note plays, then is held five seconds; held when 70% of that is within 35 cents (3976-4010) — test: `unit:core/pitch.test.ts:held when 70% of the five seconds is within 35 cents`, `train:hold-note`
 - ✓ After each note it waits for Next; nothing moves on by itself (Robert, 1 Oct; 3955-3970) — test: `train:hold-note`
@@ -228,19 +229,35 @@ Sources: the audit doc names a source for each; it was not reachable from this s
 - ✓ The exercise page (Robert, 24 Oct): back, the name, its group as the only tag, the pattern card, Goal, How, Start; the pattern's notes played only on the card's button, the piano alone, no mic; the current note lights and its syllable shows under the notes — test: `train:preview`, `unit:core/exercises.test.ts:the first rung is the pattern alone`
 - ✓ The pattern card draws each note as a short dash at its pitch height, like a melody line, wider for longer; nothing between the card and Goal (Robert, 25 Oct) — test: `train:preview`
 - ✓ How says what to do with the body, breath or mouth, in one plain sentence up to 14 words, never which sound or how many notes; How lines alone are exempt from the eight-word cap (Robert, 25 Oct) — test: `unit:core/copy.test.ts:say what to do with the body, breath or mouth`, `unit:core/copy.test.ts:a How line may run to 14 words`
-- ✓ Plain words: no singer jargon a beginner wouldn't know in a name, goal or How; a renamed exercise keeps the old app's name only behind More about this, as "Also called" (Robert, 27 Oct) — test: `unit:core/copy.test.ts:no singer jargon in a name, goal or How`, `unit:core/copy.test.ts:a renamed exercise keeps the old app`, `train:more-about`
+- ✓ The proper name is the title (Vocal Function Exercises, Messa di voce, Pentatonic run...), the plain-words name a small line right under it, on the exercise page and in the group's list; no "Also called" lines (Robert, 28 Oct; it replaces 27 Oct's plain names as titles) — test: `unit:core/copy.test.ts:the proper names are the titles again`, `unit:core/copy.test.ts:no "Also called" lines`, `train:titles`, `train:more-about`
+- ✓ Plain words: no singer jargon a beginner wouldn't know in the plain name, Goal or How; the title is exempt, and a jargon title has a plain name under it (Robert, 27 and 28 Oct) — test: `unit:core/copy.test.ts:no singer jargon in a plain name, goal or How`, `unit:core/copy.test.ts:catches a word a beginner would not know`
 - ✓ The gear's sound sheet: Any octave (off at first, remembered for this exercise alone), Count-in sound, Hear yourself and its volume (Robert, 24 Oct) — test: `train:sound-sheet`
 - ✓ A 3-2-1 count-in before singing (1b; Robert, 13 Oct) — test: `train:start-only`
 - ✓ The count-in sound: a short, soft beep on each of 3, 2, 1, through the conductor; one setting for every count-in in the app, on at first, remembered, in the exercise's sound sheet and the song's sound card; never after Close, never in a score or a take (Robert, 24 Oct) — test: `train:count-in-sound`, `song:count-in-sound`, `unit:audio/conductor/conductor.test.ts:beeps once on each of 3, 2, 1`, `unit:audio/conductor/conductor.test.ts:beeps not at all when switched off`, `unit:audio/conductor/conductor.test.ts:never sounds after Close`, `unit:core/beep.test.ts:is a short, soft sound file`
 - ✓ The singing screen (Robert, 24 Oct): the note map fills the screen, the ladder of note names at the left, every bubble with its syllable, the current one bigger with the ring, the dots along the bottom one per rung — test: `train:singing-screen`, `unit:core/exercises.test.ts:knows which rung is being sung`
 - ✓ The map is zoomed to the notes of the rung being sung, about three semitones of room above and below, and glides smoothly as the pattern climbs; the bubbles bigger to match (Robert, 25 Oct) — test: `train:singing-screen`
-- ✓ The close button is the only control while singing; closing is silence and the mic closed at once (1b; RULEBOOK 2.1) — test: `train:start-only`, `train:close`
+- ✓ While singing, every singing screen has the same controls, built once, placed in one layout that can move without touching an exercise: Pause, Restart, the gear and Close (1b; Robert, 28 Oct; it replaces "close is the only control"); closing is silence and the mic closed at once (RULEBOOK 2.1) — test: `train:start-only`, `train:close`, `unit:core/screens.test.ts:every singing screen through the one layout`
+- ✓ The map is smaller to make room for the controls; the dots stay (Robert, 28 Oct) — test: `train:singing-screen`
 - ✓ A held note: one long bubble at a time, scored by the same rule (3908-4022) — test: `unit:core/exercises.test.ts:holds five notes`, `train:hold`
 - — Hold a note's random notes, every third at the edge of your range (3909-3925). The new app holds five notes evenly through your range, so one run can be compared with the next.
 - ✓ The timed hiss times itself from the first sound and stops after a second of quiet; the result stays; nothing starts after it (9110-9135; Robert, 1 Oct) — test: `unit:core/exercises.test.ts:times itself from the first sound`, `train:timed`
 - ✓ The breath cycle: in, suspend, out, a count a second (9097-9110) — test: `train:cycle`
 - ✓ A guided exercise: the how and a clock, Done, no invented score (9047-9100) — test: `train:guided`
 - — The sirens' sine glide (9161-9180). The new app plays only the piano; sirens show your line, not scored.
+
+### Pause, Restart and takes (Robert, 28 Oct; read next.html 6000-6130, the old exercise bar, and section 4's take rules)
+- ✓ Pause stops the sound and the mic at once; its button then says Resume, as the old bar's said what it would do (6049-6055) — test: `train:pause-resume`
+- ✓ Resume carries on from the start of the repeat it was in, with the count-in; nothing scored before it is lost — test: `train:pause-resume`, `unit:core/exercises.test.ts:knows which rung is being sung`
+- — The old bar resumed from the very moment it was paused (6071-6080). The new app: from the start of the current repeat, with the count-in (Robert, 28 Oct).
+- ✓ A part (Hold the note, Long soft notes), the hiss and a range step start again from their own start; a breath count's clock waits and carries on — test: `train:pause-others`
+- ✓ Restart: from the first repeat, the score cleared, as the old bar's "From the top" (6083-6088) — test: `train:restart`
+- ✓ The gear while singing opens the same sound sheet (Hear yourself and its volume, Any octave, Count-in sound); pausing to open it and resuming works, with what was set — test: `train:pause-gear`
+- ✓ A sung exercise records the singer's voice while singing: the voice only, one mic one recorder, a stretch between pauses, joined into one take where each was sung (section 4) — test: `unit:audio/recorder.test.ts:a resume sung again from the repeat`, `train:ex-take`
+- ✓ At the end, next to the score: Save take, Try again, Next; a take is kept on the phone first, then online, private to the singer, and works offline (section 4) — test: `train:ex-take`, `train:ex-take-offline`, `train:ex-take-online`
+- ✓ Kept in the old takes table: its kind set to exercise, the exercise in its notes, no coach; the Sing tab's list of song takes leaves exercise takes out — test: `train:ex-take-online`, `train:ex-take`
+- ✓ On the exercise page, one line "Your takes" opens its takes; each plays the voice over the exercise's piano notes in time; only heard for now (no send, no delete) — test: `train:ex-takes-page`
+- — The old bar's Record toggle, "Pause take" and Listen (6062-6068, 6100-6110). Not in the new app: Robert asked for the voice recorded through every sung exercise and Save take at the end (28 Oct).
+- ✓ Long soft notes: while holding, a small readout of the note being sung and how close, On the note, A bit high or A bit low, within half a semitone (the old app's interval card, 23146-23153) — test: `train:long-soft`
 
 ### Bubbles and the score
 - ✓ A hit is half the note within a semitone; the fill shows the same share (RULEBOOK 4, Bubbles; the old app used 60 cents, 3314-3330) — test: `unit:core/exercises.test.ts:a hit is half the note within a semitone`, `train:ladder-sung`, `train:ladder-wrong`
@@ -303,7 +320,7 @@ Sources: the audit doc names a source for each; it was not reachable from this s
 
 1. Every screen has ONE stated goal (RULEBOOK 3); its goal is the first line of its file, checked by a unit test.
 2. The exercise page: back, name, group tag, the pattern card (bars, one play button, the current bar lit, the syllable under the card), Goal, How, Start. The gear opens the sound sheet; "More about this" opens the old app's why, watch for and care. Level, Quiet and what is measured stay on the list rows.
-3. The singing screen: the note map fills the screen, note names at the left, every bubble with its syllable, the current one bigger with the ring, progress dots along the bottom. Close is the only control; no pause.
+3. The singing screen: the note map fills the screen, note names at the left, every bubble with its syllable, the current one bigger with the ring, progress dots along the bottom. Close is the only control; no pause. (Replaced 28 Oct: Pause, Restart, the gear and Close.)
 4. Train: the warm-up card with Start and "More routines", then five group cards with a picture. A group's list, the other routines and the range check (in Range) are one tap away.
 5. The count-in sound: a soft beep on 3, 2, 1, on at first, one app-wide setting in the exercise sheet and the song's sound card; never in a score or a take, never after Close.
 6. Kept from the Train report: held notes spread evenly, sirens unscored, the long explanations behind "More about this"; the two test results left on the test account.
@@ -327,4 +344,12 @@ Sources: the audit doc names a source for each; it was not reachable from this s
 1. Agility's picture: five faint staff lines and five dots on different lines or spaces, joined by one smooth curve, like a quick run.
 2. La-Ga alternates one syllable a note, as the old app's "la-ga la-ga"; every exercise's syllables checked against the old app's syl strings.
 3. The top card is Today, read from one source in order: a coach's assignment, a program's day, the singer's own plan (falling back to the daily warm-up). Only the own plan exists yet.
-4. Plain words in names and How lines: "break" becomes "where your voice flips"; Vocal Function Exercises becomes Long soft notes, its old name only behind More about this.
+4. Plain words in names and How lines: "break" becomes "where your voice flips"; Vocal Function Exercises becomes Long soft notes, its old name only behind More about this. (Replaced 28 Oct: the proper name is the title, the plain name under it.)
+
+## Decided by Robert, 28 Oct (phone testing)
+
+1. Every singing screen gets Pause (Resume from the start of the current repeat, with the count-in, nothing scored lost), Restart (from the first repeat, score cleared), the gear (the sound sheet) and Close. Built once, placed in one layout that the path map can move later. The map smaller; the dots kept. No speed setting until the path map.
+2. Exercise takes: the voice recorded while singing, Save take next to the score with Try again and Next; the old takes table with its kind set to exercise; "Your takes" on the exercise page, played over the piano notes. Only Save for now.
+3. The proper name is the title, the plain name a small line under it; no "Also called".
+4. Sing the interval: shapes by level, shown in words; the note map shows the whole turn.
+5. Long soft notes: a small readout of the note being sung and how close, while holding.

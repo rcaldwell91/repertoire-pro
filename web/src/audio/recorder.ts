@@ -44,3 +44,29 @@ export class Recorder {
     return { rate: TAKE_RATE, chunks: this.chunks, seconds: this.n / TAKE_RATE, songAt: this.start };
   }
 }
+
+/** Stretches of one exercise, paused and resumed, as one take: each in its
+    place in the exercise, a later one sung over an earlier one from where it
+    begins, silence in any gap (Robert, 28 Oct). */
+export function joinTakes(recs: readonly Recording[]): Recording | null {
+  if (!recs.length) return null;
+  if (recs.length === 1) return recs[0];
+  const rate = recs[0].rate;
+  const base = Math.min(...recs.map((r) => r.songAt));
+  let out = new Int16Array(0);
+  for (const r of recs) {
+    const at = Math.round((r.songAt - base) * rate);
+    let n = 0;
+    r.chunks.forEach((c) => (n += c.length));
+    const next = new Int16Array(Math.min(at + n, TAKE_MAX_S * rate));
+    next.set(out.subarray(0, Math.min(at, out.length, next.length)));
+    let k = at;
+    for (const c of r.chunks) {
+      if (k >= next.length) break;
+      next.set(c.subarray(0, next.length - k), k);
+      k += c.length;
+    }
+    out = next;
+  }
+  return { rate, chunks: [out], seconds: out.length / rate, songAt: base };
+}

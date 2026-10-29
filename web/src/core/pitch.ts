@@ -3,10 +3,11 @@ import { keyName, type Range } from './notemap';
 import type { Note } from './exercises';
 
 /* The Pitch group (Robert, 28 Oct) and Long soft notes, as data.
-   - Sing the interval: a note plays, the jump is shown ("A fifth up"), the
-     singer sings the note it lands on; ten jumps a round, the starting notes
-     in the singer's range; scored like every bubble, half the note within a
-     semitone, octave exact unless Any octave. The level picks the jumps.
+   - Sing the interval: a note plays, the shape is shown ("A fifth up", "Up
+     the chord: 1, 3, 5"), the singer sings its notes from it; ten shapes a
+     round, every note in the singer's range; scored like every bubble, half
+     the note within a semitone, octave exact unless Any octave. The level
+     picks the shapes (Robert, 28 Oct).
    - Match the note: the old app's (next.html 3790-3880): a note plays, the
      singer sings it back; ten notes a round, from one above the bottom of
      the range to one below the top, never the same twice running (the old
@@ -44,53 +45,81 @@ export function seeded(seed: number): () => number {
 }
 
 export type JumpLevel = 1 | 2 | 3;
-/** the jumps at each level, in semitones: a step and an octave; then a third
-    and a fifth; then a fourth, sixth and seventh, and downward jumps too */
-export const JUMPS: Record<JumpLevel, { readonly semis: readonly number[]; readonly down: boolean }> = {
-  1: { semis: [2, 12], down: false },
-  2: { semis: [2, 4, 7, 12], down: false },
-  3: { semis: [2, 4, 5, 7, 9, 11, 12], down: true },
+/** the shapes, as semitones above the note that plays: a step, a third ...
+    an octave; the chord is 1, 3, 5 (Robert, 28 Oct). Down, each is the
+    same notes below it; the chord down is 5, 3, 1 from the note played. */
+export const SHAPES = {
+  step: [2], third: [4], fourth: [5], fifth: [7], chord: [4, 7], sixth: [9], seventh: [11], octave: [12],
+} as const;
+export type ShapeId = keyof typeof SHAPES;
+/** the shapes at each level: a step, 1-5 and an octave; then a third and
+    1-3-5; then a fourth, sixth and seventh, and shapes down too */
+export const LEVEL_SHAPES: Record<JumpLevel, { readonly up: readonly ShapeId[]; readonly down: readonly ShapeId[] }> = {
+  1: { up: ['step', 'fifth', 'octave'], down: [] },
+  2: { up: ['step', 'third', 'fifth', 'chord', 'octave'], down: [] },
+  3: { up: ['step', 'third', 'fourth', 'fifth', 'chord', 'sixth', 'seventh', 'octave'], down: ['step', 'third', 'fifth', 'chord', 'octave'] },
 };
 export const ROUND = 10;
-/** an interval: the first note a second, a short gap, then the jump held 2.4 s */
+/** a shape: the first note a second, a short gap, then each note of the
+    shape held 2.4 s, then a breath before the next */
 export const JUMP_PLAY = 1;
 export const JUMP_AT = 1.2;
 export const SING = 2.4;
+export const TRIAL_REST = 0.8;
+/** Match the note's turn: a note played, sung back, a breath */
 export const TRIAL = 5;
 
-/** the words for a jump: "A fifth up" */
-export function jumpName(semis: number, down: boolean): string {
-  const jump = copy.train.jumps[semis as keyof typeof copy.train.jumps];
-  return fill(down ? copy.train.jumpDown : copy.train.jumpUp, { jump });
+/** the notes of a shape, in semitones from the note played */
+export function shapeDegrees(id: ShapeId, down: boolean): number[] {
+  if (id === 'chord' && down) return [-3, -7];
+  return SHAPES[id].map((d) => (down ? -d : d));
 }
 
-/** ten jumps: every jump of the level in turn, shuffled, each from a
-    starting note that keeps both notes in the singer's range */
-export function intervalRound(level: JumpLevel, range: Range, rand: () => number = Math.random): Round {
-  const { semis, down } = JUMPS[level];
-  const order: number[] = [];
+/** the words for a shape: "A fifth up", "Up the chord: 1, 3, 5" */
+export function shapeName(id: ShapeId, down: boolean): string {
+  const s = copy.train.shapes;
+  if (id === 'chord') return down ? s.chordDown : s.chordUp;
+  return fill(down ? s.down : s.up, { jump: s[id] });
+}
+
+export interface ShapeRound extends Round {
+  /** each turn's shape, and its words */
+  readonly shapes: ReadonlyArray<{ readonly id: ShapeId; readonly down: boolean }>;
+  readonly labels: readonly string[];
+}
+
+/** ten shapes: every shape of the level in turn, shuffled, each from a
+    note that keeps all its notes in the singer's range */
+export function intervalRound(level: JumpLevel, range: Range, rand: () => number = Math.random): ShapeRound {
+  const { up, down } = LEVEL_SHAPES[level];
+  const all = [...up.map((id) => ({ id, down: false })), ...down.map((id) => ({ id, down: true }))];
+  const order: Array<{ id: ShapeId; down: boolean }> = [];
   while (order.length < ROUND) {
-    const deck = [...semis];
+    const deck = [...all];
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     order.push(...deck);
   }
-  const played: Note[] = [], notes: Note[] = [];
-  order.slice(0, ROUND).forEach((jump, k) => {
-    const dn = down && rand() < 0.5;
-    const lo = dn ? range.lo + jump : range.lo, hi = dn ? range.hi : range.hi - jump;
-    /* a jump wider than the range is centred on it */
-    const mid = (range.lo + range.hi) / 2;
-    const start = hi >= lo ? lo + Math.floor(rand() * (hi - lo + 1)) : Math.round(dn ? mid + jump / 2 : mid - jump / 2);
-    const target = dn ? start - jump : start + jump;
-    const t = k * TRIAL;
-    const name = jumpName(jump, dn);
+  const shapes = order.slice(0, ROUND);
+  const played: Note[] = [], notes: Note[] = [], labels: string[] = [];
+  let t = 0;
+  for (const sh of shapes) {
+    const degs = shapeDegrees(sh.id, sh.down);
+    const below = Math.min(0, ...degs), above = Math.max(0, ...degs);
+    const lo = range.lo - below, hi = range.hi - above;
+    /* a shape wider than the range is centred on it */
+    const start = hi >= lo ? lo + Math.floor(rand() * (hi - lo + 1)) : Math.round((range.lo + range.hi - below - above) / 2);
     played.push({ m: start, t, d: JUMP_PLAY, syl: keyName(start) + ' · ' + keyName(start) });
-    notes.push({ m: target, t: t + JUMP_AT, d: SING, syl: keyName(target) + ' · ' + name });
-  });
-  return { notes, played, length: ROUND * TRIAL, beat: 1 };
+    degs.forEach((d, i) => {
+      const m = start + d;
+      notes.push({ m, t: t + JUMP_AT + i * SING, d: SING, syl: i ? keyName(m) : keyName(m) + ' · ' + keyName(m) });
+    });
+    labels.push(shapeName(sh.id, sh.down));
+    t += JUMP_AT + degs.length * SING + TRIAL_REST;
+  }
+  return { notes, played, length: t, beat: 1, shapes, labels };
 }
 
 /** Match the note: the note plays 1.4 s, then is sung back */

@@ -18,6 +18,15 @@ export class YourLine {
     this.at.clear();
   }
 
+  /** only what came before `t` kept: sung again from there (a resume) */
+  cut(t: number): void {
+    let keep = this.t.length;
+    while (keep > 0 && this.t[keep - 1] >= t - 0.01) keep--;
+    this.t.length = keep;
+    this.m.length = keep;
+    this.at.clear();
+  }
+
   /** a point, or a better reading of one already given */
   add(p: LivePoint, songT: number | null): void {
     const known = this.at.get(p.i);
@@ -28,13 +37,7 @@ export class YourLine {
     if (songT == null) return;
     /* a repeated part came round again: the last time round goes */
     const last = this.t.length ? this.t[this.t.length - 1] : -Infinity;
-    if (songT < last - 0.5) {
-      let keep = this.t.length;
-      while (keep > 0 && this.t[keep - 1] >= songT - 0.01) keep--;
-      this.t.length = keep;
-      this.m.length = keep;
-      this.at.clear();
-    }
+    if (songT < last - 0.5) this.cut(songT);
     this.at.set(p.i, this.t.length);
     this.at.delete(p.i - 4);
     this.t.push(songT);
@@ -55,15 +58,22 @@ export function yourLine(owner: string): YourLine {
 export function useYourLine(c: Conductor, owner: string, listening: boolean, session: number | null,
   /** where a point heard at engine time `at` goes; the song's place if not given
       (an exercise with no notes uses time since it started) */
-  timeOf?: (at: number) => number | null): YourLine {
+  timeOf?: (at: number) => number | null,
+  /** where a session that carries on from earlier begins (a resume): the
+      line before it is kept; otherwise each session starts a new line */
+  keepBefore?: () => number | null): YourLine {
   const line = yourLine(owner);
   const place = useRef(timeOf);
+  const keep = useRef(keepBefore);
   useEffect(() => {
     place.current = timeOf;
+    keep.current = keepBefore;
   });
   useEffect(() => {
     if (!listening) return;
-    line.clear();
+    const from = keep.current?.() ?? null;
+    if (from == null) line.clear();
+    else line.cut(from);
     let started = false;
     const off = c.onMic((b) => {
       if (!started) {

@@ -51,6 +51,7 @@ export function TrainCategory(props: { id: string }) {
         <button key={e.id} type="button" className="ex-row" id={'ex-' + e.id} data-colour={cat.colour} onClick={() => navigate(exRoute(e.id), 'screen')}>
           <span className="ex-text">
             <strong>{copy.ex[e.id].name}</strong>
+            {'plain' in copy.ex[e.id] && <span className="ex-plain">{(copy.ex[e.id] as { plain: string }).plain}</span>}
             {line(e)}
           </span>
           <ChevronRight size={22} strokeWidth={2} aria-hidden="true" />

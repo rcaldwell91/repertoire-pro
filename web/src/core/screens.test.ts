@@ -34,3 +34,36 @@ describe('every screen states its one goal (RULEBOOK 3)', () => {
     ])).toHaveLength(2);
   });
 });
+
+/* RULEBOOK 1b (Robert, 28 Oct): the singing screen's controls are built
+   once, and where they sit is set in ONE layout place: every screen that
+   sings (it draws the note map's bubbles) goes through SingLayout, none
+   lays out its own singing screen, and the placement is one CSS rule. */
+export function layoutProblems(files: Array<{ name: string; text: string }>, css: string): string[] {
+  const out: string[] = [];
+  for (const { name, text } of files) {
+    if (text.includes('<Bubbles') && !text.includes('<SingLayout')) out.push(`${name}: sings without the one layout`);
+    if (/id="ex-run"|id="ex-pause"|id="ex-restart"|id="ex-close"/.test(text)) out.push(`${name}: builds its own singing controls`);
+  }
+  const areas = css.match(/grid-template-areas:[^;]*'bar'/g) ?? [];
+  if (areas.length !== 1) out.push(`the controls' place is set in ${areas.length} rules, not one`);
+  return out;
+}
+
+describe('the singing screen\'s one layout (RULEBOOK 1b)', () => {
+  it('every singing screen through the one layout, its controls placed in one rule', () => {
+    const files = readdirSync(SCREENS).filter((f) => f.endsWith('.tsx'))
+      .map((name) => ({ name, text: readFileSync(new URL(name, SCREENS), 'utf8') }));
+    const css = readFileSync(new URL('../ui/tokens.css', import.meta.url), 'utf8');
+    expect(files.some((f) => f.text.includes('<SingLayout'))).toBe(true);
+    expect(layoutProblems(files, css)).toEqual([]);
+  });
+
+  it('catches a screen that lays out its own (it can fail)', () => {
+    expect(layoutProblems([
+      { name: 'a.tsx', text: '<Bubbles notes={n} />' },
+      { name: 'b.tsx', text: '<div id="ex-run"><button id="ex-close" /></div>' },
+      { name: 'c.tsx', text: '<SingLayout><Bubbles /></SingLayout>' },
+    ], ".a { grid-template-areas: 'top' 'bar'; } .b { grid-template-areas: 'bar' 'top'; }")).toHaveLength(3);
+  });
+});
