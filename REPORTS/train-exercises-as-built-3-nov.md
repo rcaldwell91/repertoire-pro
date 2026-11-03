@@ -1000,7 +1000,7 @@ Before every sung or listening exercise there is a 3, 2, 1 count-in (a soft beep
 - **Watch out for:** none
 - **Why it helps:** none
 - **Pattern and speed:** No notes.
-- **How it runs:** After the count-in: "Sing your lowest comfortable note on "ooh"." until 80 sung points (a point every 50 ms, so 4 seconds of voice), then "Now your highest comfortable note." for 80 more. Your lowest comfortable note is the 5th percentile of the low singing and your highest the 95th percentile of the high; if they are under 7 semitones apart, the highest is set 12 above the lowest. It shows "Your range: {lo} to {hi}".
+- **How it runs:** After the count-in: "Sing your lowest comfortable note on "ooh"." until 80 sung points (a point every 50 ms, so 4 seconds of voice), then "Now your highest comfortable note." for 80 more. Your lowest comfortable note is the 5th percentile of the low singing and your highest the 95th percentile of the high; if they are under 7 semitones apart, the highest is set 12 above the lowest. It shows "Your range: {lo} to {hi}", with {lo} and {hi} filled in as the notes found.
 - **How it's scored:** Not scored: it measures your range.
 - **Movement cue:** none
 - **Routines:** none
@@ -1189,7 +1189,7 @@ Before every sung or listening exercise there is a 3, 2, 1 count-in (a soft beep
 - **Why it helps:** none
 - **Pattern and speed:** No pattern: one note at a time.
 - **How it runs:** 10 notes, from one above the bottom of your range to one below the top, never the same note twice running. Each turn (5 seconds): the note plays for 1.4 seconds, then from 1.6 seconds you sing it back for 2.4 seconds. It ends by itself.
-- **How it's scored:** Each note is a bubble. A note is hit when at least 50% of its time is sung within 0.5 of a semitone of it, the octave exact unless Any octave is on. The score is the notes hit out of the notes, and the % on pitch. Without the microphone: "Not scored: no microphone." (so a hit is holding it 1.2 seconds within half a semitone).
+- **How it's scored:** A hit is holding it 1.2 seconds within half a semitone. Each note is a bubble. A note is hit when at least 50% of its time is sung within 0.5 of a semitone of it, the octave exact unless Any octave is on. The score is the notes hit out of the notes, and the % on pitch. Without the microphone: "Not scored: no microphone."
 - **Movement cue:** none
 - **Routines:** none
 - **Saves:** A result, saved on the phone at once and online when signed in (notes hit, out of, %). A take of your voice, recorded while you sing (if the mic is on); kept only if you tap "Save take", on the phone first, then online, private to you.
