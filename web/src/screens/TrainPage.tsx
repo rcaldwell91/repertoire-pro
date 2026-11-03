@@ -5,6 +5,7 @@ import type { ComponentType } from 'react';
 import { copy, fill } from '../core/copy';
 import { CATEGORIES, DAILY, type CategoryId } from '../core/exercises';
 import { routineToday, type TodayItem } from '../core/today';
+import { pullSpots } from '../data/tension';
 import { today } from '../data/today';
 import { catRoute, exRoute, navigate, routineRoute } from '../shell/router';
 import { QuickRun } from '../ui/icons';
@@ -29,6 +30,8 @@ export function TrainPage() {
   useEffect(() => {
     let live = true;
     void today().then((got) => live && setT(got));
+    /* the tension check's ticks, on a new phone, from the account */
+    void pullSpots();
     return () => {
       live = false;
     };

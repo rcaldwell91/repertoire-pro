@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { CATEGORIES, EXERCISES, measures, type Exercise } from '../core/exercises';
+import { CATEGORIES, EXERCISES, levelsOf, measures, type Exercise } from '../core/exercises';
 import { keyName } from '../core/notemap';
 import { keptRange, onRange, pullRange } from '../data/range';
 import { back, exRoute, navigate } from '../shell/router';
@@ -39,7 +39,10 @@ export function TrainCategory(props: { id: string }) {
     if (e.engine.kind === 'range') {
       return <span className="ex-tags" id="range-value">{range ? fill(copy.train.rangeIs, { lo: keyName(range.lo), hi: keyName(range.hi) }) : copy.train.notMeasured}</span>;
     }
-    const tag = { level: copy.levels[e.level], measure: measureTag(e) };
+    /* an exercise with levels inside it shows their span (Robert, 3 Nov) */
+    const lv = levelsOf(e);
+    const level = lv.length > 1 ? fill(copy.train.levelSpan, { from: copy.levels[lv[0].level], to: copy.levels[lv[lv.length - 1].level] }) : copy.levels[e.level];
+    const tag = { level, measure: measureTag(e) };
     return <span className="ex-tags">{fill(e.quiet ? copy.train.tagLineQuiet : copy.train.tagLine, tag)}</span>;
   };
   return (

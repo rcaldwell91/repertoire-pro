@@ -291,6 +291,22 @@ export const copy = {
     how: 'How',
     close: 'Close',
     controls: 'Singing controls',
+    /* the exercise page (Robert, 3 Nov) */
+    need: 'You\'ll need',
+    howTo: 'How to do it',
+    right: 'You\'re doing it right when',
+    watchOut: 'Watch out for',
+    whyHelps: 'Why it helps',
+    level: 'Level',
+    levelSpan: '{from} to {to}',
+    lineOnly: 'Not scored. The line was there to watch.',
+    /* the "Ah" tension check's ticks, and the reminders they bring */
+    tensionHead: 'Tick where you felt tension.',
+    tension: { chin: 'Chin lifting', jaw: 'Jaw tight', wide: 'Mouth going wide', face: 'Face or brow tensing', tongue: 'Tongue tensing',
+      neck: 'Neck or shoulders tensing' },
+    remind: { chin: 'Keep your chin level.', jaw: 'Let your jaw hang loose.', wide: 'Open tall, not wide.', face: 'Keep your face still.',
+      tongue: 'Let your tongue rest.', neck: 'Keep your neck and shoulders loose.' },
+    tensionSaved: 'Kept. Later exercises will remind you.',
     pause: 'Pause',
     resume: 'Resume',
     restart: 'Restart',
@@ -383,8 +399,16 @@ export const copy = {
       care: "Very safe. Some people anatomically cannot trill — use a tongue trill, \"ng\", or a straw.",
     },
     straw: {
-      why: "The same idea as lip trills, but the straw sets the resistance for you. It is the best-researched exercise in the app.",
-      watch: "Air escaping around the straw, air escaping through the nose, and making the accents in your throat instead of from your belly.",
+      steps: [
+        "Seal your lips around the straw so all the sound goes through it.",
+        "Pinch your nose on and off while you make a sound. If the sound changes, air is leaking through your nose.",
+        "Sing the pattern through the straw along with the piano.",
+        "Keep your head turning slowly side to side the whole time.",
+        "Let the high notes come by letting go, not by pushing.",
+      ],
+      right: "Pinching your nose changes nothing. You feel a gentle pressure building behind the straw, and the top notes come easily.",
+      why: "The straw sends a little pressure back toward your vocal folds, which helps them vibrate with less effort. It is the same idea as lip trills, but the straw sets the resistance for you. It is the best-researched exercise in the app.",
+      watch: "Air escaping around the straw, or through your nose. Your head stopping or stiffening on certain notes, or pushing for the top.",
       care: "A narrow straw into water is a heavy load — build up to it. If you have a diagnosed voice problem, do this with a professional, not an app.",
     },
     hum: {
@@ -396,8 +420,16 @@ export const copy = {
       watch: "Speeding up through the break to hide it. Getting louder as you go up. If it flips or cracks, that is too much air pressure for what the folds can hold — the fix is less push, not more.",
     },
     mum: {
-      why: "The M is a hum, so your lips are closed and the sound has to start gently — you physically cannot slam into an M. That sets your folds going in a low-pressure state and then hands that setup over to the vowel. The M at the end is the clever part: it lets you check the resonance is still there after the vowel, rather than using the M just to launch.",
-      watch: "The vowel drifting toward \"mam\" or \"mom\" as you go up. That drift is a sign the outer neck and jaw muscles have started gripping. Also pressing the lips hard, which chokes it.",
+      steps: [
+        "Sing \"mum\" on every note: lips closed on the M, open to a short \"uh\", close again.",
+        "Keep the hum buzzing in your lips as you open.",
+        "Start each note gently, and keep the vowel from drifting.",
+        "Keep your head loose and moving a little, and your shoulders rolling.",
+        "Don't worry about how it sounds yet. How free it feels is what counts.",
+      ],
+      right: "Nothing stiffens as the notes rise. Your head and shoulders keep moving through every repetition.",
+      why: "The closed M gives the voice a little resistance to work against, so it starts easily. The M is a hum, so your lips are closed and the sound has to start gently — you physically cannot slam into an M. That sets your folds going in a low-pressure state and then hands that setup over to the vowel. The M at the end is the clever part: it lets you check the resonance is still there after the vowel, rather than using the M just to launch.",
+      watch: "A hard start. The vowel drifting toward \"mam\" or \"mom\" as you go up. That drift is a sign the outer neck and jaw muscles have started gripping. Also pressing the lips hard, which chokes it. Your head or shoulders freezing on the higher notes.",
       care: "Very safe. The best first exercise in most sessions.",
     },
     mee: {
@@ -422,8 +454,16 @@ export const copy = {
       watch: "Pressing hard instead of staying light. The jaw bouncing on every note. A click or grunt at the start of each one — that is a hard glottal attack; back off to \"hoo\".",
     },
     nay: {
+      steps: [
+        "First say \"nay, nay, nay\" out loud like a whiny little kid, and let your face act it out.",
+        "Then sing it on the pattern, one \"nay\" per note.",
+        "Keep it bright, not heavy. Ugly on purpose is fine.",
+        "Smile into it. This is the one exercise where a wide mouth is right.",
+        "Overdo the brat, not the volume. Too bratty works better than halfway.",
+      ],
+      right: "It sounds unmistakably whiny and bright, and your voice gets louder without you pushing.",
       why: "Two things at once. The N gets your folds vibrating easily and forward. The brat recruits twang — a narrowing right at the top of your larynx that bunches the sound energy into the 2.5–5 kHz band, exactly where the ear is most sensitive. The result is that your voice gets much louder to a listener without any more air pressure or effort. That is why it gets you across the break and into a mix without shouting.",
-      watch: "Making it heavy instead of bright — carrying chest weight up rather than letting the twang do the work. Forcing the nasal quality instead of letting it happen.",
+      watch: "Pushing, or making it heavy instead of bright — carrying chest weight up rather than letting the twang do the work. Forcing the nasal quality instead of letting it happen. Drifting into a darker or in-between version, or being polite with it.",
       care: "This is supposed to sound ugly. Sharp, piercing, whiny, annoying. It is not a finished sound and you should not sing songs like this — it is a temporary tool to find a coordination, and you drop it once you have found it.",
     },
     wah: {
@@ -436,11 +476,24 @@ export const copy = {
       care: "This is where people hurt themselves in a warm-up. Never do it first. If the top note cracks, go back to sirens rather than repeating the leap.",
     },
     laga: {
-      why: "L uses the tip of your tongue and G uses the back of it. Alternating them quickly demands that the front and back of your tongue move independently — and if your jaw is doing the work, it physically cannot keep up. So hanging the jaw still forces the tongue to do its own job. That matters because your tongue is attached to your larynx, so every jaw-driven tongue movement is stealing from your vowel and pitch control.",
-      watch: "The jaw closing slightly on every consonant — universal at first, and exactly the habit being broken. Jutting the jaw forward instead of letting it drop back. Clenching it open: rigid is not the same as relaxed.",
+      steps: [
+        "Let your jaw drop open, loose and comfortable.",
+        "Rest a knuckle under your chin so you can feel if it moves.",
+        "Sing la-ga-la-ga-la, one syllable per note: the tip of your tongue makes \"la\", the back of your tongue makes \"ga\".",
+        "Only your tongue moves. Keep the rest of your face still too.",
+        "As the notes go higher, make more room by opening taller, not wider.",
+      ],
+      right: "Your chin doesn't move on any syllable. The syllables still sound clear and normal, even with the jaw still.",
+      why: "In most people the jaw moves whenever the tongue does, and a moving jaw gets in the way of the voice. Separating them lets each do its own job. L uses the tip of your tongue and G uses the back of it. Alternating them quickly demands that the front and back of your tongue move independently — and if your jaw is doing the work, it physically cannot keep up. So hanging the jaw still forces the tongue to do its own job. That matters because your tongue is attached to your larynx, so every jaw-driven tongue movement is stealing from your vowel and pitch control.",
+      watch: "The jaw closing slightly on every consonant — universal at first, and exactly the habit being broken. Jutting the jaw forward instead of letting it drop back. Clenching it open: rigid is not the same as relaxed. Opening wider, smile-shaped, on the high notes.",
       care: "If your jaw hinge clicks or aches, use a smaller opening. Never force it wide.",
     },
     tongueout: {
+      steps: [
+        "Stick your tongue out and down toward your chin, and keep it there.",
+        "If your tongue keeps creeping back in, hold the tip with a clean cloth or paper towel and pull it gently out, just enough to feel a stretch at the back.",
+        "Start each note gently. Don't hit it hard.",
+      ],
       why: "Your tongue is attached to a bone that is attached to your larynx. A bunched, retracted tongue root physically pulls on your larynx. Sticking your tongue out and down stops the root bunching backward, so for the first time you get to hear what your voice sounds like without that interference.",
       watch: "The tongue creeping back in as you go up. That creep is the diagnosis. Only the tip out, so the root is still bunched. Trying for a beautiful tone — it will sound odd, and that is fine.",
       care: "Do not yank your tongue. It is a diagnostic posture, not a way to perform.",
@@ -459,6 +512,11 @@ export const copy = {
       care: "Some people simply cannot yawn on demand. That is normal.",
     },
     messa: {
+      steps: [
+        "Swell from soft to full and back while only the volume changes.",
+        "As it gets louder, let your belly and lower ribs do the work, not your throat.",
+        "Keep the note dead level. It tends to creep sharp as you get louder.",
+      ],
       why: "Getting louder and softer without the note changing is hard, because the natural coupling is that more pressure means higher pitch and a different quality. Learning to uncouple them is the best single test that your breath and your larynx are cooperating rather than compensating for each other. Only the volume should change — pitch, colour and vibrato all stay put.",
       watch: "Going sharp on the way up and flat on the way down. The vibrato speeding up or vanishing. A lopsided shape — the quiet half on the way back down is the hard half. Breaking into a different register at the quiet end.",
       care: "Do not take the loud part to maximum. This is about control at the edges, not peak volume.",
@@ -486,29 +544,112 @@ export const copy = {
       watch: "Doing it loudly. It is meant to be soft and engaged.",
       care: "Consistency over six weeks is the active ingredient. Two minutes twice a day beats twenty minutes on Sunday.",
     },
+    /* Robert's 3 Nov spec */
+    posture: {
+      steps: [
+        "Stand with your back to a wall so your heels, backside and the back of your head all touch it.",
+        "If your head only reaches the wall by lifting your chin, stop just short.",
+        "Notice how far back your head had to come. That's your neutral.",
+        "Step away and keep your ears over your shoulders.",
+        "Roll your shoulders back and let them drop.",
+        "Tuck your chin in slightly, then relax there.",
+        "Check back in now and then while you practise.",
+        "When you practise, prop your phone up at eye level so you're not looking down.",
+      ],
+      right: "All three points touch the wall without strain, and away from it nothing feels held.",
+      why: "A forward head pulls on the muscles around your voice box, and the pull gets worse when you sing.",
+      watch: "Your head poking forward, your chin lifting while you sing, and holding the posture stiffly.",
+    },
+    tensioncheck: {
+      steps: [
+        "Prop your phone up at eye level.",
+        "Stand tall and easy (see Posture check).",
+        "Sing a light \"ah\" on three notes up and back, starting low.",
+        "Keep your eyes and chin level.",
+        "Let your jaw drop so your mouth opens tall, not wide.",
+        "As the notes rise, let the sound get lighter. Don't push.",
+        "When you finish, tick every place you felt tension.",
+      ],
+      right: "Your chin stays level, your mouth stays tall, the \"ah\" stays the same vowel all the way up and your face stays still. If anything strains, sit that round out.",
+      why: "Once you know your own tension spots, you know what to watch for in every exercise after this.",
+      watch: "Your chin lifting or your eyes looking up as the notes rise, or tucking your chin down hard instead. Also a tight jaw that barely opens, a mouth spreading wide, a clenched face or brow, and pushing for volume.",
+    },
+    cheekpuffs: {
+      steps: [
+        "Puff out your cheeks and close your lips loosely.",
+        "Make a sound, letting a little air escape through your lips. It should be a real note, not just air.",
+        "Pinch your nose on and off. The sound shouldn't change.",
+        "Sing three notes up and back like this.",
+        "Roll your shoulders back in full, slow circles the whole time.",
+      ],
+      right: "You hear a clear note, pinching your nose changes nothing, and your shoulders keep making full circles.",
+      why: "Like the straw, puffed cheeks send a little pressure back toward your vocal folds so they work easily. The shoulder rolls stop your shoulders locking up.",
+      watch: "Blowing air with no note behind it, shrugging up and down instead of circling, and your shoulders stopping while you sing.",
+    },
+    chewhum: {
+      steps: [
+        "Close your lips and hum.",
+        "Chew slowly while you hum, as if you had gum.",
+        "Start with a few slow slides from low to high and back.",
+        "Then hum the five-note scale with the piano, chewing all the way through.",
+        "A wobbly sound is fine. Being exactly on the note doesn't matter here.",
+      ],
+      right: "Your jaw keeps chewing freely on every note, the hum doesn't break, and your jaw feels looser afterwards.",
+      why: "Chewing keeps your jaw moving on its own, so it stops gripping when you sing.",
+      watch: "Stopping the chewing on the high notes, pushing for the top, and worrying about how it sounds.",
+    },
+    tonguefwd: {
+      steps: [
+        "Slide the tip of your tongue forward between your upper teeth and upper lip, so your top lip bulges a little.",
+        "Close your lips and hum the five-note scale.",
+        "Turn your head slowly side to side as you hum.",
+        "Once that's easy, let your head drop forward and roll it loosely from side to side instead.",
+        "Keep your neck, throat and tongue relaxed.",
+      ],
+      right: "Your tongue stays in place for the whole scale, the hum stays even, and your head moves freely without the hum catching.",
+      why: "With the tongue forward, it can't bunch up at the back of your mouth and crowd the sound.",
+      watch: "Your tongue slipping back into your mouth, and your neck or throat tightening on the high notes.",
+    },
+    brighta: {
+      steps: [
+        "Stick out your tongue and hold the tip with the cloth.",
+        "Pull gently, just enough to feel a stretch at the back of your tongue. Don't yank.",
+        "Sing \"a\" as in \"cat\" on the five-note scale.",
+        "Make it bright and whiny, like a child complaining.",
+        "Start each note gently. Don't slam into it.",
+        "Go only as high as feels comfortable.",
+      ],
+      right: "You feel a gentle stretch the whole time, and the sound is bright and clear but not pushed. Nothing tightens as you go up.",
+      why: "Holding the tongue out stops its root pulling on your voice box, and the bright \"a\" trains the part of your voice that cuts through.",
+      watch: "Hitting the vowel hard, losing the bright sound, yanking your tongue, and going past comfortable.",
+    },
   },
   ex: {
     hiss: { name: 'Steady hiss', syl: 'sss', goal: 'One long, even hiss, timed.', how: 'Breathe in low and wide, then let the air out slow and even.' },
     farinelli: { name: 'Farinelli breath', plain: 'Breath counts', syl: 'silent', goal: 'In for a count, hold, out. Silent.', how: 'Hold the breath with your throat open and ribs wide, nothing gripping.' },
     liptrill: { name: 'Lip trills', syl: 'brrr', goal: 'Lips flutter while you add your voice.', how: 'Keep your lips loose and the air steady so they keep fluttering.' },
-    straw: { name: 'Straw phonation', plain: 'Straw singing', syl: 'oo', needs: 'You\'ll need a straw.', goal: 'Sing through a thin straw.', how: 'Seal your lips round the straw and let no air escape.' },
+    straw: { name: 'Straw phonation', plain: 'Straw singing', syl: 'oo', need: 'A thin drinking straw.', goal: 'Sing through a straw so high notes take less effort.',
+      how: 'Seal your lips around the straw so all the sound goes through it.', cue: 'Keep turning your head slowly.' },
     hum: { name: 'Humming: M, N, NG', syl: 'mmm', syls: ['mmm', 'nnn', 'ng'], goal: 'Three hums, blocking the mouth three ways.', how: 'Lips together, jaw loose, and feel the buzz in your face.' },
     siren: { name: 'Sirens', syl: 'ng', goal: 'A continuous slide from low to high.', how: 'Slide slowly through where your voice flips, without pushing or getting louder.' },
-    mum: { name: 'Mum', syl: 'mum', goal: 'A hum that opens into a vowel.', how: 'Keep the hum buzzing in your lips as you open.' },
+    mum: { name: 'Mum', syl: 'mum', goal: 'An easy hum-and-open sound to get the voice started.', how: 'Keep the hum buzzing in your lips as you open.',
+      cue: 'Keep your head loose and your shoulders rolling.' },
     mee: { name: 'Mee', syl: 'mee', goal: 'A bright "ee", started softly.', how: 'Keep it bright without spreading into a smile, and let the jaw hang.' },
     noo: { name: 'Noo', syl: 'noo', goal: 'A gentle start into the roundest vowel.', how: 'Round your lips fully and keep the sound light as you climb.' },
     loo: { name: 'Loo', syl: 'loo', goal: 'A smooth scale where only the tongue moves.', how: 'Keep your jaw still so only the tip of your tongue moves.' },
     gee: { name: 'Gee (or Kee)', syl: 'gee', goal: 'Firms up a breathy, leaky tone.', how: 'Let the back of your tongue pop lightly into the vowel.' },
     staccato: { name: 'Staccato', plain: 'Short bouncy notes', syl: 'bah', goal: 'Short, separated notes on one syllable.', how: 'Bounce each note from your breath, light, with the jaw still.' },
-    nay: { name: 'Bratty Nay', syl: 'nay', goal: 'A bratty, nasal "nay". Ugly on purpose.', how: 'Make it bright and nasal, never heavy, as you pass where your voice flips.' },
+    nay: { name: 'Bratty Nay', syl: 'nay', goal: 'A bright, bratty sound that makes your voice ring.', how: 'Make it bright and nasal, never heavy, as you pass where your voice flips.' },
     wah: { name: 'Wah', syl: 'wah', goal: 'A small "wah" coming down. Think baby cry.', how: 'Round your lips and stay quiet, like a small cry coming down.' },
     octleap: { name: 'Octave leaps', syl: 'ma', goal: 'Low note, jump the octave, land back.', how: 'Stay light on the low note and float up without reaching.' },
-    laga: { name: 'Slack-jaw La-Ga', syl: 'la', syls: ['la', 'ga'], goal: 'Jaw hangs still. Only the tongue moves.', how: 'Hang your jaw still, and a knuckle under your chin will feel it.' },
-    tongueout: { name: 'Tongue-out singing', syl: 'uh', goal: 'Sing with your tongue out and down.', how: 'Stick your tongue out and down toward your chin, and keep it there.' },
+    laga: { name: 'Slack-jaw La-Ga', syl: 'la', syls: ['la', 'ga'], need: 'A mirror, or just a knuckle under your chin.', goal: 'Free your tongue from your jaw.',
+      how: 'Hang your jaw still, and a knuckle under your chin will feel it.' },
+    tongueout: { name: 'Tongue-out singing', syl: 'uh', goal: 'Sing with your tongue out so its root can\'t pull on your voice.',
+      how: 'Stick your tongue out and down toward your chin, and keep it there.' },
     tonguecresc: { name: 'Tongue-out with a crescendo', plain: 'Tongue out, getting louder', syl: 'ah', goal: 'Tongue out, growing from quiet to full.', how: 'Keep your tongue out as you grow louder, backing off if it pulls in.' },
     blah: { name: 'Blah', syl: 'blah', goal: 'A floppy "blah blah blah", jaw hanging.', how: 'Let your jaw and tongue flop, because sloppy is the point.' },
     yawnsigh: { name: 'Yawn-sigh', syl: 'ah', goal: 'A real yawn, released into a sigh.', how: 'Start a real yawn, then let it fall into a sigh.' },
-    messa: { name: 'Messa di voce', plain: 'Soft, loud, soft', syl: 'ah', goal: 'One note: quiet, to full, back to quiet.', how: 'Swell from soft to full and back while only the volume changes.' },
+    messa: { name: 'Messa di voce', plain: 'Soft, loud, soft', syl: 'ah', goal: 'Soft, loud, soft on one held note.', how: 'Swell from soft to full and back while only the volume changes.' },
     sustain: { name: 'Sustained note', syl: 'ee', goal: 'One note, held soft and steady.', how: 'Keep the breath steady so the note stays flat and level.' },
     ninetone: { name: 'Nine-tone scale', plain: 'Nine-note scale', syl: 'lah', goal: 'Up nine notes and back, in one breath.', how: 'Keep the air flowing so every step stays separate and even.' },
     descend: { name: 'Descending five-tone', plain: 'Five notes down', syl: 'oo', goal: 'Top down instead of bottom up.', how: 'Start light at the top and stay light coming down.' },
@@ -557,6 +698,18 @@ export const copy = {
     lipstongue: { name: 'Lips and tongue', syl: 'mom', syls: ['mom', 'my', 'made', 'me', 'mash', 'my', 'M', 'and', 'Ms'], goal: 'Lips and tongue working while the tone flows.',
       how: 'Keep your lips and tongue quick and light while the air stays steady.' },
     rangecheck: { name: 'Range check', syl: 'ooh', goal: 'Your lowest and highest comfortable notes.', how: 'Sing comfortably at your bottom and then your top, never straining.' },
+    /* Robert's 3 Nov spec, in our own words; the steps are under copy.about */
+    posture: { name: 'Posture check', syl: '', need: 'A wall.', goal: 'Find an easy, neutral stance before you sing.',
+      how: 'Stand with your back to a wall so your heels, backside and the back of your head all touch it.' },
+    tensioncheck: { name: '"Ah" tension check', syl: 'ah', goal: 'An easy check to find where you tense up, before you train.',
+      how: 'Prop your phone up at eye level.' },
+    cheekpuffs: { name: 'Cheek puffs', syl: 'oo', goal: 'The straw\'s easy feeling, without a straw.', how: 'Puff out your cheeks and close your lips loosely.',
+      cue: 'Keep rolling your shoulders.' },
+    chewhum: { name: 'Chew and hum', syl: 'mmm', goal: 'Loosen your jaw by humming while you chew.', how: 'Close your lips and hum.', cue: 'Keep chewing.' },
+    tonguefwd: { name: 'Tongue-forward hum', syl: 'mmm', goal: 'Hum with your tongue tucked forward, out of the way.',
+      how: 'Slide the tip of your tongue forward between your upper teeth and upper lip, so your top lip bulges a little.', cue: 'Keep your head moving slowly.' },
+    brighta: { name: 'Tongue-out bright "a"', syl: 'a', need: 'A clean cloth, washcloth or paper towel.',
+      goal: 'Find the bright, cutting part of your voice with your tongue held out.', how: 'Stick out your tongue and hold the tip with the cloth.' },
   },
 } as const;
 
@@ -571,7 +724,12 @@ export function fill(template: string, values: Record<string, string | number>):
 /** every line of copy; `prose` marks the explanations under copy.about,
     held to the banned words but not to the eight-word cap */
 export function allCopy(node: unknown = copy, at = 'copy'): Array<{ at: string; text: string; prose: boolean }> {
-  if (typeof node === 'string') return [{ at, text: node, prose: at.startsWith('copy.about.') }];
+  if (typeof node === 'string') {
+    /* an exercise with numbered steps: its How is its first step, and steps have no length cap (Robert, 3 Nov) */
+    const how = /^copy\.ex\.(\w+)\.how$/.exec(at);
+    const stepped = !!how && 'steps' in ((copy.about as Record<string, object>)[how[1]] ?? {});
+    return [{ at, text: node, prose: at.startsWith('copy.about.') || stepped }];
+  }
   if (node && typeof node === 'object') {
     return Object.entries(node as Record<string, unknown>).flatMap(([k, v]) => allCopy(v, at + '.' + k));
   }

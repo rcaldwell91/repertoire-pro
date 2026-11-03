@@ -42,3 +42,22 @@ export function jumpLevel(): 1 | 2 | 3 {
 export function setJumpLevel(v: 1 | 2 | 3): void {
   localStore().set('rp.interval.level', String(v));
 }
+
+/** an exercise's level, for one with levels inside it (Robert, 3 Nov),
+    remembered for that exercise alone; its lowest until one is picked */
+export function levelFor(id: string): 1 | 2 | 3 | null {
+  const v = Number(localStore().get('rp.level.' + id));
+  return v === 1 || v === 2 || v === 3 ? v : null;
+}
+export function setLevelFor(id: string, v: 1 | 2 | 3): void {
+  localStore().set('rp.level.' + id, String(v));
+}
+
+/** which tension reminder comes next: one more each time an exercise starts */
+export function reminderTurn(): number {
+  const v = Number(localStore().get('rp.tension.turn'));
+  return Number.isFinite(v) && v >= 0 ? v : 0;
+}
+export function nextReminderTurn(): void {
+  localStore().set('rp.tension.turn', String(reminderTurn() + 1));
+}

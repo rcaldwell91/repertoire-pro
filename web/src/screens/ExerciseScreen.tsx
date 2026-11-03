@@ -4,8 +4,8 @@ import type { SyntheticEvent } from 'react';
 import { Settings } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
-  CATEGORIES, EXERCISES, ROUTINES, bubbleScore, exercise, firstRung, measures, notesFor, rungAt, rungStarts, type Exercise, type Note,
-  type RoutineId,
+  CATEGORIES, EXERCISES, ROUTINES, atLevel, bubbleScore, exercise, firstRung, levelsOf, measures, notesFor, routineLevel, rungAt, rungStarts,
+  stepsFor, type Exercise, type Level, type Note, type RoutineId,
 } from '../core/exercises';
 import { keyName, type Range } from '../core/notemap';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
@@ -14,6 +14,7 @@ import {
   intervalRound, matchRound, partLine, seeded, steadyParts, steadyShare, vfeParts, STEADY_LEAD, STEADY_SHARE, type JumpLevel, type Part,
 } from '../core/pitch';
 import { isRight } from '../core/takes';
+import { cueFor, pickReminder, SPOTS, type Spot } from '../core/tension';
 import { clock as clockText } from '../core/time';
 import { resultRow, type Outcome } from '../core/results';
 import { SoundClock } from '../core/timed';
@@ -22,12 +23,15 @@ import { joinTakes } from '../audio/recorder';
 import { onRange, rangeNow, saveRange } from '../data/range';
 import { saveResult } from '../data/results';
 import { exerciseKey, saveTake } from '../data/takes';
+import { keptSpots, saveSpots } from '../data/tension';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { micBlockedBrowser } from '../shell/env';
 import { useTakes } from '../shell/hooks';
 import { pianoStep } from '../shell/piano-step';
 import { back, exRoute, exTakesRoute, navigate, routineRoute } from '../shell/router';
-import { anyOctaveFor, hearOn, hearVolume, jumpLevel, setAnyOctaveFor, setHearOn, setHearVolume, setJumpLevel } from '../shell/settings';
+import {
+  anyOctaveFor, hearOn, hearVolume, jumpLevel, levelFor, nextReminderTurn, reminderTurn, setAnyOctaveFor, setHearOn, setHearVolume, setJumpLevel, setLevelFor,
+} from '../shell/settings';
 import { review, toStored, type Review } from '../shell/take-review';
 import { useYourLine } from '../shell/your-line';
 import { BackButton } from '../ui/BackButton';
@@ -67,7 +71,7 @@ const HOP = 0.05;
 
 type View = 'preview' | 'run' | 'result';
 type Shown = { o: Outcome; noMic: boolean; range?: Range; where: 'online' | 'phone' | null };
-type About = { why: string; watch?: string; care?: string };
+type About = { why: string; watch?: string; care?: string; right?: string; steps?: readonly string[] };
 /** Long soft notes' readout: on the note within half a semitone, as the old app's interval card (next.html 23146) */
 const READ_ON = 0.5;
 
@@ -87,7 +91,17 @@ export function ExerciseScreen(props: { id?: string; routine?: string; step?: nu
   return <ExerciseFor key={e.id + ':' + (routine ?? '') + ':' + step} e={e} routine={routine} step={step} />;
 }
 
-function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | null; step: number }) {
+function ExerciseFor({ e: base, routine, step }: { e: Exercise; routine: RoutineId | null; step: number }) {
+  /* the level inside it (Robert, 3 Nov): picked in the sound sheet and
+     remembered for this exercise; in a routine, the routine's own, capped
+     at the exercise's top level */
+  const levels = levelsOf(base);
+  const [exLevel, setExLevelNow] = useState<Level>(() => (routine ? routineLevel(routine) : levelFor(base.id) ?? base.level));
+  const setExLevel = (v: Level) => {
+    setExLevelNow(v);
+    setLevelFor(base.id, v);
+  };
+  const e = useMemo(() => atLevel(base, exLevel), [base, exLevel]);
   const c = useConductor();
   const snap = useSnapshot();
   const owner = 'ex:' + e.id;
@@ -170,6 +184,22 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   /* what the mic recorded, a stretch between each pause (a sung exercise) */
   const segments = useRef<Take[]>([]);
   const [take, setTake] = useState<Review | null>(null);
+  /* the line above the map while singing: a movement cue or a tension reminder, fixed for the run */
+  const [lineNow, setLineNow] = useState<string | null>(null);
+  /* the tension check's tick list, once it is done; and where the ticks got to */
+  const [ticks, setTicks] = useState<Spot[] | null>(null);
+  const [ticksWhere, setTicksWhere] = useState<'online' | 'phone' | null>(null);
+  /* a new check replaces the old ticks: none until ticked again */
+  const openTicks = () => {
+    setTicks([]);
+    setTicksWhere(null);
+    void saveSpots([]);
+  };
+  const tick = (sp: Spot, on: boolean) => {
+    const next = SPOTS.filter((x) => (x === sp ? on : !!ticks?.includes(x)));
+    setTicks(next);
+    void saveSpots(next).then(setTicksWhere);
+  };
   const [takeSaved, setTakeSaved] = useState(false);
   const takes = useTakes(sung ? exerciseKey(e.id) : '-');
   const [shown, setShown] = useState<Shown | null>(null);
@@ -228,7 +258,9 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
       const joined = joinTakes(segments.current);
       setTake(joined ? review({ ...joined, owner }, null, HOP, anyOctave) : null);
       setTakeSaved(false);
-      void finish(s.sung ? { kind: 'pitch', hits: s.hits, n: s.n } : { kind: 'none' });
+      /* the line shown but not scored (Robert, 3 Nov) */
+      void finish(s.sung && !e.lineOnly ? { kind: 'pitch', hits: s.hits, n: s.n } : { kind: 'none' });
+      if (e.id === 'tensioncheck') openTicks();
     }
     /* stopped by leaving, hiding, a call or a stall: back to the preview */
     if (snap.state === 'stopped' && was !== 'stopped' && snap.why !== 'stop') setView('preview');
@@ -372,6 +404,12 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
 
   /* Start, Try again and Restart: from the first repeat, nothing kept */
   function start(ev: SyntheticEvent) {
+    /* the one line while singing: the movement cue, or the next tension reminder that suits it */
+    const cue = cueFor(e.id);
+    const spot = cue ? null : pickReminder(e.id, keptSpots(), reminderTurn());
+    if (spot) nextReminderTurn();
+    setLineNow(cue ?? (spot ? copy.train.remind[spot] : null));
+    setTicks(null);
     heard.current = false;
     clock.current = null;
     phase.current = { which: 'low', from: 0, low: [] };
@@ -515,6 +553,20 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   }
 
   function close() {
+    /* the tension check stopped early: the tick list still, once a round was sung */
+    if (e.id === 'tensioncheck' && view === 'run') {
+      const at = c.position();
+      const done = at != null ? rungAt(plan.notes, at) : paused ? resumeRung.current : 0;
+      if (done >= 1) {
+        if (playing) c.stop();
+        c.dropTake();
+        setPaused(false);
+        setSheet(false);
+        void finish({ kind: 'none' });
+        openTicks();
+        return;
+      }
+    }
     if (playing) c.stop();
     c.dropTake();
     setClockFrom(null);
@@ -558,6 +610,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
   /* the proper name is the title; the plain words under it (Robert, 28 Oct) */
   const name = copy.ex[e.id].name;
   const plain = (copy.ex[e.id] as { plain?: string }).plain;
+  const need = (copy.ex[e.id] as { need?: string }).need;
 
   /* the sound sheet's rows: the same behind the gear on the page and while singing */
   const sheetRows = {
@@ -580,12 +633,13 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           </>
         )}
         sheet={sheet && <SoundSheet {...sheetRows} />}
-        prompt={kind === 'interval' ? <p className="ex-line ex-jump" id="ex-jump">{jumpNow}</p> : undefined}
+        prompt={kind === 'interval' ? <p className="ex-line ex-jump" id="ex-jump">{jumpNow}</p>
+          : lineNow ? <p className="ex-line ex-cue" id="ex-cue">{lineNow}</p> : undefined}
         map={(sung || kind === 'glide') && (
           <Bubbles notes={sung ? plan.notes : []} you={line}
             now={() => c.position() ?? (!sung ? 0 : paused ? rungTime(resumeRung.current) : keepFrom.current ?? 0)}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
-            heard={kind === 'interval' ? plan.played : undefined} />
+            heard={kind === 'interval' ? plan.played : undefined} scored={!e.lineOnly} />
         )}
         dots={sung && (
           <div className="dots" id="ex-dots" role="img" aria-label={copy.train.rungs}>
@@ -660,7 +714,7 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
         {kind === 'guided' && (
           <>
             <div className="ex-big" id="ex-clock">{clockText(elapsed)}</div>
-            <p className="ex-line">{copy.ex[e.id].how}</p>
+            <ol className="ex-steps">{stepsFor(e.id).map((t) => <li key={t}>{t}</li>)}</ol>
             <p className="hint">{copy.train.guided}</p>
           </>
         )}
@@ -687,12 +741,17 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
       )}
       <h1 id="ex-name">{name}</h1>
       {plain && <p className="ex-plain" id="ex-plain">{plain}</p>}
+      {/* the plain one-line description (Robert, 3 Nov) */}
+      <p className="ex-desc" id="ex-goal">{copy.ex[e.id].goal}</p>
       <div className="tags" id="ex-tags">
         <span className="tag" data-colour={cat.colour}>{copy.cats[e.category]}</span>
       </div>
-      {'needs' in copy.ex[e.id] && <p className="ex-line" id="ex-needs">{(copy.ex[e.id] as { needs: string }).needs}</p>}
 
-      {sheet && view === 'preview' && <SoundSheet {...sheetRows} level={kind === 'interval' ? { value: level, set: setLevel } : undefined} />}
+      {sheet && view === 'preview' && (
+        <SoundSheet {...sheetRows}
+          level={kind === 'interval' ? { value: level, set: setLevel, label: copy.train.jumpLevel, options: [1, 2, 3] }
+            : levels.length > 1 && !routine ? { value: e.level, set: setExLevel, label: copy.train.level, options: levels.map((x) => x.level) } : undefined} />
+      )}
 
       {view === 'result' && shown && (
         <section className="card ex-result" id="ex-result">
@@ -723,8 +782,20 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           )}
           {shown.o.kind === 'none' && !shown.range && (
             <p className="hint" id="ex-unscored">
-              {shown.noMic ? copy.train.noMicScore : measures(e) === 'none' ? copy.train.notScored : copy.train.nothingSung}
+              {shown.noMic ? copy.train.noMicScore : e.lineOnly ? copy.train.lineOnly : measures(e) === 'none' ? copy.train.notScored : copy.train.nothingSung}
             </p>
+          )}
+          {ticks && (
+            <fieldset className="ticks" id="tension-ticks">
+              <legend className="ex-label">{copy.train.tensionHead}</legend>
+              {SPOTS.map((sp) => (
+                <label key={sp} className="tick-row">
+                  <input type="checkbox" id={'tick-' + sp} checked={ticks.includes(sp)} onChange={(ev) => tick(sp, ev.target.checked)} />
+                  <span>{copy.train.tension[sp]}</span>
+                </label>
+              ))}
+              {ticksWhere && ticks.length > 0 && <p className="hint" id="tension-saved">{copy.train.tensionSaved}</p>}
+            </fieldset>
           )}
           {shown.where && <p className="hint" id="ex-saved">{shown.where === 'online' ? copy.train.saved : copy.train.savedPhone}</p>}
           <div className="ex-actions">
@@ -750,15 +821,22 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
 
       {view === 'preview' && (
         <>
+          {need && (
+            <>
+              <p className="ex-label">{copy.train.need}</p>
+              <p className="ex-line" id="ex-needs">{need}</p>
+            </>
+          )}
           {sung && (
             <PatternCard notes={pattern} colour={cat.colour} playing={previewing} now={() => c.position() ?? -1} onPlay={hearPattern} />
           )}
-          <p className="ex-label">{copy.train.goal}</p>
-          <p className="ex-line" id="ex-goal">{copy.ex[e.id].goal}</p>
-          <p className="ex-label">{copy.train.how}</p>
-          <p className="ex-line" id="ex-how">{copy.ex[e.id].how}</p>
+          <p className="ex-label">{copy.train.howTo}</p>
+          <ol className="ex-steps" id="ex-how">
+            {stepsFor(e.id).map((t) => <li key={t}>{t}</li>)}
+          </ol>
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
-            data-round={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
+            data-round={sung ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
+            data-rounds={kind === 'ladder' ? JSON.stringify(rungStarts(plan.notes).map((i) => plan.notes[i].m)) : undefined}
             data-played={kind === 'interval' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
             data-shapes={plan.shapes ? JSON.stringify(plan.shapes) : undefined}
             data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
@@ -776,20 +854,22 @@ function ExerciseFor({ e, routine, step }: { e: Exercise; routine: RoutineId | n
           )}
           {about && more && (
             <section className="card about" id="ex-about">
-              <p className="ex-label">{copy.train.why}</p>
+              {/* Robert, 3 Nov: doing it right, then watch out (care points at its end, so nothing is lost), then why */}
+              {about.right && (
+                <>
+                  <p className="ex-label">{copy.train.right}</p>
+                  <p>{about.right}</p>
+                </>
+              )}
+              {(about.watch || about.care) && (
+                <>
+                  <p className="ex-label">{copy.train.watchOut}</p>
+                  {about.watch && <p>{about.watch}</p>}
+                  {about.care && <p>{about.care}</p>}
+                </>
+              )}
+              <p className="ex-label">{copy.train.whyHelps}</p>
               <p>{about.why}</p>
-              {about.watch && (
-                <>
-                  <p className="ex-label">{copy.train.watchFor}</p>
-                  <p>{about.watch}</p>
-                </>
-              )}
-              {about.care && (
-                <>
-                  <p className="ex-label">{copy.train.care}</p>
-                  <p>{about.care}</p>
-                </>
-              )}
             </section>
           )}
         </>

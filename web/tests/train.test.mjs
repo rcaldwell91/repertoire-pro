@@ -18,7 +18,7 @@ import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
 import { firstNote, pcm, pitchTrack, singNotes, steadyNote } from './voice.mjs';
 import { copy, fill } from '../src/core/copy.ts';
 import { SUPABASE_KEY, SUPABASE_URL } from '../src/data/config.ts';
-import { EMAIL, password } from './test-account.mjs';
+import { COACH_EMAIL, EMAIL, password } from './test-account.mjs';
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
 const REPO = resolve(WEB, '..');
@@ -34,13 +34,14 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'singing-screen',
+const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'pause-resume', 'ex-take', 'ex-takes-page', 'restart', 'pause-gear', 'pause-others',
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
-  'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'no-page-errors'];
+  'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
+  'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
-const GROUPS = { warmup: 7, breath: 6, tone: 11, agility: 10, range: 5, words: 7, pitch: 3 };
+const GROUPS = { warmup: 12, breath: 6, tone: 12, agility: 10, range: 5, words: 7, pitch: 3 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
 /** the count-in beep: the one short sound the app makes itself */
 const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
@@ -85,6 +86,8 @@ const keyNameOf = (m) => ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯
 const b64 = (v) => v.buffer.toString('base64');
 const sing = (notes, opts) => b64(singNotes(FFMPEG, SOURCE, STEADY, notes, tmp, opts));
 const MUM = ladder('five', 120, RANGE);
+/* the Intermediate warm-up's steps, for its La-Ga */
+const ROUTINE_INTERMEDIATE = ['hiss', 'farinelli', 'liptrill', 'descend', 'mum', 'mee', 'tongueout', 'laga', 'nay', 'wah', 'staccato', 'ninetone'];
 
 const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
 const env = await launch({ mic: SILENCE, allowMic: true, online: ONLINE });
@@ -157,6 +160,19 @@ const exLength = (notes) => Math.max(...notes.map((n) => n.t + n.d));
 /** when this run began: what it put online since then is its own */
 const RUN_FROM = new Date(Date.now() - 60000).toISOString();
 /** the test singer's own key for the database, as the app would hold it */
+/** a test account's own key and id */
+const signedIn = (email) => JSON.parse(execFileSync('curl', ['-sS', '-X', 'POST', SUPABASE_URL + '/auth/v1/token?grant_type=password', '-H', 'apikey: ' + SUPABASE_KEY,
+  '-H', 'content-type: application/json', '--data', JSON.stringify({ email, password: password(email) })], { encoding: 'utf8' }));
+/** the database's own answer to a request, as that person (or no one) */
+const rest = (method, path, token, body) => {
+  const out = execFileSync('curl', ['-sS', '-w', '\n%{http_code}', '-X', method, SUPABASE_URL + '/rest/v1/' + path, '-H', 'apikey: ' + SUPABASE_KEY,
+    '-H', 'authorization: Bearer ' + (token || SUPABASE_KEY), '-H', 'content-type: application/json', '-H', 'prefer: return=representation',
+    ...(body ? ['--data', JSON.stringify(body)] : [])], { encoding: 'utf8' });
+  const at = out.lastIndexOf('\n');
+  let data = null;
+  try { data = JSON.parse(out.slice(0, at)); } catch { /* not JSON */ }
+  return { status: +out.slice(at + 1), data };
+};
 const singerToken = () => JSON.parse(execFileSync('curl', ['-sS', '-X', 'POST', SUPABASE_URL + '/auth/v1/token?grant_type=password', '-H', 'apikey: ' + SUPABASE_KEY,
   '-H', 'content-type: application/json', '--data', JSON.stringify({ email: EMAIL, password: password(EMAIL) })], { encoding: 'utf8' })).access_token;
 /** what the phone keeps in a store of the app's own database */
@@ -320,7 +336,7 @@ try {
       lit: document.querySelectorAll('#pattern .pdash[data-now]').length, syl: document.querySelector('#pattern-syl')?.textContent,
       dashes: [...document.querySelectorAll('#pattern .pdash i')].map((d) => { const r = d.getBoundingClientRect(); return { top: r.top, h: r.height, w: r.width }; }),
       gap: document.querySelector('.ex-label').getBoundingClientRect().top - document.querySelector('#pattern').getBoundingClientRect().bottom,
-      goal: document.querySelector('#ex-goal')?.textContent, how: document.querySelector('#ex-how')?.textContent,
+      goal: document.querySelector('#ex-goal')?.textContent, how: [...document.querySelectorAll('#ex-how li')].map((l) => l.textContent),
       start: document.querySelector('#ex-start')?.textContent, more: document.querySelector('#ex-more')?.textContent,
       sheet: !!document.querySelector('#sound-sheet'), anyOctave: !!document.querySelector('#any-octave'), started: window.__probe.started })`);
     await sleep(1500);
@@ -340,9 +356,9 @@ try {
     const melody = d.length === 9 && d[4].top < Math.min(...d.filter((_, i) => i !== 4).map((x) => x.top)) && Math.abs(d[0].top - d[8].top) < 1 &&
       d[0].top >= Math.max(...d.map((x) => x.top)) - 1 && d.every((x) => x.h <= 10) && d[8].w > 1.5 * d[0].w;
     check('preview', v.back && v.name === copy.ex.mum.name && v.tags.join('|') === copy.cats.tone && melody && v.gap <= 30 && v.bars === 9 && v.lit === 0 && v.syl === '' &&
-      v.goal === copy.ex.mum.goal && v.how === copy.ex.mum.how && v.start === copy.train.start && v.more === copy.train.moreAbout && !v.sheet && !v.anyOctave &&
+      v.goal === copy.ex.mum.goal && JSON.stringify(v.how) === JSON.stringify(copy.about.mum.steps) && v.start === copy.train.start && v.more === copy.train.moreAbout && !v.sheet && !v.anyOctave &&
       v.started === 0 && still === 0 && played && litUp && sylShown === copy.ex.mum.syl && gum === 0 && stopped && sylGone === '',
-      `"${v.name}", tags ${v.tags.join(' / ')}; ${v.bars} dashes as a melody line ${melody} (${v.gap.toFixed(0)} px to Goal), none lit; goal "${v.goal}"; how "${v.how}"; "${v.start}", "${v.more}"; ` +
+      `"${v.name}", tags ${v.tags.join(' / ')}; ${v.bars} dashes as a melody line ${melody} (${v.gap.toFixed(0)} px to Goal), none lit; "${v.goal}"; ${v.how.length} steps; "${v.start}", "${v.more}"; ` +
       `the sheet closed ${!v.sheet}, Any octave off the page ${!v.anyOctave}; nothing played before the tap (${still}); on the button: played ${played}, a bar lit ${litUp}, ` +
       `"${sylShown}" under the card, mic asked ${gum}; a second tap stops it ${stopped}, the syllable goes ${sylGone === ''}`);
   }
@@ -423,9 +439,12 @@ try {
     const a = await page.eval(`({ labels: [...document.querySelectorAll('#ex-about .ex-label')].map((l) => l.textContent), text: document.querySelector('#ex-about').textContent })`);
     await page.tap('#ex-more');
     const gone = await page.eval(`!document.querySelector('#ex-about')`);
-    check('more-about', !before && after && JSON.stringify(a.labels) === JSON.stringify([copy.train.why, copy.train.watchFor, copy.train.care]) &&
-      a.text.includes(copy.about.mum.why) && a.text.includes(copy.about.mum.watch) && a.text.includes(copy.about.mum.care) && gone,
-      `closed at first ${!before}; opened ${after} with ${a.labels.join(', ')}, the old app's words ${a.text.includes(copy.about.mum.why)}; closed again ${gone}`);
+    /* Robert, 3 Nov: doing it right, then watch out (its care points at the end), then why it helps */
+    const order = a.text.indexOf(copy.about.mum.right) < a.text.indexOf(copy.about.mum.watch) &&
+      a.text.indexOf(copy.about.mum.watch) < a.text.indexOf(copy.about.mum.care) && a.text.indexOf(copy.about.mum.care) < a.text.indexOf(copy.about.mum.why);
+    check('more-about', !before && after && JSON.stringify(a.labels) === JSON.stringify([copy.train.right, copy.train.watchOut, copy.train.whyHelps]) &&
+      order && a.text.includes(copy.about.mum.why) && a.text.includes(copy.about.mum.watch) && a.text.includes(copy.about.mum.care) && gone,
+      `closed at first ${!before}; opened ${after} with ${a.labels.join(', ')}, in that order with the care points at the end of watch out ${order}; closed again ${gone}`);
   }
 
   /* 2c'. The proper name is the title, the plain name a small line under it, on the page and in the list; no "Also called" (Robert, 28 Oct) */
@@ -509,6 +528,21 @@ try {
     check('start-only', before.s === 0 && before.gum === 0 && ['3', '2', '1'].every((x) => counts.has(x)) &&
       JSON.stringify(controls) === JSON.stringify(['ex-close', 'ex-pause', 'ex-restart', 'ex-gear-run']),
       `before Start: notes ${before.s}, mic asked ${before.gum}; counted ${[...counts].join(', ')}; controls while singing: ${controls.join(', ')}`);
+  }
+
+  /* 3a. On a narrow phone (360 px), every control along the bottom inside the screen (3 Nov) */
+  if (want('narrow-controls')) {
+    await page.c.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 780, deviceScaleFactor: 2, mobile: true });
+    await openEx('mum');
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(`!!document.querySelector('#ex-run')`, 3000);
+    const fits = await page.eval(`(() => { const w = document.documentElement.clientWidth;
+      return ['#ex-pause', '#ex-restart', '#ex-gear-run', '#ex-close'].map((q) => { const r = document.querySelector(q)?.getBoundingClientRect();
+        return { q, ok: !!r && r.left >= 0 && r.right <= w && r.width >= 44 }; }); })()`);
+    await page.tap('#ex-close');
+    await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    check('narrow-controls', fits.every((f) => f.ok), fits.map((f) => `${f.q} ${f.ok ? 'inside' : 'OFF THE SCREEN'}`).join(', '));
   }
 
   /* 3b. The singing screen (Robert, 24 Oct): the note map fills the screen,
@@ -639,16 +673,21 @@ try {
       `"${a}", then "${b}"; mic asked ${mic}; after Done: "${un}"`);
   }
 
-  /* 10. A guided exercise: the how and a clock; Done; not scored */
+  /* 10. A guided exercise, the Posture check (Robert, 3 Nov): its steps and a clock, no pitch line; Done; not scored */
   if (want('guided')) {
-    await openEx('straw');
+    await openEx('posture');
+    const need = await text('#ex-needs');
     await page.tap('#ex-start');
     await sleep(2200);
     const clock = await text('#ex-clock');
+    const run = await page.eval(`({ steps: document.querySelectorAll('#ex-run .ex-steps li').length, map: !!document.querySelector('#bubbles'), mic: window.__probe.gum,
+      line: document.querySelector('#ex-cue')?.textContent ?? null })`);
     await page.tap('#ex-done');
     await result(3000);
     const un = await text('#ex-unscored');
-    check('guided', clock === '0:02' && un === copy.train.notScored, `the clock at ${clock}; after Done: "${un}"`);
+    check('guided', clock === '0:02' && un === copy.train.notScored && need === copy.ex.posture.need && run.steps === copy.about.posture.steps.length &&
+      !run.map && run.mic === 0 && run.line === null,
+      `Posture check: "You'll need: ${need}"; while doing it: ${run.steps} steps, the clock at ${clock}, a pitch line ${run.map}, mic asked ${run.mic}, a reminder ${run.line}; after Done: "${un}"`);
   }
 
   /* 11. The range check: four seconds low, four high, by a real voice; kept, and shown on Train */
@@ -745,10 +784,11 @@ try {
     await page.goto(URL_APP + '?load=' + ++loads + '#/train/routine/cooldown/0');
     await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
     const step1 = await text('#routine-step');
+    /* Straw is sung now (Robert, 3 Nov), at the Cool-down's level, 1-2-3-2-1: sung through, then its result */
+    const strawLevel = await page.eval(`JSON.parse(document.querySelector('#pattern') ? JSON.stringify(document.querySelectorAll('#pattern .pdash').length) : '0')`);
+    await noSinger();
     await page.tap('#ex-start');
-    await sleep(500);
-    await page.tap('#ex-done');
-    await result(3000);
+    await result(60000);
     const next = await text('#ex-next');
     await sleep(3000);
     const stayed = await page.eval(`location.hash`);
@@ -758,10 +798,194 @@ try {
     const paused = await page.eval(`({ s: window.__probe.started, live: window.__probe.live.size, start: !!document.querySelector('#ex-start'), end: !!document.querySelector('#end-session') })`);
     await page.tap('#end-session');
     const home = await page.waitFor(`location.hash === '#/train'`, 3000);
-    check('routine', step1 === fill(copy.train.step, { name: copy.routineNames.cooldown, i: 1, n: 3 }) && next === fill(copy.train.next, { name: copy.ex.hum.name }) &&
+    check('routine', step1 === fill(copy.train.step, { name: copy.routineNames.cooldown, i: 1, n: 3 }) && strawLevel === 5 && next === fill(copy.train.next, { name: copy.ex.hum.name }) &&
       stayed === '#/train/routine/cooldown/0' && paused.live === 0 && paused.start && paused.end && home,
-      `"${step1}"; after it: "${next}", and three seconds later still on that step ${stayed === '#/train/routine/cooldown/0'}; ` +
+      `"${step1}", Straw at the Cool-down's level (${strawLevel} notes, 1-2-3-2-1); after it: "${next}", and three seconds later still on that step ${stayed === '#/train/routine/cooldown/0'}; ` +
       `the next step paused (playing ${paused.live}, Start ${paused.start}, End session ${paused.end}); End session back to Train ${home}`);
+  }
+
+  /* 3 Nov (Robert's spec). The exercise page: title, plain line, You'll
+     need, How to do it as numbered steps, Start; behind More about this,
+     doing it right, watch out (care at its end), why it helps */
+  if (want('page-layout')) {
+    await openEx('laga');
+    const v = await page.eval(`(() => {
+      const main = document.querySelector('main');
+      const order = ['#ex-name', '#ex-goal', '#ex-needs', '#ex-how', '#ex-start'].map((q) => document.querySelector(q));
+      const tops = order.map((el) => (el ? el.getBoundingClientRect().top : NaN));
+      return { title: order[0]?.textContent, line: order[1]?.textContent, need: order[2]?.textContent,
+        steps: [...document.querySelectorAll('#ex-how li')].map((l) => l.textContent), numbered: document.querySelector('#ex-how')?.tagName,
+        inOrder: tops.every((t, i) => i === 0 || t > tops[i - 1]), labels: [...main.querySelectorAll('.ex-label')].map((l) => l.textContent) };
+    })()`);
+    await page.tap('#ex-more');
+    const a = await page.eval(`[...document.querySelectorAll('#ex-about .ex-label')].map((l) => l.textContent)`);
+    const ok = v.title === copy.ex.laga.name && v.line === copy.ex.laga.goal && v.need === copy.ex.laga.need && v.numbered === 'OL' &&
+      JSON.stringify(v.steps) === JSON.stringify(copy.about.laga.steps) && v.inOrder && JSON.stringify(v.labels) === JSON.stringify([copy.train.need, copy.train.howTo]) &&
+      JSON.stringify(a) === JSON.stringify([copy.train.right, copy.train.watchOut, copy.train.whyHelps]);
+    check('page-layout', ok, `"${v.title}", "${v.line}", You'll need "${v.need}", ${v.steps.length} numbered steps, then Start, in that order ${v.inOrder}; ` +
+      `on the page: ${v.labels.join(', ')}; behind More about this: ${a.join(', ')}`);
+  }
+
+  /* 3 Nov: levels inside La-Ga, Bratty Nay and Straw, picked in the gear's
+     sheet and remembered for that exercise; the list row shows the span; a
+     routine uses its own level */
+  if (want('levels')) {
+    await openEx('laga');
+    await page.eval(`localStorage.removeItem('rp.level.laga'); localStorage.removeItem('rp.level.nay')`);
+    await openEx('laga');
+    const dashes = () => page.eval(`document.querySelectorAll('#pattern .pdash').length`);
+    const first = await dashes();
+    await page.tap('#ex-gear');
+    const options = await page.eval(`[...document.querySelectorAll('#jump-level [role=radio]')].map((b) => b.textContent)`);
+    await page.tap('#level-3');
+    const top = await dashes();
+    await openEx('laga');
+    const kept = await dashes();
+    await openEx('nay');
+    const nay = await dashes();
+    await page.tap('#ex-gear');
+    const nayOptions = await page.eval(`[...document.querySelectorAll('#jump-level [role=radio]')].map((b) => b.textContent)`);
+    await go('/train');
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/agility');
+    await page.waitFor(`!!document.querySelector('#ex-laga')`, 5000);
+    const row = await page.eval(`document.querySelector('#ex-laga .ex-tags')?.textContent`);
+    /* the Intermediate warm-up sings La-Ga's five-note scale, whatever was picked on its page */
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/routine/intermediate/' + ROUTINE_INTERMEDIATE.indexOf('laga'));
+    await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
+    const inRoutine = await dashes();
+    await page.tap('#ex-gear');
+    const noPicker = await page.eval(`!document.querySelector('#jump-level')`);
+    await page.eval(`localStorage.removeItem('rp.level.laga')`);
+    check('levels', first === 5 && JSON.stringify(options) === JSON.stringify([copy.levels[1], copy.levels[2], copy.levels[3]]) && top === 11 && kept === 11 &&
+      nay === 9 && JSON.stringify(nayOptions) === JSON.stringify([copy.levels[1], copy.levels[2]]) &&
+      row === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[3] }), measure: copy.train.tagPitch }) &&
+      inRoutine === 9 && noPicker,
+      `La-Ga at first ${first} notes (1-2-3-2-1); levels ${options.join(', ')}; Advanced ${top} notes, remembered ${kept}; Bratty Nay ${nay} notes (${nayOptions.join(', ')}); ` +
+      `the list row "${row}"; in the Intermediate warm-up ${inRoutine} notes, no level picker there ${noPicker}`);
+  }
+
+  /* 3 Nov: these exercises climb a half step every round, however many rounds */
+  if (want('climb')) {
+    const wide = { lo: HOME - 12, hi: HOME + 12 };
+    await openEx('laga', wide);
+    await page.eval(`localStorage.removeItem('rp.level.laga')`);
+    await openEx('laga', wide);
+    const lagaRounds = await page.eval(`(() => { const r = JSON.parse(document.querySelector('#ex-start').dataset.rounds || '[]'); return r; })()`);
+    await openEx('mum', wide);
+    const mumRounds = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.rounds || '[]')`);
+    const steps = (r) => r.every((x, i) => i === 0 || x - r[i - 1] === 1);
+    check('climb', lagaRounds.length === wide.hi - 4 - wide.lo && lagaRounds[0] === wide.lo + 1 && steps(lagaRounds) && mumRounds.length <= 14,
+      `a two-octave range: La-Ga ${lagaRounds.length} rounds, from ${lagaRounds[0]} a half step each ${steps(lagaRounds)}; Mum keeps the old app's 14 at most (${mumRounds.length})`);
+  }
+
+  /* 3 Nov: Cheek puffs (and Straw, Chew and hum, the tension check): the line shown, not scored */
+  if (want('line-only')) {
+    await go('/train');
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/warmup');
+    await page.waitFor(`!!document.querySelector('#ex-cheekpuffs')`, 5000);
+    const rows = await page.eval(`Object.fromEntries(['straw', 'cheekpuffs', 'chewhum', 'tensioncheck'].map((id) => [id, document.querySelector('#ex-' + id + ' .ex-tags')?.textContent]))`);
+    await openEx('cheekpuffs');
+    const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    const notes = round.map(([m, t, d]) => ({ m, t, d }));
+    await singer(sing(notes));
+    await page.tap('#ex-start');
+    await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
+    await sleep(4000);
+    const during = await page.eval(`({ map: !!document.querySelector('#bubbles'), you: +document.querySelector('#bubbles').dataset.you, fill: document.querySelector('#bubbles').dataset.fill })`);
+    await result(exLength(notes) * 1000 + 15000);
+    const r = await page.eval(`({ score: document.querySelector('#ex-score')?.textContent ?? null, un: document.querySelector('#ex-unscored')?.textContent ?? null,
+      take: !!document.querySelector('#ex-take-save') })`);
+    const notScored = Object.values(rows).every((x) => (x || '').endsWith(copy.train.tagNone));
+    check('line-only', notScored && during.map && during.you > 0 && during.fill.split(',').every((f) => +f === 0) && r.score === null && r.un === copy.train.lineOnly && r.take,
+      `the list rows: ${Object.entries(rows).map(([k, x]) => k + ' "' + x + '"').join(', ')}; Cheek puffs sung by a real voice: the line drawn (${during.you} points), ` +
+      `no bubble filled ${during.fill.split(',').every((f) => +f === 0)}; at the end no score, "${r.un}", Save take ${r.take}`);
+  }
+
+  /* 3 Nov: the movement cue, one line above the map from the moment the singing screen opens; the map never jumps */
+  if (want('cue-line')) {
+    const cueOn = async (id) => {
+      await openEx(id);
+      await noSinger();
+      await page.tap('#ex-start');
+      await page.waitFor(`!!document.querySelector('#ex-run')`, 3000);
+      const a = await page.eval(`({ cue: document.querySelector('#ex-cue')?.textContent ?? null, h: document.querySelector('#bubbles')?.getBoundingClientRect().height ?? 0,
+        lines: (() => { const c = document.querySelector('#ex-cue'); return c ? Math.round(c.getBoundingClientRect().height / parseFloat(getComputedStyle(c).lineHeight)) : 0; })() })`);
+      await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
+      await sleep(800);
+      const b = await page.eval(`({ cue: document.querySelector('#ex-cue')?.textContent ?? null, h: document.querySelector('#bubbles')?.getBoundingClientRect().height ?? 0 })`);
+      await page.tap('#ex-close');
+      return { id, a, b };
+    };
+    const got = [];
+    for (const id of ['mum', 'straw', 'cheekpuffs', 'chewhum', 'tonguefwd']) got.push(await cueOn(id));
+    const ok = got.every(({ id, a, b }) => a.cue === copy.ex[id].cue && b.cue === a.cue && Math.abs(a.h - b.h) < 1);
+    check('cue-line', ok, got.map(({ id, a, b }) => `${id}: "${a.cue}" (${a.lines} line${a.lines === 1 ? '' : 's'}), the map ${a.h.toFixed(0)} px before the count-in, ${b.h.toFixed(0)} px singing`).join('; '));
+  }
+
+  /* 3 Nov: the "Ah" tension check: after the last round, the tick list;
+     each tick kept on the phone as it is tapped; a new check replaces the old */
+  if (want('tension-ticks', 'reminders')) {
+    await openEx('tensioncheck');
+    await page.eval(`localStorage.setItem('rp.tension', JSON.stringify({ spots: ['chin', 'jaw', 'wide', 'face', 'tongue', 'neck'] }))`);
+    const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    const notes = round.map(([m, t, d]) => ({ m, t, d }));
+    await singer(sing(notes));
+    await page.tap('#ex-start');
+    await result(exLength(notes) * 1000 + 15000);
+    const list = await page.eval(`({ head: document.querySelector('#tension-ticks legend')?.textContent, labels: [...document.querySelectorAll('#tension-ticks .tick-row span')].map((x) => x.textContent),
+      ticked: document.querySelectorAll('#tension-ticks input:checked').length, kept: JSON.parse(localStorage.getItem('rp.tension') || '{}').spots })`);
+    await page.tap('#tick-jaw');
+    await page.tap('#tick-face');
+    await sleep(300);
+    const kept = await page.eval(`JSON.parse(localStorage.getItem('rp.tension') || '{}').spots`);
+    if (want('tension-ticks')) {
+      const labels = ['chin', 'jaw', 'wide', 'face', 'tongue', 'neck'].map((k) => copy.train.tension[k]);
+      check('tension-ticks', list.head === copy.train.tensionHead && JSON.stringify(list.labels) === JSON.stringify(labels) && list.ticked === 0 &&
+        JSON.stringify(list.kept) === '[]' && JSON.stringify(kept) === JSON.stringify(['jaw', 'face']),
+        `after the last round: "${list.head}" with ${list.labels.join(', ')}; none ticked, and the old six cleared ${JSON.stringify(list.kept) === '[]'}; ` +
+        `ticked Jaw and Face: kept on the phone at once ${JSON.stringify(kept)}`);
+    }
+    /* the reminders: one line, rotating, never one that contradicts the exercise */
+    if (want('reminders')) {
+      const lineOn = async (id) => {
+        await openEx(id);
+        await noSinger();
+        await page.tap('#ex-start');
+        await page.waitFor(`!!document.querySelector('#ex-run')`, 3000);
+        const l = await page.eval(`document.querySelector('#ex-cue')?.textContent ?? null`);
+        await page.tap('#ex-close');
+        return l;
+      };
+      await page.eval(`localStorage.setItem('rp.tension.turn', '0')`);
+      const mee1 = await lineOn('mee'), mee2 = await lineOn('mee'), mee3 = await lineOn('mee');
+      const chew = await lineOn('chewhum');
+      const interval = await lineOn('interval');
+      /* only reminders that contradict Bratty Nay ticked (its wide mouth, its acting face): none there */
+      await page.eval(`localStorage.setItem('rp.tension', JSON.stringify({ spots: ['wide', 'face'] }))`);
+      const nay = await lineOn('nay');
+      await page.eval(`localStorage.setItem('rp.tension', JSON.stringify({ spots: [] }))`);
+      const none = await lineOn('mee');
+      const r = copy.train.remind;
+      check('reminders', mee1 === r.jaw && mee2 === r.face && mee3 === r.jaw && nay === null && chew === copy.ex.chewhum.cue && interval === null && none === null,
+        `with Jaw and Face ticked, Mee each start: "${mee1}", "${mee2}", "${mee3}"; Chew and hum its cue "${chew}"; Sing the interval ${interval}; ` +
+        `with only Mouth going wide and Face ticked, Bratty Nay (a wide mouth, an acting face) ${nay}; with none ticked ${none}`);
+    }
+  }
+
+  /* 3 Nov: stopped before the last round, the tick list still, once a round was sung; not before */
+  if (want('tension-early')) {
+    await openEx('tensioncheck');
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
+    await sleep(500);
+    await page.tap('#ex-close');
+    const tooSoon = await page.eval(`({ list: !!document.querySelector('#tension-ticks'), page: !!document.querySelector('#ex-start') })`);
+    await page.tap('#ex-start');
+    await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 20000);
+    await page.tap('#ex-close');
+    const after = await page.waitFor(`!!document.querySelector('#tension-ticks')`, 3000);
+    check('tension-early', !tooSoon.list && tooSoon.page && after, `closed in the first round: back to the page, no list ${!tooSoon.list}; closed after a round: the tick list ${after}`);
   }
 
   /* 14a. Pause, Resume and the take (Robert, 28 Oct), by a real voice: Pause
@@ -971,7 +1195,7 @@ try {
     await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/bay');
     await page.waitFor(`!!document.querySelector('main p.problem')`, 5000);
     const bay = await text('main p.problem');
-    const ok = straw === copy.ex.straw.needs && loo.name === 'Loo' && leap.n === 3 && leap.pitches[1] - leap.pitches[0] === 12 && leap.pitches[2] === leap.pitches[0] &&
+    const ok = straw === copy.ex.straw.need && loo.name === 'Loo' && leap.n === 3 && leap.pitches[1] - leap.pitches[0] === 12 && leap.pitches[2] === leap.pitches[0] &&
       red.n === copy.ex.redleather.syls.length && JSON.stringify(redSyls) === JSON.stringify(copy.ex.redleather.syls) &&
       ny.n === copy.ex.uniqueny.syls.length && JSON.stringify(nySyls) === JSON.stringify(copy.ex.uniqueny.syls) && bay === copy.train.missing;
     check('content', ok, `straw: "${straw}"; "${loo.name}"; Octave leaps ${leap.pitches.join(', ')}; Red leather ${red.n} notes: ${redSyls.join(' ')}; ` +
@@ -1149,7 +1373,7 @@ try {
     await go('/train');
     await page.eval(`localStorage.setItem('rp.results', JSON.stringify([{ kind: 'practice', label: 'Bratty Bay', app_ex_id: 'bay', score: 9, out_of: 10, pct: 90,
       created_at: '2026-10-20T10:00:00Z', online: false }, ...JSON.parse(localStorage.getItem('rp.results') || '[]')]))`);
-    await openEx('straw');
+    await openEx('pulses');
     await page.tap('#ex-start');
     await sleep(500);
     await page.tap('#ex-done');
@@ -1162,25 +1386,25 @@ try {
   if (want('progress-phone')) {
     const kept = await page.eval(`JSON.parse(localStorage.getItem('rp.results') || '[]')`);
     const mum = kept.find((r) => r.app_ex_id === 'mum' && r.out_of != null);
-    const straw = kept.find((r) => r.app_ex_id === 'straw');
+    const straw = kept.find((r) => r.app_ex_id === 'pulses');
     check('progress-phone', !!mum && mum.score >= 0 && mum.out_of === MUM.length && mum.pct === Math.round((100 * mum.score) / mum.out_of) && !!straw && straw.score == null,
-      `kept on the phone: ${kept.length}; Mum ${mum ? mum.score + ' of ' + mum.out_of + ', ' + mum.pct + '%' : 'missing'}; Straw with no number ${!!straw && straw.score == null}`);
+      `kept on the phone: ${kept.length}; Mum ${mum ? mum.score + ' of ' + mum.out_of + ', ' + mum.pct + '%' : 'missing'}; Breath pulses with no number ${!!straw && straw.score == null}`);
   }
 
   /* 16. Signed in as the test singer: the result reaches the account (RP_ONLINE=1) */
   if (want('progress-online') && ONLINE) {
     await signIn();
     const t0 = new Date(Date.now() - 5000).toISOString();
-    await openEx('straw');
+    await openEx('pulses');
     await page.tap('#ex-start');
     await sleep(500);
     await page.tap('#ex-done');
     await page.waitFor(`!!document.querySelector('#ex-saved')`, 10000);
     const saidWhere = await text('#ex-saved');
     const token = singerToken();
-    const rows = JSON.parse(execFileSync('curl', ['-sS', SUPABASE_URL + `/rest/v1/results?select=app_ex_id,kind,label,score,created_at&app_ex_id=eq.straw&created_at=gte.${encodeURIComponent(t0)}`,
+    const rows = JSON.parse(execFileSync('curl', ['-sS', SUPABASE_URL + `/rest/v1/results?select=app_ex_id,kind,label,score,created_at&app_ex_id=eq.pulses&created_at=gte.${encodeURIComponent(t0)}`,
       '-H', 'apikey: ' + SUPABASE_KEY, '-H', 'authorization: Bearer ' + token], { encoding: 'utf8' }));
-    check('progress-online', saidWhere === copy.train.saved && rows.length >= 1 && rows[0].label === copy.ex.straw.name && rows[0].score == null,
+    check('progress-online', saidWhere === copy.train.saved && rows.length >= 1 && rows[0].label === copy.ex.pulses.name && rows[0].score == null,
       `said "${saidWhere}"; on the account: ${rows.length} row(s) ${rows[0] ? JSON.stringify({ label: rows[0].label, kind: rows[0].kind, score: rows[0].score }) : ''}`);
   }
 
@@ -1228,11 +1452,48 @@ try {
     }
   }
 
+  /* 18. The tension ticks on the account (RP_ONLINE=1): only the singer can
+         read or change them, the database's rule; tried as the singer's own
+         linked coach, the second test account, and as no one */
+  if (want('tension-online') && ONLINE) {
+    await signIn();
+    await openEx('tensioncheck');
+    const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    await noSinger();
+    await page.tap('#ex-start');
+    await result(exLength(round.map(([m, t, d]) => ({ m, t, d }))) * 1000 + 15000);
+    await page.tap('#tick-chin');
+    await page.tap('#tick-neck');
+    const said = await page.waitFor(`!!document.querySelector('#tension-saved')`, 8000) ? await text('#tension-saved') : null;
+    await sleep(1500);
+    const me = signedIn(EMAIL), coach = signedIn(COACH_EMAIL);
+    const own = rest('GET', `tension_spots?select=spots&user_id=eq.${me.user.id}`, me.access_token);
+    const coachRead = rest('GET', `tension_spots?select=spots&user_id=eq.${me.user.id}`, coach.access_token);
+    const coachEdit = rest('PATCH', `tension_spots?user_id=eq.${me.user.id}`, coach.access_token, { spots: ['tongue'] });
+    const coachAdd = rest('POST', 'tension_spots', coach.access_token, { user_id: me.user.id, spots: ['tongue'] });
+    const nobody = rest('GET', `tension_spots?select=spots&user_id=eq.${me.user.id}`, null);
+    const after = rest('GET', `tension_spots?select=spots&user_id=eq.${me.user.id}`, me.access_token);
+    /* a new phone: the account's ticks come back */
+    await page.eval(`localStorage.removeItem('rp.tension')`);
+    await go('/train');
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train');
+    const back = await page.waitFor(`(JSON.parse(localStorage.getItem('rp.tension') || 'null')?.spots || []).join() === 'chin,neck'`, 8000);
+    /* the test singer's row, and only it, removed again */
+    const gone = rest('DELETE', `tension_spots?user_id=eq.${me.user.id}`, me.access_token);
+    const ok = said === copy.train.tensionSaved && JSON.stringify(own.data) === JSON.stringify([{ spots: ['chin', 'neck'] }]) &&
+      Array.isArray(coachRead.data) && coachRead.data.length === 0 && Array.isArray(coachEdit.data) && coachEdit.data.length === 0 && coachAdd.status >= 400 &&
+      (nobody.status >= 400 || (Array.isArray(nobody.data) && nobody.data.length === 0)) && JSON.stringify(after.data) === JSON.stringify(own.data) && back &&
+      gone.status < 300;
+    check('tension-online', ok, `"${said}"; the singer reads ${JSON.stringify(own.data)}; their coach reads ${JSON.stringify(coachRead.data)}, ` +
+      `changes ${JSON.stringify(coachEdit.data)}, adds one for them: ${coachAdd.status}; no one signed in: ${nobody.status} ${JSON.stringify(nobody.data)}; ` +
+      `still ${JSON.stringify(after.data)}; on a new phone they come back ${back}; removed after ${gone.status}`);
+  }
+
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));
 } catch (e) {
   const why = 'the test stopped: ' + String(e.message || e).split('\n')[0];
   const said = new Set(results.map((r) => r.name));
-  for (const name of ALL) if (want(name) && !said.has(name) && (!['progress-online', 'ex-take-offline', 'ex-take-online'].includes(name) || ONLINE)) check(name, false, why);
+  for (const name of ALL) if (want(name) && !said.has(name) && (!['progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online'].includes(name) || ONLINE)) check(name, false, why);
 } finally {
   /* the exercise takes this run put on the test account, and only those, deleted (RULEBOOK: delete test takes after live tests) */
   if (ONLINE) {

@@ -8,9 +8,12 @@ import { allCopy, copy } from './copy';
    this"), which are prose: their words are checked, not their length. */
 export const BANNED = ['acapella', 'a cappella', 'stem', 'stems', 'separator', 'latency', 'f0'];
 export const MAX_WORDS = 8;
-/** an exercise's How line: one plain sentence, up to 14 words (Robert, 25 Oct) */
+/** an exercise's How line: one plain sentence, up to 14 words (Robert, 25 Oct);
+    its plain one-line description and "You'll need" the same, since the 3 Nov
+    spec's descriptions run past eight words ("Sing with your tongue out so
+    its root can't pull on your voice.") */
 export const MAX_HOW_WORDS = 14;
-export const isHow = (at: string) => /^copy\.ex\.\w+\.how$/.test(at);
+export const isHow = (at: string) => /^copy\.ex\.\w+\.(how|goal|need)$/.test(at);
 
 export function problems(lines: Array<{ at: string; text: string; prose?: boolean }>): string[] {
   const out: string[] = [];
@@ -55,14 +58,17 @@ describe('copy-lint', () => {
     const w = (n: number) => Array.from({ length: n }, (_, i) => 'w' + i).join(' ');
     expect(problems([{ at: 'copy.ex.mum.how', text: w(14) }])).toEqual([]);
     expect(problems([{ at: 'copy.ex.mum.how', text: w(15) }])).toHaveLength(1);
-    expect(problems([{ at: 'copy.ex.mum.goal', text: w(9) }])).toHaveLength(1);
+    expect(problems([{ at: 'copy.ex.mum.goal', text: w(15) }])).toHaveLength(1);
+    expect(problems([{ at: 'copy.ex.mum.cue', text: w(9) }])).toHaveLength(1);
     expect(problems([{ at: 'copy.train.how', text: w(9) }])).toHaveLength(1);
   });
 
   it('only the explanations under copy.about are prose', () => {
     const prose = allCopy().filter((l) => l.prose);
     expect(prose.length).toBeGreaterThan(50);
-    expect(prose.every((l) => l.at.startsWith('copy.about.'))).toBe(true);
+    /* and the How of an exercise with numbered steps, which is its first step (Robert, 3 Nov) */
+    expect(prose.every((l) => l.at.startsWith('copy.about.') || (/^copy\.ex\.(\w+)\.how$/.test(l.at) &&
+      'steps' in (copy.about as Record<string, object>)[l.at.split('.')[2]]))).toBe(true);
     /* the old app's exercises have them; the range check and Articulation (ours) do not */
     const ours = ['vowels', 'redleather', 'uniqueny', 'peterpiper', 'pops', 'tonguetip', 'lipstongue', 'buzz', 'raspberry', 'tonguetrill', 'pulses',
       'goo', 'guh', 'run5', 'minor5', 'penta', 'chrom', 'turns', 'arp19', 'interval', 'match', 'holdnote'];
@@ -82,9 +88,12 @@ describe('copy-lint', () => {
    syllable, so How says what to do with the body, breath or mouth, in one
    plain sentence: never which sound, never how many notes. */
 const NUMBERS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'twice', 'octave', 'notes'];
-export function howProblems(ex: Record<string, { syl: string; syls?: readonly string[]; how: string }>): string[] {
+export function howProblems(ex: Record<string, { syl: string; syls?: readonly string[]; how: string }>,
+  /** exercises with numbered steps: the 3 Nov spec replaces the 25 Oct How rule for steps */
+  withSteps: readonly string[] = []): string[] {
   const out: string[] = [];
   for (const [id, e] of Object.entries(ex)) {
+    if (withSteps.includes(id)) continue;
     const words = e.how.trim().split(/\s+/).filter(Boolean);
     if (words.length > MAX_HOW_WORDS) out.push(`${id}: ${words.length} words`);
     if ((e.how.match(/[.!?]/g) ?? []).length > 1) out.push(`${id}: more than one sentence`);
@@ -105,7 +114,11 @@ export function howProblems(ex: Record<string, { syl: string; syls?: readonly st
 
 describe('How lines (Robert, 25 Oct)', () => {
   it('say what to do with the body, breath or mouth, never the sound or how many notes', () => {
-    expect(howProblems(copy.ex as Record<string, { syl: string; syls?: readonly string[]; how: string }>)).toEqual([]);
+    const withSteps = Object.entries(copy.about).filter(([, a]) => 'steps' in a).map(([id]) => id);
+    expect(withSteps.sort()).toEqual(['brighta', 'cheekpuffs', 'chewhum', 'laga', 'messa', 'mum', 'nay', 'posture', 'straw', 'tensioncheck', 'tonguefwd', 'tongueout']);
+    expect(howProblems(copy.ex as Record<string, { syl: string; syls?: readonly string[]; how: string }>, withSteps)).toEqual([]);
+    /* and the rule still bites where there are no steps (it can fail) */
+    expect(howProblems({ mee: { syl: 'mee', how: 'Sing mee on five notes.' } }, withSteps).length).toBeGreaterThan(0);
   });
 
   it('catches a sound named, a count, two sentences and a long line (it can fail)', () => {
@@ -126,10 +139,15 @@ describe('How lines (Robert, 25 Oct)', () => {
 export const JARGON = ['break', 'phonation', 'staccato', 'legato', 'crescendo', 'messa di voce', 'vocal function', 'farinelli', 'narrow vowel',
   'engaged', 'the line', 'five-tone', 'nine-tone', 'register', 'passaggio', 'glottis', 'glottal', 'larynx', 'vocal folds', 'cords', 'belt',
   'twang', 'resonance', 'onset', 'support', 'diaphragm', 'falsetto', 'head voice', 'chest voice', 'mix', 'pentatonic', 'chromatic', 'arpeggio'];
-export function jargonProblems(ex: Record<string, { name: string; plain?: string; goal: string; how: string }>): string[] {
+export function jargonProblems(ex: Record<string, { name: string; plain?: string; goal: string; how: string; need?: string; cue?: string }>,
+  /* the numbered steps (Robert, 3 Nov): held to the jargon list too, though not to a length */
+  steps: Record<string, { steps?: readonly string[] }> = {}): string[] {
   const out: string[] = [];
   for (const [id, e] of Object.entries(ex)) {
     const fields: Array<[string, string]> = [['goal', e.goal], ['how', e.how]];
+    if (e.need) fields.push(['need', e.need]);
+    if (e.cue) fields.push(['cue', e.cue]);
+    (steps[id]?.steps ?? []).forEach((t, i) => fields.push(['step' + (i + 1), t]));
     /* the title may be the proper name; what a beginner reads to know it is plain */
     fields.unshift(['plain', e.plain ?? e.name]);
     for (const [field, text] of fields) {
@@ -142,7 +160,8 @@ export function jargonProblems(ex: Record<string, { name: string; plain?: string
 
 describe('plain words (Robert, 27 and 28 Oct)', () => {
   it('no singer jargon in a plain name, goal or How; a jargon title has a plain name under it', () => {
-    expect(jargonProblems(copy.ex as Record<string, { name: string; plain?: string; goal: string; how: string }>)).toEqual([]);
+    expect(jargonProblems(copy.ex as Record<string, { name: string; plain?: string; goal: string; how: string }>,
+      copy.about as Record<string, { steps?: readonly string[] }>)).toEqual([]);
   });
 
   it('catches a word a beginner would not know, and a jargon title with no plain name (it can fail)', () => {
@@ -150,6 +169,9 @@ describe('plain words (Robert, 27 and 28 Oct)', () => {
       a: { name: 'Messa di voce', goal: 'A legato scale.', how: 'Slide through your break.' },
       b: { name: 'Messa di voce', plain: 'Soft, loud, soft', goal: 'In, hold, out.', how: 'Keep the ribs wide.' },
     })).toEqual(['a.plain: "messa di voce"', 'a.goal: "legato"', 'a.how: "break"']);
+    /* the steps and You'll need are held to it too; Why it helps is not (it can fail) */
+    expect(jargonProblems({ c: { name: 'C', goal: 'Easy.', how: 'Easy.', need: 'A falsetto.' } },
+      { c: { steps: ['Breathe.', 'Find your head voice.'] } })).toEqual(['c.need: "falsetto"', 'c.step2: "head voice"']);
   });
 
   it('the proper names are the titles again, the plain names under them', () => {

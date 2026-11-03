@@ -39,7 +39,9 @@ export interface YouLine {
 export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () => number; live: boolean; anyOctave: boolean;
   colour: string; label: string; count?: number | null;
   /** the note heard before each rung, one per rung: drawn hollow, the view fitted to the turn */
-  heard?: readonly Note[] }) {
+  heard?: readonly Note[];
+  /** false: the line shown but not marked, no bubble fills (Robert, 3 Nov) */
+  scored?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -54,7 +56,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
     if (!cv) return;
     let raf = 0;
     const draw = () => {
-      const { notes, you, now, anyOctave, colour, heard } = propsRef.current;
+      const { notes, you, now, anyOctave, colour, heard, scored = true } = propsRef.current;
       const css = getComputedStyle(cv);
       const dpr = window.devicePixelRatio || 1;
       const W = cv.clientWidth, H = cv.clientHeight;
@@ -163,7 +165,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         g.fillStyle = tint;
         g.fill();
         g.globalAlpha = 1;
-        if (score.fill[i] > 0) {
+        if (scored && score.fill[i] > 0) {
           g.save();
           shape();
           g.clip();
@@ -238,8 +240,8 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.now = at.toFixed(2);
       cv.dataset.current = String(current);
       cv.dataset.you = String(drawn);
-      cv.dataset.hits = String(score.hits);
-      cv.dataset.fill = score.fill.map((f) => f.toFixed(2)).join(',');
+      cv.dataset.hits = String(scored ? score.hits : 0);
+      cv.dataset.fill = (scored ? score.fill : score.fill.map(() => 0)).map((f) => f.toFixed(2)).join(',');
       cv.dataset.visible = String(visible);
       cv.dataset.labelled = String(labelled);
       cv.dataset.names = String(names);

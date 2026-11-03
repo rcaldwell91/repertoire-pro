@@ -502,6 +502,13 @@ input[type='range'] {
 .tag[data-colour='words'] { color: var(--words); border-color: var(--words); }
 .ex-plain { display: block; margin: 0; color: var(--muted); font-size: 1rem; }
 h1 + .ex-plain { margin: -6px 0 6px; }
+.ex-desc { margin: 2px 0 8px; font-size: 1.05rem; font-style: italic; }
+.ex-steps { margin: 4px 0 12px; padding-left: 1.4em; font-size: 1.05rem; }
+.ex-steps li { margin: 4px 0; }
+.ex-cue { text-align: center; font-weight: 700; }
+.ticks { border: 0; padding: 0; margin: 4px 0 12px; }
+.tick-row { display: flex; align-items: center; gap: 12px; min-height: var(--tap); font-size: 1.05rem; }
+.tick-row input { width: 24px; height: 24px; }
 .ex-label { color: var(--muted); font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
 .ex-line { margin: 2px 0 0; font-size: 1.05rem; }
 .ex-result { margin: 4px 0 12px; }
@@ -600,7 +607,10 @@ h1 + .ex-plain { margin: -6px 0 6px; }
 .sing .dots { grid-area: dots; }
 .sing-body { grid-area: body; min-height: 0; overflow: auto; }
 .sing-bar { grid-area: bar; display: flex; align-items: center; justify-content: center; gap: 10px; padding-top: 8px; }
-.sing-btn { display: inline-flex; align-items: center; gap: 6px; }
+.sing-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* on a narrow phone the two buttons share the width, so the gear never runs off the edge */
+.sing-bar .sing-btn { flex: 1 1 0; min-width: 0; max-width: 11rem; padding-inline: 12px; }
+.sing-bar .gear { flex: none; }
 .ex-readout { text-align: center; margin: 8px 0 0; }
 .ex-readout strong { font-size: 2rem; display: block; }
 .dots { flex: none; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 10px 0 4px; }

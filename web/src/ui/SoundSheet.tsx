@@ -1,19 +1,20 @@
 import { copy } from '../core/copy';
-import type { JumpLevel } from '../core/pitch';
+type Level = 1 | 2 | 3;
 import { Slider } from './Slider';
 
 /* The sound sheet behind the gear (Robert, 24 and 28 Oct), the same on an
    exercise's page and while singing it: Any octave, Count-in sound, Hear
-   yourself and its volume; on the page only, Sing the interval's level
-   (changing it mid-round would change the round). A row shows only where
-   it means something. */
+   yourself and its volume; on the page only, the level (Sing the
+   interval's shapes, or an exercise's levels inside it, Robert 3 Nov):
+   changing it mid-round would change the round. A row shows only where it
+   means something. */
 export interface SheetRow<T> {
   readonly value: T;
   readonly set: (v: T) => void;
 }
 
 export function SoundSheet(props: {
-  level?: SheetRow<JumpLevel>;
+  level?: SheetRow<Level> & { readonly label: string; readonly options: readonly Level[] };
   anyOctave?: SheetRow<boolean>;
   countSound?: SheetRow<boolean>;
   hear?: SheetRow<boolean>;
@@ -23,9 +24,9 @@ export function SoundSheet(props: {
   return (
     <section className="card sheet" id="sound-sheet" aria-label={copy.train.soundSheet}>
       {level && (
-        <div className="choices" role="radiogroup" aria-label={copy.train.jumpLevel} id="jump-level">
-          <p className="ex-label">{copy.train.jumpLevel}</p>
-          {([1, 2, 3] as const).map((v) => (
+        <div className="choices" role="radiogroup" aria-label={level.label} id="jump-level">
+          <p className="ex-label">{level.label}</p>
+          {level.options.map((v) => (
             <button key={v} type="button" className="choice" role="radio" id={'level-' + v} aria-checked={level.value === v} onClick={() => level.set(v)}>
               {copy.levels[v]}
             </button>
