@@ -1,82 +1,95 @@
-# Report, 29 Oct 2026, commit fde8bfa
+# Report, 3 Nov 2026, commit 6497b3b
 
-Your phone-testing round is built and live: Pause, Restart and the gear while singing, takes on exercises, the proper names back as titles, shapes in Sing the interval, and a note readout in Vocal Function Exercises.
+The Train update from your 3 Nov spec is built and live, with your answers to the plan.
 
 ## What works
 
-- **While singing, every exercise has the same controls along the bottom**: Pause, Restart and the gear, with Close at the top.
-  - **Pause** stops the sound and the mic at once. The button then says **Resume**.
-  - **Resume** counts in again (3, 2, 1) and carries on from the start of the repeat you were in. What you sang before it still counts.
-  - **Restart** goes back to the first repeat, with the score cleared.
-  - **The gear** opens the same sound sheet as the exercise page: Hear yourself and its volume, Any octave, Count-in sound. It works while paused, and what you set there holds when you resume.
-  - For the exercises that go a part at a time (Hold the note, Vocal Function Exercises), Resume plays that part again from its start. The hiss and the range check start their step again. Breath counts and the guided ones just hold their clock and carry on.
-  - The controls are built once, and where they sit is set in one place, so the path map can move them later without touching any exercise.
-  - The note map is smaller, by the height of the controls. The dots stay under it.
-  - RULEBOOK 1b now says this, in your words, in place of "✕ as the only control".
-- **Takes on exercises.** Every exercise sung over piano notes records your voice while you sing: your voice only, the same recorder as Learn a song. If you pause and resume, the stretches join into one take, each in its place.
-  - At the end, next to the score: **Save take**, Try again, Next. A saved take is kept on the phone at once, then goes online, private to you. With no signal it waits on the phone and goes up when you're back online.
-  - It goes into the same takes table as your song takes, marked as an exercise, with the exercise in it. It doesn't show in the Sing tab's list of song takes.
-  - On the exercise page, one line, **Your takes**, opens that exercise's takes. Tapping one plays your voice over the exercise's piano notes, in time. Only play for now: no send, no delete.
-- **Names**: the proper name is the title again, with the plain name as a small line right under it, on the exercise page and in the group's list. The "Also called" lines are gone. The jargon check now leaves titles alone, but still holds the plain name, Goal and How to plain words.
-  - Vocal Function Exercises / Long soft notes
-  - Messa di voce / Soft, loud, soft
-  - Pentatonic run / Skipping run
-  - Chromatic run / Half-step run
-  - Three-note turns / Little turns
-  - Octave-and-a-half arpeggio / Big climb
-  - Staccato / Short bouncy notes
-  - Farinelli breath / Breath counts
-  - Straw phonation / Straw singing
-  - Nine-tone scale / Nine-note scale
-  - Descending five-tone / Five notes down
-  - Tongue-out with a crescendo / Tongue out, getting louder
-- **Sing the interval** sings shapes now. A note plays; the shape shows in words ("A fifth up", "Up the chord: 1, 3, 5"); you sing its notes from it.
-  - Beginner: a step, 1-5, an octave.
-  - Intermediate adds a third and 1-3-5.
-  - Advanced adds a fourth, sixth and seventh, and the shapes going down (a step, third, 1-5, 5-3-1 and an octave down).
-  - The note map shows the whole turn at once: the note you hear, drawn hollow, and every note you'll sing. You see the next note before it comes, and the map moves on to the next turn as it starts.
-- **Vocal Function Exercises**: while you hold a note, a small readout shows the note you're singing and how close you are: On the note, A bit high, or A bit low. "On" is within half a semitone, as on the old app's interval card.
+- **The exercise page**, on every exercise: the title, the plain line under it, You'll need, How to do it as numbered steps, then Start. Behind "More about this", in this order: You're doing it right when, Watch out for (the old care points at its end, so nothing is lost), Why it helps.
+- **Six rewrites** with your spec's words: Slack-jaw La-Ga, Bratty Nay, Straw, Tongue-out singing, Mum and Messa di voce. Every point of ours the spec didn't list is kept. Straw's "accents" clause is gone and the water warning is in Watch out for. Tongue-out's cloth line and "Overdo the brat, not the volume." are in your words.
+- **Six new exercises**, in their places:
+  - Warm-up opens with Posture check and "Ah" tension check.
+  - Cheek puffs and Chew and hum come after Straw.
+  - Tongue-forward hum comes after Humming.
+  - Tongue-out bright "a" is in Tone, after Tongue-out with a crescendo.
+
+  Train has 55 exercises now.
+- **Levels inside one exercise**, picked in the gear's sheet and remembered for that exercise:
+  - La-Ga: Beginner 1-2-3-2-1, Intermediate five-note, Advanced Big climb's arpeggio, all at 132.
+  - Bratty Nay: Beginner five-note, Intermediate the octave, both at 120.
+  - Straw: the same three, at 110, 110 and 120.
+
+  The list row shows the span ("Beginner to Advanced"). A routine uses its own level, capped at the exercise's top. So the Intermediate warm-up sings La-Ga's five-note scale and Bratty Nay's octave, the Advanced one Straw's arpeggio, and the Cool-down Straw at 1-2-3-2-1.
+- **A half step every round** with no 14-round cap, for the spec's climbing exercises only. A two-octave range on La-Ga at Beginner is 20 rounds. The rest of Train is as it was.
+- **Line shown, not scored**: Straw, Cheek puffs, Chew and hum and the tension check. The bubbles show and your line draws, but nothing fills and there is no score. The result says "Not scored. The line was there to watch." and the list row says "Not scored". Save take still works.
+- **The movement cue**, one line above the map:
+  - Mum: "Keep your head loose and your shoulders rolling."
+  - Straw: "Keep turning your head slowly."
+  - Cheek puffs: "Keep rolling your shoulders."
+  - Chew and hum: "Keep chewing."
+  - Tongue-forward hum: "Keep your head moving slowly."
+
+  It is there before the count-in, so the map never changes size.
+- **The tension check.** After the last round comes "Tick where you felt tension." with the six spots. Each tick is kept the moment it's tapped: on the phone, then on your account. A new check clears the old ticks. Stopping early still shows the list once a round has been sung.
+- **Reminders.** Later exercises show one reminder line, rotating through your ticks, one more each time an exercise starts. A reminder that contradicts the exercise never shows (for example, no "Open tall, not wide." on Bratty Nay or with closed lips). There is none on Posture check, the tension check or Sing the interval. On the five cue exercises, the cue wins.
+- **Posture check**: its steps and a one-minute clock, no pitch line, not scored. You'll need: a wall.
+- **The ticks are private.** They're kept in a small table of their own on your account, which only the singer can read or change. The database itself enforces that, not just the app. They don't go on the profile, because a coach can read their singer's profile.
+- **Narrow phones**: Pause, Restart and the gear now share the width on a 360 px phone. Before this, Pause and the gear ran off the edges.
 
 ## What was measured
 
-All on the built app, in a Chrome made to behave like Android, sung by a real voice, never a tone.
-- Pause in the second repeat of Mum: silence and the mic closed within a millisecond, and nothing at the speaker for the 1.5 seconds checked after. Resume counted in, then carried on at 6.50 s, where the second repeat starts. The end score was 18 of 18: the first repeat, sung before the pause, still counted.
-- The take from that run: 12.1 seconds from the very start, the whole 12-second exercise in one take, both stretches joined. It plays back as your voice over all 18 piano notes.
-- Restart: 10 notes hit before it, 0 straight after, back to the first repeat, then 18 of 18 sung through.
-- The gear while paused: the sheet with its four settings; Count-in sound switched off there, and Resume counted in without a beep.
-- Hold the note paused on note 1: Resume played note 1 again. Breath counts paused on 3 stayed on 3 for two seconds, then carried on.
-- Sing the interval at Intermediate (10 shapes, 12 notes): 11 of 12 sung right; the same voice three semitones off, 1 of 12. All five Intermediate shapes were shown in words. In 226 of 227 looks while singing, the map showed the whole turn. Advanced drew shapes going down.
-- Vocal Function Exercises: the readout said the note and "On the note" on 12 of 12 holds. Sung 0.8 of a semitone high it said "F♯3 A bit high"; sung low, "E3 A bit low". The holds still timed at 2.8 to 2.9 seconds for 3 seconds sung.
-- Signed in as the test singer: a take saved with no signal stayed on the phone, listed as "On this phone. Saves online when connected.". Back online it went up, as one row marked "exercise" with no coach. Without signing in the recording couldn't be opened (400); signed in as the singer it could (200). The test take was deleted afterwards.
-- Every page: the proper names as titles, the plain names under them, in the list too, and no "Also called".
+All on the built app, in a Chrome made to behave like Android, with a real voice where something was sung.
+- La-Ga's page in order: title, plain line, You'll need, five numbered steps, Start. Behind More about this: doing it right, watch out, why.
+- Levels: La-Ga 5 notes at first, 11 at Advanced and remembered. Bratty Nay 9 notes with two levels. In the Intermediate warm-up La-Ga sings 9 notes, with no picker there.
+- Climb: a two-octave range gives La-Ga 20 rounds, a half step each. Mum stays within 14.
+- Cheek puffs sung by a real voice: the line drawn (31 points), no bubble filled, no score, Save take offered.
+- The cue line on all five, the map the same size before and during the count-in.
+- Tension check: the six spots, none ticked at first, the old ticks cleared; Jaw and Face kept on the phone at once.
+- Reminders with Jaw and Face ticked:
+  - Mee showed "Let your jaw hang loose.", then "Keep your face still.", then the jaw line again.
+  - Chew and hum showed its cue instead.
+  - Sing the interval showed nothing.
+  - Bratty Nay showed nothing when only its two contradicting spots were ticked.
+- Signed in as the test singer:
+  - The ticks reached the account as Chin and Neck.
+  - As the singer's linked coach (the second test account), I tried three things. Reading them returned nothing. Changing them changed nothing. Adding a row for the singer was refused (403).
+  - Signed out, the request was refused (401).
+  - On a new phone the ticks came back.
+  - The test row was deleted afterwards.
+- At 360 px wide every control along the bottom is inside the screen.
 
-Every check passes: Train 42 and the signed-in 4 (11 new checks, 4 extended), browser 15, Android 28, library 7, note map 13, Learn a song 19, takes 19, loudness 11, 255 unit tests (7 new), and the old app's 187. All 227 broken builds of the app and 142 of the core are caught; 43 are new for this round.
+Every check passes: Train 51 and the signed-in 5, browser 15, Android 28, library 7, note map 13, Learn a song 19, takes 19, loudness 11, 267 unit tests, and the old app's 187. All 249 broken builds of the app and 155 of the core are caught; 35 are new for this round.
 
-To say plainly, one broken build slipped past at first. It changed how a resumed stretch is joined into the take, and every test still passed. On a closer look it couldn't fail: it gave exactly the same take, because the resumed stretch writes over the same place either way. I replaced it with one that really breaks the rule, keeping the earlier stretch past where the resumed one ends. I added a test for that case, and it's caught.
+To say plainly:
+- **The ticks could land out of order.** Two quick ticks were sent at once, and the older one could arrive last. The signed-in check caught the account holding only "chin" after "chin" and "neck" were ticked. Saves now go one at a time.
+- **Pause and the gear ran off a 360 px screen.** This came from the last round and was missed because the checks ran at 390 px. A new check at 360 px failed on the old build and passes now.
+- **One old broken build stopped testing anything.** It broke Mum's How line, which is numbered steps now. It's moved to an exercise that still has one How line, and it's caught.
 
-The interval check works out every shape's notes itself, from the note heard and its own table of shapes, so it doesn't just follow what the page lists.
+The checklist has this round's rules, including the old app's body warm-up rules (nothing on the throat, no head rolled back, nothing held long): 202 ticked, 35 left out with reasons, none crossed.
 
-The checklist has this round's rules, including the old exercise bar's (read from the old app): 187 ticked, 34 left out with reasons, none crossed.
+Screenshots at 360 px wide, the narrowest phone width tested, are in the repo's REPORTS folder, dated 3 Nov: La-Ga's page, Cheek puffs' page, the tension tick list, and Mum's singing screen with its cue. Lines that wrapped there: Mum's cue (two lines). On La-Ga's and Cheek puffs' pages, You'll need, the plain line and most steps run to two to four lines, as long sentences do on a narrow screen.
 
 ## Not tried on a real phone
 
-None of it. Things I decided that you may want to change:
-- Takes are only for the exercises sung over piano notes. The hiss, sirens, breath counts, Hold the note and Vocal Function Exercises don't record a take yet.
-- The old exercise bar resumed from the exact moment you paused. Here it's the start of the repeat, as you asked. Its Record button, "Pause take" and Listen aren't here: your voice is recorded through every sung exercise instead.
-- Learn a song's singing screen keeps its own play bar; the new controls are on the exercise screens.
-- If the phone takes the sound away mid-exercise (a call, hiding the app), it still goes back to the exercise page, as before, rather than to Paused.
-- Each signed-in test run saves one more test Straw result on the test account, as before.
+None of it. Things I decided, and things left open:
+- **Straw and Cheek puffs stay unscored** until your real-phone test with a straw, as you said.
+- **The plain line and You'll need** may run to 14 words, as How did. Several of the spec's descriptions are longer than the old eight-word cap.
+- **Cheek puffs' bubbles say "oo"**, as Straw's do; the spec gave no syllable.
+- **Posture check** isn't marked Quiet: it makes no sound, and the plan didn't list it as Quiet.
+- **Mum's cue wraps to two lines** at 360 px. No other cue, reminder or tick label wraps there.
+- **The Cool-down is still listed as 3 minutes.** Straw is sung now, so it may run a little longer on a wide range.
+- **Database change.** The table is the one change, as the plan said. Its definition is kept in the repo, under the web folder's database scripts, dated 3 Nov.
+- **Leaked password protection** is off. Supabase's security check lists this, and it isn't from this round.
 
 ## Your taps
 
-Samsung, Chrome, headphones in.
+Samsung, Chrome.
 
 1. Close Chrome fully, then open:
 ```
 https://rcaldwell91.github.io/repertoire-pro/app/
 ```
-2. Tap Train, Tone, Mum, Start. In the second repeat tap Pause: the notes stop. Tap the gear, look, tap it again. Tap Resume: 3, 2, 1, and it carries on from the start of that repeat. Sing to the end.
-3. At the end tap Save take. Tap back, then Your takes on Mum's page, and tap the take: your voice over the piano.
-4. Start Mum again, and part way through tap Restart: back to the first repeat, score cleared.
-5. Tap Train, Pitch, Sing the interval. Tap the gear, pick Intermediate, close it, tap Start. Watch the words above the map, and sing each shape from the note you hear.
-6. Tap Train, Breath, Vocal Function Exercises: the name on top, "Long soft notes" under it. Start, hold "ee" softly, and watch the note and "On the note" under the seconds.
+2. Tap Train, Warm-up: Posture check and "Ah" tension check are at the top. Open "Ah" tension check, tap Start, sing the "ah" rounds. At the end, tick where you felt tension.
+3. Tap Train, Tone, Mee, Start: one reminder from your ticks shows above the map. Close, and Start again: the next one shows.
+4. Tap Train, Agility, Slack-jaw La-Ga. Read the page, tap the gear, pick Advanced, close it, tap Start.
+5. Tap Train, Warm-up, Cheek puffs, Start: the cue line, your line, no score at the end.
+6. When you have a straw: Train, Warm-up, Straw phonation, Start. The line shows but isn't scored yet. Tell me how the line follows you, and I'll switch scoring on.
