@@ -57,7 +57,7 @@ export const MUTATIONS = [
   { rule: 'a phrase\'s syllables do not change note by note', file: X,
     from: "  const at = e.sylsBy === 'rung' ? r : i;", to: "  const at = e.sylsBy === 'rung' ? r : 0 * i;" },
   { rule: 'a How line names its sound', file: 'src/core/copy.ts',
-    from: "how: 'Keep the hum buzzing in your lips as you open.'", to: "how: 'Keep the hum buzzing on mum as you open.'" },
+    from: "how: 'Keep it bright without spreading into a smile, and let the jaw hang.'", to: "how: 'Keep mee bright without spreading into a smile, and let the jaw hang.'" },
   { rule: 'a How line counts the notes', file: 'src/core/copy.ts',
     from: "how: 'Start light at the top and stay light coming down.'", to: "how: 'Start light at the top and come down five notes.'" },
   { rule: 'a How line over fourteen words', file: 'src/core/copy.ts',
