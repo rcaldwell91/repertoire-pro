@@ -386,6 +386,9 @@ try {
 
   /* 2a'. Syllables per note (Robert, 27 Oct): La-Ga alternates la, ga a note, as the old app's "la-ga la-ga" */
   if (want('syllables')) {
+    /* at Intermediate, the five-note scale (La-Ga opens at Beginner's three notes since 3 Nov) */
+    await openEx('laga');
+    await page.eval(`localStorage.setItem('rp.level.laga', '2')`);
     await openEx('laga');
     await noSinger();
     await page.tap('#pattern-play');
@@ -400,7 +403,8 @@ try {
     await page.waitFor(P('live.size === 0'), 6000);
     const want9 = ['la', 'ga', 'la', 'ga', 'la', 'ga', 'la', 'ga', 'la'];
     const ok = seen.length >= 7 && seen.every(({ i, s }) => s === want9[i]);
-    check('syllables', ok, `La-Ga's card, note by note: ${seen.map(({ i, s }) => i + 1 + ' ' + s).join(', ')}`);
+    await page.eval(`localStorage.removeItem('rp.level.laga')`);
+    check('syllables', ok, `La-Ga's card at Intermediate, note by note: ${seen.map(({ i, s }) => i + 1 + ' ' + s).join(', ')}`);
   }
 
   /* 2b. The gear's sound sheet: Any octave (off at first, remembered for
