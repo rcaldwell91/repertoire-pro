@@ -146,60 +146,78 @@ Only the changes the review lists.
   - Exercises without a clock get an allowance: Steady hiss 25 s, Farinelli 90 s, Sirens 45 s, Match the note at Beginner 70 s.
   - Every step gets 15 s for reading and tapping.
   - For the app's default range (A2 to A4) that gives:
-
-| Routine | Listed today | Worked out |
-| :- | :- | :- |
-| Daily warm-up | 9 min, 7 steps | About 9 min, 8 steps; about 11 min the first time, with the tension check |
-| Intermediate warm-up | 16 min | About 15 min |
-| Advanced warm-up | 20 min | About 16 min |
-| Quiet session | 10 min | About 10 min |
-| Cool-down | 3 min | About 3 min (today it actually runs about 4, because Straw climbs) |
+    - Daily warm-up: listed 9 min, 7 steps today. Worked out: about 9 min, 8 steps; about 11 min the first time, with the tension check.
+    - Intermediate warm-up: listed 16 min. Worked out: about 15 min.
+    - Advanced warm-up: listed 20 min. Worked out: about 16 min.
+    - Quiet session: listed 10 min. Worked out: about 10 min.
+    - Cool-down: listed 3 min. Worked out: about 3 min (today it actually runs about 4, because Straw climbs).
 
 ## 3. How I'd build each new behaviour
 
-1. **Speed levels** (runs, Nine-tone scale, twisters). Each level is the same pattern at its own speed, in the level row built on 3 Nov. Nothing else about how they run changes.
-2. **Match the note's three levels.**
-   - **Beginner:** 10 notes in order, a half step apart, from one note above the bottom of your range.
-     - Each note plays (1.4 s, as today), then the app listens with no time limit.
-     - Once you've held it within a half step for 1.2 seconds in all, the bubble fills, "Held" shows, and the next note plays a second later. That's today's rule and the old app's.
-     - You can tap Next at any time. A note skipped without singing doesn't count. A note you sang but didn't land is a miss.
-     - Pause and Resume play the note again.
-   - **Intermediate:** today's random notes, with 5 seconds to land each instead of 2.4. The rule for a hit stays exactly as today: 1.2 seconds within a half step. On today's 2.4-second bubble that was "half of it"; on the 5-second one the fill shows progress toward the 1.2 seconds. A turn takes about 7.4 s, a round of ten about 75 s.
-   - **Advanced:** the note plays; you sing for 3 seconds with your line hidden (the note's bubble still shows where it is); then the note plays again and your line from that attempt appears over its bubble. It's scored on the hidden attempt only. A turn is about 7.5 s.
-   - The level is picked in the gear's sheet and remembered. The Daily warm-up uses Beginner.
-3. **Lip trills levels:** as above, a pattern per level, all at 100.
-4. **A level per routine step:** each step in a routine names its level. The table in Routines lists every step whose notes change.
-5. **The Cool-down stepping down:** inside the Cool-down, the ladder starts at the middle of your range and moves down a half step a round to one above the bottom. At the default range: Straw 10 rounds, Humming 9, Descending five-tone 9.
-6. **Not counting what wasn't sung:** a round with no voice on any of its notes is left out of the score, and the result says how many rounds it counted. For Match the note, Sing the interval, Hold the note and Match the tone, each turn or note counts the same way. The saved result holds only what was counted.
-7. **The plain tone for Match the tone.**
-   - The phone makes the tone itself each time, from a pure wave with a soft start and end so it doesn't click. It's handed to the player the same way a piano note is, so no sound file goes in the repo and the player itself doesn't change. Its loudness is matched to the piano.
-   - 10 notes: five in order, a whole step apart from the lower middle of your range, then five drawn at random. Each plays for 10 seconds: 2 seconds to find it, then 8 seconds held with the tone still playing. It's scored like Hold the note (70% of the hold within 35 hundredths of a half step), and each waits for Next.
-   - **Line shown, not scored, until your headphone test,** as the review says.
-   - **A guard against a false line:** without headphones the microphone hears the tone, and "your line" would really be the tone. A pure tone is perfectly steady and a voice never is. So if the line sits dead on the tone with no movement at all for over a second, the screen says "I can hear the tone. Put your headphones in." That's tested on your phone with and without headphones before it ships.
-   - Proposal: Hear yourself is on by default for this one, because the wobble is easiest to hear when your voice and the tone are both in your ears.
-8. **Farinelli counts growing:** in, pause and out each last 4 seconds in round 1, 5 in round 2, and so on up to 8, then stay at 8 until Done. The screen shows the round's count.
-9. **Best time on Steady hiss:** your best comes from your own saved results, on the phone and on your account. The database already lets a singer read their own results; no change there.
-   - The result shows "Your best: 24 seconds".
-   - "A new best." shows only when there was an earlier time and this one beat it.
-   - The first time, it says it's your first.
-10. **The old range on Range check:** before a new range is saved, the one it replaces is kept. The result then shows "Was A2 to E4." under the new range. This shows only when the old one was found by singing, not when it was the "Not measured yet" default.
-11. **The Vocal Function Exercises goal:** your best Steady hiss, shown during the "ee" and "ol" holds ("Goal: 24 s") and in the result.
-    - If you haven't done Steady hiss yet: "Do Steady hiss once to set your goal."
-    - **Progress:** under the result, your longest "ee" on each day you did it, from your saved results (the last 10 such days).
-12. **Landing measures on Match the note,** worked out for each note from your line:
-    - **First try:** where your voice sits in its first 0.3 seconds.
-    - **Time to settle:** from your first sound until you stay within 35 hundredths of a half step for 0.6 seconds.
-    - **How close it settles:** your middle reading once settled.
+**1. Speed levels** (runs, Nine-tone scale, twisters). Each level is the same pattern at its own speed, in the level row built on 3 Nov. Nothing else about how they run changes.
 
-    Shown in plain words: "First try on the note: 4 of 10 (last time 2)", "Took 1.8 seconds to settle, on average (last time 2.5)", and how close: "very close", "close" or "a bit off". "On the note" means within half a half step, the same rule as Vocal Function Exercises' "On the note". It's shown against your last three sessions.
+**2. Match the note's three levels.**
 
-    Saved with the result: the first-try average goes in the results table's existing "cents" column (the old app keeps its ear results the same way). The time to settle goes in "seconds", and notes landed in the score. "How close it settles" has no column. Question 4.
-13. **Tongue-out with a crescendo and Blah moving onto notes:**
-    - **Tongue-out with a crescendo** becomes five held notes, 8 seconds each on "ah", scored like Sustained note. It no longer uses a two-minute clock.
-    - **Blah** becomes a five-note-scale ladder at 110 on "blah", the line shown but not scored. It no longer uses a one-minute clock.
-14. **Three-note steps:** Pitch, Beginner, Quiet, 1-2-3-2-1 on "ah" at 110, climbing a half step every round, scored.
-15. **Neck and shoulder release:** Warm-up, Beginner, Quiet, steps and a one-minute clock (see question 1).
-16. **Song cues on Sing the interval:** one line under the jump, for the first three times you meet each shape (counted on the phone), then gone. Question 3 has the list.
+- **Beginner:** 10 notes in order, a half step apart, from one note above the bottom of your range.
+  - Each note plays (1.4 s, as today), then the app listens with no time limit.
+  - Once you've held it within a half step for 1.2 seconds in all, the bubble fills, "Held" shows, and the next note plays a second later. That's today's rule and the old app's.
+  - You can tap Next at any time. A note skipped without singing doesn't count. A note you sang but didn't land is a miss.
+  - Pause and Resume play the note again.
+- **Intermediate:** today's random notes, with 5 seconds to land each instead of 2.4. The rule for a hit stays exactly as today: 1.2 seconds within a half step. On today's 2.4-second bubble that was "half of it"; on the 5-second one the fill shows progress toward the 1.2 seconds. A turn takes about 7.4 s, a round of ten about 75 s.
+- **Advanced:** the note plays; you sing for 3 seconds with your line hidden (the note's bubble still shows where it is); then the note plays again and your line from that attempt appears over its bubble. It's scored on the hidden attempt only. A turn is about 7.5 s.
+- The level is picked in the gear's sheet and remembered. The Daily warm-up uses Beginner.
+
+**3. Lip trills levels:** as above, a pattern per level, all at 100.
+
+**4. A level per routine step:** each step in a routine names its level. The table in Routines lists every step whose notes change.
+
+**5. The Cool-down stepping down:** inside the Cool-down, the ladder starts at the middle of your range and moves down a half step a round to one above the bottom. At the default range: Straw 10 rounds, Humming 9, Descending five-tone 9.
+
+**6. Not counting what wasn't sung:** a round with no voice on any of its notes is left out of the score, and the result says how many rounds it counted. For Match the note, Sing the interval, Hold the note and Match the tone, each turn or note counts the same way. The saved result holds only what was counted.
+
+**7. The plain tone for Match the tone.**
+
+- The phone makes the tone itself each time, from a pure wave with a soft start and end so it doesn't click. It's handed to the player the same way a piano note is, so no sound file goes in the repo and the player itself doesn't change. Its loudness is matched to the piano.
+- 10 notes: five in order, a whole step apart from the lower middle of your range, then five drawn at random. Each plays for 10 seconds: 2 seconds to find it, then 8 seconds held with the tone still playing. It's scored like Hold the note (70% of the hold within 35 hundredths of a half step), and each waits for Next.
+- **Line shown, not scored, until your headphone test,** as the review says.
+- **A guard against a false line:** without headphones the microphone hears the tone, and "your line" would really be the tone. A pure tone is perfectly steady and a voice never is. So if the line sits dead on the tone with no movement at all for over a second, the screen says "I can hear the tone. Put your headphones in." That's tested on your phone with and without headphones before it ships.
+- Proposal: Hear yourself is on by default for this one, because the wobble is easiest to hear when your voice and the tone are both in your ears.
+
+**8. Farinelli counts growing:** in, pause and out each last 4 seconds in round 1, 5 in round 2, and so on up to 8, then stay at 8 until Done. The screen shows the round's count.
+
+**9. Best time on Steady hiss:** your best comes from your own saved results, on the phone and on your account. The database already lets a singer read their own results; no change there.
+
+- The result shows "Your best: 24 seconds".
+- "A new best." shows only when there was an earlier time and this one beat it.
+- The first time, it says it's your first.
+
+**10. The old range on Range check:** before a new range is saved, the one it replaces is kept. The result then shows "Was A2 to E4." under the new range. This shows only when the old one was found by singing, not when it was the "Not measured yet" default.
+
+**11. The Vocal Function Exercises goal:** your best Steady hiss, shown during the "ee" and "ol" holds ("Goal: 24 s") and in the result.
+
+- If you haven't done Steady hiss yet: "Do Steady hiss once to set your goal."
+- **Progress:** under the result, your longest "ee" on each day you did it, from your saved results (the last 10 such days).
+
+**12. Landing measures on Match the note,** worked out for each note from your line:
+
+- **First try:** where your voice sits in its first 0.3 seconds.
+- **Time to settle:** from your first sound until you stay within 35 hundredths of a half step for 0.6 seconds.
+- **How close it settles:** your middle reading once settled.
+
+Shown in plain words: "First try on the note: 4 of 10 (last time 2)", "Took 1.8 seconds to settle, on average (last time 2.5)", and how close: "very close", "close" or "a bit off". "On the note" means within half a half step, the same rule as Vocal Function Exercises' "On the note". It's shown against your last three sessions.
+
+Saved with the result: the first-try average goes in the results table's existing "cents" column (the old app keeps its ear results the same way). The time to settle goes in "seconds", and notes landed in the score. "How close it settles" has no column. Question 4.
+
+**13. Tongue-out with a crescendo and Blah moving onto notes:**
+
+- **Tongue-out with a crescendo** becomes five held notes, 8 seconds each on "ah", scored like Sustained note. It no longer uses a two-minute clock.
+- **Blah** becomes a five-note-scale ladder at 110 on "blah", the line shown but not scored. It no longer uses a one-minute clock.
+
+**14. Three-note steps:** Pitch, Beginner, Quiet, 1-2-3-2-1 on "ah" at 110, climbing a half step every round, scored.
+
+**15. Neck and shoulder release:** Warm-up, Beginner, Quiet, steps and a one-minute clock (see question 1).
+
+**16. Song cues on Sing the interval:** one line under the jump, for the first three times you meet each shape (counted on the phone), then gone. Question 3 has the list.
 
 Then, as every round: the old app read first where it had the same thing (rule 6), the checklist, tests for each new behaviour, broken builds to prove the tests can fail, all the suites, merge, and checking the live app.
 
@@ -242,25 +260,30 @@ Nothing in the review needs a demonstration the app can't give, in my reading. T
 
 ## 6. Questions for you
 
-1. **Neck and shoulder release, step 3:** drop the hand, as the old app's research said (my recommendation, wording in section 5)? Or keep the review's step?
-2. **Chromatic run and Three-note turns:** give them all three speeds (the list shows "Beginner to Advanced"), or only Intermediate 130 and Advanced 160, so they stay advanced?
-3. **Song cues for Sing the interval.** The review gives two. These are the rest I'm sure of:
-   - **Up:**
-     - A step up: the first jump in Happy Birthday.
-     - A third up: Oh When the Saints.
-     - A fourth up: Here Comes the Bride.
-     - A fifth up: Twinkle, Twinkle (yours).
-     - A sixth up: My Bonnie Lies Over the Ocean.
-     - An octave up: Somewhere Over the Rainbow (yours).
-     - Up the chord, 1, 3, 5: The Blue Danube.
-   - **Down:**
-     - A step down: Mary Had a Little Lamb.
-     - A third down: Swing Low, Sweet Chariot.
-     - A fifth down: The Flintstones.
-     - Down the chord, 5, 3, 1: the start of The Star-Spangled Banner.
+**1. Neck and shoulder release, step 3:** drop the hand, as the old app's research said (my recommendation, wording in section 5)? Or keep the review's step?
 
-   A seventh up and an octave down get no cue, since I don't know a well-known song I'm sure of. OK as listed?
-4. **"How close it settles" on Match the note** needs one new column in the results table. It would be a number that can be left empty, with no change to who can read or write results. OK? If not, it's kept on the phone only.
-5. **Your takes for the scoring checks:** may I read the takes you save on Staccato, Consonant pops and the Five-note run from your account, read only, and nothing else there?
+**2. Chromatic run and Three-note turns:** give them all three speeds (the list shows "Beginner to Advanced"), or only Intermediate 130 and Advanced 160, so they stay advanced?
+
+**3. Song cues for Sing the interval.** The review gives two. These are the rest I'm sure of:
+
+- **Up:**
+  - A step up: the first jump in Happy Birthday.
+  - A third up: Oh When the Saints.
+  - A fourth up: Here Comes the Bride.
+  - A fifth up: Twinkle, Twinkle (yours).
+  - A sixth up: My Bonnie Lies Over the Ocean.
+  - An octave up: Somewhere Over the Rainbow (yours).
+  - Up the chord, 1, 3, 5: The Blue Danube.
+- **Down:**
+  - A step down: Mary Had a Little Lamb.
+  - A third down: Swing Low, Sweet Chariot.
+  - A fifth down: The Flintstones.
+  - Down the chord, 5, 3, 1: the start of The Star-Spangled Banner.
+
+A seventh up and an octave down get no cue, since I don't know a well-known song I'm sure of. OK as listed?
+
+**4. "How close it settles" on Match the note** needs one new column in the results table. It would be a number that can be left empty, with no change to who can read or write results. OK? If not, it's kept on the phone only.
+
+**5. Your takes for the scoring checks:** may I read the takes you save on Staccato, Consonant pops and the Five-note run from your account, read only, and nothing else there?
 
 Everything else in this plan goes as proposed unless you say otherwise.
