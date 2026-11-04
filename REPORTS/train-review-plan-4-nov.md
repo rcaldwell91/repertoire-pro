@@ -169,7 +169,7 @@ Only the changes the review lists.
 
 **3. Lip trills levels:** as above, a pattern per level, all at 100.
 
-**4. A level per routine step:** each step in a routine names its level. The table in Routines lists every step whose notes change.
+**4. A level per routine step:** each step in a routine names its level. Routines (section 2) lists every step whose notes change.
 
 **5. The Cool-down stepping down:** inside the Cool-down, the ladder starts at the middle of your range and moves down a half step a round to one above the bottom. At the default range: Straw 10 rounds, Humming 9, Descending five-tone 9.
 
