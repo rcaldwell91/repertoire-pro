@@ -194,6 +194,9 @@ export class FakeEngine implements AudioEngine {
   outputLatency(): number {
     return this.latency;
   }
+  inputLatency(): number {
+    return 0;
+  }
   onInterrupt(cb: () => void): () => void {
     this.interruptCbs.add(cb);
     return () => {

@@ -66,6 +66,10 @@ export const JUMP_PLAY = 1;
 export const JUMP_AT = 1.2;
 export const SING = 2.4;
 export const TRIAL_REST = 0.8;
+/** at Beginner, five seconds a note to land it (Robert, 4 Nov), still
+    counted once it is held 1.2 s, as a 2.4 s note always was */
+export const SING_SLOW = 5;
+export const HOLD_TO_COUNT = 1.2;
 /** Match the note's turn: a note played, sung back, a breath */
 export const TRIAL = 5;
 
@@ -112,22 +116,34 @@ export function intervalRound(level: JumpLevel, range: Range, rand: () => number
     /* a shape wider than the range is centred on it */
     const start = hi >= lo ? lo + Math.floor(rand() * (hi - lo + 1)) : Math.round((range.lo + range.hi - below - above) / 2);
     played.push({ m: start, t, d: JUMP_PLAY, syl: keyName(start) + ' · ' + keyName(start) });
+    const sing = level === 1 ? SING_SLOW : SING;
     degs.forEach((d, i) => {
       const m = start + d;
-      notes.push({ m, t: t + JUMP_AT + i * SING, d: SING, syl: i ? keyName(m) : keyName(m) + ' · ' + keyName(m) });
+      notes.push({ m, t: t + JUMP_AT + i * sing, d: sing, syl: i ? keyName(m) : keyName(m) + ' · ' + keyName(m), need: HOLD_TO_COUNT });
     });
     labels.push(shapeName(sh.id, sh.down));
-    t += JUMP_AT + degs.length * SING + TRIAL_REST;
+    t += JUMP_AT + degs.length * sing + TRIAL_REST;
   }
   return { notes, played, length: t, beat: 1, shapes, labels };
 }
 
-/** Match the note: the note plays 1.4 s, then is sung back */
+/** Match the note: the note plays 1.4 s, then is sung back. Intermediate
+    (Robert, 4 Nov): five seconds to land it, counted once it has been on it
+    1.2 s, the rule it always had. Advanced: three seconds sung with your
+    line hidden, then the note plays again and your line appears; scored on
+    the hidden try. */
 export const MATCH_PLAY = 1.4;
 export const MATCH_AT = 1.6;
-export function matchRound(range: Range, rand: () => number = Math.random): Round {
+export const MATCH_WINDOW = 5;
+export const BLIND_SING = 3;
+export const BLIND_REPLAY = 0.4;
+export interface MatchRound extends Round {
+  /** Advanced: when each turn's line is shown (the note played again) */
+  readonly reveal?: readonly number[];
+}
+export function matchNotes(range: Range, rand: () => number = Math.random): number[] {
   const lo = range.lo + 1, hi = Math.max(range.lo + 1, range.hi - 1);
-  const played: Note[] = [], notes: Note[] = [];
+  const out: number[] = [];
   let last = NaN;
   for (let k = 0; k < ROUND; k++) {
     /* the old app drew again once if the note repeated; here, until it doesn't */
@@ -135,12 +151,102 @@ export function matchRound(range: Range, rand: () => number = Math.random): Roun
     for (let i = 0; i < 20 && m === last && hi > lo; i++) m = lo + Math.floor(rand() * (hi - lo + 1));
     if (m === last && hi > lo) m = m === hi ? m - 1 : m + 1;
     last = m;
-    const t = k * TRIAL;
-    played.push({ m, t, d: MATCH_PLAY, syl: keyName(m) + ' · ' + keyName(m) });
-    notes.push({ m, t: t + MATCH_AT, d: SING, syl: keyName(m) + ' · ' + keyName(m) });
+    out.push(m);
   }
-  return { notes, played, length: ROUND * TRIAL, beat: 1 };
+  return out;
 }
+export function matchRound(range: Range, rand: () => number = Math.random, mode: 'window' | 'blind' = 'window'): MatchRound {
+  const played: Note[] = [], notes: Note[] = [], reveal: number[] = [];
+  let t = 0;
+  for (const m of matchNotes(range, rand)) {
+    const name = keyName(m) + ' · ' + keyName(m);
+    played.push({ m, t, d: MATCH_PLAY, syl: name });
+    if (mode === 'blind') {
+      notes.push({ m, t: t + MATCH_AT, d: BLIND_SING, syl: name, need: HOLD_TO_COUNT });
+      const again = t + MATCH_AT + BLIND_SING + BLIND_REPLAY;
+      played.push({ m, t: again, d: MATCH_PLAY, syl: keyName(m) });
+      reveal.push(again);
+      t = again + MATCH_PLAY + 1.2;
+    } else {
+      notes.push({ m, t: t + MATCH_AT, d: MATCH_WINDOW, syl: name, need: HOLD_TO_COUNT });
+      t += MATCH_AT + MATCH_WINDOW + TRIAL_REST;
+    }
+  }
+  return { notes, played, length: t, beat: 1, ...(mode === 'blind' ? { reveal } : {}) };
+}
+
+/** Match the note at Beginner (Robert, 4 Nov): ten notes in order, a half
+    step apart, from one above the bottom of the range; each waits, with no
+    time limit, until it is held 1.2 s, or Next is tapped */
+export function waitParts(range: Range): Part[] {
+  const lo = range.lo + 1, hi = Math.max(range.lo + 1, range.hi - 1);
+  return Array.from({ length: ROUND }, (_, k) => ({ kind: 'wait' as const, m: lo + (k % (hi - lo + 1)) }));
+}
+
+/** Match the tone (Robert, 4 Nov): a plain tone on real notes in the
+    range, five in order a whole step apart from the lower middle, then
+    five drawn at random; each 2 s to find, then 8 s held with it */
+export const TONE_LEAD = 2;
+export const TONE_SECS = 8;
+export function toneParts(range: Range, rand: () => number = Math.random): Part[] {
+  const lo = Math.round(range.lo) + 2, hi = Math.max(lo, Math.round(range.hi) - 2);
+  const start = Math.min(Math.round(range.lo + (range.hi - range.lo) / 3), Math.max(lo, hi - 8));
+  const out: Part[] = [];
+  for (let k = 0; k < 5; k++) out.push({ kind: 'tone', m: Math.min(hi, start + 2 * k), secs: TONE_SECS });
+  let last = out[out.length - 1].kind === 'tone' ? (out[out.length - 1] as { m: number }).m : NaN;
+  for (let k = 0; k < 5; k++) {
+    let m = lo + Math.floor(rand() * (hi - lo + 1));
+    for (let i = 0; i < 20 && m === last && hi > lo; i++) m = lo + Math.floor(rand() * (hi - lo + 1));
+    last = m;
+    out.push({ kind: 'tone', m, secs: TONE_SECS });
+  }
+  return out;
+}
+
+/** How a sung try landed (Robert, 4 Nov), from your line's points between
+    `from` and `to`: where the first 0.3 s of voice sat, how long from the
+    first sound until it stayed within 35 hundredths of a half step for
+    0.6 s, and how close it sat from then on. In hundredths of a half step
+    (cents), the octave folded with Any octave; null where it never did. */
+export const FIRST_TRY = 0.3;
+export const SETTLE_CENTS = 35;
+export const SETTLE_HOLD = 0.6;
+export interface Landing {
+  readonly first: number | null;
+  readonly settleAfter: number | null;
+  readonly settled: number | null;
+}
+const centsOff = (m: number, note: number, anyOctave: boolean) => {
+  let d = m - note;
+  if (anyOctave) d = ((((d % 12) + 18) % 12) + 12) % 12 - 6;
+  return Math.abs(d) * 100;
+};
+const median = (v: number[]) => {
+  const s = [...v].sort((a, b) => a - b);
+  return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : NaN;
+};
+export function landing(t: ArrayLike<number>, m: ArrayLike<number>, note: number, from: number, to: number, anyOctave: boolean): Landing {
+  const pts: Array<{ t: number; c: number }> = [];
+  for (let i = 0; i < t.length; i++) if (t[i] >= from && t[i] < to && Number.isFinite(m[i])) pts.push({ t: t[i], c: centsOff(m[i], note, anyOctave) });
+  if (!pts.length) return { first: null, settleAfter: null, settled: null };
+  const t0 = pts[0].t;
+  const first = median(pts.filter((p) => p.t < t0 + FIRST_TRY).map((p) => p.c));
+  let settleAt: number | null = null;
+  for (let i = 0; i < pts.length && settleAt == null; i++) {
+    if (pts[i].c > SETTLE_CENTS) continue;
+    let j = i;
+    while (j + 1 < pts.length && pts[j + 1].c <= SETTLE_CENTS && pts[j + 1].t - pts[j].t < 0.11) j++;
+    if (pts[j].t - pts[i].t >= SETTLE_HOLD - 1e-6) settleAt = pts[i].t;
+  }
+  const after = settleAt == null ? [] : pts.filter((p) => p.t >= (settleAt as number)).map((p) => p.c);
+  return { first, settleAfter: settleAt == null ? null : settleAt - t0, settled: after.length ? median(after) : null };
+}
+/** a distance in words: very close (15 or less), close (35), a bit off (100), far off */
+export function nearness(cents: number): 'veryClose' | 'close' | 'bitOff' | 'farOff' {
+  return cents <= 15 ? 'veryClose' : cents <= 35 ? 'close' : cents <= 100 ? 'bitOff' : 'farOff';
+}
+/** "on the note": within half a half step, as Long soft notes' readout */
+export const ON_CENTS = 50;
 
 /** one part of an exercise that goes a part at a time, each started by a tap */
 export type Part =
@@ -149,7 +255,11 @@ export type Part =
   /** Long soft notes, steps 1 and 4: the note plays, then is held as long as it can be */
   | { readonly kind: 'long'; readonly step: 1 | 4; readonly round: 1 | 2; readonly m: number; readonly syl: string }
   /** Long soft notes, steps 2 and 3: a slide, untimed */
-  | { readonly kind: 'slide'; readonly step: 2 | 3; readonly round: 1 | 2; readonly syl: string };
+  | { readonly kind: 'slide'; readonly step: 2 | 3; readonly round: 1 | 2; readonly syl: string }
+  /** Match the note at Beginner: the note plays, then waits until held */
+  | { readonly kind: 'wait'; readonly m: number }
+  /** Match the tone: a plain tone, found, then held with it `secs` */
+  | { readonly kind: 'tone'; readonly m: number; readonly secs: number };
 
 /** Hold the note: how long the note plays first, how long it is held, and the rule */
 export const STEADY_LEAD = 1.2;

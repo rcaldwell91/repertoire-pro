@@ -39,7 +39,7 @@ const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'prev
   'pause-resume', 'ex-take', 'ex-takes-page', 'restart', 'pause-gear', 'pause-others',
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
-  'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
+  'next-moves-on', 'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
 const GROUPS = { warmup: 12, breath: 6, tone: 12, agility: 10, range: 5, words: 7, pitch: 3 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
@@ -87,6 +87,8 @@ const b64 = (v) => v.buffer.toString('base64');
 const sing = (notes, opts) => b64(singNotes(FFMPEG, SOURCE, STEADY, notes, tmp, opts));
 const MUM = ladder('five', 120, RANGE);
 /* the Intermediate warm-up's steps, for its La-Ga */
+/* the exercise after each in its group's list (core/exercises' order) */
+const NEXT_AFTER = { tensioncheck: 'liptrill', posture: 'tensioncheck' };
 const ROUTINE_INTERMEDIATE = ['hiss', 'farinelli', 'liptrill', 'descend', 'mum', 'mee', 'tongueout', 'laga', 'nay', 'wah', 'staccato', 'ninetone'];
 
 const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
@@ -692,6 +694,34 @@ try {
     check('guided', clock === '0:02' && un === copy.train.notScored && need === copy.ex.posture.need && run.steps === copy.about.posture.steps.length &&
       !run.map && run.mic === 0 && run.line === null,
       `Posture check: "You'll need: ${need}"; while doing it: ${run.steps} steps, the clock at ${clock}, a pitch line ${run.map}, mic asked ${run.mic}, a reminder ${run.line}; after Done: "${un}"`);
+  }
+
+  /* 13 Nov, Robert's phone: after the tension check, Next took him to Posture check, and
+     there Next did nothing. Signed in, on the phone-sized Android Chrome: each Next moves on to
+     the next exercise in the group, and a tap on it always leads somewhere new. */
+  if (want('next-moves-on')) {
+    if (ONLINE) await signIn();
+    await openEx('tensioncheck');
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 20000);
+    await page.tap('#ex-close');
+    await result(3000);
+    const ticks = await page.eval(`!!document.querySelector('#tension-ticks')`);
+    await page.tap('#ex-next');
+    await sleep(800);
+    const after1 = await page.eval(`({ hash: location.hash, name: document.querySelector('#ex-name')?.textContent })`);
+    await openEx('posture');
+    await page.tap('#ex-start');
+    await sleep(600);
+    await page.tap('#ex-done');
+    await result(3000);
+    await page.tap('#ex-next');
+    await sleep(800);
+    const after2 = await page.eval(`({ hash: location.hash, name: document.querySelector('#ex-name')?.textContent, result: !!document.querySelector('#ex-result') })`);
+    check('next-moves-on', ticks && after1.hash.endsWith('/train/ex/' + NEXT_AFTER.tensioncheck) && after2.hash.endsWith('/train/ex/' + NEXT_AFTER.posture) && !after2.result,
+      `signed in ${ONLINE}; the tension check's result (ticks ${ticks}), Next: ${after1.hash} "${after1.name}"; Posture check done, Next: ${after2.hash} "${after2.name}", ` +
+      `still on its result ${after2.result}`);
   }
 
   /* 11. The range check: four seconds low, four high, by a real voice; kept, and shown on Train */

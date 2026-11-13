@@ -7,6 +7,7 @@ import { CATEGORIES, DAILY, type CategoryId } from '../core/exercises';
 import { routineToday, type TodayItem } from '../core/today';
 import { pullSpots } from '../data/tension';
 import { today } from '../data/today';
+import { beginRoutine } from '../shell/routine-session';
 import { catRoute, exRoute, navigate, routineRoute } from '../shell/router';
 import { QuickRun } from '../ui/icons';
 
@@ -36,7 +37,11 @@ export function TrainPage() {
       live = false;
     };
   }, []);
-  const start = () => navigate(t.start.kind === 'routine' ? routineRoute(t.start.key, 0) : exRoute(t.start.id), 'screen');
+  const start = () => {
+    /* a routine's steps are fixed as it starts (Robert, 4 Nov) */
+    if (t.start.kind === 'routine') beginRoutine(t.start.key);
+    navigate(t.start.kind === 'routine' ? routineRoute(t.start.key, 0) : exRoute(t.start.id), 'screen');
+  };
   return (
     <>
       <h1>{copy.tabs.train}</h1>

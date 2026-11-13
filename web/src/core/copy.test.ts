@@ -67,12 +67,13 @@ describe('copy-lint', () => {
     const prose = allCopy().filter((l) => l.prose);
     expect(prose.length).toBeGreaterThan(50);
     /* and the How of an exercise with numbered steps, which is its first step (Robert, 3 Nov) */
-    expect(prose.every((l) => l.at.startsWith('copy.about.') || (/^copy\.ex\.(\w+)\.how$/.test(l.at) &&
+    expect(prose.every((l) => l.at.startsWith('copy.about.') || l.at.startsWith('copy.stepLines.') || (/^copy\.ex\.(\w+)\.how$/.test(l.at) &&
       'steps' in (copy.about as Record<string, object>)[l.at.split('.')[2]]))).toBe(true);
-    /* the old app's exercises have them; the range check and Articulation (ours) do not */
-    const ours = ['vowels', 'redleather', 'uniqueny', 'peterpiper', 'pops', 'tonguetip', 'lipstongue', 'buzz', 'raspberry', 'tonguetrill', 'pulses',
-      'goo', 'guh', 'run5', 'minor5', 'penta', 'chrom', 'turns', 'arp19', 'interval', 'match', 'holdnote'];
-    expect(Object.keys(copy.about)).toEqual(Object.keys(copy.ex).filter((k) => k !== 'rangecheck' && !ours.includes(k)));
+    /* Robert's 4 Nov review: every exercise has its steps, doing it right, watch out and why */
+    expect(Object.keys(copy.about).sort()).toEqual(Object.keys(copy.ex).sort());
+    for (const [id, a] of Object.entries(copy.about) as Array<[string, Record<string, unknown>]>) {
+      expect(['steps', 'right', 'why', 'watch'].filter((f) => !a[f]), id).toEqual([]);
+    }
   });
 
   it('does not flag ordinary words that merely contain a banned one', () => {
@@ -115,10 +116,11 @@ export function howProblems(ex: Record<string, { syl: string; syls?: readonly st
 describe('How lines (Robert, 25 Oct)', () => {
   it('say what to do with the body, breath or mouth, never the sound or how many notes', () => {
     const withSteps = Object.entries(copy.about).filter(([, a]) => 'steps' in a).map(([id]) => id);
-    expect(withSteps.sort()).toEqual(['brighta', 'cheekpuffs', 'chewhum', 'laga', 'messa', 'mum', 'nay', 'posture', 'straw', 'tensioncheck', 'tonguefwd', 'tongueout']);
+    /* every exercise has numbered steps now (Robert, 4 Nov): the 3 Nov spec's rule for steps holds them */
+    expect(withSteps.sort()).toEqual(Object.keys(copy.ex).sort());
     expect(howProblems(copy.ex as Record<string, { syl: string; syls?: readonly string[]; how: string }>, withSteps)).toEqual([]);
     /* and the rule still bites where there are no steps (it can fail) */
-    expect(howProblems({ mee: { syl: 'mee', how: 'Sing mee on five notes.' } }, withSteps).length).toBeGreaterThan(0);
+    expect(howProblems({ zz: { syl: 'mee', how: 'Sing mee on five notes.' } }, withSteps).length).toBeGreaterThan(0);
   });
 
   it('catches a sound named, a count, two sentences and a long line (it can fail)', () => {

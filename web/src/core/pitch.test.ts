@@ -147,6 +147,6 @@ describe('Long soft notes (Stemple\'s vocal function exercises)', () => {
     expect(p.map((x) => (x.kind === 'long' ? `${x.step}:${x.syl}` : x.kind === 'slide' ? `${x.step}:${x.syl}:slide` : 'steady'))).toEqual([
       '1:ee', '1:ee', '2:knoll:slide', '2:knoll:slide', '3:knoll:slide', '3:knoll:slide',
       '4:ol', '4:ol', '4:ol', '4:ol', '4:ol', '4:ol', '4:ol', '4:ol', '4:ol', '4:ol']);
-    expect(p.map((x) => (x.kind === 'steady' ? 0 : x.round))).toEqual([1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2]);
+    expect(p.map((x) => (x.kind === 'long' || x.kind === 'slide' ? x.round : 0))).toEqual([1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2]);
   });
 });

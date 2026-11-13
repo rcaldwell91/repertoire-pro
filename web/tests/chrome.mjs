@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-export const CHROME = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+export const CHROME = process.env.CHROME || '/opt/pw-browsers/chromium';
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let nextPort = 9400 + Math.floor(Math.random() * 400);

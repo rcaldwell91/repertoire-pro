@@ -32,3 +32,18 @@ export class SoundClock {
     return { heard: true, held: Math.max(0, to - this.heardAt), done: this.end !== null };
   }
 }
+
+/* Breath counts (Robert, 4 Nov): in, pause and out each last `from`
+   seconds in the first round, one more each round up to `to`, then stay
+   there until Done. Where the clock is: the round (from 1), its count,
+   the phase (0 in, 1 pause, 2 out) and the seconds left in it. */
+export function cycleAt(elapsed: number, from: number, to: number): { round: number; count: number; phase: 0 | 1 | 2; left: number } {
+  let t = Math.max(0, elapsed), round = 1, count = from;
+  while (t >= 3 * count) {
+    t -= 3 * count;
+    round++;
+    count = Math.min(to, from + round - 1);
+  }
+  const phase = Math.min(2, Math.floor(t / count)) as 0 | 1 | 2;
+  return { round, count, phase, left: count * (phase + 1) - t };
+}

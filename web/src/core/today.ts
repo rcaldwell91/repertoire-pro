@@ -1,5 +1,7 @@
 import { copy } from './copy';
-import { ROUTINES, DAILY, type RoutineId } from './exercises';
+import { ROUTINES, DAILY, routineMins, routineSteps, type RoutineId } from './exercises';
+import type { Range } from './notemap';
+import { DEFAULT_RANGE } from './range';
 
 /* Today (Robert, 27 Oct): what the singer should do next, from one source,
    asked in this order:
@@ -27,15 +29,17 @@ export interface TodayItem {
 /** a source answers with something to do today, or nothing */
 export type TodaySource = () => Promise<TodayItem | null>;
 
-/** one of the app's routines, as something to do today */
-export function routineToday(key: RoutineId, from: TodayFrom = 'own'): TodayItem {
-  const r = ROUTINES[key];
-  return { from, name: copy.routineNames[key], mins: r.mins, count: r.steps.length, start: { kind: 'routine', key } };
+/** one of the app's routines, as something to do today: its length worked
+    out for the singer's range (Robert, 4 Nov), and the daily one with the
+    tension check first for anyone who has never done it */
+export function routineToday(key: RoutineId, from: TodayFrom = 'own', range: Range = DEFAULT_RANGE, tensionDone = true): TodayItem {
+  const steps = routineSteps(key, tensionDone);
+  return { from, name: copy.routineNames[key], mins: routineMins(steps, range, !!ROUTINES[key].down), count: steps.length, start: { kind: 'routine', key } };
 }
 
 /** The first source in order that has something; a source that fails is
     passed over; with nothing anywhere, the daily warm-up. */
-export async function pickToday(sources: Partial<Record<TodayFrom, TodaySource>>): Promise<TodayItem> {
+export async function pickToday(sources: Partial<Record<TodayFrom, TodaySource>>, fallback: () => TodayItem = () => routineToday(DAILY)): Promise<TodayItem> {
   for (const from of TODAY_ORDER) {
     const ask = sources[from];
     if (!ask) continue;
@@ -46,5 +50,5 @@ export async function pickToday(sources: Partial<Record<TodayFrom, TodaySource>>
       /* this source could not answer (offline, say): ask the next */
     }
   }
-  return routineToday(DAILY);
+  return fallback();
 }

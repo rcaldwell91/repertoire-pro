@@ -19,6 +19,17 @@ function parse(raw: string | null): Spot[] | null {
 }
 
 /** the spots ticked at the last check; none if never */
+/** whether the "Ah" tension check was ever finished on this phone (or
+    brought from the account by pullSpots): finishing it always keeps a
+    record, even with nothing ticked */
+export function tensionEverDone(): boolean {
+  try {
+    return localStorage.getItem(KEY) != null;
+  } catch {
+    return true;
+  }
+}
+
 export function keptSpots(): Spot[] {
   try {
     return parse(localStorage.getItem(KEY)) ?? [];

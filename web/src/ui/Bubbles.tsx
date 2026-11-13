@@ -41,7 +41,10 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
   /** the note heard before each rung, one per rung: drawn hollow, the view fitted to the turn */
   heard?: readonly Note[];
   /** false: the line shown but not marked, no bubble fills (Robert, 3 Nov) */
-  scored?: boolean }) {
+  scored?: boolean;
+  /** one per rung (Match the note, Advanced: Robert 4 Nov): until this time the
+      rung's line and fill are hidden, then they appear as the note plays again */
+  reveal?: readonly number[] }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -56,7 +59,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
     if (!cv) return;
     let raf = 0;
     const draw = () => {
-      const { notes, you, now, anyOctave, colour, heard, scored = true } = propsRef.current;
+      const { notes, you, now, anyOctave, colour, heard, scored = true, reveal } = propsRef.current;
       const css = getComputedStyle(cv);
       const dpr = window.devicePixelRatio || 1;
       const W = cv.clientWidth, H = cv.clientHeight;
@@ -149,6 +152,22 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       /* the bubbles: the share sung on the note filled green, every
          syllable inside, the one to sing now bigger with a white ring */
       const score = bubbleScore(notes, you.t, you.m, 0.05, anyOctave);
+      /* a hidden try: its rung's notes and line are not shown until it is revealed */
+      const starts0 = rungStarts(notes);
+      const rungOf = (i: number) => {
+        let r = 0;
+        starts0.forEach((s0, k) => {
+          if (i >= s0) r = k;
+        });
+        return r;
+      };
+      const hiddenNote = (i: number) => !!reveal && at < (reveal[rungOf(i)] ?? -Infinity);
+      const hiddenAt = (t: number) => {
+        if (!reveal) return false;
+        const k = notes.findIndex((q) => t >= q.t - 0.2 && t < (reveal[rungOf(notes.indexOf(q))] ?? -Infinity));
+        return k >= 0 && hiddenNote(k);
+      };
+      let hiddenPts = 0;
       const h = Math.max(BUBBLE_MIN, Math.min(BUBBLE_MAX, rowH * 0.95));
       const tint = css.getPropertyValue('--' + colour).trim();
       let current = -1, visible = 0, labelled = 0;
@@ -165,7 +184,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         g.fillStyle = tint;
         g.fill();
         g.globalAlpha = 1;
-        if (scored && score.fill[i] > 0) {
+        if (scored && score.fill[i] > 0 && !hiddenNote(i)) {
           g.save();
           shape();
           g.clip();
@@ -219,6 +238,10 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       for (let i = 0; i < you.t.length; i++) {
         const t = you.t[i];
         if (t < t0 - 1 || t > t1) continue;
+        if (hiddenAt(t)) {
+          hiddenPts++;
+          continue;
+        }
         let m = you.m[i];
         if (anyOctave && Number.isFinite(m)) {
           const n = notes.find((q) => t >= q.t && t < q.t + q.d);
@@ -241,7 +264,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.current = String(current);
       cv.dataset.you = String(drawn);
       cv.dataset.hits = String(scored ? score.hits : 0);
-      cv.dataset.fill = (scored ? score.fill : score.fill.map(() => 0)).map((f) => f.toFixed(2)).join(',');
+      cv.dataset.fill = (scored ? score.fill.map((f, i) => (hiddenNote(i) ? 0 : f)) : score.fill.map(() => 0)).map((f) => f.toFixed(2)).join(',');
       cv.dataset.visible = String(visible);
       cv.dataset.labelled = String(labelled);
       cv.dataset.names = String(names);
@@ -253,6 +276,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.viewT0 = t0.toFixed(2);
       cv.dataset.viewT1 = t1.toFixed(2);
       cv.dataset.heardShown = String(heardShown);
+      cv.dataset.hidden = String(hiddenPts);
       if (propsRef.current.live) raf = requestAnimationFrame(draw);
     };
     view.current = null;

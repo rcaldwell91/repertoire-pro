@@ -43,6 +43,8 @@ export interface StoredTake {
   /** a take of an exercise (Robert, 28 Oct): which, and the piano notes it
       was sung over ([note, time, length]), to hear it over them again */
   readonly exercise?: { readonly id: string; readonly notes: ReadonlyArray<readonly [number, number, number]> };
+  /** the delays the phone reported while it was sung, seconds (13 Nov) */
+  readonly delays?: { readonly out: number; readonly mic: number };
 }
 
 /** an exercise's takes are kept under this, beside the songs' */
@@ -226,7 +228,7 @@ async function sync(): Promise<void> {
       /* an exercise's take: the same row, its kind and the exercise in it (no new column) */
       const details = { app: t.exercise ? 'train' : 'learn', songId: t.songId, songTitle: t.songTitle, songAt: t.songAt, created: t.created,
         rightPct: t.rightPct, anyOctave: t.anyOctave, t: Array.from(t.line.t, round2), m: Array.from(t.line.m, round2),
-        ...(t.exercise ? { exercise: t.exercise.id, piano: t.exercise.notes } : {}) };
+        ...(t.exercise ? { exercise: t.exercise.id, piano: t.exercise.notes } : {}), ...(t.delays ? { delays: t.delays } : {}) };
       const row = (coach: string | null) => ({ student_id: me, coach_id: coach, title: t.songTitle, note: '', audio_path: path,
         duration: Math.round(t.seconds * 10) / 10, kind: t.exercise ? 'exercise' : 'song', notes: details });
       if (!t.kept) {
@@ -279,14 +281,15 @@ async function pull(me: string): Promise<void> {
     if (have.has(path) || added.has(path) || x.coach_id) continue;
     added.add(path);
     const d = x.notes as { songId: string; songTitle: string; songAt: number; created: number; rightPct: number | null;
-      anyOctave: boolean; t: (number | null)[]; m: (number | null)[]; exercise?: string; piano?: Array<[number, number, number]> };
+      anyOctave: boolean; t: (number | null)[]; m: (number | null)[]; exercise?: string; piano?: Array<[number, number, number]>;
+      delays?: { out: number; mic: number } };
     const id = path.split('/').pop()!.replace(/\.wav$/, '');
     const sent = rows.filter((y) => y.audio_path === path && y.coach_id)
       .map((y) => ({ id: y.coach_id as string, name: names.get(y.coach_id as string) ?? '' }));
     const take: StoredTake = { id, songId: d.songId, songTitle: d.songTitle, created: d.created, audio: null,
       seconds: Number(x.duration) || 0, songAt: d.songAt, line: { t: Float32Array.from(d.t, num), m: Float32Array.from(d.m, num) },
       anyOctave: d.anyOctave, rightPct: d.rightPct, path, kept: true, sendTo: [], sent,
-      ...(d.exercise ? { exercise: { id: d.exercise, notes: d.piano ?? [] } } : {}) };
+      ...(d.exercise ? { exercise: { id: d.exercise, notes: d.piano ?? [] } } : {}), ...(d.delays ? { delays: d.delays } : {}) };
     await inStore('takes', 'readwrite', (s) => s.put(take));
   }
   if (added.size) changed();

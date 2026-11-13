@@ -72,6 +72,8 @@
 
 :root {
   --tap: 48px;
+  /* the tab bar's height: always on screen (Robert, 13 Nov), so the singing screen sits above it */
+  --tabs-h: calc(var(--tap) + 13px + env(safe-area-inset-bottom));
   --radius: 18px;
   font-family: 'Quicksand', system-ui, sans-serif;
   font-weight: 500;
@@ -211,6 +213,7 @@ h1, h2, strong { font-weight: 700; }
   border-top: 1px solid var(--line);
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   gap: 2px;
+  z-index: 6;
 }
 
 .tab {
@@ -587,14 +590,14 @@ h1 + .ex-plain { margin: -6px 0 6px; }
    is smaller by the controls along the bottom; the dots stay under it. */
 .sing {
   position: fixed;
-  inset: 0;
+  inset: 0 0 var(--tabs-h) 0;
   z-index: 5;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto auto;
   grid-template-areas: 'top' 'status' 'sheet' 'prompt' 'map' 'dots' 'body' 'bar';
   background: var(--bg);
-  padding: calc(8px + env(safe-area-inset-top)) 12px calc(8px + env(safe-area-inset-bottom));
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
 }
 .sing:not(:has(.sing-map)) { grid-template-rows: auto auto auto auto auto auto minmax(0, 1fr) auto; }
 .sing-top { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }

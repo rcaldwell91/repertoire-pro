@@ -1,5 +1,7 @@
 import { ROUTINES, DAILY, type RoutineId } from '../core/exercises';
 import { pickToday, routineToday, type TodayItem, type TodaySource } from '../core/today';
+import { rangeNow } from './range';
+import { tensionEverDone } from './tension';
 
 /* Today's sources, in core/today's order (Robert, 27 Oct). */
 
@@ -21,10 +23,10 @@ const ownPlan: TodaySource = async () => {
   } catch {
     /* a private window, or storage turned off: no plan kept */
   }
-  return routineToday(key && key in ROUTINES ? (key as RoutineId) : DAILY);
+  return routineToday(key && key in ROUTINES ? (key as RoutineId) : DAILY, 'own', rangeNow(), tensionEverDone());
 };
 
 /** what to do today, asked of every source in order */
 export function today(): Promise<TodayItem> {
-  return pickToday({ coach: coachAssigned, program: programDay, own: ownPlan });
+  return pickToday({ coach: coachAssigned, program: programDay, own: ownPlan }, () => routineToday(DAILY, 'own', rangeNow(), tensionEverDone()));
 }

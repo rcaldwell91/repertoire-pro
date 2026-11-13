@@ -203,7 +203,7 @@ export class WebEngine implements AudioEngine {
   /** the last stage on the way out (the safety), for Hear yourself to join
       after the limiter, which would add its delay */
   private last: AudioNode | null = null;
-  private inputLatency = 0;
+  private micLate = 0;
   private readonly micCbs = new Set<(b: MicBlock) => void>();
   /** everything played goes out through here, so the Sound check can see it */
   private out: GainNode | null = null;
@@ -701,7 +701,7 @@ export class WebEngine implements AudioEngine {
     micNode.connect(this.analyser);     /* measured */
     /* the mic's own delay, as the phone reports it, taken off at the source */
     const lat = (stream.getAudioTracks()[0]?.getSettings() as { latency?: number } | undefined)?.latency;
-    this.inputLatency = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
+    this.micLate = typeof lat === 'number' && lat > 0 && lat < 1 ? lat : 0;
     /* Hear yourself: lifted, and into the ceiling beside the song, which
        rounds it off so it can't clip (not through the compressors, which
        would add their delay: the ceiling alone adds CEILING.delay) */
@@ -747,7 +747,7 @@ export class WebEngine implements AudioEngine {
     const tap = new AudioWorkletNode(ctx, 'rp-mic-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
     tap.port.onmessage = (e: MessageEvent<{ s: Float32Array; end: number }>) => {
       if (this.tap !== tap) return;
-      const block: MicBlock = { samples: e.data.s, end: e.data.end - this.inputLatency, sampleRate: ctx.sampleRate };
+      const block: MicBlock = { samples: e.data.s, end: e.data.end - this.micLate, sampleRate: ctx.sampleRate };
       this.micCbs.forEach((f) => f(block));
     };
     from.connect(tap);
@@ -766,6 +766,10 @@ export class WebEngine implements AudioEngine {
     this.monitorLevel = Math.min(MONITOR_ROOM, Math.max(0, gain));
     const g = this.monitorGain;
     if (g && this.ctx) g.gain.setTargetAtTime(this.monitorLevel, this.ctx.currentTime, 0.015);
+  }
+
+  inputLatency(): number {
+    return this.micLate;
   }
 
   outputLatency(): number {

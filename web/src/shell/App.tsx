@@ -18,7 +18,7 @@ import { ExerciseScreen } from '../screens/ExerciseScreen';
 import { ExerciseTakes } from '../screens/ExerciseTakes';
 import { TabBar } from '../ui/TabBar';
 import { ConductorContext } from './conductor-context';
-import { CAT_ROUTE, current, EX_ROUTE, EX_TAKES_ROUTE, isExercise, navigate, onRoute, ROUTINE_ROUTE, SEND_ROUTE, SONG_ROUTE, tabOf, type Route } from './router';
+import { CAT_ROUTE, current, EX_ROUTE, EX_TAKES_ROUTE, navigate, onRoute, ROUTINE_ROUTE, SEND_ROUTE, SONG_ROUTE, tabOf, type Route } from './router';
 
 /* The one screen registry (RULEBOOK 4, Screens). */
 const SCREENS: Record<string, () => ReactNode> = {
@@ -73,7 +73,9 @@ export function App(props: { conductor: Conductor }) {
         <main className="screen" key={route} data-screen={route}>
           {screenFor(route)}
         </main>
-        {!isExercise(route) && <TabBar active={tabOf(route)} onPick={(t) => navigate(('/' + t) as Route, 'tab')} />}
+        {/* the menu on every screen, so anywhere is one tap away (Robert, 13 Nov);
+            leaving by it stops the sound and the mic at once (onRoute, above) */}
+        <TabBar active={tabOf(route)} onPick={(t) => navigate(('/' + t) as Route, 'tab')} />
       </div>
     </ConductorContext.Provider>
   );

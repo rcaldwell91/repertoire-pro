@@ -141,6 +141,9 @@ export interface AudioEngine {
   monitor(gain: number): void;
   /** seconds from a sound's engine time to when it is heard */
   outputLatency(): number;
+  /** seconds the mic's sound is late by, as the phone reports it (0 if it
+      doesn't); taken off every mic point */
+  inputLatency(): number;
   /** Silence every source and close the mic. The sound itself is never
       suspended (RULEBOOK 4, Sound, Android 1). */
   release(): void;

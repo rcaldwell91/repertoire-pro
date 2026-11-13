@@ -1,6 +1,7 @@
+import { DEFAULT_RANGE } from './range';
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
-import { DAILY, ROUTINES } from './exercises';
+import { DAILY, ROUTINES, routineMins } from './exercises';
 import { pickToday, routineToday, TODAY_ORDER, type TodayItem } from './today';
 
 /* Robert, 27 Oct: the top card on Train is "Today": what the singer should
@@ -23,8 +24,9 @@ describe('Today', () => {
 
   it('with nothing from any of them, it is the daily warm-up', async () => {
     const t = await pickToday({});
-    expect(t).toMatchObject({ from: 'own', name: copy.routineNames[DAILY], mins: ROUTINES[DAILY].mins, count: ROUTINES[DAILY].steps.length,
-      start: { kind: 'routine', key: DAILY } });
+    /* its length worked out from its exercises for the range (Robert, 4 Nov) */
+    expect(t).toMatchObject({ from: 'own', name: copy.routineNames[DAILY], mins: routineMins(ROUTINES[DAILY].steps, DEFAULT_RANGE),
+      count: ROUTINES[DAILY].steps.length, start: { kind: 'routine', key: DAILY } });
   });
 
   it('a source that fails is passed over, never the end of Today', async () => {

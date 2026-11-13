@@ -262,6 +262,22 @@ export class Conductor {
     return this.songTime(this.engine.now());
   }
 
+  /** The delays the phone reports, in seconds, as they are taken off now:
+      from a sound to hearing it (with the way out's own), and the mic's.
+      Kept with a take (13 Nov), so a measurement of when a voice arrives
+      can tell the phone's part from the singer's. */
+  delays(): { out: number; mic: number } {
+    return { out: this.engine.outputLatency(), mic: this.engine.inputLatency() };
+  }
+
+  /** Seconds since this session began running (after its count-in), on the
+      one clock; null unless running. A part that only listens (a held
+      note) is placed by this, as its points are. */
+  sinceStart(): number | null {
+    const at = this.snap.startedAt;
+    return this.snap.state === 'running' && at != null ? this.engine.now() - at : null;
+  }
+
   /** The point in the song heard at engine time `at` (RULEBOOK 2.2: one
       clock; the speaker's delay is taken off here, at the song's source).
       Null if no song is playing, or `at` is before it started. */
