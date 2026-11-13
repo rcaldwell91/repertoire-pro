@@ -326,7 +326,6 @@ export const copy = {
     notesHit: '{hits} of {n} notes',
     onPitch: '{pct}% of the notes on pitch',
     held: '{s} seconds',
-    heldOf: 'Aiming for {target} seconds',
     notScored: 'Not scored. Nothing here can be measured.',
     noMicScore: 'Not scored: no microphone.',
     nothingSung: 'Nothing sung, so nothing scored.',

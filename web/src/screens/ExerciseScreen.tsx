@@ -828,8 +828,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   const sheetRows = {
     anyOctave: sung || inParts ? { value: anyOctave, set: setAnyOctave } : undefined,
     countSound: countsIn ? { value: countSound, set: setCountSound } : undefined,
-    hear: sung ? { value: hear, set: setHear } : undefined,
-    hearVolume: sung ? { value: hearVol, set: setHearVol } : undefined,
+    hear: sung || kind === 'tone' ? { value: hear, set: setHear } : undefined,
+    hearVolume: sung || kind === 'tone' ? { value: hearVol, set: setHearVol } : undefined,
   };
 
   if (view === 'run') {

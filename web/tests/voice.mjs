@@ -116,3 +116,45 @@ export function firstNote(x, minSecs = 0.1) {
   }
   return null;
 }
+
+/** Real short sung sounds in a recording (13 Nov, for very short notes):
+    every voiced stretch that starts and ends in silence or an unvoiced
+    sound, `minSecs` to `maxSecs` long, holding one note (within half a
+    semitone). Each keeps its own natural start and end. */
+export function syllables(x, minSecs = 0.08, maxSecs = 0.5) {
+  const m = pitchTrack(x);
+  const out = [];
+  for (let i = 1; i < m.length; i++) {
+    if (!Number.isFinite(m[i]) || Number.isFinite(m[i - 1])) continue;
+    let j = i;
+    while (j + 1 < m.length && Number.isFinite(m[j + 1])) j++;
+    const len = (j - i + 1) / 100;
+    if (len >= minSecs && len <= maxSecs) {
+      const seg = m.slice(i, j + 1).sort((a, b) => a - b);
+      const med = seg[seg.length >> 1];
+      if (seg[0] > med - 0.5 && seg[seg.length - 1] < med + 0.5) out.push({ start: i / 100, secs: len, m: med });
+    }
+    i = j;
+  }
+  return out;
+}
+
+/** Short notes sung with real syllables: each note `sungFor` seconds of a
+    real sung sound of about that length (its own start and end, with 30 ms
+    of what came before and after it), moved onto the note, at the note's
+    start; `shift` semitones off (a wrong singer). */
+export function singShort(ffmpeg, source, pool, notes, dir, { sungFor = 0.15, shift = 0, lead = 0, tail = 1 } = {}) {
+  const end = Math.max(...notes.map((n) => n.t + n.d)) + lead + tail;
+  const out = new Float32Array(Math.ceil(end * RATE));
+  const near = [...pool].sort((a, b) => Math.abs(a.secs - sungFor) - Math.abs(b.secs - sungFor)).slice(0, 6);
+  notes.forEach((n, k) => {
+    const s0 = near[k % near.length];
+    const semis = n.m + shift - s0.m;
+    const tempo = s0.secs / sungFor;
+    const s = pcm(ffmpeg, source, ['-af', `rubberband=pitch=${Math.pow(2, semis / 12)}:tempo=${tempo}:formant=preserved`],
+      ['-ss', String(Math.max(0, s0.start - 0.03)), '-t', String(s0.secs + 0.06)]);
+    const at = Math.round((lead + n.t) * RATE);
+    for (let i = 0; i < s.length && at + i < out.length; i++) out[at + i] += s[i];
+  });
+  return wav(out, join(dir, `short-${Date.now()}-${Math.round(Math.random() * 1e6)}.wav`));
+}
