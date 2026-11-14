@@ -12,7 +12,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
 import { firstNote, pcm, pitchTrack, singNotes, steadyNote } from './voice.mjs';
@@ -90,7 +90,10 @@ const MUM = ladder('five', 120, RANGE);
 /* the Intermediate warm-up's steps, for its La-Ga */
 /* the exercise after each in its group's list (core/exercises' order) */
 /* every exercise, as the app lists them (core/exercises) */
-const CORE = await import('../src/core/exercises.ts');
+/* the app's own exercise list, bundled once for these checks (Node can't load it from the source as it is) */
+const CORE_JS = join(tmp, 'core-exercises.mjs');
+spawnSync('npx', ['rolldown', join(WEB, 'src/core/exercises.ts'), '--platform', 'node', '--format', 'esm', '-o', CORE_JS], { cwd: WEB });
+const CORE = await import(pathToFileURL(CORE_JS).href);
 const EXERCISES_ALL = CORE.EXERCISES.map((e) => e.id);
 /* a routine's listed length, worked out as the app does for the range the checks sing in (Robert, 4 Nov) */
 const minsOf = (key, tensionDone = true) => CORE.routineMins(CORE.routineSteps(key, tensionDone), RANGE, !!CORE.ROUTINES[key].down);
@@ -1311,7 +1314,8 @@ try {
         await result(exLength(targets) * 1000 + 15000);
         const wrong = await scoreOf();
         const names = [...shown];
-        check('interval', fits && right && right.n === targets.length && right.hits >= Math.ceil(0.8 * right.n) && wrong && wrong.hits <= Math.floor(0.2 * wrong.n) &&
+        /* a turn the voice never reached is left out, not counted as a miss (Robert, 4 and 13 Nov) */
+        check('interval', fits && right && right.n >= targets.length - 2 && right.hits >= Math.ceil(0.8 * right.n) && wrong && wrong.hits <= Math.floor(0.2 * wrong.n) &&
           names.length >= 2 && names.every((n) => Object.values(WORDS).includes(n)) && shapes.every((sh) => sh.id in WORDS && !sh.down),
           `ten shapes at Intermediate (${shapes.map((x) => x.id).join(', ')}), their notes as the test works them out ${fits}; sung by a real voice: ` +
           `"${right ? right.hits + ' of ' + right.n : '-'}"; three semitones off: "${wrong ? wrong.hits + ' of ' + wrong.n : '-'}"; shown: ${names.join(', ')}`);
@@ -1338,6 +1342,9 @@ try {
 
   /* 14d. Match the note, by a real voice */
   if (want('match')) {
+    /* the old Match the note: random notes, now its Intermediate level, with five seconds each (Robert, 4 Nov) */
+    await go('/train');
+    await page.eval(`localStorage.setItem('rp.level.match', '2')`);
     await openEx('match');
     const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
     const targets = round.map(([m, t, d]) => ({ m, t, d }));
@@ -1345,7 +1352,8 @@ try {
     await page.tap('#ex-start');
     await result(exLength(targets) * 1000 + 15000);
     const right = await scoreOf();
-    check('match', right && right.n === 10 && right.hits >= 8 && targets.every((n) => n.m >= RANGE.lo + 1 && n.m <= RANGE.hi - 1),
+    await page.eval(`localStorage.removeItem('rp.level.match')`);
+    check('match', right && right.n >= 9 && right.hits >= 8 && targets.every((n) => n.m >= RANGE.lo + 1 && n.m <= RANGE.hi - 1),
       `ten notes in the range, sung back by a real voice: "${right ? right.hits + ' of ' + right.n : '-'}"`);
   }
 

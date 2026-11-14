@@ -86,7 +86,11 @@ describe('a note to land in a longer time still counts after 1.2 s on it (Match 
     expect(b.notes.every((x) => x.d === 3)).toBe(true);
     expect(b.reveal?.length).toBe(10);
     expect(b.played.length).toBe(20);
-    b.notes.forEach((x, i) => expect((b.reveal as number[])[i]).toBeGreaterThan(x.t + x.d - 1e-9));
+    /* shown once the note plays again, before the next turn begins */
+    b.notes.forEach((x, i) => {
+      expect((b.reveal as number[])[i]).toBeGreaterThan(x.t + x.d - 1e-9);
+      expect((b.reveal as number[])[i]).toBeLessThan(b.played[2 * i + 2]?.t ?? b.length);
+    });
   });
   it('Match the note at Beginner: ten notes in order, a half step apart, from one above the bottom', () => {
     expect(waitParts({ lo: 45, hi: 69 }).map((p) => (p.kind === 'wait' ? p.m : 0))).toEqual([46, 47, 48, 49, 50, 51, 52, 53, 54, 55]);
@@ -109,6 +113,14 @@ describe('how a try landed (Match the note, Robert 4 Nov)', () => {
     expect(r.first).toBeCloseTo(80, 0);
     expect(r.settleAfter).toBeCloseTo(0.8, 1);
     expect(r.settled).toBeCloseTo(10, 0);
+  });
+  it('a moment on the note is not settling: it has to stay 0.6 s', () => {
+    const pts: Array<[number, number]> = [];
+    for (let t = 2; t < 2.2; t += 0.05) pts.push([t, 60.1]);          /* on it for 0.2 s */
+    for (let t = 2.2; t < 2.8; t += 0.05) pts.push([t, 61]);          /* off again */
+    for (let t = 2.8; t < 4; t += 0.05) pts.push([t, 60]);            /* then stays */
+    const l = line(pts);
+    expect(landing(l.t, l.m, 60, 1.6, 6.6, false).settleAfter).toBeCloseTo(0.8, 1);
   });
   it('never settles: null, never a guess; nothing sung: all null', () => {
     const l = line([[2, 62], [2.05, 62], [2.1, 62]]);
@@ -181,7 +193,9 @@ describe('Match the tone\'s plain tone (Robert, 4 Nov)', () => {
   it('a pure tone on the note, at the piano\'s level, with no click at either end', () => {
     const x = toneSamples(69, 1);
     const rms = Math.sqrt(x.reduce((a, v) => a + v * v, 0) / x.length);
-    expect(20 * Math.log10(rms)).toBeCloseTo(TONE_RMS_DB, 0);
+    /* the piano's reference notes average -16 dB over their first 1.5 s (measured from the sample files, 13 Nov) */
+    expect(20 * Math.log10(rms)).toBeCloseTo(-16, 0);
+    expect(TONE_RMS_DB).toBe(-16);
     expect(Math.abs(x[0])).toBeLessThan(1e-6);
     expect(Math.abs(x[x.length - 1])).toBeLessThan(0.01);
     /* 440 cycles in a second: count the rising zero crossings */
