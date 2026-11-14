@@ -1090,7 +1090,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
             data-round={sung ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
             data-rounds={kind === 'ladder' ? JSON.stringify(rungStarts(plan.notes).map((i) => plan.notes[i].m)) : undefined}
-            data-played={kind === 'interval' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
+            data-played={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
             data-shapes={plan.shapes ? JSON.stringify(plan.shapes) : undefined}
             data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
             {copy.train.start}

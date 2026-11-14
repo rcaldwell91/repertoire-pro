@@ -87,6 +87,12 @@ const keyNameOf = (m) => ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯
 const b64 = (v) => v.buffer.toString('base64');
 const sing = (notes, opts) => b64(singNotes(FFMPEG, SOURCE, STEADY, notes, tmp, opts));
 const MUM = ladder('five', 120, RANGE);
+/* Match the note: each try sung on the note the piano played just before it (not on the note the app
+   scores, so a round that scores another note than it plays is caught) */
+const onPlayed = async (targets) => {
+  const played = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.played)`);
+  return targets.map((n) => ({ ...n, m: played.filter(([, t]) => t <= n.t + 1e-6).pop()[0] }));
+};
 /* the Intermediate warm-up's steps, for its La-Ga */
 /* the exercise after each in its group's list (core/exercises' order) */
 /* every exercise, as the app lists them (core/exercises) */
@@ -1348,7 +1354,7 @@ try {
     await openEx('match');
     const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
     const targets = round.map(([m, t, d]) => ({ m, t, d }));
-    await singer(sing(targets));
+    await singer(sing(await onPlayed(targets)));
     await page.tap('#ex-start');
     await result(exLength(targets) * 1000 + 15000);
     const right = await scoreOf();
@@ -1699,7 +1705,7 @@ try {
       const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
       const targets = round.map(([m, t, d]) => ({ m, t, d }));
       /* each sung a second late, then held: a slide onto it, as the steps ask */
-      await singer(sing(targets.map((n) => ({ ...n, t: n.t + 0.4, d: Math.min(n.d - 0.4, 2.2) }))));
+      await singer(sing((await onPlayed(targets)).map((n) => ({ ...n, t: n.t + 0.4, d: Math.min(n.d - 0.4, 2.2) }))));
       await page.tap('#ex-start');
       let hidden = 0, shownLater = 0;
       if (name === 'match-blind') {
