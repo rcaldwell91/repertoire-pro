@@ -32,7 +32,7 @@ export interface Pattern {
   readonly span: number;
 }
 export const PATTERNS: Record<PatternId, Pattern> = {
-  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 2], span: 7 },
+  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 },
   down5: { deg: [7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 7 },
   down3: { deg: [4, 2, 0], dur: [1, 1, 2], span: 4 },
   arp: { deg: [0, 4, 7, 4, 0], dur: [1, 1, 2, 1, 2], span: 7 },
