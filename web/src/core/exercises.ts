@@ -32,7 +32,7 @@ export interface Pattern {
   readonly span: number;
 }
 export const PATTERNS: Record<PatternId, Pattern> = {
-  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 },
+  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 2], span: 7 },
   down5: { deg: [7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 7 },
   down3: { deg: [4, 2, 0], dur: [1, 1, 2], span: 4 },
   arp: { deg: [0, 4, 7, 4, 0], dur: [1, 1, 2, 1, 2], span: 7 },
@@ -121,6 +121,11 @@ export interface Exercise {
   /** held notes keep at least this many half steps below the top of the
       range (Tongue-out with a crescendo, Robert 13 Nov: five) */
   readonly topGap?: number;
+  /** sung short on purpose (Staccato, Consonant pops): a note counts once
+      0.1 s of it is heard on the note, not half its length (13 Nov: real
+      short sung sounds of 0.1 to 0.2 s, sung right, scored 0 to 6 in 10
+      under the half rule) */
+  readonly shortNotes?: boolean;
 }
 
 const ex = (id: Exercise['id'], category: CategoryId, level: Level, quiet: boolean, engine: Engine, sylsBy: SylsBy = 'note'): Exercise =>
@@ -181,7 +186,7 @@ export const EXERCISES: readonly Exercise[] = [
   ex('guh', 'tone', 2, false, ladder('oct', 120)),
   /* Agility */
   ex('loo', 'agility', 1, true, ladder('five', 130)),
-  ex('staccato', 'agility', 2, false, ladder('arp', 120)),
+  { ...ex('staccato', 'agility', 2, false, ladder('arp', 120)), shortNotes: true },
   leveled('laga', 'agility', true, [{ level: 1, engine: ladder('three', 132) }, { level: 2, engine: ladder('five', 132) },
     { level: 3, engine: ladder('arp19', 132) }], { everyStep: true }),
   /* Robert, 4 Nov: on notes, the line shown, not scored, like Chew and hum */
@@ -209,7 +214,7 @@ export const EXERCISES: readonly Exercise[] = [
   leveled('uniqueny', 'words', true, speeds([[1, 100], [2, 110]], 'twist8')),
   leveled('peterpiper', 'words', true, speeds([[1, 100], [2, 120]], 'twist7')),
   leveled('lipstongue', 'words', true, speeds([[1, 100], [2, 112]], 'five')),
-  ex('pops', 'words', 1, true, ladder('pops', 100)),
+  { ...ex('pops', 'words', 1, true, ladder('pops', 100)), shortNotes: true },
   ex('tonguetip', 'words', 1, true, ladder('five', 120)),
   /* Pitch (Robert, 28 Oct; his 4 Nov order): Match the note first, with its three levels */
   leveled('match', 'pitch', true, [{ level: 1, engine: { kind: 'match', mode: 'wait' } }, { level: 2, engine: { kind: 'match', mode: 'window' } },
@@ -300,6 +305,8 @@ export interface Note {
 }
 
 export const MAX_RUNGS = 14;
+/** a short note counts once this long on it (seconds) */
+export const SHORT_NEED = 0.1;
 export const REST_BEATS = 2;
 
 /** The old app's ladder (3706-3740): the pattern from one note above the
@@ -330,7 +337,8 @@ export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } 
   roots.forEach((root, r) => {
     p.deg.forEach((dg, i) => {
       const syl = sylFor(e, i, r);
-      notes.push({ m: root + dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl });
+      notes.push({ m: root + dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl,
+        ...(e.shortNotes ? { need: SHORT_NEED } : {}) });
       b += p.dur[i];
     });
     b += REST_BEATS;
@@ -424,6 +432,7 @@ export function bubbleScore(notes: readonly Note[], t: ArrayLike<number>, m: Arr
   { fill: number[]; hit: boolean[]; hits: number; n: number; sung: boolean; counted: boolean[]; rounds: { sung: number; of: number } } {
   const fill = notes.map(() => 0);
   const heard = notes.map(() => false);
+  const heardFor = notes.map(() => 0), onFor = notes.map(() => 0);
   let sung = false;
   for (let i = 0; i < t.length; i++) {
     if (!Number.isFinite(m[i])) continue;
@@ -433,12 +442,19 @@ export function bubbleScore(notes: readonly Note[], t: ArrayLike<number>, m: Arr
       const n = notes[k];
       if (at >= ms(n.t) && at < ms(n.t + n.d)) {
         heard[k] = true;
-        if (isRight(m[i], n.m, anyOctave)) fill[k] += hop / (n.need ?? n.d * HIT_SHARE) * HIT_SHARE;
+        heardFor[k] += hop;
+        if (isRight(m[i], n.m, anyOctave)) {
+          onFor[k] += hop;
+          fill[k] += hop / (n.need ?? n.d * HIT_SHARE) * HIT_SHARE;
+        }
         break;
       }
     }
   }
-  const capped = fill.map((f) => Math.min(1, f));
+  /* a very short note (one with its own `need`) also needs most of what was
+     heard in it on the note (the 4 Nov plan): the bubble stops just short */
+  const capped = fill.map((f, k) =>
+    notes[k].need != null && onFor[k] < heardFor[k] / 2 - 1e-9 ? Math.min(f, HIT_SHARE * 0.98) : Math.min(1, f));
   const hit = capped.map((f) => f >= HIT_SHARE - 1e-9);
   /* each note's round, and whether any note of it was heard */
   const starts = rungStarts(notes);

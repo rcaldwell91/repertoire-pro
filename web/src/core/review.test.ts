@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
 import {
-  EXERCISES, ROUTINES, atLevel, bubbleScore, exercise, ladderNotes, holdNotes, nextInGroup, routineMins, routineSecs, routineSteps, rungStarts,
+  EXERCISES, HIT_SHARE, ROUTINES, atLevel, bubbleScore, exercise, ladderNotes, holdNotes, nextInGroup, routineMins, routineSecs, routineSteps, rungStarts,
   type Exercise, type Note,
 } from './exercises';
 import { HOLD_TO_COUNT, intervalRound, landing, matchRound, nearness, seeded, toneParts, waitParts, SING, SING_SLOW } from './pitch';
@@ -98,6 +98,34 @@ describe('a note to land in a longer time still counts after 1.2 s on it (Match 
   it('Sing the interval at Beginner gives five seconds a note; the other levels 2.4', () => {
     expect(intervalRound(1, DEFAULT_RANGE, seeded(0.1)).notes.every((x) => x.d === SING_SLOW && x.need === HOLD_TO_COUNT)).toBe(true);
     expect(intervalRound(2, DEFAULT_RANGE, seeded(0.1)).notes.every((x) => x.d === SING)).toBe(true);
+  });
+});
+
+describe('very short notes (Staccato, Consonant pops): counted once 0.1 s is heard on the note (13 Nov, from the real-voice check)', () => {
+  it('only those two; and 0.1 s on the note is a hit, 0.05 s is not, a wrong note never', () => {
+    expect(EXERCISES.filter((e) => e.shortNotes).map((e) => e.id).sort()).toEqual(['pops', 'staccato']);
+    const n = ladderNotes(ex('staccato'), { lo: 50, hi: 62 }).notes[0];
+    expect(n.need).toBe(0.1);
+    const pts = (k: number, m: number) => ({ t: Array.from({ length: k }, (_, i) => n.t + 0.02 + i * 0.05), m: Array(k).fill(m) });
+    expect(bubbleScore([n], pts(2, n.m).t, pts(2, n.m).m, 0.05, false).hits).toBe(1);
+    expect(bubbleScore([n], pts(1, n.m).t, pts(1, n.m).m, 0.05, false).hits).toBe(0);
+    expect(bubbleScore([n], pts(6, n.m + 3).t, pts(6, n.m + 3).m, 0.05, false).hits).toBe(0);
+    expect(ladderNotes(ex('mum'), { lo: 50, hi: 62 }).notes[0].need).toBeUndefined();
+  });
+  it('and most of what was heard in it on the note: 0.1 s on it then 0.15 s off is a miss, and its bubble stops short', () => {
+    const n = ladderNotes(ex('pops'), { lo: 50, hi: 62 }).notes[0];
+    const t = [0, 1, 2, 3, 4].map((i) => n.t + 0.02 + i * 0.05);
+    const off = [n.m, n.m, n.m + 3, n.m + 3, n.m + 3];
+    const r = bubbleScore([n], t, off, 0.05, false);
+    expect(r.hits).toBe(0);
+    expect(r.fill[0]).toBeLessThan(HIT_SHARE);
+    /* three on and two off is most of it */
+    expect(bubbleScore([n], t, [n.m, n.m, n.m, n.m + 3, n.m + 3], 0.05, false).hits).toBe(1);
+    /* a longer note keeps its own rule: half its length on it, whatever else is heard */
+    const mum = ladderNotes(ex('mum'), { lo: 50, hi: 62 }).notes[0];
+    const k = Math.ceil(mum.d / 2 / 0.05) + 1;
+    const tm = Array.from({ length: Math.floor(mum.d / 0.05) }, (_, i) => mum.t + 0.01 + i * 0.05);
+    expect(bubbleScore([mum], tm, tm.map((_, i) => (i < k ? mum.m : mum.m + 3)), 0.05, false).hits).toBe(1);
   });
 });
 

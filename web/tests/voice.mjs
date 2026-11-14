@@ -68,14 +68,37 @@ export function steadyNote(x, minSecs = 0.5) {
 /** That note, sung on each of `notes` ({ m, t, d } in seconds), with
     silence `lead` seconds before the first and `tail` after the last;
     `shift` semitones off every note (a wrong singer), as a WAV file. */
-export function singNotes(ffmpeg, source, steady, notes, dir, { shift = 0, lead = 0, tail = 1 } = {}) {
+export function singNotes(ffmpeg, source, steady, notes, dir, { shift = 0, lead = 0, tail = 1, slides = null, slideSource = source } = {}) {
   const end = Math.max(...notes.map((n) => n.t + n.d)) + lead + tail;
   const out = new Float32Array(Math.ceil(end * RATE));
   const cache = new Map();
-  for (const n of notes) {
+  notes.forEach((n0, k) => {
+    let n = n0;
+    /* with `slides` (13 Nov, runs at speed): every note after the first
+       starts with a real slide from `slideSource` (the recording `slides`
+       were found in), going the same way and
+       moved so that it ends on the note; the steady stretch follows it */
+    const prev = notes[k - 1];
+    const way = prev ? Math.sign(n.m - prev.m) : 0;
+    const ways = slides && way ? slides.filter((x) => Math.sign(x.to - x.from) === way) : [];
+    const nearBy = ways.filter((x) => Math.abs(x.to - (n.m + shift)) <= 5);
+    const fits = nearBy.length ? nearBy : ways;
+    if (fits.length) {
+      const size = Math.abs(n.m - prev.m);
+      const sl = fits.reduce((a, b) => (Math.abs(Math.abs(b.to - b.from) - size) < Math.abs(Math.abs(a.to - a.from) - size) ? b : a));
+      /* shifted with a quarter second either side (rubberband needs it on
+         a clip this short), then the slide alone cut out, faded in 10 ms */
+      const pad = Math.min(0.25, sl.start);
+      const wide = pcm(ffmpeg, slideSource, ['-af', `rubberband=pitch=${Math.pow(2, (n.m + shift - sl.to) / 12)}:formant=preserved`],
+        ['-ss', String(sl.start - pad), '-t', String(sl.secs + pad + 0.25)]);
+      const g = wide.subarray(Math.round(pad * RATE), Math.round((pad + sl.secs) * RATE));
+      const at0 = Math.round((lead + n.t) * RATE), fade = 0.01 * RATE;
+      for (let i = 0; i < g.length && at0 + i < out.length; i++) out[at0 + i] += g[i] * Math.min(1, i / fade);
+      n = { m: n.m, t: n.t + sl.secs, d: n.d - sl.secs };
+    }
     const semis = n.m + shift - steady.m;
     /* the steady stretch, made as long as the note and moved onto it */
-    const len = Math.max(0.15, n.d - 0.04);
+    const len = Math.max(0.1, n.d - 0.04);
     const key = semis.toFixed(3) + ':' + len.toFixed(3);
     let s = cache.get(key);
     if (!s) {
@@ -87,7 +110,7 @@ export function singNotes(ffmpeg, source, steady, notes, dir, { shift = 0, lead 
     }
     const at = Math.round((lead + n.t) * RATE);
     for (let i = 0; i < s.length && at + i < out.length; i++) out[at + i] += s[i];
-  }
+  });
   return wav(out, join(dir, `sung-${Date.now()}-${Math.round(Math.random() * 1e6)}.wav`));
 }
 
@@ -141,14 +164,18 @@ export function syllables(x, minSecs = 0.08, maxSecs = 0.5) {
 
 /** Short notes sung with real syllables: each note `sungFor` seconds of a
     real sung sound of about that length (its own start and end, with 30 ms
-    of what came before and after it), moved onto the note, at the note's
-    start; `shift` semitones off (a wrong singer). */
-export function singShort(ffmpeg, source, pool, notes, dir, { sungFor = 0.15, shift = 0, lead = 0, tail = 1 } = {}) {
+    of what came before and after it), sung within five half steps of the
+    note and moved onto it, at the note's start; `shift` semitones off (a
+    wrong singer). */
+export function singShort(ffmpeg, source, pool, notes, dir, { sungFor = 0.15, shift = 0, lead = 0, tail = 1, turn = 0 } = {}) {
   const end = Math.max(...notes.map((n) => n.t + n.d)) + lead + tail;
   const out = new Float32Array(Math.ceil(end * RATE));
-  const near = [...pool].sort((a, b) => Math.abs(a.secs - sungFor) - Math.abs(b.secs - sungFor)).slice(0, 6);
   notes.forEach((n, k) => {
-    const s0 = near[k % near.length];
+    /* one of the six sounds closest in length among those sung within five
+       half steps of the note: a sound moved further is no longer a voice */
+    const close = pool.filter((x) => Math.abs(x.m - (n.m + shift)) <= 5);
+    const near = [...(close.length >= 6 ? close : pool)].sort((a, b) => Math.abs(a.secs - sungFor) - Math.abs(b.secs - sungFor)).slice(0, 6);
+    const s0 = near[(k + turn) % near.length];
     const semis = n.m + shift - s0.m;
     const tempo = s0.secs / sungFor;
     const s = pcm(ffmpeg, source, ['-af', `rubberband=pitch=${Math.pow(2, semis / 12)}:tempo=${tempo}:formant=preserved`],
@@ -157,4 +184,26 @@ export function singShort(ffmpeg, source, pool, notes, dir, { sungFor = 0.15, sh
     for (let i = 0; i < s.length && at + i < out.length; i++) out[at + i] += s[i];
   });
   return wav(out, join(dir, `short-${Date.now()}-${Math.round(Math.random() * 1e6)}.wav`));
+}
+
+/** Real slides in a recording (13 Nov, runs at speed): a voiced stretch of
+    40 to 150 ms whose pitch moves one way, one to five half steps in all,
+    and then holds a note (within 0.3 of a half step) for at least 0.1 s.
+    How a real singer gets from one note to the next. */
+export function slides(x) {
+  const m = pitchTrack(x);
+  const out = [];
+  for (let i = 1; i < m.length - 1; i++) {
+    if (!Number.isFinite(m[i])) continue;
+    const way = Math.sign(m[i + 1] - m[i]);
+    if (!way) continue;
+    let j = i;
+    while (j + 1 < m.length && Number.isFinite(m[j + 1]) && Math.sign(m[j + 1] - m[j]) === way && Math.abs(m[j + 1] - m[j]) < 1) j++;
+    const move = Math.abs(m[j] - m[i]), secs = (j - i) / 100;
+    let h = j;
+    while (h + 1 < m.length && Number.isFinite(m[h + 1]) && Math.abs(m[h + 1] - m[j]) < 0.3) h++;
+    if (secs >= 0.04 && secs <= 0.15 && move >= 1 && move <= 5 && (h - j) / 100 >= 0.1) out.push({ start: i / 100, secs, from: m[i], to: m[j] });
+    i = j;
+  }
+  return out;
 }

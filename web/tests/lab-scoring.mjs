@@ -5,7 +5,9 @@
       its own natural start and end (tests/voice.mjs syllables), at the
       note's start; then the same three half steps off;
    B. the runs and the nine-tone scale at every speed: sung right, sung
-      off, and sung right but arriving 80 ms after each piano note.
+      off, sung right but arriving 80 ms after each piano note, and sung
+      right and off with a real slide into every note (tests/voice.mjs
+      slides).
    The voice is the separated voice of a real song (RP_SPLIT, kept outside
    the repo). Prints a line per case and the counts; it measures and
    reports, it doesn't pass or fail the build. ONLY=a,b to run one part. */
@@ -16,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
-import { pcm, singNotes, singShort, steadyNote, syllables } from './voice.mjs';
+import { pcm, singNotes, singShort, slides, steadyNote, syllables } from './voice.mjs';
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
 const REPO = resolve(WEB, '..');
@@ -30,6 +32,7 @@ const SILENCE = join(tmp, 'silence.wav');
 spawnSync(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-t', '30', SILENCE]);
 const STEADY = steadyNote(pcm(FFMPEG, SOURCE30));
 const POOL = syllables(pcm(FFMPEG, SOURCE));
+const SLIDES = slides(pcm(FFMPEG, SOURCE));
 const HOME = Math.round(STEADY.m);
 const RANGE = { lo: HOME - 4, hi: HOME + 5 };
 const b64 = (v) => v.buffer.toString('base64');
@@ -67,13 +70,19 @@ async function run(id, level, voiceOf, label) {
 
 if (ONLY.includes('a')) {
   console.log(`A. very short notes, real syllables from the recording (${POOL.length} found)`);
-  for (const [id, level] of [['staccato', 2], ['pops', 1]]) {
-    for (const len of [0.1, 0.15, 0.2, 0.3]) {
-      await run(id, level, (notes) => singShort(FFMPEG, SOURCE, POOL, notes, tmp, { sungFor: len }), `${id} sung right, ${len} s a note`);
+  /* Staccato's round is 10 notes: three runs, each with other sounds, so a
+     share is out of 30 */
+  const total = async (id, level, times, opts, label) => {
+    let hits = 0, n = 0;
+    for (let turn = 0; turn < times; turn++) {
+      const r = await run(id, level, (notes) => singShort(FFMPEG, SOURCE, POOL, notes, tmp, { ...opts, turn: turn * 2 }), `${label}, run ${turn + 1}`);
+      hits += r.hits; n += r.n;
     }
-    for (const len of [0.15, 0.3]) {
-      await run(id, level, (notes) => singShort(FFMPEG, SOURCE, POOL, notes, tmp, { sungFor: len, shift: 3 }), `${id} three half steps off, ${len} s a note`);
-    }
+    console.log(`= ${label}: ${hits} of ${n} (${Math.round((100 * hits) / Math.max(1, n))}%)`);
+  };
+  for (const [id, level, times] of [['staccato', 2, 3], ['pops', 1, 1]]) {
+    for (const len of [0.1, 0.15, 0.2, 0.3]) await total(id, level, times, { sungFor: len }, `${id} sung right, ${len} s a note`);
+    for (const len of [0.15, 0.3]) await total(id, level, times, { sungFor: len, shift: 3 }, `${id} three half steps off, ${len} s a note`);
   }
 }
 if (ONLY.includes('b')) {
@@ -84,6 +93,8 @@ if (ONLY.includes('b')) {
       await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, notes, tmp), `${id} level ${level} right`);
       await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, notes.map((n) => ({ ...n, t: n.t + 0.08 })), tmp), `${id} level ${level} right, 80 ms late`);
       await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, notes, tmp, { shift: 3 }), `${id} level ${level} three half steps off`);
+      await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, notes, tmp, { slides: SLIDES, slideSource: SOURCE }), `${id} level ${level} right, sliding into each note`);
+      await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, notes, tmp, { slides: SLIDES, slideSource: SOURCE, shift: 3 }), `${id} level ${level} three half steps off, sliding`);
     }
   }
 }
