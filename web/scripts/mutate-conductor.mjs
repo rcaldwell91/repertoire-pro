@@ -46,14 +46,14 @@ export const MUTATIONS = [
   { rule: 'time is compared unrounded', file: X,
     from: 'const ms = (s: number) => Math.round(s * 1000);', to: 'const ms = (s: number) => s * 1000;' },
   { rule: 'the bubbles fold every octave', file: X,
-    from: '        if (isRight(m[i], n.m, anyOctave)) fill[k] +=', to: '        if (isRight(m[i], n.m, true)) fill[k] +=' },
+    from: '        if (isRight(m[i], n.m, anyOctave)) {', to: '        if (isRight(m[i], n.m, true)) {' },
   { rule: 'something unsung is scored', file: X,
     from: '    sung = true;\n', to: '' },
   /* Robert, 25 Oct: Articulation, the syllables note by note, the How lines */
   { rule: 'Articulation in a colour already used', file: X,
     from: "  { id: 'words', colour: 'words' },", to: "  { id: 'words', colour: 'tone' }," },
   { rule: 'an Articulation exercise is dropped', file: X,
-    from: "  ex('pops', 'words', 1, true, ladder('pops', 100)),\n", to: '' },
+    from: "  { ...ex('pops', 'words', 1, true, ladder('pops', 100)), shortNotes: true },\n", to: '' },
   { rule: 'a phrase\'s syllables do not change note by note', file: X,
     from: "  const at = e.sylsBy === 'rung' ? r : i;", to: "  const at = e.sylsBy === 'rung' ? r : 0 * i;" },
   /* every exercise has numbered steps since Robert's 4 Nov review, held by the 3 Nov rule for steps, which replaced the 25 Oct How rule */
