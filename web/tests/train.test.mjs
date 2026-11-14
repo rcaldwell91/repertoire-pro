@@ -594,10 +594,10 @@ try {
       near(c.viewLo, Math.min(...r1.map((n) => n.m)) - 3) && near(c.viewHi, Math.max(...r1.map((n) => n.m)) + 3);
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
     /* the map smaller, to make room for the controls along the bottom (Robert, 28 Oct), and still the larger part of the screen */
-    /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after) */
+    /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after, and no smaller) */
     check('singing-screen', a.top <= 1 && a.height >= a.inner - 70 && a.canvas >= 0.55 * a.inner && a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner &&
       +a.visible > 0 && a.labelled === a.visible && +a.names >= 6 &&
-      +a.bubble >= 36 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
+      +a.bubble >= 38.5 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
       `fills the screen above the menu: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px down to ${a.mapEnd}, the controls under it from ${a.barTop} to ${a.bar} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
       `${a.names} note names; bubbles ${a.bubble} px, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
       `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}`);
