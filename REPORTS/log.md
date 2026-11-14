@@ -1046,7 +1046,7 @@ https://rcaldwell91.github.io/repertoire-pro/app/
 4. **Staccato.** Tap Train, Agility, Staccato, Start. Sing the notes short and bouncy. At the end, tap Save take.
 5. **Consonant pops.** Tap Train, Articulation, Consonant pops, Start. At the end, tap Save take.
 6. **Five-note run at 160.** Tap Train, Agility, Five-note run. Tap the gear, pick Advanced, close it, tap Start. At the end, tap Save take.
-7. **Timing.** Tap Train, Tone, Mum, Start, sing it through, and tap Save take. With steps 4 to 6, that gives me slow, short and fast notes to measure, so no other exercise is needed.
+7. **Timing.** Tap Train, Tone, Mum, Start, sing it through, and tap Save take. With the Staccato, Consonant pops and Five-note run takes, that gives me slow, short and fast notes to measure, so no other exercise is needed.
 8. **Match the tone, without headphones.** Tap Train, Pitch, Match the tone, Start, and sing along through the phone's speaker. Tell me whether "I can hear the tone. Put your headphones in." showed.
 9. **Match the tone, with headphones.** The same again with headphones in. That line should not show, and your line should follow your voice.
 
