@@ -1986,6 +1986,20 @@ try {
       else await tapAll(e + ' singing', ['#ex-close']);
       if (await page.eval(`!!document.querySelector('#ex-result')`)) await tapAll(e + ' result', ['#ex-next']);
     }
+    /* Match the note at Beginner, a note held: the moment it waits for Next, with nothing to pause */
+    await go('/train');
+    await page.eval(`localStorage.setItem('rp.level.match', '1')`);
+    await openEx('match');
+    const firstPart = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.parts)[0]`);
+    await singer(sing([{ m: firstPart, t: 1.6, d: 3 }]));
+    await page.tap('#ex-start');
+    await page.waitFor(`document.querySelector('#ex-part-result')?.textContent === ${JSON.stringify(copy.train.heldIt)}`, 15000);
+    await noSinger();
+    const offHeld = await page.eval(`[...document.querySelectorAll('#ex-run button:disabled')].map((b) => b.id)`);
+    if (offHeld.length && !(await page.eval(`!!document.querySelector('#ex-wait-hint')`))) disabledUnsaid.push('match held: ' + offHeld.join(','));
+    await tapAll('match held', ['#ex-gear-run', '#ex-gear-run', '#ex-next-part']);
+    await page.tap('#ex-close');
+    await page.eval(`localStorage.removeItem('rp.level.match')`);
     check('no-silent-taps', silent.length === 0 && disabledUnsaid.length === 0,
       `taps that changed nothing: ${silent.length ? silent.join('; ') : 'none'}; disabled with nothing said: ${disabledUnsaid.length ? disabledUnsaid.join('; ') : 'none'}`);
   }
