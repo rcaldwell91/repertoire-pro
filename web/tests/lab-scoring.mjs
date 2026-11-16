@@ -18,14 +18,16 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
-import { pcm, singNotes, singShort, slides, steadyNote, syllables } from './voice.mjs';
+import { pcm, pitchTrack, restingSlides, singNotes, singShort, slides, steadyNote, syllables } from './voice.mjs';
+/* a note's name, as the app writes it (core/notemap) */
+const keyName = (m) => ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'][((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
 const REPO = resolve(WEB, '..');
 const APP = resolve(process.env.APP_DIR || join(REPO, 'app'));
 const FFMPEG = process.env.FFMPEG || 'ffmpeg';
 const PREFIX = process.env.RP_SPLIT || '';
-const ONLY = (process.env.ONLY || 'a,b').split(',');
+const ONLY = (process.env.ONLY || 'a,b,c,d').split(',');
 const SOURCE30 = `${PREFIX}-voice30.mp3`, SOURCE = `${PREFIX}-voice.mp3`;
 const tmp = mkdtempSync(join(tmpdir(), 'rp-lab-'));
 const SILENCE = join(tmp, 'silence.wav');
@@ -46,10 +48,10 @@ await page.addInitScript(MIRROR);
 await page.addInitScript(PROBE);
 let loads = 0;
 
-async function run(id, level, voiceOf, label) {
+async function run(id, level, voiceOf, label, range = RANGE) {
   await page.goto(URL_APP + '?load=' + ++loads + '#/train');
   await page.waitFor(`!!document.querySelector('main h1')`, 8000);
-  await page.eval(`localStorage.setItem('rp.range', ${JSON.stringify(JSON.stringify({ ...RANGE, at: '2026-11-13T00:00:00Z', by: 'test' }))});
+  await page.eval(`localStorage.setItem('rp.range', ${JSON.stringify(JSON.stringify({ ...range, at: '2026-11-13T00:00:00Z', by: 'test' }))});
     localStorage.setItem('rp.level.${id}', '${level}')`);
   await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/' + id);
   await page.waitFor(`!!document.querySelector('#ex-start')`, 8000);
@@ -98,5 +100,57 @@ if (ONLY.includes('b')) {
     }
   }
 }
+if (ONLY.includes('c')) {
+  /* C. Find your resting note (Robert, 16 Nov): real sung sound sliding down
+     and settling on a note we know, three slides a go, then Done; and slides
+     that never settle. Counted: the notes named right, named wrong, and not
+     named. */
+  console.log('C. Find your resting note: slides that settle on a known note');
+  const S30 = SOURCE30;
+  let right = 0, wrong = 0, none = 0, n = 0;
+  const sets = [[[56, 48], [55, 47], [57, 49]], [[60, 52], [59, 51], [58, 50]], [[53, 45], [54, 46], [52, 44]], [[62, 55], [61, 54], [63, 56]]];
+  for (const set of sets) {
+    const slidesOf = set.map(([from, to], k) => ({ t: 4 + k * 4, from, to, secs: 1 + 0.3 * k, hold: 1.1 }));
+    const got = await rest(restingSlides(FFMPEG, S30, STEADY, slidesOf, tmp));
+    set.forEach(([, to], k) => {
+      n++;
+      if (got[k] == null) none++;
+      else if (got[k] === to) right++;
+      else wrong++;
+    });
+    console.log(`  sung to rest on ${set.map(([, to]) => keyName(to)).join(', ')}: named ${got.map((x) => (x == null ? '-' : keyName(x))).join(', ')}`);
+  }
+  console.log(`= settling slides: ${right} of ${n} named right, ${wrong} named wrong, ${none} not named`);
+  const never = await rest(restingSlides(FFMPEG, S30, STEADY, [0, 1, 2].map((k) => ({ t: 4 + k * 4, from: 56 - k, to: 48 - k, secs: 2.6, hold: 0 })), tmp));
+  console.log(`= slides that never settle: ${never.filter((x) => x == null).length} of ${never.length} not named (named: ${never.filter((x) => x != null).map(keyName).join(', ') || 'none'})`);
+}
+if (ONLY.includes('d')) {
+  /* D. Bwoop at the heights it reaches (Robert, 16 Nov): the singer's own range
+     from the recording, so it climbs from the middle to the top; the short-note rule */
+  const m = pitchTrack(pcm(FFMPEG, SOURCE)).filter(Number.isFinite).sort((a, b) => a - b);
+  const VOICE_RANGE = { lo: Math.round(m[Math.floor(m.length * 0.05)]), hi: Math.round(m[Math.floor(m.length * 0.95)]) };
+  console.log(`D. Bwoop over the singer's own range ${keyName(VOICE_RANGE.lo)} to ${keyName(VOICE_RANGE.hi)}, real syllables`);
+  for (const len of [0.1, 0.15, 0.2, 0.3]) {
+    for (const turn of [0, 2]) await run('bwoop', 3, (notes) => singShort(FFMPEG, SOURCE, POOL, notes, tmp, { sungFor: len, turn }), `bwoop sung right, ${len} s a note, run ${turn / 2 + 1}`, VOICE_RANGE);
+  }
+  for (const len of [0.15, 0.3]) await run('bwoop', 3, (notes) => singShort(FFMPEG, SOURCE, POOL, notes, tmp, { sungFor: len, shift: 3 }), `bwoop three half steps off, ${len} s a note`, VOICE_RANGE);
+}
+
+/* Find your resting note, sung: Start, the slides, Done; the notes it named, slide by slide */
+async function rest(voice) {
+  await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/restnote');
+  await page.waitFor(`!!document.querySelector('#ex-start')`, 8000);
+  await page.eval(`window.__mirror.on = true; window.__mirror.atOnce = true; window.__mirror.load(${JSON.stringify(b64(voice))})`);
+  await page.tap('#ex-start');
+  await page.waitFor(`!!document.querySelector('#ex-done')`, 8000);
+  const secs = voice.buffer.length / 2 / 48000;
+  await sleep(secs * 1000 + 1500);
+  await page.tap('#ex-done');
+  await page.waitFor(`!!document.querySelector('#ex-rest')`, 5000);
+  /* each slide's resting note, in order (null: it never settled), as the result holds them */
+  return page.eval(`JSON.parse(document.querySelector('#ex-rest').dataset.notes)`);
+}
+
 await env.close();
 server.close();
+

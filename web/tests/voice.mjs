@@ -207,3 +207,31 @@ export function slides(x) {
   }
   return out;
 }
+
+/** Slides down that come to rest (16 Nov, Find your resting note): the
+    steady stretch of a real voice, made as long as each slide and its hold,
+    then bent by ffmpeg's rubberband as it plays (a pitch command every 20
+    ms): from `from` down to `to` over `secs`, then held on `to` for `hold`
+    seconds, its own natural wobble kept; with no hold, it never settles. Each
+    at its time `t`, as a WAV. */
+export function restingSlides(ffmpeg, source, steady, slides, dir, { tail = 1.5 } = {}) {
+  const end = Math.max(...slides.map((x) => x.t + x.secs + x.hold)) + tail;
+  const out = new Float32Array(Math.ceil(end * RATE));
+  slides.forEach((x, k) => {
+    const len = x.secs + x.hold;
+    const flat = join(dir, `rest-flat-${Date.now()}-${k}.wav`);
+    spawnSync(ffmpeg, ['-v', 'error', '-y', '-ss', String(steady.start), '-t', String(steady.secs), '-i', source,
+      '-af', `rubberband=tempo=${steady.secs / len}:formant=preserved,afade=t=in:d=0.03,areverse,afade=t=in:d=0.08,areverse`,
+      '-ac', '1', '-ar', String(RATE), flat]);
+    const cmds = [];
+    for (let at = 0; at <= len + 1e-9; at += 0.02) {
+      const m = at < x.secs ? x.from + ((x.to - x.from) * at) / x.secs : x.to;
+      cmds.push(`${at.toFixed(2)} rubberband pitch ${Math.pow(2, (m - steady.m) / 12).toFixed(5)}`);
+    }
+    const first = Math.pow(2, (x.from - steady.m) / 12).toFixed(5);
+    const bent = pcm(ffmpeg, flat, ['-af', `asendcmd=c='${cmds.join(';')}',rubberband=pitch=${first}:formant=preserved`]);
+    const at0 = Math.round(x.t * RATE);
+    for (let i = 0; i < bent.length && at0 + i < out.length; i++) out[at0 + i] += bent[i];
+  });
+  return wav(out, join(dir, `rest-${Date.now()}-${Math.round(Math.random() * 1e6)}.wav`));
+}

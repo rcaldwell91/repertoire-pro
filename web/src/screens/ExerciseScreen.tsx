@@ -1063,7 +1063,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           {shown.rest && (() => {
             const notes = shown.rest.filter((x) => x.note != null).map((x) => keyName(x.note as number));
             return (
-              <p className="ex-score" id="ex-rest">
+              <p className="ex-score" id="ex-rest" data-notes={JSON.stringify(shown.rest.map((x) => x.note))}>
                 {notes.length ? fill(copy.train.restResult, { notes: andList(notes) }) : copy.train.restNone.join(' ')}
               </p>
             );

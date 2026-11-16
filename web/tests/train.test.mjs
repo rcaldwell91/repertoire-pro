@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
-import { firstNote, pcm, pitchTrack, singNotes, steadyNote } from './voice.mjs';
+import { firstNote, pcm, pitchTrack, restingSlides, singNotes, steadyNote } from './voice.mjs';
 import { copy, fill } from '../src/core/copy.ts';
 import { SUPABASE_KEY, SUPABASE_URL } from '../src/data/config.ts';
 import { COACH_EMAIL, EMAIL, password } from './test-account.mjs';
@@ -40,9 +40,9 @@ const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'prev
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
   'next-moves-on', 'no-silent-taps', 'menu-everywhere', 'menu-leave', 'rounds-sung', 'stop-early', 'match-wait', 'match-window', 'match-blind', 'hold-map', 'match-tone',
-  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
+  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
-const GROUPS = { warmup: 13, breath: 6, tone: 12, agility: 10, range: 5, words: 7, pitch: 5 };
+const GROUPS = { warmup: 14, breath: 6, tone: 12, agility: 12, range: 6, words: 7, pitch: 5 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
 /** the count-in beep: the one short sound the app makes itself */
 const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
@@ -103,7 +103,8 @@ const CORE = await import(pathToFileURL(CORE_JS).href);
 const EXERCISES_ALL = CORE.EXERCISES.map((e) => e.id);
 /* a routine's listed length, worked out as the app does for the range the checks sing in (Robert, 4 Nov) */
 const minsOf = (key, tensionDone = true) => CORE.routineMins(CORE.routineSteps(key, tensionDone), RANGE, !!CORE.ROUTINES[key].down);
-const NEXT_AFTER = { tensioncheck: 'liptrill', posture: 'neckrelease' };
+/* since 16 Nov Find your resting note comes straight after the tension check */
+const NEXT_AFTER = { tensioncheck: 'restnote', posture: 'neckrelease' };
 const ROUTINE_INTERMEDIATE = ['hiss', 'farinelli', 'liptrill', 'descend', 'mum', 'mee', 'tongueout', 'laga', 'nay', 'wah', 'staccato', 'ninetone'];
 
 const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
@@ -2010,6 +2011,91 @@ try {
     await page.eval(`localStorage.removeItem('rp.level.match')`);
     check('no-silent-taps', silent.length === 0 && disabledUnsaid.length === 0,
       `taps that changed nothing: ${silent.length ? silent.join('; ') : 'none'}; disabled with nothing said: ${disabledUnsaid.length ? disabledUnsaid.join('; ') : 'none'}`);
+  }
+
+  /* Find your resting note (Robert, 16 Nov), by a real voice: two slides that
+     come to rest, on C3 and B2, and one that never settles; each named as it
+     ends, then the result in his words */
+  if (want('rest-note')) {
+    await openEx('restnote');
+    const voice = restingSlides(FFMPEG, SOURCE, STEADY, [{ t: 4, from: 56, to: 48, secs: 1.2, hold: 1.2 }, { t: 8.5, from: 55, to: 47, secs: 1.2, hold: 1.2 },
+      { t: 13, from: 54, to: 49, secs: 2.6, hold: 0 }], tmp);
+    await singer(b64(voice), true);
+    await page.tap('#ex-start');
+    const mapOnly = await page.waitFor(`!!document.querySelector('#bubbles') && +(document.querySelector('#bubbles').dataset.visible ?? 0) === 0`, 8000).then(() => true, () => false);
+    const said = (k, note) => fill(copy.train.restSlide, { k, note });
+    const first = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(said(1, 'C3'))}`, 15000).then(() => true, () => false);
+    const second = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(said(2, 'B2'))}`, 10000).then(() => true, () => false);
+    const unsettled = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(copy.train.restNone.join(' '))}`, 12000).then(() => true, () => false);
+    await page.tap('#ex-done');
+    await page.waitFor(`!!document.querySelector('#ex-rest')`, 5000);
+    const r = await page.eval(`({ text: document.querySelector('#ex-rest').textContent, notes: document.querySelector('#ex-rest').dataset.notes,
+      unscored: !!document.querySelector('#ex-unscored') })`);
+    await noSinger();
+    const want1 = fill(copy.train.restResult, { notes: fill(copy.train.listAnd, { a: 'C3', b: 'B2' }) });
+    check('rest-note', mapOnly && first && second && unsettled && r.text === want1 && r.notes === '[48,47,null]' && !r.unscored,
+      `the map with your line only ${mapOnly}; "${said(1, 'C3')}" ${first}, "${said(2, 'B2')}" ${second}, then "${copy.train.restNone.join(' ')}" ${unsettled}; ` +
+      `at Done "${r.text}" (each slide ${r.notes})`);
+  }
+
+  /* Tongue trill at Advanced (Robert, 16 Nov): picked in the gear, its own step 3 and doing-right line; the list says "Intermediate to Advanced" */
+  if (want('trill-advanced')) {
+    await go('/train');
+    await page.eval(`localStorage.removeItem('rp.level.tonguetrill')`);
+    await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/warmup');
+    await page.waitFor(`document.querySelectorAll('.ex-row').length > 0`, 5000);
+    const row = await page.eval(`document.querySelector('#ex-tonguetrill .ex-tags')?.textContent`);
+    await openEx('tonguetrill');
+    const step3 = () => page.eval(`[...document.querySelectorAll('#ex-how li')][2]?.textContent`);
+    const right = async () => {
+      if (!(await page.eval(`!!document.querySelector('#ex-about')`))) await page.tap('#ex-more');
+      return page.eval(`document.querySelector('#ex-right')?.textContent`);
+    };
+    const mid = { step: await step3(), right: await right() };
+    await page.eval(`localStorage.setItem('rp.level.tonguetrill', '3')`);
+    await openEx('tonguetrill');
+    const top = { step: await step3(), right: await right() };
+    await page.eval(`localStorage.removeItem('rp.level.tonguetrill')`);
+    check('trill-advanced', row?.startsWith(fill(copy.train.levelSpan, { from: copy.levels[2], to: copy.levels[3] })) &&
+      mid.step === copy.about.tonguetrill.steps[2] && mid.right === copy.about.tonguetrill.right &&
+      top.step === copy.about.tonguetrill.byLevel[3].steps[3] && top.right === copy.about.tonguetrill.byLevel[3].right,
+      `the row "${row}"; Intermediate: "${mid.step}" / "${mid.right}"; Advanced: "${top.step}" / "${top.right}"`);
+  }
+
+  /* the four new ones on their lists (Robert, 16 Nov), each in its place with its level, and how each runs */
+  if (want('new-four')) {
+    const rows = async (cat) => {
+      await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/' + cat);
+      await page.waitFor(`document.querySelectorAll('.ex-row').length > 0`, 5000);
+      return page.eval(`[...document.querySelectorAll('.ex-row')].map((r) => ({ id: r.id.replace(/^ex-/, ''), tags: r.querySelector('.ex-tags').textContent }))`);
+    };
+    const warm = await rows('warmup'), agil = await rows('agility'), rng = await rows('range');
+    const at = (list, id) => list.findIndex((r) => r.id === id);
+    const placed = at(warm, 'restnote') === at(warm, 'tensioncheck') + 1 && at(agil, 'threerun') === at(agil, 'run5') - 1 &&
+      at(agil, 'bends') === at(agil, 'turns') + 1 && at(rng, 'bwoop') === at(rng, 'descend') + 1;
+    const tags = { restnote: warm[at(warm, 'restnote')]?.tags, threerun: agil[at(agil, 'threerun')]?.tags, bends: agil[at(agil, 'bends')]?.tags,
+      bwoop: rng[at(rng, 'bwoop')]?.tags };
+    const levelsOk = tags.restnote === fill(copy.train.tagLineQuiet, { level: copy.levels[1], measure: copy.train.tagNone }) &&
+      tags.threerun === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[2] }), measure: copy.train.tagPitch }) &&
+      tags.bends === fill(copy.train.tagLineQuiet, { level: copy.levels[3], measure: copy.train.tagNone }) &&
+      tags.bwoop === fill(copy.train.tagLine, { level: copy.levels[3], measure: copy.train.tagPitch });
+    /* Bwoop: "bwoop" in every bubble, from the middle of the range; Note bends: the line shown, nothing filled */
+    await openEx('bwoop');
+    const bwoopRound = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 8000);
+    const bw = await page.eval(`({ title: document.querySelector('.sing-top strong').textContent, labelled: +document.querySelector('#bubbles').dataset.labelled,
+      visible: +document.querySelector('#bubbles').dataset.visible })`);
+    await page.tap('#ex-close');
+    const fromMid = bwoopRound[0][0] === Math.round((RANGE.lo + RANGE.hi) / 2 - 3.5) && bwoopRound[bwoopRound.length - 1][0] <= RANGE.hi;
+    await openEx('bends');
+    const bendRound = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+    const ups = bendRound.slice(0, 10).map(([m]) => m - bendRound[0][0]), downs = bendRound.slice(10, 20).map(([m]) => m - bendRound[10][0]);
+    check('new-four', placed && levelsOk && bw.title === 'Bwoop' && bw.labelled === bw.visible && bw.visible > 0 && fromMid &&
+      JSON.stringify(ups) === '[0,1,0,1,0,1,0,1,0,0]' && JSON.stringify(downs) === '[0,-1,0,-1,0,-1,0,-1,0,0]',
+      `in their places ${placed}; rows ${JSON.stringify(tags)}; Bwoop's title "${bw.title}", ${bw.labelled} of ${bw.visible} bubbles with "bwoop", from the middle ${fromMid}; ` +
+      `Note bends up ${ups.join(',')} then down ${downs.join(',')}`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));
