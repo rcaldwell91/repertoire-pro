@@ -15,6 +15,10 @@ const M = 'src/audio/mic-modes.ts';
 
 /* the Train tab's numbers (CHECKLIST 5) */
 const X = 'src/core/exercises.ts';
+/* Robert's 16 Nov additions */
+const REST = 'src/core/rest.ts';
+const TEN = 'src/core/tension.ts';
+const CP = 'src/core/copy.ts';
 
 export const MUTATIONS = [
   { rule: 'an exercise of the old app is dropped', file: X,
@@ -402,6 +406,51 @@ export const MUTATIONS = [
   { rule: 'how it settled is not kept', file: 'src/core/results.ts',
     from: "      ...(l?.settled != null ? { settle_cents: Math.round(l.settled) } : {}) };", to: '    };' },
 
+  /* Robert, 16 Nov */
+  { rule: 'a resting note needs no time settled', file: REST,
+    from: '      if (t[j] - t[i] >= SETTLE_HOLD - 1e-6) best = mid;', to: '      best = mid;' },
+  { rule: 'a resting note need not be settled at all', file: REST,
+    from: '      if (w.some((x) => Math.abs(x - mid) * 100 > SETTLE_CENTS)) break;', to: '' },
+  { rule: 'a slide still going is counted', file: REST,
+    from: 'export const REST_DONE = 0.6;', to: 'export const REST_DONE = 0;' },
+  { rule: 'a short sound counts as a slide', file: REST,
+    from: 'export const REST_MIN = 0.4;', to: 'export const REST_MIN = 0;' },
+  { rule: 'slides with pauses between are taken as one', file: REST,
+    from: 'export const REST_GAP = 0.4;', to: 'export const REST_GAP = 10;' },
+  { rule: 'the resting note is where the slide first settled, not last', file: REST,
+    from: '  for (let j = t.length - 1; j >= 0; j--) {', to: '  for (let j = 0; j < t.length; j++) {' },
+  { rule: 'Note bends never flick down', file: X,
+    from: '    const way = p.flip && r % 2 ? -1 : 1;', to: '    const way = 1;' },
+  { rule: 'Note bends flick for half a beat', file: X,
+    from: 'dur: [1, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 2]', to: 'dur: [1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 2]' },
+  { rule: 'Note bends are scored', file: X,
+    from: "  climbing(ex('bends', 'agility', 3, true, ladder('bend', 100)), { lineOnly: true }),", to: "  climbing(ex('bends', 'agility', 3, true, ladder('bend', 100)))," },
+  { rule: 'Bwoop starts at the bottom', file: X,
+    from: '  } else for (let r = e.fromMiddle ? mid : lo; r <= top; r++) roots.push(r);', to: '  } else for (let r = lo; r <= top; r++) roots.push(r);' },
+  { rule: 'Bwoop is held to half its notes', file: X,
+    from: '{ shortNotes: true, fromMiddle: true }', to: '{ fromMiddle: true }' },
+  { rule: 'Three-note run goes up before down', file: X,
+    from: 'threerun: { deg: [4, 2, 0, 0, 2, 4]', to: 'threerun: { deg: [0, 2, 4, 4, 2, 0]' },
+  { rule: 'Find your resting note is not straight after the tension check', file: X,
+    from: "  ex('restnote', 'warmup', 1, true, { kind: 'glide', rest: true }),\n", to: '' },
+  { rule: 'a level\'s own step is not shown', file: X,
+    from: '  const steps = (a?.steps ?? [copy.ex[id].how]).map((t, i) => own?.[i + 1] ?? t);', to: '  const steps = (a?.steps ?? [copy.ex[id].how]).map((t) => t);\n  void own;' },
+  { rule: 'a level\'s own doing-right line is not shown', file: X,
+    from: '  return (level && a?.byLevel?.[level]?.right) ?? a?.right;', to: '  return a?.right;' },
+  { rule: 'Tongue trill has no Advanced level', file: X,
+    from: "  leveled('tonguetrill', 'warmup', true, [{ level: 2, engine: ladder('five', 120) }, { level: 3, engine: ladder('five', 120) }]),",
+    to: "  ex('tonguetrill', 'warmup', 2, true, ladder('five', 120))," },
+  { rule: '"Keep your face still." with puffed cheeks', file: TEN,
+    from: '  face: { tonguetrill: 3 },', to: '' },
+  { rule: '"Open tall, not wide." on the hum and the bwoop', file: TEN,
+    from: "    'tonguetrill', 'restnote', 'bwoop'],", to: "    'tonguetrill'],"},
+  { rule: 'the fingertip under the chin is missing', file: CP,
+    from: '        "Rest a fingertip under your chin, in the soft spot behind the bone. It should stay soft while you hum.",\n', to: '' },
+  { rule: 'the mirror is missing on Tongue-out bright "a"', file: CP,
+    from: '        "Stick out your tongue and hold the tip with the cloth.",\n        "If you can, watch in a mirror. Your tongue should stay out on every note.",\n',
+    to: '        "Stick out your tongue and hold the tip with the cloth.",\n' },
+  { rule: 'Bwoop turns into boop', file: CP,
+    from: "    bwoop: { name: 'Bwoop', syl: 'bwoop',", to: "    bwoop: { name: 'Bwoop', syl: 'boop'," },
 ];
 
 function run() {

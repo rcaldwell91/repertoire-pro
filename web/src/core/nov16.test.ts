@@ -119,6 +119,11 @@ describe('Find your resting note: where each slide came to rest (core/rest)', ()
     expect(restNote(j.t, j.m)).toBe(45);
   });
 
+  it('the last place it settled, when it settles twice', () => {
+    const j = join(slide(0, 52, 47, 0.8, 0.8), slide(1.6, 47, 45, 0.4, 0.9));
+    expect(restNote(j.t, j.m)).toBe(45);
+  });
+
   it('a slide that never settles names nothing', () => {
     const a = slide(0, 55, 44, 2.5, 0);
     expect(restNote(a.t, a.m)).toBeNull();
@@ -136,7 +141,9 @@ describe('Find your resting note: where each slide came to rest (core/rest)', ()
   });
 
   it('a short sound is not a slide; silence between readings (NaN) is skipped', () => {
-    const blip = slide(0, 50, 50, REST_MIN - 0.15, 0);
+    expect(REST_MIN).toBe(0.4);
+    /* a quarter of a second of sound: too short to be a slide */
+    const blip = slide(0, 50, 50, 0.25, 0);
     const a = slide(2, 52, 45, 1, 1);
     const gap = { t: [1, 1.05, 1.1], m: [NaN, NaN, NaN] };
     const j = join(blip, gap, a);
