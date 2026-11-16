@@ -1499,8 +1499,12 @@ try {
       check('ex-take-offline', !!t && !t.path && offRow === copy.takes.onPhone, `saved with no signal: on the phone ${!!t}, online ${!!t?.path}; listed as "${offRow}"`);
     }
     await NET(false);
-    await page.waitFor(`document.querySelector('.take-row[data-take=${JSON.stringify(t?.id ?? '')}] .take-where')?.textContent === ${JSON.stringify(copy.takes.saved)}`, 60000);
+    const wentUp = await page.waitFor(`document.querySelector('.take-row[data-take=${JSON.stringify(t?.id ?? '')}] .take-where')?.textContent === ${JSON.stringify(copy.takes.saved)}`, 60000);
     const up = (await exTakes('mum')).find((x) => x.id === t?.id);
+    /* what the phone held if it never went up: every take waiting, oldest first, and what the row said */
+    const waiting = wentUp ? '' : JSON.stringify(await idb('takes', `(all) => ({ online: navigator.onLine, takes: all.sort((a, b) => a.created - b.created)
+      .map((x) => ({ id: x.id.slice(0, 8), song: x.songId, path: !!x.path, kept: !!x.kept, progress: x.progress ?? null, bytes: x.audio?.size ?? null })) })`)) +
+      ' row: ' + (await page.eval(`document.querySelector('.take-row[data-take=${JSON.stringify(t?.id ?? '')}] .take-where')?.textContent ?? null`));
     if (want('ex-take-online')) {
       const token = singerToken();
       const rows = up?.path ? JSON.parse(execFileSync('curl', ['-sS', SUPABASE_URL + `/rest/v1/takes?select=kind,coach_id,title,notes&audio_path=eq.${encodeURIComponent(up.path)}`,
@@ -1517,7 +1521,7 @@ try {
       check('ex-take-online', rows.length === 1 && r.kind === 'exercise' && r.coach_id === null && r.title === copy.ex.mum.name && r.notes?.app === 'train' &&
         r.notes?.exercise === 'mum' && r.notes?.piano?.length === MUM.length && open !== '200' && own === '200' && !inSongs,
         `back online it went up: ${rows.length} row ${r ? JSON.stringify({ kind: r.kind, coach: r.coach_id, title: r.title, app: r.notes?.app, exercise: r.notes?.exercise }) : ''}; ` +
-        `the recording without signing in: ${open}, as the singer: ${own}; in the Sing tab's song takes ${inSongs}`);
+        `the recording without signing in: ${open}, as the singer: ${own}; in the Sing tab's song takes ${inSongs}` + (waiting ? `; not up after 60 s: ${waiting}` : ''));
     }
   }
 
