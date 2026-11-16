@@ -642,6 +642,15 @@ const MUTATIONS = [
   { test: "train", what: "the phone's delays are not kept with a take", file: E, from: ", delays: delaysAt.current ?? c.delays() });", to: " });", checks: ["note-timing"] },
   { test: "train", what: "Straw is not scored after the straw test", file: "src/core/exercises.ts", from: "    { level: 3, engine: ladder('arp19', 120) }], { everyStep: true }),", to: "    { level: 3, engine: ladder('arp19', 120) }], { everyStep: true, lineOnly: true }),", checks: ["line-only"] },
   { test: "train", what: "the climbing line is missing", file: "src/core/exercises.ts", from: "  return steps.some((x) => /^stop (climbing|before|when)/i.test(x)) ? steps : [...steps, copy.stepLines.stopEasy];", to: "  return steps;", checks: ["page-layout"] },
+  /* Robert, 16 Nov */
+  { test: 'train', what: 'bubbles under 40 px on a short phone', file: 'src/ui/Bubbles.tsx', from: 'export const BUBBLE_MIN = 40;', to: 'export const BUBBLE_MIN = 18;', checks: ['menu-everywhere'] },
+  { test: 'train', what: 'the map keeps its old margin, its rows under 42 px', file: 'src/ui/Bubbles.tsx', from: 'const PAD = 6;', to: 'const PAD = 14;', checks: ['singing-screen'] },
+  { test: 'train', what: 'no resting note named while singing', file: E, from: "        {resting && restLive.length > 0 && (() => {", to: "        {resting && restLive.length < 0 && (() => {", checks: ['rest-note'] },
+  { test: 'train', what: 'the resting notes left out of the result', file: E, from: "            const notes = shown.rest.filter((x) => x.note != null).map((x) => keyName(x.note as number));", to: "            const notes: string[] = [];", checks: ['rest-note'] },
+  { test: 'train', what: 'Find your resting note shows the Sirens line', file: E, from: "        {kind === 'glide' && !resting && <p className=\"hint\">{copy.train.glide}</p>}", to: "        {kind === 'glide' && <p className=\"hint\" id=\"ex-rest-now\">{copy.train.glide}</p>}", checks: ['rest-note'] },
+  { test: 'train', what: "the page's steps ignore the level", file: E, from: "            {stepsFor(e.id, { cooldown: down, level: e.level }).map((t) => <li key={t}>{t}</li>)}", to: "            {stepsFor(e.id, { cooldown: down }).map((t) => <li key={t}>{t}</li>)}", checks: ['trill-advanced'] },
+  { test: 'train', what: "the doing-right line ignores the level", file: E, from: "                  <p id=\"ex-right\">{rightFor(e.id, e.level)}</p>", to: "                  <p id=\"ex-right\">{rightFor(e.id)}</p>", checks: ['trill-advanced'] },
+  { test: 'train', what: 'Bwoop listed in Agility, not Range', file: 'src/core/exercises.ts', from: "climbing(ex('bwoop', 'range', 3, false", to: "climbing(ex('bwoop', 'agility', 3, false", checks: ['new-four', 'category'] },
 ];
 
 function edit(dir, { file, from, to }) {
