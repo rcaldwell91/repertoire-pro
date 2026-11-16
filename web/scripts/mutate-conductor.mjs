@@ -126,7 +126,9 @@ export const MUTATIONS = [
   { rule: 'Posture check loses the chin step', file: 'src/core/copy.ts',
     from: "        \"If your head only reaches the wall by lifting your chin, stop just short.\",\n", to: '' },
   { rule: 'a plain line may run to any length', file: 'src/core/copy.test.ts',
-    from: 'export const isHow = (at: string) => /^copy\\.ex\\.\\w+\\.(how|goal|need)$/.test(at);', to: 'export const isHow = (at: string) => /^copy\\.ex\\.\\w+\\.(how|goal|need)$/.test(at) || true;' },
+    from: 'export const isHow = (at: string) => /^copy\\.ex\\.\\w+\\.(how|goal|need)$/.test(at) || HIS_WORDS.includes(at);', to: 'export const isHow = (at: string) => /^copy\\.ex\\.\\w+\\.(how|goal|need)$/.test(at) || HIS_WORDS.includes(at) || true;' },
+  { rule: 'any line may claim to be in Robert\'s own words', file: 'src/core/copy.test.ts',
+    from: "export const HIS_WORDS = ['copy.train.restNone.0'];", to: "export const HIS_WORDS = ['copy.train.restNone.0', 'copy.train.restSlide', 'copy.train.glide'];" },
   /* Robert, 28 Oct: one layout for every singing screen */
   { rule: 'a screen sings outside the one layout', file: 'src/core/screens.test.ts',
     from: "    if (text.includes('<Bubbles') && !text.includes('<SingLayout')) out.push(`${name}: sings without the one layout`);\n", to: '' },

@@ -57,6 +57,11 @@ describe('copy-lint', () => {
     expect(problems([{ at: 'copy.train.x', text: long, prose: false }])).toHaveLength(1);
   });
 
+  it('only Robert\'s own result sentence for Find your resting note runs past eight words outside an exercise\'s own lines (16 Nov)', () => {
+    expect(HIS_WORDS).toEqual(['copy.train.restNone.0']);
+    expect(copy.train.restNone[0]).toBe("That slide didn't come to rest on a note.");
+  });
+
   it('a How line may run to 14 words, and no further (it can fail)', () => {
     const w = (n: number) => Array.from({ length: n }, (_, i) => 'w' + i).join(' ');
     expect(problems([{ at: 'copy.ex.mum.how', text: w(14) }])).toEqual([]);
