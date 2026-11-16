@@ -5,7 +5,7 @@ import { Settings } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
   CATEGORIES, ROUTINES, atLevel, bubbleScore, exercise, firstRung, levelsOf, measures, nextInGroup, notesFor, rungAt, rungStarts,
-  stepsFor, type Exercise, type Level, type Note, type RoutineId,
+  rightFor, stepsFor, type Exercise, type Level, type Note, type RoutineId,
 } from '../core/exercises';
 import { keyName, type Range } from '../core/notemap';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
@@ -19,6 +19,7 @@ import { cueFor, pickReminder, SPOTS, type Spot } from '../core/tension';
 import { clock as clockText } from '../core/time';
 import { resultRow, type Outcome } from '../core/results';
 import { cycleAt, SoundClock } from '../core/timed';
+import { restSlides, type Slide } from '../core/rest';
 import type { Plan, Take } from '../audio/conductor/conductor';
 import { joinTakes } from '../audio/recorder';
 import { keptRange, onRange, rangeNow, saveRange } from '../data/range';
@@ -74,8 +75,12 @@ const LONG_LEAD = 1.5;
 const HOP = 0.05;
 
 type View = 'preview' | 'run' | 'result';
-type Shown = { o: Outcome; noMic: boolean; range?: Range; was?: Range; where: 'online' | 'phone' | null };
+type Shown = { o: Outcome; noMic: boolean; range?: Range; was?: Range; where: 'online' | 'phone' | null; rest?: readonly Slide[] };
 type About = { why: string; watch?: string; care?: string; right?: string; steps?: readonly string[] };
+/** "A2", "A2 and G♯2", "A2, A2 and G♯2" */
+function andList(v: readonly string[]): string {
+  return v.length < 2 ? v.join('') : fill(copy.train.listAnd, { a: v.slice(0, -1).join(', '), b: v[v.length - 1] });
+}
 /** Long soft notes' readout: on the note within half a semitone, as the old app's interval card (next.html 23146) */
 const READ_ON = 0.5;
 
@@ -127,6 +132,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   /* a part with your line on the map: one note's bubble (Robert, 4 and 13 Nov) */
   const partMap = kind === 'steady' || kind === 'tone' || matchMode === 'wait';
   const usesMic = sung || inParts || kind === 'timed' || kind === 'glide' || kind === 'range';
+  /* Find your resting note: a slide, each one's resting note named (Robert, 16 Nov) */
+  const resting = e.engine.kind === 'glide' && !!e.engine.rest;
   /* a count-in, and so a count-in sound: everything the conductor runs */
   const countsIn = kind !== 'cycle' && kind !== 'guided';
   const about = (copy.about as Partial<Record<string, About>>)[e.id];
@@ -263,7 +270,18 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   }, [startedAt]);
   const line = useYourLine(c, owner, listening, startedAt, sung ? undefined : (at) => (since.current == null ? null : at - since.current),
     () => keepFrom.current);
-  /* was the mic ever open while it ran: a score needs it */
+
+  /* Find your resting note: the slides finished so far, looked at four times a second */
+  const [restLive, setRestLive] = useState<readonly Slide[]>([]);
+  useEffect(() => {
+    if (!resting || !running) return;
+    const id = window.setInterval(() => {
+      const now = c.sinceStart();
+      const got = restSlides(line.t, line.m, now == null ? {} : { now });
+      setRestLive((was) => (was.length === got.length && was.every((x, k) => x.note === got[k].note) ? was : got));
+    }, 250);
+    return () => window.clearInterval(id);
+  }, [resting, running, c, line]);  /* was the mic ever open while it ran: a score needs it */
   const heard = useRef(false);
   useEffect(() => {
     if (listening) heard.current = true;
@@ -556,7 +574,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     setToneHeard(false);
     /* the one line while singing: the movement cue, or the next tension reminder that suits it */
     const cue = cueFor(e.id);
-    const spot = cue ? null : pickReminder(e.id, keptSpots(), reminderTurn());
+    const spot = cue ? null : pickReminder(e.id, keptSpots(), reminderTurn(), e.level);
     if (spot) nextReminderTurn();
     setLineNow(cue ?? (spot ? copy.train.remind[spot] : null));
     setTicks(null);
@@ -790,7 +808,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   function done() {
     if (playing) c.stop();
     setClockFrom(null);
-    void finish({ kind: 'none' });
+    void finish({ kind: 'none' }, resting ? { rest: restSlides(line.t, line.m, { all: true }) } : {});
+    setRestLive([]);
   }
 
   /* Save take: on the phone now, online when it can, the singer's alone;
@@ -920,7 +939,15 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
             </div>
           );
         })()}
-        {kind === 'glide' && <p className="hint">{copy.train.glide}</p>}
+        {kind === 'glide' && !resting && <p className="hint">{copy.train.glide}</p>}
+        {resting && restLive.length > 0 && (() => {
+          const last = restLive[restLive.length - 1];
+          return (
+            <p className="ex-line" id="ex-rest-now" role="status">
+              {last.note != null ? fill(copy.train.restSlide, { k: restLive.length, note: keyName(last.note) }) : copy.train.restNone.join(' ')}
+            </p>
+          );
+        })()}
         {kind === 'timed' && counting == null && (
           <>
             <div className="ex-big" id="ex-held">{fill(copy.train.held, { s: (withMic ? heldNow : elapsed).toFixed(1) })}</div>
@@ -947,7 +974,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
         {kind === 'guided' && (
           <>
             <div className="ex-big" id="ex-clock">{clockText(elapsed)}</div>
-            <ol className="ex-steps">{stepsFor(e.id, { cooldown: down }).map((t) => <li key={t}>{t}</li>)}</ol>
+            <ol className="ex-steps">{stepsFor(e.id, { cooldown: down, level: e.level }).map((t) => <li key={t}>{t}</li>)}</ol>
             <p className="hint">{copy.train.guided}</p>
           </>
         )}
@@ -1033,7 +1060,15 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           {shown.range && shown.was && (
             <p className="hint" id="ex-range-was">{fill(copy.train.rangeWas, { lo: keyName(shown.was.lo), hi: keyName(shown.was.hi) })}</p>
           )}
-          {shown.o.kind === 'none' && !shown.range && (
+          {shown.rest && (() => {
+            const notes = shown.rest.filter((x) => x.note != null).map((x) => keyName(x.note as number));
+            return (
+              <p className="ex-score" id="ex-rest">
+                {notes.length ? fill(copy.train.restResult, { notes: andList(notes) }) : copy.train.restNone.join(' ')}
+              </p>
+            );
+          })()}
+          {shown.o.kind === 'none' && !shown.range && !shown.rest && (
             <p className="hint" id="ex-unscored">
               {shown.noMic ? copy.train.noMicScore : e.lineOnly ? copy.train.lineOnly : measures(e) === 'none' ? copy.train.notScored : copy.train.nothingSung}
             </p>
@@ -1085,7 +1120,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           )}
           <p className="ex-label">{copy.train.howTo}</p>
           <ol className="ex-steps" id="ex-how">
-            {stepsFor(e.id, { cooldown: down }).map((t) => <li key={t}>{t}</li>)}
+            {stepsFor(e.id, { cooldown: down, level: e.level }).map((t) => <li key={t}>{t}</li>)}
           </ol>
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
             data-round={sung ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
@@ -1108,10 +1143,10 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           {about && more && (
             <section className="card about" id="ex-about">
               {/* Robert, 3 Nov: doing it right, then watch out (care points at its end, so nothing is lost), then why */}
-              {about.right && (
+              {rightFor(e.id, e.level) && (
                 <>
                   <p className="ex-label">{copy.train.right}</p>
-                  <p>{about.right}</p>
+                  <p id="ex-right">{rightFor(e.id, e.level)}</p>
                 </>
               )}
               {(about.watch || about.care) && (

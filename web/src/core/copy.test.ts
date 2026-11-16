@@ -13,7 +13,10 @@ export const MAX_WORDS = 8;
     spec's descriptions run past eight words ("Sing with your tongue out so
     its root can't pull on your voice.") */
 export const MAX_HOW_WORDS = 14;
-export const isHow = (at: string) => /^copy\.ex\.\w+\.(how|goal|need)$/.test(at);
+/** lines Robert gave word for word, held to the 14 words of an exercise's own lines:
+    the one sentence of his Find your resting note result over eight (16 Nov) */
+export const HIS_WORDS = ['copy.train.restNone.0'];
+export const isHow = (at: string) => /^copy\.ex\.\w+\.(how|goal|need)$/.test(at) || HIS_WORDS.includes(at);
 
 export function problems(lines: Array<{ at: string; text: string; prose?: boolean }>): string[] {
   const out: string[] = [];

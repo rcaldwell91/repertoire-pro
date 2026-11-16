@@ -368,6 +368,11 @@ export const copy = {
     near: { veryClose: 'very close', close: 'close', bitOff: 'a bit off', farOff: 'far off' },
     /* Robert's words, a sentence a line */
     toneHeard: ['I can hear the tone.', 'Put your headphones in.'],
+    /* Find your resting note (Robert, 16 Nov; the result in his words) */
+    restSlide: 'Slide {k}: came to rest on {note}.',
+    restNone: ["That slide didn't come to rest on a note.", 'Try again and let it settle.'],
+    restResult: 'Your slides came to rest on {notes}.',
+    listAnd: '{a} and {b}',
     /* a song for each shape, the first three times it comes (Robert, 13 Nov) */
     cues: { step: 'the first jump in Happy Birthday', third: 'Oh When the Saints', fourth: 'Here Comes the Bride',
       fifth: 'the first jump in Twinkle, Twinkle', sixth: 'My Bonnie Lies Over the Ocean', octave: 'the first jump in Somewhere Over the Rainbow',
@@ -499,6 +504,13 @@ export const copy = {
       right: "The trill keeps rolling through every note and your jaw stays loose.",
       why: "The trill loosens your tongue and, like lip trills, gives a gentle resistance that eases your vocal folds.",
       watch: "Tensing your tongue to force the trill, the trill stopping on the high notes, and your jaw tightening.",
+      /* Advanced (Robert, 16 Nov): the trill through puffed cheeks, its own step 3 and doing-right line */
+      byLevel: {
+        3: {
+          steps: { 3: "Keep the trill going and close your lips until only a little air gets out. Your cheeks will puff out. Keep them puffed and sing the pattern." },
+          right: "The trill keeps rolling and your cheeks stay puffed on every note.",
+        },
+      },
     },
     straw: {
       steps: [
@@ -516,14 +528,14 @@ export const copy = {
     cheekpuffs: {
       steps: [
         "Puff out your cheeks and close your lips loosely.",
-        "Make a sound, letting a little air escape through your lips. It should be a real note, not just air.",
+        "Make a sound, letting the air out through your lips in a small, steady stream. It should be a real note, not just air.",
         "Pinch your nose on and off. The sound shouldn't change.",
         "Sing three notes up and back like this.",
         "Roll your shoulders back in full, slow circles the whole time.",
       ],
-      right: "You hear a clear note, pinching your nose changes nothing, and your shoulders keep making full circles.",
+      right: "You hear a clear note, your cheeks stay puffed the whole time, pinching your nose changes nothing, and your shoulders keep making full circles.",
       why: "Like the straw, puffed cheeks send a little pressure back toward your vocal folds so they work easily. The shoulder rolls stop your shoulders locking up.",
-      watch: "Blowing air with no note behind it, shrugging up and down instead of circling, and your shoulders stopping while you sing.",
+      watch: "Blowing air with no note behind it, shrugging up and down instead of circling, and your shoulders stopping while you sing. Your cheeks going flat, and the air rushing out all at once.",
     },
     chewhum: {
       steps: [
@@ -543,10 +555,11 @@ export const copy = {
         "\"nnn\" rounds: tip of your tongue on the ridge behind your top teeth, lips slightly apart.",
         "\"ng\" rounds, as at the end of \"sing\": the back of your tongue touches the roof of your mouth.",
         "Keep every hum gentle and feel the buzz in your face.",
+        "Rest a fingertip under your chin, in the soft spot behind the bone. It should stay soft while you hum.",
       ],
       right: "You feel a buzz around your nose, lips or cheeks, your jaw is loose behind the hum, and it stays soft.",
       why: "All three send the sound out through your nose instead of your mouth, which is the same gentle, low-pressure way of getting your folds going. They differ in where the block is: M at the lips is the mildest, NG at the back of the tongue is the strongest and is the classic siren sound. The strong buzz in your face makes resonance easy to feel.",
-      watch: "Clenching the jaw behind closed lips. Humming too loudly.",
+      watch: "Clenching the jaw behind closed lips. Humming too loudly. The soft spot under your chin going hard or pushing down against your finger.",
     },
     tonguefwd: {
       steps: [
@@ -597,12 +610,15 @@ export const copy = {
     },
     pulses: {
       steps: [
-        "Put one hand on your belly, just below your ribs.",
+        "Put one hand on your chest and one on your belly, just below your ribs.",
+        "Breathe in so the belly hand moves out and the chest hand stays still.",
         "Say short bursts of \"ha, ha, ha, ha\".",
         "Feel your belly pull in on each \"ha\", then let it spring back out so the next breath comes in by itself.",
+        "Now move your chest hand to your lower back and try a firm \"shh\", as if quieting a room. Both hands should feel a kick.",
         "Keep your shoulders and throat relaxed. Short and light, not loud.",
+        "Chest still lifting? Lie on your back with a book on your belly and breathe so the book rises. Then try again standing.",
       ],
-      right: "Your hand moves in on each \"ha\", the breath refills by itself between bursts, and your throat doesn't grunt or squeeze.",
+      right: "Your chest hand stays still when you breathe in, your belly hand moves in on each \"ha\", the breath refills by itself between bursts, and your throat doesn't grunt or squeeze.",
       why: "It wakes up the belly muscles that power your voice, and teaches a quick, easy refill between phrases.",
       watch: "Pushing the sound from your throat (it sounds like a cough), your shoulders bouncing, and speeding up as you go. If you feel light-headed, slow down.",
     },
@@ -646,12 +662,13 @@ export const copy = {
         "Sing \"mum\" on every note: lips closed on the M, open to a short \"uh\", close again.",
         "Keep the hum buzzing in your lips as you open.",
         "Start each note gently, and keep the vowel from drifting.",
+        "Say it the way you'd speak it, at talking volume. Don't get louder as the notes climb.",
         "Keep your head loose and moving a little, and your shoulders rolling.",
         "Don't worry about how it sounds yet. How free it feels is what counts.",
       ],
-      right: "Nothing stiffens as the notes rise. Your head and shoulders keep moving through every repetition.",
+      right: "Nothing stiffens as the notes rise. Your head and shoulders keep moving through every repetition. The \"uh\" sounds the same on every note, and the top is no louder than the bottom.",
       why: "The closed M makes the sound start gently, since you can't slam into an M, and gives your voice a little resistance to work against. The M at the end lets you check the buzz is still there after the vowel.",
-      watch: "A hard start. The vowel drifting toward \"mam\" or \"mom\" as you go up. That drift is a sign the outer neck and jaw muscles have started gripping. Also pressing the lips hard, which chokes it. Your head or shoulders freezing on the higher notes.",
+      watch: "A hard start. The vowel drifting toward \"mam\" or \"mom\" as you go up. That drift is a sign the outer neck and jaw muscles have started gripping. Also pressing the lips hard, which chokes it. Your head or shoulders freezing on the higher notes. Your chin lifting as the notes rise.",
       care: "Very safe. The best first exercise in most sessions.",
     },
     mee: {
@@ -713,6 +730,7 @@ export const copy = {
     tongueout: {
       steps: [
         "Stick your tongue out and down toward your chin, and keep it there.",
+        "If you can, watch in a mirror. Your tongue should stay out on every note.",
         "If your tongue keeps creeping back in, hold the tip with a clean cloth or paper towel and pull it gently out, just enough to feel a stretch at the back.",
         "Start each note gently. Don't hit it hard.",
       ],
@@ -724,6 +742,7 @@ export const copy = {
     tonguecresc: {
       steps: [
         "Stick your tongue out and down, as in Tongue-out singing.",
+        "If you can, watch in a mirror. Your tongue should stay out on every note.",
         "When the note plays, start it quietly on \"ah\" and grow louder through the hold.",
         "Keep your tongue out the whole time. If it starts pulling in, stop growing and stay at that volume.",
         "Never go to your loudest.",
@@ -735,6 +754,7 @@ export const copy = {
     brighta: {
       steps: [
         "Stick out your tongue and hold the tip with the cloth.",
+        "If you can, watch in a mirror. Your tongue should stay out on every note.",
         "Pull gently, just enough to feel a stretch at the back of your tongue. Don't yank.",
         "Sing \"a\" as in \"cat\" on the five-note scale.",
         "Make it bright and whiny, like a child complaining.",
@@ -844,6 +864,56 @@ export const copy = {
       right: "Every bubble fills, you can hear each note separately even at speed, and the top note is as light as the rest.",
       why: "Runs need every note placed quickly and cleanly. Learning them slowly first, then speeding up, is how singers build them; rushing just practises the smear.",
       watch: "Notes smearing together, slowing down at the top, your jaw chopping on each note, and getting louder as you climb.",
+    },
+    /* Robert, 16 Nov */
+    restnote: {
+      steps: [
+        "Close your lips and sigh out an easy \"hmm\", as if you're thinking something over.",
+        "Start the next \"hmm\" a little higher and let it slide down until it comes to rest. Don't steer it.",
+        "Do three slides, pausing between them. After each one, the screen shows the note you came to rest on.",
+        "On the last one, hold that note and let your jaw drop open to \"ah\". Keep it just as easy.",
+        "Tap Done.",
+      ],
+      right: "The \"hmm\" feels as easy as a sigh, and your three slides come to rest on the same note or the one next to it.",
+      why: "An easy \"hmm\" shows you what singing with no extra effort feels like, and the note it comes to rest on is a relaxed place to start from.",
+      watch: "Sliding so low that the sound turns gravelly or pressed. Stop where it's still easy. Don't aim for a note; let your voice choose.",
+    },
+    /* the runs' shared steps, why and watch-out, with its own doing-right line */
+    threerun: {
+      steps: [
+        "Sing \"my\" on every note at first, so each note is its own little start.",
+        "When that's easy, sing \"my\" on the first note and let the rest flow on the vowel.",
+        "Keep your jaw still and your air moving. Every note gets the same weight.",
+        "Keep the top note light; don't slow down or push there.",
+        "If you can't land every note, pick a slower level. Speed comes after accuracy.",
+      ],
+      right: "All three notes are clear on the way down and on the way up, with no slide between them.",
+      why: "Runs need every note placed quickly and cleanly. Learning them slowly first, then speeding up, is how singers build them; rushing just practises the smear.",
+      watch: "Notes smearing together, slowing down at the top, your jaw chopping on each note, and getting louder as you climb.",
+    },
+    bends: {
+      steps: [
+        "Sing \"ah\" on the note the piano gives you.",
+        "Flick to the very next note (a half step away) and straight back, as quick and light as you can. The piano shows you how.",
+        "Do four flicks, then hold the note.",
+        "The rounds switch between flicking up and flicking down.",
+        "Keep it quiet, and stay where your voice is comfortable.",
+      ],
+      right: "Each flick is quick and clean, and your line lands back on the same note every time.",
+      why: "Most runs are built from small, quick moves like this one. Getting one clean makes the longer ones easier.",
+      watch: "Slow, smeary flicks, getting louder, and reaching for high notes. This isn't a range exercise.",
+    },
+    bwoop: {
+      steps: [
+        "Sing a short, light \"bwoop\" on every note, like a bubble popping.",
+        "Say it in three quick parts: \"b\", then \"woo\", then \"p\". Don't skip the \"w\". It's \"bwoop\", not \"boop\".",
+        "Round your lips for the \"woo\" and close them again on the \"p\".",
+        "Leave a tiny gap between notes. Don't join them up.",
+        "Keep it quiet all the way. The top notes should be as light as the bottom ones.",
+      ],
+      right: "You can hear the \"w\" in every \"bwoop\", every note is short and separate, and the high notes come out as easily and as quietly as the low ones.",
+      why: "A short, light note is over before you can push on it, so it's a gentle way to visit your high notes.",
+      watch: "The \"w\" dropping out so it turns into \"boop\", notes getting long or joining up, getting louder as you climb, and pushing for the top.",
     },
     minor5: {
       steps: [
@@ -1129,6 +1199,15 @@ export const copy = {
       how: 'Let your belly kick in for each burst, with shoulders and throat relaxed.' },
     goo: { name: 'Goo', syl: 'goo', goal: 'A round, easy sound up and back.', how: 'Round your lips and let the back of your tongue lift lightly.' },
     guh: { name: 'Guh', syl: 'guh', goal: 'A warm sound up high and back down.', how: 'Keep your jaw loose and the sound the same weight at the top.' },
+    /* Robert, 16 Nov: four new ones, in our own words */
+    restnote: { name: 'Find your resting note', syl: 'hmm', goal: 'Hum, slide down, and see where your voice comes to rest.',
+      how: 'Hum, let it slide down, and see where it comes to rest.' },
+    threerun: { name: 'Three-note run', syl: 'my', goal: 'Three notes down, three notes up. The smallest run there is.',
+      how: 'Keep the air moving so every step is light and clean.' },
+    bends: { name: 'Note bends', syl: 'ah', goal: 'One note with a quick flick to the note next door.',
+      how: 'Flick to the next note and straight back, quick and light.' },
+    bwoop: { name: 'Bwoop', syl: 'bwoop', goal: 'Short, light "bwoop"s that bounce up toward your top.',
+      how: 'Short, light, separate notes, each one a quick "bwoop".' },
     run5: { name: 'Five-note run', syl: 'my', goal: 'A quick, even run up and back.', how: 'Keep the air moving so every step is light and clean.' },
     minor5: { name: 'Five-note minor run', syl: 'my', goal: 'The same run, with a darker middle.',
       how: 'Lean into the darker step and keep your jaw still.' },

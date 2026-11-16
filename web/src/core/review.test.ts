@@ -29,7 +29,8 @@ function sing(notes: ReadonlyArray<{ m: number; t: number; d: number }>, opts: {
 
 describe('Next moves on (Robert, 13 Nov: from the tension check it went to Posture check, and there did nothing)', () => {
   it('is the next exercise in the group, by id, whatever level the exercise is at', () => {
-    expect(nextInGroup('tensioncheck')).toBe('liptrill');
+    /* since 16 Nov Find your resting note comes straight after the tension check */
+    expect(nextInGroup('tensioncheck')).toBe('restnote');
     expect(nextInGroup('posture')).toBe('neckrelease');
     expect(nextInGroup('neckrelease')).toBe('tensioncheck');
     /* the last of a group goes round to its first, never to itself */
@@ -103,7 +104,7 @@ describe('a note to land in a longer time still counts after 1.2 s on it (Match 
 
 describe('very short notes (Staccato, Consonant pops): counted once 0.1 s is heard on the note (13 Nov, from the real-voice check)', () => {
   it('only those two; and 0.1 s on the note is a hit, 0.05 s is not, a wrong note never', () => {
-    expect(EXERCISES.filter((e) => e.shortNotes).map((e) => e.id).sort()).toEqual(['pops', 'staccato']);
+    expect(EXERCISES.filter((e) => e.shortNotes).map((e) => e.id).sort()).toEqual(['bwoop', 'pops', 'staccato']);
     const n = ladderNotes(ex('staccato'), { lo: 50, hi: 62 }).notes[0];
     expect(n.need).toBe(0.1);
     const pts = (k: number, m: number) => ({ t: Array.from({ length: k }, (_, i) => n.t + 0.02 + i * 0.05), m: Array(k).fill(m) });

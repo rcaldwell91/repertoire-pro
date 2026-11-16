@@ -1,5 +1,5 @@
 import { copy } from './copy';
-import { exercise } from './exercises';
+import { exercise, type Level } from './exercises';
 
 /* The "Ah" tension check (Robert, 3 Nov): where the singer felt tension,
    ticked after it, and the one-line reminder each tick brings to later
@@ -23,22 +23,27 @@ const NOT: Record<Spot, readonly string[]> = {
   chin: [],
   jaw: ['chewhum'],
   wide: ['nay', 'hum', 'mum', 'liptrill', 'buzz', 'raspberry', 'straw', 'cheekpuffs', 'chewhum', 'tonguefwd', 'tongueout', 'tonguecresc', 'brighta',
-    'tonguetrill'],
+    'tonguetrill', 'restnote', 'bwoop'],
   face: ['nay', 'cheekpuffs', 'chewhum', 'brighta'],
   tongue: ['tongueout', 'tonguecresc', 'brighta', 'tonguefwd', 'tonguetrill', 'laga', 'loo', 'blah'],
   neck: [],
 };
 
-/** the ticked spots whose reminder suits this exercise, in the spec's order */
-export function remindersFor(id: string, ticked: readonly Spot[]): Spot[] {
+/* and at one level only: Tongue trill at Advanced puffs the cheeks (16 Nov) */
+const NOT_AT: Partial<Record<Spot, Readonly<Record<string, Level>>>> = {
+  face: { tonguetrill: 3 },
+};
+
+/** the ticked spots whose reminder suits this exercise (at this level), in the spec's order */
+export function remindersFor(id: string, ticked: readonly Spot[], level?: Level): Spot[] {
   if (NO_LINE.includes(id)) return [];
   const words = exercise(id)?.category === 'words';
-  return SPOTS.filter((s) => ticked.includes(s) && !NOT[s].includes(id) && !(s === 'tongue' && words));
+  return SPOTS.filter((s) => ticked.includes(s) && !NOT[s].includes(id) && !(s === 'tongue' && words) && !(level != null && NOT_AT[s]?.[id] === level));
 }
 
 /** the reminder for this start: the turn-th of those that suit it, round and round */
-export function pickReminder(id: string, ticked: readonly Spot[], turn: number): Spot | null {
-  const fit = remindersFor(id, ticked);
+export function pickReminder(id: string, ticked: readonly Spot[], turn: number, level?: Level): Spot | null {
+  const fit = remindersFor(id, ticked, level);
   return fit.length ? fit[turn % fit.length] : null;
 }
 

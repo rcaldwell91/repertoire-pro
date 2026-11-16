@@ -24,12 +24,15 @@ export const CATEGORIES: ReadonlyArray<{ id: CategoryId; colour: Colour }> = [
 ];
 
 export type PatternId = 'five' | 'down5' | 'down3' | 'arp' | 'oct' | 'octrep' | 'nine' | 'oct15' | 'same5' | 'pops' | 'leap' | 'twist7' | 'twist8'
-  | 'run5' | 'minor5' | 'penta' | 'chrom' | 'turns' | 'arp19' | 'three';
+  | 'run5' | 'minor5' | 'penta' | 'chrom' | 'turns' | 'arp19' | 'three' | 'threerun' | 'bend';
 /** degrees in semitones from the rung's root, and each note's beats */
 export interface Pattern {
   readonly deg: readonly number[];
   readonly dur: readonly number[];
   readonly span: number;
+  /** every other round the other way up: its steps away from the root
+      turned upside down (Note bends: flicks up, then flicks down) */
+  readonly flip?: boolean;
 }
 export const PATTERNS: Record<PatternId, Pattern> = {
   five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 },
@@ -60,6 +63,11 @@ export const PATTERNS: Record<PatternId, Pattern> = {
   arp19: { deg: [0, 4, 7, 12, 16, 19, 16, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2], span: 19 },
   /* Robert, 3 Nov: three notes up and back, 1-2-3-2-1, four even notes and the last held */
   three: { deg: [0, 2, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 4 },
+  /* Robert, 16 Nov: 3-2-1, then 1-2-3, in one round */
+  threerun: { deg: [4, 2, 0, 0, 2, 4], dur: [1, 1, 2, 1, 1, 2], span: 4 },
+  /* Robert, 16 Nov: the note, four flicks (a quarter beat on the note a half
+     step away, three quarters back), the note held; up one round, down the next */
+  bend: { deg: [0, 1, 0, 1, 0, 1, 0, 1, 0, 0], dur: [1, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 2], span: 1, flip: true },
 };
 
 /** how an exercise runs. ladder: the pattern up your range, sung back over
@@ -74,7 +82,9 @@ export type Engine =
   /* breath counts: in, pause and out, each `from` counts in the first round,
      one more each round up to `to` (Robert, 4 Nov) */
   | { kind: 'cycle'; from: number; to: number }
-  | { kind: 'glide' }
+  /* a slide, your line shown; `rest`: Find your resting note, where each
+     slide's resting note is named (Robert, 16 Nov; core/rest) */
+  | { kind: 'glide'; rest?: boolean }
   | { kind: 'guided'; mins: number }
   | { kind: 'range' }
   /* Pitch (Robert, 28 Oct): a note plays, then the jump is sung; a note
@@ -126,6 +136,8 @@ export interface Exercise {
       short sung sounds of 0.1 to 0.2 s, sung right, scored 0 to 6 in 10
       under the half rule) */
   readonly shortNotes?: boolean;
+  /** starts in the middle of the range and climbs to the top (Bwoop, Robert 16 Nov) */
+  readonly fromMiddle?: boolean;
 }
 
 const ex = (id: Exercise['id'], category: CategoryId, level: Level, quiet: boolean, engine: Engine, sylsBy: SylsBy = 'note'): Exercise =>
@@ -148,12 +160,15 @@ export const EXERCISES: readonly Exercise[] = [
   ex('posture', 'warmup', 1, false, guided(1)),
   ex('neckrelease', 'warmup', 1, true, guided(1)),
   climbing(ex('tensioncheck', 'warmup', 1, true, ladder('three', 110)), { lineOnly: true }),
+  /* Robert, 16 Nov: hum and slide down; the note each slide comes to rest on, not scored */
+  ex('restnote', 'warmup', 1, true, { kind: 'glide', rest: true }),
   /* Robert, 4 Nov: three levels, all at today's speed */
   leveled('liptrill', 'warmup', true, [{ level: 1, engine: ladder('five', 100) }, { level: 2, engine: ladder('oct', 100) },
     { level: 3, engine: ladder('oct15', 100) }]),
   ex('buzz', 'warmup', 1, true, ladder('five', 110), 'rung'),
   ex('raspberry', 'warmup', 1, true, { kind: 'glide' }),
-  ex('tonguetrill', 'warmup', 2, true, ladder('five', 120)),
+  /* Robert, 16 Nov: an Advanced level, the trill through puffed cheeks, same pattern and speed */
+  leveled('tonguetrill', 'warmup', true, [{ level: 2, engine: ladder('five', 120) }, { level: 3, engine: ladder('five', 120) }]),
   /* Robert, 3 Nov: sung patterns in place of the clock; scored since his
      real-straw test on his phone ("the straw test was good", 13 Nov) */
   leveled('straw', 'warmup', true, [{ level: 1, engine: ladder('three', 110) }, { level: 2, engine: ladder('five', 110) },
@@ -194,14 +209,20 @@ export const EXERCISES: readonly Exercise[] = [
   leveled('ninetone', 'agility', false, speeds([[2, 130], [3, 160]], 'nine')),
   /* the runs, all on "my": a speed for each level (Robert, 4 Nov); the
      chromatic run and the turns stay advanced, with no 100 (13 Nov) */
+  /* Robert, 16 Nov: the smallest run, 3-2-1 then 1-2-3, a half step a round */
+  leveled('threerun', 'agility', true, speeds([[1, 100], [2, 130]], 'threerun'), { everyStep: true }),
   leveled('run5', 'agility', true, speeds([[1, 100], [2, 130], [3, 160]], 'run5')),
   leveled('minor5', 'agility', true, speeds([[1, 100], [2, 130], [3, 160]], 'minor5')),
   leveled('penta', 'agility', true, speeds([[1, 100], [2, 130], [3, 160]], 'penta')),
   leveled('chrom', 'agility', true, speeds([[2, 130], [3, 160]], 'chrom')),
   leveled('turns', 'agility', true, speeds([[2, 130], [3, 160]], 'turns')),
+  /* Robert, 16 Nov: a flick is about three of the line's readings, so the line is shown, not scored */
+  climbing(ex('bends', 'agility', 3, true, ladder('bend', 100)), { lineOnly: true }),
   /* Range */
   ex('octleap', 'range', 3, false, ladder('leap', 100)),
   ex('descend', 'range', 1, true, ladder('down5', 120)),
+  /* Robert, 16 Nov: short, light notes from the middle of the range to the top, scored by the short-note rule */
+  climbing(ex('bwoop', 'range', 3, false, ladder('five', 120)), { shortNotes: true, fromMiddle: true }),
   ex('octrep', 'range', 3, false, ladder('octrep', 112)),
   ex('arp19', 'range', 3, false, ladder('arp19', 120)),
   /* the old app's range check (3754-3790), as its own exercise */
@@ -323,10 +344,10 @@ export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } 
   const lo = range.lo + 1;
   const top = range.hi - p.span;
   let roots: number[] = [];
+  const mid = Math.max(lo, Math.min(top, Math.round((range.lo + range.hi) / 2 - p.span / 2)));
   if (opts.down) {
-    const mid = Math.min(top, Math.round((range.lo + range.hi) / 2 - p.span / 2));
     for (let r = mid; r >= lo; r--) roots.push(r);
-  } else for (let r = lo; r <= top; r++) roots.push(r);
+  } else for (let r = e.fromMiddle ? mid : lo; r <= top; r++) roots.push(r);
   if (!roots.length) roots = [lo];
   if (roots.length > MAX_RUNGS && !e.everyStep) {
     const step = Math.ceil(roots.length / MAX_RUNGS);
@@ -335,9 +356,10 @@ export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } 
   const notes: Note[] = [];
   let b = 0;
   roots.forEach((root, r) => {
+    const way = p.flip && r % 2 ? -1 : 1;
     p.deg.forEach((dg, i) => {
       const syl = sylFor(e, i, r);
-      notes.push({ m: root + dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl,
+      notes.push({ m: root + way * dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl,
         ...(e.shortNotes ? { need: SHORT_NEED } : {}) });
       b += p.dur[i];
     });
@@ -476,9 +498,23 @@ export function bubbleScore(notes: readonly Note[], t: ArrayLike<number>, m: Arr
     How line. One that climbs ends "Stop when it stops feeling easy; you
     don't have to finish the climb." unless its steps already say so; in the
     Cool-down, which steps down, "Stop whenever you like." (Robert, 4 and 13 Nov) */
-export function stepsFor(id: Exercise['id'], opts: { cooldown?: boolean } = {}): readonly string[] {
-  const a = (copy.about as Record<string, { steps?: readonly string[] }>)[id];
-  const steps = a?.steps ?? [copy.ex[id].how];
+/** a level's own words (Robert, 16 Nov: Tongue trill at Advanced): a step
+    (numbered from 1) and the doing-right line, in place of the exercise's */
+export interface ByLevel {
+  readonly steps?: Readonly<Record<number, string>>;
+  readonly right?: string;
+}
+type AboutWords = { steps?: readonly string[]; right?: string; byLevel?: Partial<Record<Level, ByLevel>> };
+const aboutOf = (id: Exercise['id']) => (copy.about as Record<string, AboutWords>)[id];
+/** the doing-right line at a level: the level's own, or the exercise's */
+export function rightFor(id: Exercise['id'], level?: Level): string | undefined {
+  const a = aboutOf(id);
+  return (level && a?.byLevel?.[level]?.right) ?? a?.right;
+}
+export function stepsFor(id: Exercise['id'], opts: { cooldown?: boolean; level?: Level } = {}): readonly string[] {
+  const a = aboutOf(id);
+  const own = opts.level ? a?.byLevel?.[opts.level]?.steps : undefined;
+  const steps = (a?.steps ?? [copy.ex[id].how]).map((t, i) => own?.[i + 1] ?? t);
   const e = exercise(id);
   if (!e || !levelsOf(e).every((l) => l.engine.kind === 'ladder')) return steps;
   if (opts.cooldown) return [...steps, copy.stepLines.stopAny];
