@@ -600,12 +600,12 @@ try {
       near(c.viewLo, Math.min(...r1.map((n) => n.m)) - 3) && near(c.viewHi, Math.max(...r1.map((n) => n.m)) + 3);
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
     /* the map smaller, to make room for the controls along the bottom (Robert, 28 Oct), and still the larger part of the screen */
-    /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after, and no smaller) */
+    /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after), and back to 40 on 16 Nov, inside rows of 42 px or more */
     check('singing-screen', a.top <= 1 && a.height >= a.inner - 70 && a.canvas >= 0.55 * a.inner && a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner &&
       +a.visible > 0 && a.labelled === a.visible && +a.names >= 6 &&
-      +a.bubble >= 38.5 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
+      +a.bubble >= 40 && +a.row >= 42 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
       `fills the screen above the menu: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px down to ${a.mapEnd}, the controls under it from ${a.barTop} to ${a.bar} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
-      `${a.names} note names; bubbles ${a.bubble} px, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
+      `${a.names} note names; bubbles ${a.bubble} px on ${a.row} px rows, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
       `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}`);
   }
 
@@ -1589,11 +1589,19 @@ try {
     const ctrls = await Promise.all(['#ex-pause', '#ex-restart', '#ex-gear-run', '#ex-close', '#ex-cue'].map(box));
     const fits = ctrls.every((b) => b && b.l >= 0 && b.r <= 360 && b.b <= tabs.t) && tabs.b <= 740 && during.b <= tabs.t;
     await page.tap('#ex-close');
+    /* Mum at 360 x 740, its five-note pattern zoomed as on any phone: bubbles still 40 px (Robert, 16 Nov) */
+    await openEx('mum');
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 8000);
+    const narrow = await page.eval(`({ bubble: +document.querySelector('#bubbles').dataset.bubble, row: +document.querySelector('#bubbles').dataset.row })`);
+    await page.tap('#ex-close');
     await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-    check('menu-everywhere', !!page1 && !!step && !!takesPage && page1.on === 'page' && fits && before && during && before.h === during.h && before.t === during.t,
+    check('menu-everywhere', !!page1 && !!step && !!takesPage && page1.on === 'page' && fits && before && during && before.h === during.h && before.t === during.t &&
+      narrow.bubble >= 40,
       `the menu on an exercise page ${!!page1} (Train lit ${page1?.on}), a routine step ${!!step}, an exercise's takes ${!!takesPage}; ` +
       `at 360 px singing: the controls and the cue inside and above the menu ${fits}; the map ${before?.h} px before the count-in, ${during?.h} px singing, ` +
-      `the same place ${before?.t === during?.t}`);
+      `the same place ${before?.t === during?.t}; Mum's bubbles at 360 x 740 ${narrow.bubble} px on ${narrow.row} px rows`);
   }
 
   /* leaving a running exercise by the menu: the sound and the mic stop at

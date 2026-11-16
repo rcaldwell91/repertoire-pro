@@ -307,7 +307,7 @@ Sources: the audit doc names a source for each; it was not reachable from this s
 - ✓ Straw and Cheek puffs scored (Robert's straw test, 13 Nov) — test: `unit:core/exercises.test.ts:says what it measures, and only that`, `train:line-only`
 - ✓ When the voice arrives on each note, measured from a saved take, the whole spread; the delays the phone reported kept with the take; nothing about the bubbles or the score changed — test: `unit:core/review.test.ts:a voice 0.2 s late arrives 0.2 s after each note`, `train:note-timing`
 - — The pause between the piano and the singer (Robert, 13 Nov): not built. Its size comes from his takes, once he says they may be read.
-- — Bubbles of at least 40 px on a 390 x 844 phone. Not in the app now: with the menu on screen the map is 61 px shorter and the bubbles 39 px (44 before); told to Robert.
+- ✓ Bubbles of at least 40 px with the menu on screen (Robert, 16 Nov): on a 390 x 844 phone inside their rows (the map's own margin, 14 px above and below, down to 6), and on a shorter phone (360 x 740) a little taller than their rows — test: `train:singing-screen`, `train:menu-everywhere`
 
 ### Bubbles and the score
 - ✓ A hit is half the note within a semitone; the fill shows the same share (RULEBOOK 4, Bubbles; the old app used 60 cents, 3314-3330) — test: `unit:core/exercises.test.ts:a hit is half the note within a semitone`, `train:ladder-sung`, `train:ladder-wrong`

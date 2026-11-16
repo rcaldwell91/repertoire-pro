@@ -25,9 +25,16 @@ export const ROOM = 3;
 export const MIN_WINDOW = 10;
 /** the view glides to a new rung: this far toward it each second's quarter */
 export const GLIDE_SECONDS = 0.25;
-/** a bubble's height, in px: never under this, never over that */
-const BUBBLE_MIN = 18;
+/** a bubble's height, in px: never under this, never over that. At least
+    40 px with the menu on screen (Robert, 16 Nov): on a 390 x 844 phone a
+    row is taller than that; on a shorter one a bubble can stand a little
+    taller than its row, which never hides another, as no two notes sound
+    at once */
+export const BUBBLE_MIN = 40;
 const BUBBLE_MAX = 48;
+/** the map's own margin above the top row and below the bottom one, in px:
+    enough for half a note name (16 Nov: 14 before, the room given to the rows) */
+const PAD = 6;
 /** the bubble to sing now, bigger than the rest */
 const NOW_SCALE = 1.3;
 
@@ -119,7 +126,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         v.at = wall;
       }
       const lo = v.lo, hi = v.hi;
-      const pad = 14;
+      const pad = PAD;
       const rowH = (H - 2 * pad) / (hi - lo);
       const y = (m: number) => pad + ((hi - m) / (hi - lo)) * (H - 2 * pad);
       const t0 = turn ? turn.a : at - NOW_AT * SPAN, t1 = turn ? turn.b : at + (1 - NOW_AT) * SPAN;
@@ -269,6 +276,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.labelled = String(labelled);
       cv.dataset.names = String(names);
       cv.dataset.bubble = h.toFixed(0);
+      cv.dataset.row = rowH.toFixed(1);
       cv.dataset.nowBubble = (h * NOW_SCALE).toFixed(0);
       cv.dataset.viewLo = lo.toFixed(2);
       cv.dataset.viewHi = hi.toFixed(2);
