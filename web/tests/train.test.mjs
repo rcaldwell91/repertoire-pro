@@ -2028,11 +2028,11 @@ try {
       { t: 13, from: 54, to: 49, secs: 2.6, hold: 0 }], tmp);
     await singer(b64(voice), true);
     await page.tap('#ex-start');
-    const mapOnly = await page.waitFor(`!!document.querySelector('#bubbles') && +(document.querySelector('#bubbles').dataset.visible ?? 0) === 0`, 8000).then(() => true, () => false);
+    const mapOnly = await page.waitFor(`!!document.querySelector('#bubbles') && +(document.querySelector('#bubbles').dataset.visible ?? 0) === 0`, 8000);
     const said = (k, note) => fill(copy.train.restSlide, { k, note });
-    const first = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(said(1, 'C3'))}`, 15000).then(() => true, () => false);
-    const second = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(said(2, 'B2'))}`, 10000).then(() => true, () => false);
-    const unsettled = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(copy.train.restNone.join(' '))}`, 12000).then(() => true, () => false);
+    const first = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(said(1, 'C3'))}`, 15000);
+    const second = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(said(2, 'B2'))}`, 10000);
+    const unsettled = await page.waitFor(`document.querySelector('#ex-rest-now')?.textContent === ${JSON.stringify(copy.train.restNone.join(' '))}`, 12000);
     await page.tap('#ex-done');
     await page.waitFor(`!!document.querySelector('#ex-rest')`, 5000);
     const r = await page.eval(`({ text: document.querySelector('#ex-rest').textContent, notes: document.querySelector('#ex-rest').dataset.notes,
