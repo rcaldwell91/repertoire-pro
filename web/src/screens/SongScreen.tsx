@@ -13,9 +13,10 @@ import { startSplit } from '../data/split';
 import { useConductor, useSnapshot } from '../shell/conductor-context';
 import { useSingerLine, useSong, useSplit } from '../shell/hooks';
 import { readSingerLine } from '../shell/singer-line';
-import { useYourLine } from '../shell/your-line';
+import { useYourLine, yourLine } from '../shell/your-line';
 import { review, toStored } from '../shell/take-review';
 import { saveTake, UNDO_MS, type StoredTake } from '../data/takes';
+import { draftFor, dropDraft, keepDraft, takeOf } from '../data/take-draft';
 import { TakesList } from './TakesList';
 import { localStore, micBlockedBrowser } from '../shell/env';
 import { hearOn, hearVolume, setHearOn, setHearVolume } from '../shell/settings';
@@ -119,8 +120,35 @@ export function SongScreen(props: { id: string }) {
   const rv = review(c.take(owner), singer?.m ?? null, singer?.hop ?? 0.05, anyOctave);
   const decided = () => {
     c.dropTake();
+    void dropDraft(props.id);
     setDecided((n) => n + 1);
   };
+  /* the take waiting to be decided on, kept on the phone as well (Robert,
+     17 Nov: a closed app, a page Chrome threw away while the phone was
+     locked, or something else sung in between lost it), and brought back
+     when the song opens */
+  const keptDraft = useRef<Take | null>(null);
+  useEffect(() => {
+    if (!rv || playing || keptDraft.current === rv.take) return;
+    keptDraft.current = rv.take;
+    void keepDraft(props.id, rv.take, yourLine(owner));
+  });
+  useEffect(() => {
+    let live = true;
+    if (c.take(owner) || c.active()) return;
+    void draftFor(props.id).then((d) => {
+      if (!live || !d || c.take(owner) || c.active()) return;
+      const t = takeOf(d);
+      yourLine(owner).load(d.t, d.m);
+      keptDraft.current = t;
+      c.restoreTake(t);
+      setDecided((n) => n + 1);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.id]);
   /* a take not kept, thrown away by Start or Try again: Undo for a moment */
   const [removed, setRemoved] = useState<Take | null>(null);
   useEffect(() => {

@@ -27,6 +27,15 @@ export class YourLine {
     this.at.clear();
   }
 
+  /** a line kept on the phone, put back as it was (a take waiting to be decided on, 17 Nov) */
+  load(t: ArrayLike<number>, m: ArrayLike<number>): void {
+    this.clear();
+    for (let i = 0; i < t.length; i++) {
+      this.t.push(t[i]);
+      this.m.push(m[i]);
+    }
+  }
+
   /** a point, or a better reading of one already given */
   add(p: LivePoint, songT: number | null): void {
     const known = this.at.get(p.i);

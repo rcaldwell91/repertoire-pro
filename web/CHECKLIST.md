@@ -320,6 +320,9 @@ Sources: the audit doc names a source for each; it was not reachable from this s
 - ✓ The added lines on Humming (a fingertip resting under the chin, as the old app's own tongue check), the three tongue-out exercises, Cheek puffs, Mum and Breath pulses; sounds and cues as they were — test: `unit:core/nov16.test.ts:Humming`, `unit:core/nov16.test.ts:the three tongue-out exercises`, `unit:core/nov16.test.ts:Cheek puffs, Mum and Breath pulses`
 - — Find your resting note read right from a real voice (12 of 12 slides at known notes, none named for 3 that never settle) and Bwoop by the short-note rule over a singer's own range: measured in the lab (tests/lab-scoring.mjs parts C and D), not a check: the lab reports and doesn't pass or fail the build.
 
+### Robert's 17 Nov phone finds in Learn a song
+- ✓ A take waits to be decided on, with its Save, however it ended: Stop, the song's end, the menu mid-song, Back, the phone locked or the app hidden, leaving and coming back, the app closed and opened again (or Chrome throwing the page away while the phone was locked), and something else sung in between; Try again throws it away with Undo; once saved or thrown away it doesn't come back (17 Nov: a reload or another exercise lost it) — test: `takes:take-endings`
+
 ### Bubbles and the score
 - ✓ A hit is half the note within a semitone; the fill shows the same share (RULEBOOK 4, Bubbles; the old app used 60 cents, 3314-3330) — test: `unit:core/exercises.test.ts:a hit is half the note within a semitone`, `train:ladder-sung`, `train:ladder-wrong`
 - ✓ Within a semitone means the note itself, half a semitone either side, the note map's own rule — test: `unit:core/exercises.test.ts:within a semitone means the note itself`

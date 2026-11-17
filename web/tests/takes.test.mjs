@@ -27,6 +27,8 @@ const APP = resolve(process.env.APP_DIR || join(REPO, 'app'));
 const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
 const want = (...names) => !ONLY.length || names.some((n) => ONLY.includes(n));
 const QUIET_MS = 300;
+/* past the Undo after Try again (data/takes UNDO_MS, 6 s), and a little more */
+const UNDO_WAIT = 7000;
 const PREFIX = process.env.RP_SPLIT || '';
 const PARTS = ['voice', 'music', 'voice30', 'music30'];
 if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
@@ -34,7 +36,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
   process.exit(1);
 }
 
-const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-no-clip', 'take-leave', 'take-removed-undo', 'take-saved-first', 'take-offline',
+const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-no-clip', 'take-leave', 'take-endings', 'take-removed-undo', 'take-saved-first', 'take-offline',
   'take-delete-undo', 'take-send', 'take-private', 'apps-side-by-side', 'take-new-phone', 'old-app-takes', 'take-send-kept', 'take-unlinked', 'take-no-coach', 'take-words', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -307,6 +309,134 @@ try {
     check('take-leave', quietOk(q) && kept && quietOk(q2) && still && gone,
       `singing, then another tab: silence and the mic closed in ${q.ms} ms, and the take was there to decide on coming back ${kept}; ` +
       `hearing it, then another tab: silence in ${q2.ms} ms, still silent 1 s later ${still}; Try again threw it away with no question ${gone}`);
+  }
+
+  /* Every way a take can end (Robert, 17 Nov: "I went to save a take and there
+     was no save"): after each, is the take there to decide on, with its Save
+     on the screen? Stop, the song's end, the menu, Back, the phone hidden,
+     and leaving and coming back keep it; Try again throws it away with Undo. */
+  if (want('take-endings')) {
+    const seen = {};
+    const card = () => page.eval(`(() => { const b = document.querySelector('#take-save'); const r = b?.getBoundingClientRect();
+      return { card: !!document.querySelector('#take-review'), save: !!b && !b.disabled && r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight + scrollY + 2000 }; })()`);
+    const settle = async (ms = 1500) => { await page.waitFor(`!!document.querySelector('#take-review')`, ms); return card(); };
+    const singFor = async (from, secs) => {
+      await page.eval(`window.__mirror.on = true`);
+      await page.eval(`(() => { const r = document.querySelector('#song-position'); r.focus();
+        const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(r, ${from});
+        r.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+      await page.key('ArrowLeft');
+      await page.key('ArrowRight');
+      const n = await page.eval(S(SONG + '.length'));
+      await page.tap('#song-play');
+      await page.waitFor(S(`${SONG}.length >= ${n + 2} && window.__probe.micLive() === 1`), 8000);
+      await sleep(secs * 1000);
+    };
+    const throwAway = async () => {
+      if (await page.eval(`!!document.querySelector('#take-again')`)) await page.tap('#take-again');
+      await sleep(300);
+    };
+    /* Stop */
+    await open();
+    await singFor(SUNG, 4);
+    await page.tap('#song-play');
+    seen.stop = await settle(4000);
+    /* Try again: thrown away, with Undo */
+    await page.tap('#take-again');
+    seen.again = { card: !!(await page.eval(`document.querySelector('#take-review')`)),
+      undo: await page.waitFor(`(document.querySelector('#take-removed-line')?.innerText || '').includes(${JSON.stringify(copy.take.removed)})`, 2000) };
+    /* the song reaching its end */
+    const end = await page.eval(`+document.querySelector('#song-position').max`);
+    await singFor(end - 6, 0);
+    await page.waitFor(`document.querySelector('#song-play')?.textContent === ${JSON.stringify(copy.song.start)}`, 15000);
+    seen.end = await settle(4000);
+    await throwAway();
+    /* the menu at the bottom, mid-song, then back */
+    await singFor(SUNG, 4);
+    await page.tap('#tab-home');
+    await sleep(800);
+    await page.back();
+    await page.waitFor(`!!document.querySelector('#song-play')`, 5000);
+    seen.menu = await settle(4000);
+    await throwAway();
+    /* Back, mid-song, then the song again from the list */
+    await singFor(SUNG, 4);
+    await page.tap('.back');
+    await page.waitFor(`!document.querySelector('#song-play')`, 5000);
+    await sleep(800);
+    await page.eval(`location.hash = '#/sing/learn/song/${ID}'`);
+    await page.waitFor(`!!document.querySelector('#song-play')`, 5000);
+    seen.back = await settle(4000);
+    await throwAway();
+    /* the phone locked, or the app hidden, mid-song */
+    await singFor(SUNG, 4);
+    const show = await env.hide();
+    await page.waitFor(`document.visibilityState === 'hidden'`, 2000);
+    await sleep(1500);
+    await show();
+    await page.waitFor(`document.visibilityState === 'visible'`, 2000);
+    seen.hidden = await settle(4000);
+    /* leaving with the take waiting, and coming back */
+    await page.tap('#tab-home');
+    await sleep(800);
+    await page.back();
+    await page.waitFor(`!!document.querySelector('#song-play')`, 5000);
+    seen.left = await settle(4000);
+    await throwAway();
+    /* the app closed, or the phone's Chrome throwing the page away while locked, and opened again: a reload */
+    await singFor(SUNG, 4);
+    await page.tap('#song-play');
+    await page.waitFor(`!!document.querySelector('#take-review')`, 4000);
+    await sleep(500);
+    await open();
+    seen.reopened = await settle(5000);
+    await throwAway();
+    /* something else sung in between (a Train exercise), then back to the song */
+    await singFor(SUNG, 4);
+    await page.tap('#song-play');
+    await page.waitFor(`!!document.querySelector('#take-review')`, 4000);
+    await page.eval(`window.__mirror.on = false`);
+    await page.eval(`location.hash = '#/train/ex/hiss'`);
+    await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
+    await page.tap('#ex-start');
+    await sleep(5000);
+    await page.tap('#ex-close');
+    await sleep(500);
+    await page.eval(`location.hash = '#/sing/learn/song/${ID}'`);
+    await page.waitFor(`!!document.querySelector('#song-play')`, 5000);
+    seen.between = await settle(4000);
+    await throwAway();
+    /* saved, or thrown away: it doesn't come back when the song opens again */
+    await singFor(SUNG, 4);
+    await page.tap('#song-play');
+    await page.waitFor(`!!document.querySelector('#take-review')`, 4000);
+    const before = (await takesKept()).map((t) => t.id);
+    await page.tap('#take-save');
+    await page.waitFor(`!document.querySelector('#take-review')`, 3000);
+    const savedNow = (await takesKept()).find((t) => !before.includes(t.id));
+    if (savedNow) made.add(savedNow.id);
+    await open();
+    await sleep(1500);
+    seen.savedBack = await card();
+    await singFor(SUNG, 4);
+    await page.tap('#song-play');
+    await page.waitFor(`!!document.querySelector('#take-review')`, 4000);
+    await page.tap('#take-again');
+    await sleep(UNDO_WAIT);
+    await open();
+    await sleep(1500);
+    seen.thrownBack = await card();
+    /* a narrow phone: the take's Save inside the screen */
+    await page.c.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 740, deviceScaleFactor: 1, mobile: true });
+    await singFor(SUNG, 4);
+    await page.tap('#song-play');
+    seen.narrow = await settle(4000);
+    await throwAway();
+    await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    const kept = ['stop', 'end', 'menu', 'back', 'hidden', 'left', 'reopened', 'between', 'narrow'];
+    check('take-endings', kept.every((k) => seen[k]?.card && seen[k]?.save) && !seen.again.card && seen.again.undo && !seen.savedBack.card && !seen.thrownBack.card,
+      kept.map((k) => `${k}: take ${!!seen[k]?.card}, Save ${!!seen[k]?.save}`).join('; ') + `; Try again: take gone ${!seen.again.card}, Undo offered ${seen.again.undo}; ` +
+      `opened again after Save: no take waiting ${!seen.savedBack.card}; after Try again: none ${!seen.thrownBack.card}`);
   }
 
   /* thrown away by Try again, or by singing again: "Take removed", with Undo */
