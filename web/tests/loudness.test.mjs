@@ -244,10 +244,12 @@ async function recorded(run) {
   const all = Buffer.concat(bufs);
   const raw = join(tmp, 'out-' + Date.now() + '.f32');
   writeFileSync(raw, all);
-  /* unbroken stretches: a block whose time is not one block after the last starts a new one */
+  /* unbroken stretches: a block that comes a block or more late starts a new one */
   const breaks = [0];
-  for (let i = 1; i < at.length; i++) if (Math.abs(at[i] - at[i - 1] - size / rate) > 1.5 / rate) breaks.push(i);
+  /* (block times wobble by a render quantum, 128 samples, either way: a missed block is a whole one late) */
+  for (let i = 1; i < at.length; i++) if (at[i] - at[i - 1] > 1.5 * size / rate) breaks.push(i);
   breaks.push(at.length);
+  if (process.env.RP_DEBUG) console.log('blocks', at.length, 'size', size, 'rate', rate, 'steps', at.slice(1, 40).map((t, i) => ((t - at[i]) * rate).toFixed(1)).join(' '));
   const f = new Float32Array(all.buffer, all.byteOffset, all.length / 4);
   const len = f.length / 2, l = new Float32Array(len), r = new Float32Array(len);
   for (let i = 0; i < len; i++) { l[i] = f[2 * i]; r[i] = f[2 * i + 1]; }
@@ -395,8 +397,9 @@ try {
     await stopped();
     const louder = 20 * Math.log10(m100.out / music.out);
     /* at 100 the ceiling rounds off the voice's loudest moments, so a little
-       under six: x5.6 with the ceiling at 0.8, x5.4 at 0.7 (17 Nov: peaks
-       under -1 dB between the samples), 2.8 and 2.5 dB over the music */
+       under six: x5.6 with the ceiling at 0.8, x5.4 at 0.7, about x5.2 at
+       0.66 (17 Nov: peaks under -1 dB between the samples), 2.8, 2.5 and
+       about 2.3 dB over the music */
     check('monitor-level', first === '70' && ok && near(m50.ratio, monitorOf(50), 0.1) && m0.out < 1e-4 && near(m100.ratio, monitorOf(100), 0.15) && m100.peak < 1 &&
       kept === '100' && louder >= 2,
       `the slider first at ${first}; at 50: ${show(m50)}; at 0: ${dB(m0.out)}; at 100: ${show(m100)}, loudest ${m100.peak.toFixed(3)}; ` +

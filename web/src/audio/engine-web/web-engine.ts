@@ -88,12 +88,14 @@ export const LOUD = {
 
     Robert, 17 Nov: peaks stay under -1 dB, between the samples, on every
     song at every slider, every run. Coming back down from twice the rate
-    lets a rounded-off peak ring past the top by up to 1.7 dB, so the top
+    lets a rounded-off peak ring past the top by up to 2.1 dB, so the top
     sits low enough for that: at 0.8 a song and your voice back at the top
     reached -0.6 dB (tests/ceiling-lab, offline; -0.4 in a live run on 16
-    Nov); at 0.7, -1.4 at worst, on three songs, sliders up to 200, your
-    voice at three offsets. The song alone comes out 0.2 dB quieter. */
-export const CEILING = { knee: 0.58, top: 0.7, oversample: '2x' as OverSampleType };
+    Nov); at 0.66, -1.5 at worst, on three songs, sliders from half to
+    200, your voice lined up with the song sixteen ways, at the phone's
+    own rate (44.1 kHz; at 0.7 it reached -1.2, and -1.28 live). The song
+    alone comes out 0.2 dB quieter. */
+export const CEILING = { knee: 0.55, top: 0.66, oversample: '2x' as OverSampleType };
 
 /** How long the way out holds the sound back, measured: each compressor
     looks 6 ms ahead, and the ceiling adds 2.7 ms. Part of when a sound is

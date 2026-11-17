@@ -61,8 +61,8 @@ describe('the ceiling on the way out', () => {
     }
     expect(safety(1.2)).toBeGreaterThan(safety(1.0));
   });
-  it('sits low enough that a peak ringing past it still stays under -1 dB (Robert, 17 Nov: offline, it rings up to 1.7 dB over)', () => {
-    expect(20 * Math.log10(CEILING.top) + 1.7).toBeLessThan(-1);
+  it('sits low enough that a peak ringing past it still stays under -1 dB (Robert, 17 Nov: offline, it rings up to 2.1 dB over)', () => {
+    expect(20 * Math.log10(CEILING.top) + 2.1).toBeLessThan(-1);
   });
 });
 

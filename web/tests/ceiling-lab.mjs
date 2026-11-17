@@ -26,7 +26,7 @@ const MIC = process.env.RP_MIC || '';
 const tmp = mkdtempSync(join(tmpdir(), 'rp-ceiling-'));
 const cut = (src, name, args) => {
   const out = join(tmp, name + '.mp3');
-  spawnSync(FFMPEG, ['-v', 'error', '-y', ...args.pre, '-i', src, ...args.post, '-ac', '2', '-ar', '48000', '-b:a', '256k', out]);
+  spawnSync(FFMPEG, ['-v', 'error', '-y', ...args.pre, '-i', src, ...args.post, '-ac', '2', '-ar', String(+(process.env.RATE || 48000)), '-b:a', '256k', out]);
   return readFileSync(out).toString('base64');
 };
 const files = {
@@ -54,7 +54,7 @@ for (const [k, b64] of Object.entries(files)) {
 await page.eval(`window.LOUD = ${JSON.stringify(LOUD)}`);
 
 function r128(raw) {
-  const out = spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', raw, '-af', 'ebur128=peak=true+sample:framelog=quiet', '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
+  const out = spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-f', 'f32le', '-ar', String(+(process.env.RATE || 48000)), '-ac', '2', '-i', raw, '-af', 'ebur128=peak=true+sample:framelog=quiet', '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
   const pick = (re) => +((re.exec(out) || [])[1] ?? NaN);
   return { lufs: pick(/I:\s+(-?[\d.]+) LUFS/), tp: pick(/True peak:\s+Peak:\s+(-?[\d.]+)/), sp: pick(/Sample peak:\s+Peak:\s+(-?[\d.]+)/) };
 }
@@ -62,7 +62,7 @@ function r128(raw) {
 /* one render: the song (parts at gain g, lifted to its loudest moment at -1 dBFS), your voice back at `mon` (0 for none) offset by `off` s */
 async function render(v, song, g, mon, off) {
   const b64 = await page.eval(`(async () => {
-    const SECS = 28, R = 48000, L = window.LOUD, v = ${JSON.stringify(v)};
+    const SECS = 28, R = ${+(process.env.RATE || 48000)}, L = window.LOUD, v = ${JSON.stringify(v)};
     const ctx = new OfflineAudioContext(4, SECS * R, R);
     const dec = (k) => ctx.decodeAudioData(window.__f[k].slice(0));
     const parts = ${JSON.stringify(song.parts)};

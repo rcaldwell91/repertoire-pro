@@ -377,10 +377,10 @@ const MUTATIONS = [
   { test: 'loudness', what: 'nothing raises the whole (no 1.4)', file: 'src/audio/engine-web/web-engine.ts',
     from: '    body.connect(raise);\n    raise.connect(limit);', to: '    body.connect(limit);', checks: ['song-loudness'] },
   { test: 'loudness', what: 'the ceiling lets peaks past -1 dB', file: 'src/audio/engine-web/web-engine.ts',
-    from: 'export const CEILING = { knee: 0.58, top: 0.7,', to: 'export const CEILING = { knee: 0.9, top: 0.999,', checks: ['peaks-held'] },
+    from: 'export const CEILING = { knee: 0.55, top: 0.66,', to: 'export const CEILING = { knee: 0.9, top: 0.999,', checks: ['peaks-held'] },
   /* Robert, 17 Nov: louder, and peaks under -1 dB every run */
   { test: 'loudness', what: 'the ceiling back where it was on 16 Nov (a rounded peak rings past -1 dB)', file: 'src/audio/engine-web/web-engine.ts',
-    from: 'export const CEILING = { knee: 0.58, top: 0.7,', to: 'export const CEILING = { knee: 0.66, top: 0.8,', checks: ['peaks-held'] },
+    from: 'export const CEILING = { knee: 0.55, top: 0.66,', to: 'export const CEILING = { knee: 0.66, top: 0.8,', checks: ['peaks-held'] },
   { test: 'loudness', what: 'Voice and Music stop at 100 again', file: 'src/screens/SongScreen.tsx',
     from: '<Slider id="voice-volume" label={copy.song.voice} value={voice} max={SONG_TOP}', to: '<Slider id="voice-volume" label={copy.song.voice} value={voice}',
     and: { file: 'src/screens/SongScreen.tsx', from: '<Slider id="music-volume" label={copy.song.music} value={music} max={SONG_TOP}', to: '<Slider id="music-volume" label={copy.song.music} value={music}' },
