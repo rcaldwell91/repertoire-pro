@@ -406,7 +406,7 @@ const MUTATIONS = [
   { test: 'train', what: 'the view jumps to the next rung instead of gliding', file: 'src/ui/Bubbles.tsx',
     from: '        const k = 1 - Math.exp(-(wall - v.at) / GLIDE_SECONDS);', to: '        const k = 1;', checks: ['singing-screen'] },
   { test: 'train', what: 'bubbles no bigger with the zoom', file: 'src/ui/Bubbles.tsx',
-    from: 'const BUBBLE_MAX = 48;', to: 'const BUBBLE_MAX = 36;', checks: ['singing-screen'] },
+    from: 'const BUBBLE_MAX = 48;', to: 'const BUBBLE_MAX = 40;', checks: ['menu-everywhere'] },
   { test: 'train', what: 'Agility keeps the lightning bolt', file: 'src/screens/TrainPage.tsx',
     from: 'agility: QuickRun,', to: 'agility: Zap,',
     and: { file: 'src/screens/TrainPage.tsx', from: "import { Ear, Flame, MoveVertical, Music2, Speech, Wind } from 'lucide-react';", to: "import { Ear, Flame, MoveVertical, Music2, Speech, Wind, Zap } from 'lucide-react';" },
