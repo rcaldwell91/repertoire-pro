@@ -76,13 +76,16 @@ const micMean = meanOf(MIC_WAV);
 /* the song's own files, voice and music added together: how loud it is in itself */
 const SONG_OWN = r128Of(spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', `${PREFIX}-voice30.mp3`, '-i', `${PREFIX}-music30.mp3`, '-filter_complex',
   '[0:a][1:a]amix=inputs=2:normalize=0,ebur128=peak=true+sample:framelog=quiet', '-f', 'null', '-'], { encoding: 'utf8' }).stderr);
+/* and its first 15 s, as the song-mic check hears it */
+const SONG_OWN15 = r128Of(spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-t', '15', '-i', `${PREFIX}-voice30.mp3`, '-t', '15', '-i', `${PREFIX}-music30.mp3`, '-filter_complex',
+  '[0:a][1:a]amix=inputs=2:normalize=0,ebur128=peak=true+sample:framelog=quiet', '-f', 'null', '-'], { encoding: 'utf8' }).stderr);
 /* the quiet song's loudest moment, voice and music together, as decoded at the speaker's rate */
 const QUIET_PEAK = (() => {
   const out = spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', QUIET.voice30, '-i', QUIET.music30, '-filter_complex',
     '[0:a][1:a]amix=inputs=2:normalize=0,aresample=48000,aformat=sample_fmts=flt,astats=measure_perchannel=none:measure_overall=Peak_level', '-f', 'null', '-'], { encoding: 'utf8' }).stderr;
   return 10 ** (+((/Peak level dB: (-?[\d.]+)/.exec(out) || [])[1] ?? NaN) / 20);
 })();
-if (![MIC_WAV, RIDE30, HUSH, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5) || !Number.isFinite(SONG_OWN.lufs) || !Number.isFinite(QUIET_PEAK)) {
+if (![MIC_WAV, RIDE30, HUSH, ...Object.values(QUIET)].every(existsSync) || !(Math.abs(micMean + 24) < 0.5) || !Number.isFinite(SONG_OWN.lufs) || !Number.isFinite(SONG_OWN15.lufs) || !Number.isFinite(QUIET_PEAK)) {
   console.log('FAIL setup: could not make the recordings (FFMPEG)');
   process.exit(1);
 }
@@ -535,8 +538,10 @@ try {
     await slide('#monitor-volume', 70);
     await hearOn(false);
     const db = (x) => `${x.lufs.toFixed(1)} LUFS (true peak ${x.truePeak.toFixed(1)} dBFS)`;
-    check('song-mic', on.ok && off.ok && noMic && off.seconds > 12 && Math.abs(on.lufs - off.lufs) <= 0.5 && hear.lufs >= on.lufs - 0.5,
-      `the song at 100, 15 s: with the mic open ${db(on)}; with the mic refused ${db(off)} (no mic open ${noMic}); ` +
+    /* and with the mic open it is as much louder than its own files as the v9.8 stage makes it (song-loudness: 3 to 6 dB) */
+    const lift = on.lufs - SONG_OWN15.lufs;
+    check('song-mic', on.ok && off.ok && noMic && off.seconds > 12 && Math.abs(on.lufs - off.lufs) <= 0.5 && hear.lufs >= on.lufs - 0.5 && lift >= 3 && lift <= 6,
+      `the song at 100, 15 s: its own files ${SONG_OWN15.lufs.toFixed(1)} LUFS; with the mic open ${db(on)}, ${lift >= 0 ? '+' : ''}${lift.toFixed(1)} dB louder; with the mic refused ${db(off)} (no mic open ${noMic}); ` +
       `with the mic open and Hear yourself at 42 ${db(hear)}`);
   }
 
