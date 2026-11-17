@@ -326,6 +326,8 @@ const MUTATIONS = [
     from: '      c.restoreTake(t);\n', to: '', checks: ['take-endings'] },
   { test: 'takes', what: 'a take saved or thrown away comes back', file: 'src/screens/SongScreen.tsx',
     from: '    void dropDraft(props.id);\n    setDecided((n) => n + 1);', to: '    void dropDraft;\n    setDecided((n) => n + 1);', checks: ['take-endings'] },
+  { test: 'takes', what: 'a kept take that comes back before the singer\'s line is read stays unscored', file: 'src/shell/take-review.ts',
+    from: '  } else if (r.rightPct == null && singer) {', to: '  } else if (false) {', checks: ['take-endings'] },
   { test: 'takes', what: 'a kept take comes back without your line', file: 'src/screens/SongScreen.tsx',
     from: '      yourLine(owner).load(d.t, d.m);\n', to: '', checks: ['take-endings'] },
   { test: 'takes', what: 'no line for a singer with no coach', file: 'src/screens/SendTake.tsx',

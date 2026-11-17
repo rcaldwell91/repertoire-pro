@@ -393,6 +393,8 @@ try {
     await open();
     seen.reopened = await settle(5000);
     /* the same take, with your line over it (the summary's score is read from it), and it plays */
+    /* (the song's own line is read again as it opens, so the score may come a moment after the take) */
+    await page.waitFor(`document.querySelector('#take-summary')?.innerText === ${JSON.stringify(said)}`, 10000);
     const saidAgain = await summary();
     const n0 = await page.eval(S(SONG + '.length'));
     if (seen.reopened.card) await page.tap('#take-hear');

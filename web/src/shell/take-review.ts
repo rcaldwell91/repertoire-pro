@@ -36,6 +36,12 @@ export function review(take: Take | null, singer: ArrayLike<number> | null, hop:
     r = { take, audio, url: URL.createObjectURL(audio), t, m, anyOctave,
       rightPct: singer ? rightPct(t, m, singer, hop, anyOctave) : null };
     cache.set(take, r);
+  } else if (r.rightPct == null && singer) {
+    /* worked out before the singer's line was read (a take brought back as
+       the song opens, 17 Nov: it read "too little sung to score" until
+       then): scored now that it is */
+    r = { ...r, rightPct: rightPct(r.t, r.m, singer, hop, r.anyOctave) };
+    cache.set(take, r);
   }
   return r;
 }

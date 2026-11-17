@@ -264,6 +264,8 @@ export const MUTATIONS = [
   /* Robert, 17 Nov: peaks under -1 dB, every run; Voice and Music to 200 */
   { rule: 'the ceiling\'s top is back at 0.8, where a rounded peak rings past -1 dB', file: W,
     from: 'export const CEILING = { knee: 0.55, top: 0.66,', to: 'export const CEILING = { knee: 0.58, top: 0.8,' },
+  { rule: 'a take brought back before the singer\'s line is read stays unscored', file: 'src/shell/take-review.ts',
+    from: '  } else if (r.rightPct == null && singer) {', to: '  } else if (false) {' },
   { rule: 'Voice and Music stop at 100', file: 'src/core/song.ts',
     from: 'export const SONG_TOP = 200;', to: 'export const SONG_TOP = 100;' },
   { rule: 'past 100 the song is no louder', file: 'src/core/song.ts',
