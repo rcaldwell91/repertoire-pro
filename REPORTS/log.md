@@ -1199,7 +1199,7 @@ Taps 13 and 14 below check both in a few seconds. If your phone turns out to be 
   - before, at full slider (100): -7.8 LUFS;
   - now, at full slider (200): -6.6 LUFS.
   - That's **1.2 dB louder**: a small step you'll hear side by side, not a big jump.
-- **Why not more:** the song was already close to the loudest a phone can play without distortion. I tried four times its level: that gained only 0.4 dB more, and the song came out audibly squashed. So I stopped at 200%, where it gets louder and still sounds clean. Tap 14 asks you to judge that by ear.
+- **Why not more:** the song was already close to the loudest a phone can play without distortion. I tried four times its level: that gained only 0.4 dB more, and the song came out audibly squashed. So I stopped at 200%, where it gets louder and still sounds clean. Tap 15 asks you to judge that by ear.
 - At 100, the song is 0.2 dB quieter than before, too little to hear.
 
 **The stage that rounds off the loudest peaks.** Peaks now stay under -1 dB, measured between samples.
@@ -1294,11 +1294,10 @@ https://rcaldwell91.github.io/repertoire-pro/app/
 11. **Bwoop.** Tap Train, Range, Bwoop, Start. Sing it as the steps say. Tell me the score, and whether it matches how you sang.
 12. **Note bends.** Tap Train, Agility, Note bends, Start. Tell me whether your line showed the flicks, and whether the piano's flicks were clear enough to copy.
 13. **Mic mode.** Tap Profile, Sound check. Under Start it says "Mic mode: …". Tell me what it says. It should be "raw (best for pitch)".
-14. **How loud a song plays now.** Open a song in Learn a song, with the phone's volume all the way up and Hear yourself as you like it. Tap Start.
-   - While it plays, press the phone's volume-up button once and look at the bar that appears: tell me whether it's for media (a music note) or for a call (a phone handset).
-   - Then slide Voice and Music to the right: they now go to 200%. Tell me whether 200% is loud enough, and whether it sounds clean or squashed.
-15. **The save, after closing the app.** In the same song, sing about 20 seconds and tap Pause. The take card shows with Save. Close Chrome fully, open the app again and open the same song: the take card should be back, with Save. Tap Hear it, then Save.
-16. **The save, with something sung in between.** Sing about 20 seconds of the song again and tap Pause. Without saving, tap Train, sing a round of Mum, then go back to Learn a song and open the same song: the take card should be back. Tap Save.
+14. **Media or call.** Open a song in Learn a song, with the phone's volume all the way up and Hear yourself as you like it. Tap Start. While it plays, press the phone's volume-up button once and look at the bar that appears: tell me whether it's for media (a music note) or for a call (a phone handset).
+15. **How loud a song plays now.** In the same song, slide Voice and Music to the right: they now go to 200%. Tell me whether 200% is loud enough, and whether it sounds clean or squashed.
+16. **The save, after closing the app.** In the same song, sing about 20 seconds and tap Pause. The take card shows with Save. Close Chrome fully, open the app again and open the same song: the take card should be back, with Save. Tap Hear it, then Save.
+17. **The save, with something sung in between.** Sing about 20 seconds of the song again and tap Pause. Without saving, tap Train, sing a round of Mum, then go back to Learn a song and open the same song: the take card should be back. Tap Save.
 
 ## Two questions, again
 
