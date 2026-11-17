@@ -120,8 +120,8 @@ https://rcaldwell91.github.io/repertoire-pro/app/
 12. **Note bends.** Tap Train, Agility, Note bends, Start. Tell me whether your line showed the flicks, and whether the piano's flicks were clear enough to copy.
 13. **Mic mode.** Tap Profile, Sound check. Under Start it says "Mic mode: …". Tell me what it says. It should be "raw (best for pitch)".
 14. **How loud a song plays now.** Open a song in Learn a song, with the phone's volume all the way up and Hear yourself as you like it. Tap Start.
-    - While it plays, press the phone's volume-up button once and look at the bar that appears: tell me whether it's for media (a music note) or for a call (a phone handset).
-    - Then slide Voice and Music to the right: they now go to 200%. Tell me whether 200% is loud enough, and whether it sounds clean or squashed.
+   - While it plays, press the phone's volume-up button once and look at the bar that appears: tell me whether it's for media (a music note) or for a call (a phone handset).
+   - Then slide Voice and Music to the right: they now go to 200%. Tell me whether 200% is loud enough, and whether it sounds clean or squashed.
 15. **The save, after closing the app.** In the same song, sing about 20 seconds and tap Pause. The take card shows with Save. Close Chrome fully, open the app again and open the same song: the take card should be back, with Save. Tap Hear it, then Save.
 16. **The save, with something sung in between.** Sing about 20 seconds of the song again and tap Pause. Without saving, tap Train, sing a round of Mum, then go back to Learn a song and open the same song: the take card should be back. Tap Save.
 
