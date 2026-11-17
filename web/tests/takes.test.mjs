@@ -388,8 +388,20 @@ try {
     await page.tap('#song-play');
     await page.waitFor(`!!document.querySelector('#take-review')`, 4000);
     await sleep(500);
+    const summary = () => page.eval(`document.querySelector('#take-summary')?.innerText ?? null`);
+    const said = await summary();
     await open();
     seen.reopened = await settle(5000);
+    /* the same take, with your line over it (the summary's score is read from it), and it plays */
+    const saidAgain = await summary();
+    const n0 = await page.eval(S(SONG + '.length'));
+    if (seen.reopened.card) await page.tap('#take-hear');
+    const plays = await page.waitFor(S(`${SONG}.length >= ${n0 + 3}`), 8000);
+    if (plays) await page.tap('#take-hear');
+    await sleep(300);
+    seen.reopened.same = said != null && said === saidAgain && /\d+%/.test(said);
+    seen.reopened.plays = plays;
+    seen.reopened.said = `"${said}" then "${saidAgain}"`;
     await throwAway();
     /* something else sung in between (a Train exercise), then back to the song */
     await singFor(SUNG, 4);
@@ -434,8 +446,10 @@ try {
     await throwAway();
     await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     const kept = ['stop', 'end', 'menu', 'back', 'hidden', 'left', 'reopened', 'between', 'narrow'];
-    check('take-endings', kept.every((k) => seen[k]?.card && seen[k]?.save) && !seen.again.card && seen.again.undo && !seen.savedBack.card && !seen.thrownBack.card,
+    check('take-endings', kept.every((k) => seen[k]?.card && seen[k]?.save) && !seen.again.card && seen.again.undo && !seen.savedBack.card && !seen.thrownBack.card &&
+      seen.reopened.same && seen.reopened.plays,
       kept.map((k) => `${k}: take ${!!seen[k]?.card}, Save ${!!seen[k]?.save}`).join('; ') + `; Try again: take gone ${!seen.again.card}, Undo offered ${seen.again.undo}; ` +
+      `opened again, the same take ${seen.reopened.said}, it plays ${seen.reopened.plays}; ` +
       `opened again after Save: no take waiting ${!seen.savedBack.card}; after Try again: none ${!seen.thrownBack.card}`);
   }
 

@@ -84,10 +84,18 @@ export function listLine(has: SongHas, split: SplitPhase | null): string {
   return copy.songs.needsSplit;
 }
 
-/** Slider (0-100) to volume: by ear, not by number. 100 is the song's own level. */
+/** where the Voice and Music sliders stop (Robert, 17 Nov: "the song is
+    still too quiet"; let them past 100, as the old app's Hear me went to 200) */
+export const SONG_TOP = 200;
+
+/** Slider to volume: by ear, not by number, up to 100, the song's own
+    level; past it, 200 is twice that (as the old app's Hear me was). The
+    way out holds the peaks, so twice is louder, not clipped: measured, the
+    song at 200 comes out about 1 dB louder than at 100, which is most of
+    what any setting can add (4 times adds 0.4 dB more, squashed). */
 export function gainOf(slider: number): number {
-  const v = Math.min(100, Math.max(0, slider)) / 100;
-  return v * v;
+  const v = Math.min(SONG_TOP, Math.max(0, slider)) / 100;
+  return v <= 1 ? v * v : v;
 }
 
 /** "Repeat this part": the ten seconds just heard, ending where you are. */
@@ -123,7 +131,7 @@ export const MONITOR_DEFAULT = 70;
 /** The Hear yourself slider (0-100) to how loud your voice comes back, by
     ear like the others: 0 is silent, 100 is MONITOR_MAX. */
 export function monitorOf(slider: number): number {
-  return MONITOR_MAX * gainOf(slider);
+  return MONITOR_MAX * gainOf(Math.min(100, slider));
 }
 
 /** where a song's loudest moment is put: -1 dBFS (Robert, 22 Oct) */

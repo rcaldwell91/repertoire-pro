@@ -84,8 +84,16 @@ export const LOUD = {
 /** The ceiling after it: the sound as it is up to the knee, then rounded
     off short of the top, so no peak reaches -1 dBFS (0.891), between the
     samples too: the curve runs at twice the rate (Robert, 23 Oct). That
-    adds 2.7 ms (measured), which is all Hear yourself goes through. */
-export const CEILING = { knee: 0.66, top: 0.8, oversample: '2x' as OverSampleType };
+    adds 2.7 ms (measured), which is all Hear yourself goes through.
+
+    Robert, 17 Nov: peaks stay under -1 dB, between the samples, on every
+    song at every slider, every run. Coming back down from twice the rate
+    lets a rounded-off peak ring past the top by up to 1.7 dB, so the top
+    sits low enough for that: at 0.8 a song and your voice back at the top
+    reached -0.6 dB (tests/ceiling-lab, offline; -0.4 in a live run on 16
+    Nov); at 0.7, -1.4 at worst, on three songs, sliders up to 200, your
+    voice at three offsets. The song alone comes out 0.2 dB quieter. */
+export const CEILING = { knee: 0.58, top: 0.7, oversample: '2x' as OverSampleType };
 
 /** How long the way out holds the sound back, measured: each compressor
     looks 6 ms ahead, and the ceiling adds 2.7 ms. Part of when a sound is

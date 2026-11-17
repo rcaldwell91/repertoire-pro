@@ -44,7 +44,7 @@ if (!['voice30', 'music30'].every((p) => existsSync(`${PREFIX}-${p}.mp3`)) || !e
 }
 
 const ALL = ['monitor-before-start', 'monitor-count-in', 'monitor-after-rebuild', 'monitor-unmute', 'monitor-level', 'monitor-remembered', 'song-level',
-  'song-full', 'song-loudness', 'peaks-held', 'no-page-errors'];
+  'song-full', 'song-loudness', 'song-mic', 'song-louder', 'peaks-held', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -345,8 +345,11 @@ try {
     await page.tap('#song-play');
     await stopped();
     const louder = 20 * Math.log10(m100.out / music.out);
-    check('monitor-level', first === '70' && ok && near(m50.ratio, monitorOf(50), 0.1) && m0.out < 1e-4 && near(m100.ratio, monitorOf(100), 0.1) && m100.peak < 1 &&
-      kept === '100' && louder >= 2.5,
+    /* at 100 the ceiling rounds off the voice's loudest moments, so a little
+       under six: x5.6 with the ceiling at 0.8, x5.4 at 0.7 (17 Nov: peaks
+       under -1 dB between the samples), 2.8 and 2.5 dB over the music */
+    check('monitor-level', first === '70' && ok && near(m50.ratio, monitorOf(50), 0.1) && m0.out < 1e-4 && near(m100.ratio, monitorOf(100), 0.15) && m100.peak < 1 &&
+      kept === '100' && louder >= 2,
       `the slider first at ${first}; at 50: ${show(m50)}; at 0: ${dB(m0.out)}; at 100: ${show(m100)}, loudest ${m100.peak.toFixed(3)}; ` +
       `the music alone at 100 ${dB(music.out)}, so your voice is ${louder.toFixed(1)} dB louder; remembered after leaving: ${kept}`);
   }
@@ -453,27 +456,99 @@ try {
       `${m.lufs.toFixed(1)} LUFS, ${lift >= 0 ? '+' : ''}${lift.toFixed(1)} dB louder; true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS`);
   }
 
-  /* 8. Everything at 100 at once, the song and your voice back at the top
-        of its slider: still never over -1 dB. And Ride's chorus, whose
-        sharp peaks get past a ceiling between the samples unless it runs
-        faster than the sound (measured offline: -0.7 dB at the plain rate) */
-  if (want('peaks-held')) {
-    await open('ride-song');
-    await page.tap('#song-play');
-    const rideOk = await playing();
-    const ride = await recorded(() => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000));
+  /* Robert, 17 Nov: "the song is still too quiet", even with Hear yourself
+     off. The song at 100 with the mic open and with it refused (Carry on):
+     what the app sends to the speaker is the same either way; and with
+     Hear yourself at his 42 */
+  if (want('song-mic')) {
+    const take = async () => {
+      await page.tap('#song-play');
+      const ok = await playing();
+      const m = await recorded(() => sleep(15000));
+      await page.tap('#song-play');
+      await stopped();
+      return { ok, ...m };
+    };
+    await open('loud-song');
+    const on = await take();
+    /* the mic refused: the song plays all the same (RULEBOOK 3), with no mic */
+    await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'denied', origin: ORIGIN });
+    await open('loud-song');
+    const off = await take();
+    const noMic = await page.eval(`window.__probe.micLive() === 0`);
+    await env.browser.send('Browser.setPermission', { permission: { name: 'microphone' }, setting: 'granted', origin: ORIGIN });
     await open('loud-song', true);
-    await slide('#monitor-volume', 100);
-    await page.tap('#song-play');
-    const ok = await playing();
-    const m = await recorded(() => sleep(12000));
-    await page.tap('#song-play');
-    await stopped();
+    await slide('#monitor-volume', 42);
+    const hear = await take();
     await slide('#monitor-volume', 70);
     await hearOn(false);
-    check('peaks-held', rideOk && ride.seconds > 25 && ride.truePeak < -1 && ride.samplePeak < -1 && ok && m.seconds > 10 && m.truePeak < -1 && m.samplePeak < -1,
-      `Ride's chorus at 100, over ${ride.seconds.toFixed(0)} s: true peak ${ride.truePeak.toFixed(1)} dBFS, sample peak ${ride.samplePeak.toFixed(1)} dBFS, ${ride.lufs.toFixed(1)} LUFS; ` +
-      `the song and your voice back, all at 100, over ${m.seconds.toFixed(0)} s: true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS, ${m.lufs.toFixed(1)} LUFS`);
+    const db = (x) => `${x.lufs.toFixed(1)} LUFS (true peak ${x.truePeak.toFixed(1)} dBFS)`;
+    check('song-mic', on.ok && off.ok && noMic && off.seconds > 12 && Math.abs(on.lufs - off.lufs) <= 0.5 && hear.lufs >= on.lufs - 0.5,
+      `the song at 100, 15 s: with the mic open ${db(on)}; with the mic refused ${db(off)} (no mic open ${noMic}); ` +
+      `with the mic open and Hear yourself at 42 ${db(hear)}`);
+  }
+
+  /* Robert, 17 Nov: "He wants it louder": Voice and Music go on to 200,
+     twice the song's level, as the old app's Hear me did. Moved by hand to
+     the top, they stop at 200, the song is sent at twice, and it comes out
+     louder than at 100 (the same 15 s), its peaks still under -1 dB */
+  if (want('song-louder')) {
+    const at = async (v) => {
+      await open('loud-song');
+      await slide('#voice-volume', v);
+      await slide('#music-volume', v);
+      const shown = await page.eval(`[...document.querySelectorAll('#voice-volume, #music-volume')].map((e) => [e.max, e.value, e.closest('label').textContent.trim()])`);
+      await page.tap('#song-play');
+      const ok = await playing();
+      await sleep(300);
+      const gains = await page.eval(`window.__probe.playing().map((p) => p.gain)`);
+      const m = await recorded(() => sleep(15000));
+      await page.tap('#song-play');
+      await stopped();
+      return { ok, shown, gains, ...m };
+    };
+    const a = await at(100), b = await at(250);
+    const louder = b.lufs - a.lufs;
+    const db = (x) => `${x.lufs.toFixed(1)} LUFS, true peak ${x.truePeak.toFixed(1)} dBFS, sample peak ${x.samplePeak.toFixed(1)} dBFS`;
+    check('song-louder', a.ok && b.ok && b.shown.every(([max, v, t]) => max === '200' && v === '200' && t.endsWith('200%')) &&
+      a.gains.every((g) => Math.abs(g - 1) < 1e-6) && b.gains.length === 2 && b.gains.every((g) => Math.abs(g - 2) < 1e-6) &&
+      louder >= 0.8 && b.truePeak < -1 && b.samplePeak < -1 && a.truePeak < -1,
+      `the sliders moved to the top: ${b.shown.map(([max, v, t]) => `${t} (stops at ${max})`).join(', ')}; sent at x${b.gains.map((g) => g.toFixed(2)).join(' and x')}; ` +
+      `the song, 15 s, at 100: ${db(a)}; at 200: ${db(b)}; ${louder >= 0 ? '+' : ''}${louder.toFixed(1)} dB louder`);
+  }
+
+  /* 8. Everything at the top at once, the song and your voice back at the
+        top of its slider: still never over -1 dB, between the samples.
+        And Ride's chorus, whose sharp peaks get past a ceiling between the
+        samples unless it runs faster than the sound (measured offline:
+        -0.7 dB at the plain rate). At 100, and at 200 (Robert, 17 Nov:
+        "on every test song at every slider setting, every run") */
+  if (want('peaks-held')) {
+    const rows = [];
+    let all = true;
+    for (const v of [100, 200]) {
+      await open('ride-song');
+      await slide('#voice-volume', v);
+      await slide('#music-volume', v);
+      await page.tap('#song-play');
+      const rideOk = await playing();
+      const ride = await recorded(() => page.waitFor(`${PLAY} === ${JSON.stringify(copy.song.start)}`, 40000));
+      await open('loud-song', true);
+      await slide('#voice-volume', v);
+      await slide('#music-volume', v);
+      await slide('#monitor-volume', 100);
+      await page.tap('#song-play');
+      const ok = await playing();
+      const m = await recorded(() => sleep(12000));
+      await page.tap('#song-play');
+      await stopped();
+      await slide('#monitor-volume', 70);
+      await hearOn(false);
+      all = all && rideOk && ride.seconds > 25 && ride.truePeak < -1 && ride.samplePeak < -1 && ok && m.seconds > 10 && m.truePeak < -1 && m.samplePeak < -1;
+      rows.push(`Ride's chorus at ${v}, over ${ride.seconds.toFixed(0)} s: true peak ${ride.truePeak.toFixed(1)} dBFS, sample peak ${ride.samplePeak.toFixed(1)} dBFS, ${ride.lufs.toFixed(1)} LUFS; ` +
+        `the song at ${v} and your voice back at 100, over ${m.seconds.toFixed(0)} s: true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS, ${m.lufs.toFixed(1)} LUFS`);
+    }
+    check('peaks-held', all, rows.join('; '));
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));

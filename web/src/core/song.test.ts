@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
-import { gainOf, listLine, repeatPart, songLine, titleFrom, type SongHas, countBeat, monitorOf, songLevel, MAX_LIFT, MONITOR_DEFAULT, SONG_PEAK } from './song';
+import { gainOf, listLine, repeatPart, songLine, titleFrom, type SongHas, countBeat, monitorOf, songLevel, MAX_LIFT, MONITOR_DEFAULT, SONG_PEAK, SONG_TOP } from './song';
 import { clock } from './time';
 
 const has = (over: Partial<SongHas> = {}): SongHas => ({ state: 'new', full: false, first30: false, ...over });
@@ -35,7 +35,17 @@ describe('the controls', () => {
     expect(gainOf(100)).toBe(1);
     expect(gainOf(0)).toBe(0);
     expect(gainOf(50)).toBeCloseTo(0.25);
-    expect(gainOf(150)).toBe(1);
+  });
+  it('Voice and Music go on past 100, to twice the song\'s level at 200, and stop there (Robert, 17 Nov)', () => {
+    expect(SONG_TOP).toBe(200);
+    expect(gainOf(150)).toBeCloseTo(1.5);
+    expect(gainOf(200)).toBe(2);
+    expect(gainOf(260)).toBe(2);
+    expect(gainOf(101)).toBeGreaterThan(gainOf(100));
+    expect(gainOf(-5)).toBe(0);
+  });
+  it('Hear yourself stays at its own top past 100', () => {
+    expect(monitorOf(150)).toBe(monitorOf(100));
   });
   it('repeats the ten seconds just heard', () => {
     expect(repeatPart(42, 270)).toEqual({ start: 32, end: 42 });

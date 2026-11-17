@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { Repeat, RotateCcw } from 'lucide-react';
 import { copy, fill } from '../core/copy';
-import { countBeat, gainOf, micLine, monitorOf, repeatPart, songLine, COUNT_BEATS } from '../core/song';
+import { countBeat, gainOf, micLine, monitorOf, repeatPart, songLine, COUNT_BEATS, SONG_TOP } from '../core/song';
 import { barFill } from '../core/level';
 import { clock } from '../core/time';
 import { FIRST_SECONDS } from '../core/limits';
@@ -426,9 +426,9 @@ export function SongScreen(props: { id: string }) {
       </div>
 
       <section className="card" aria-label={copy.song.sound}>
-        <Slider id="voice-volume" label={copy.song.voice} value={voice}
+        <Slider id="voice-volume" label={copy.song.voice} value={voice} max={SONG_TOP}
           onChange={(v) => { setVoice(v); if (playing) c.setGain(0, gainOf(v)); }} />
-        <Slider id="music-volume" label={copy.song.music} value={music}
+        <Slider id="music-volume" label={copy.song.music} value={music} max={SONG_TOP}
           onChange={(v) => { setMusic(v); if (playing) c.setGain(1, gainOf(v)); }} />
         {(rv || heard) && (
           <Slider id="take-volume" label={copy.take.volume} value={takeVol}

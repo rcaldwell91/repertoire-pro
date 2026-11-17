@@ -321,6 +321,9 @@ Sources: the audit doc names a source for each; it was not reachable from this s
 - — Find your resting note read right from a real voice (12 of 12 slides at known notes, none named for 3 that never settle) and Bwoop by the short-note rule over a singer's own range: measured in the lab (tests/lab-scoring.mjs parts C and D), not a check: the lab reports and doesn't pass or fail the build.
 
 ### Robert's 17 Nov phone finds in Learn a song
+- ✓ The song plays just as loud with the mic open as with it refused, and with Hear yourself at his 42 (17 Nov: "even with Hear yourself off it's far too low") — test: `loudness:song-mic`
+- ✓ Voice and Music go on past 100 to 200, twice the song's level, as the old app's Hear me went to 200%; the song at 200 comes out louder than at 100, peaks still under -1 dB; Hear yourself and Your take stay 0 to 100 — test: `loudness:song-louder`, `unit:core/song.test.ts:Voice and Music go on past 100`
+- ✓ Peaks under -1 dB between the samples on every test song at every slider, every run: the ceiling's top lowered to 0.7, because coming back down from twice the rate lets a rounded peak ring up to 1.7 dB past it (measured offline, tests/ceiling-lab; the 16 Nov build reached +0.1 dB live with a song and your voice at the top). Hear yourself at 100 is rounded a little more: x5.4 for six, 2.5 dB over the music (2.8 before) — test: `loudness:peaks-held`, `loudness:monitor-level`, `unit:audio/engine-web/web-engine.test.ts:sits low enough`
 - ✓ A take waits to be decided on, with its Save, however it ended: Stop, the song's end, the menu mid-song, Back, the phone locked or the app hidden, leaving and coming back, the app closed and opened again (or Chrome throwing the page away while the phone was locked), and something else sung in between; Try again throws it away with Undo; once saved or thrown away it doesn't come back (17 Nov: a reload or another exercise lost it) — test: `takes:take-endings`
 
 ### Bubbles and the score
