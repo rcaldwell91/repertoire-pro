@@ -84,7 +84,13 @@ describe('four new exercises (Robert, 16 Nov), none in a routine', () => {
   it('every one that climbs ends with the climbing line; Find your resting note does not climb', () => {
     for (const id of ['threerun', 'bends', 'bwoop'] as const) expect(stepsFor(id).slice(-1)[0]).toBe(copy.stepLines.stopEasy);
     expect(stepsFor('restnote').slice(-1)[0]).toBe('Tap Done.');
-    expect(stepsFor('restnote')).toHaveLength(5);
+    /* Robert, 17 Nov: four steps, the first sigh being the first slide */
+    expect(stepsFor('restnote')).toEqual([
+      'Close your lips and sigh out an easy "hmm", as if you\'re thinking something over. Let it slide down until it comes to rest. Don\'t steer it.',
+      'Do that two more times, starting each one a little higher, with a pause in between. After each one, the screen shows the note you came to rest on.',
+      'On the last one, hold that note and let your jaw drop open to "ah". Keep it just as easy.',
+      'Tap Done.',
+    ]);
   });
 
   it('no reminder that contradicts them: not "Open tall, not wide" on the hum or the "bwoop"', () => {

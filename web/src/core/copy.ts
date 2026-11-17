@@ -868,9 +868,9 @@ export const copy = {
     /* Robert, 16 Nov */
     restnote: {
       steps: [
-        "Close your lips and sigh out an easy \"hmm\", as if you're thinking something over.",
-        "Start the next \"hmm\" a little higher and let it slide down until it comes to rest. Don't steer it.",
-        "Do three slides, pausing between them. After each one, the screen shows the note you came to rest on.",
+        /* Robert, 17 Nov: the first sigh is the first slide, so three slides name three notes */
+        "Close your lips and sigh out an easy \"hmm\", as if you're thinking something over. Let it slide down until it comes to rest. Don't steer it.",
+        "Do that two more times, starting each one a little higher, with a pause in between. After each one, the screen shows the note you came to rest on.",
         "On the last one, hold that note and let your jaw drop open to \"ah\". Keep it just as easy.",
         "Tap Done.",
       ],
