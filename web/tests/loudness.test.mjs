@@ -110,11 +110,11 @@ const METER = `(() => {
     const sp = ctx.createScriptProcessor(4096, 2, 2);
     connect.call(g, sp); connect.call(sp, ctx.destination);
     sp.onaudioprocess = (e) => { if (!M.rec || ctx.state !== 'running') return;
-      M.l.push(new Float32Array(e.inputBuffer.getChannelData(0))); M.r.push(new Float32Array(e.inputBuffer.getChannelData(1))); M.rate = ctx.sampleRate; };
+      M.l.push(new Float32Array(e.inputBuffer.getChannelData(0))); M.r.push(new Float32Array(e.inputBuffer.getChannelData(1))); M.at.push(e.playbackTime); M.rate = ctx.sampleRate; };
     outs.set(ctx, { g, read: reader(an), ctx });
     return outs.get(ctx);
   };
-  M.rec = false; M.l = []; M.r = []; M.rate = 48000;
+  M.rec = false; M.l = []; M.r = []; M.at = []; M.rate = 48000;
   /* what was recorded, both sides interleaved, as base64, a piece at a time */
   M.take = (from, n) => { const l = M.l.slice(from, from + n), r = M.r.slice(from, from + n);
     let len = 0; l.forEach((c) => (len += c.length)); const out = new Float32Array(len * 2); let k = 0;
@@ -198,17 +198,66 @@ function r128Of(out) {
   const pick = (re) => +((re.exec(out) || [])[1] ?? NaN);
   return { lufs: pick(/I:\s+(-?[\d.]+) LUFS/), truePeak: pick(/True peak:\s+Peak:\s+(-?[\d.]+)/), samplePeak: pick(/Sample peak:\s+Peak:\s+(-?[\d.]+)/) };
 }
+/* The loudest point between the samples, read the way the standard meter
+   reads it (four times the rate, through a smooth filter), but only where
+   the recording runs on unbroken. The recorder hands over the sound a block
+   at a time; on a busy machine a block can be missed, and the jump where the
+   recording joins up again reads as a peak the app never sent (17 Nov: one
+   run of six read -1.0 dB that way). Each block carries its time, so a
+   missed one is seen, counted, and the stretches either side are read on
+   their own, away from their ends. */
+const UP = 4, TAPS = 12;
+const KERNEL = (() => {
+  const k = [];
+  for (let p = 0; p < UP; p++) {
+    const row = [];
+    for (let j = -TAPS; j < TAPS; j++) {
+      const x = j - p / UP, w = 0.5 + 0.5 * Math.cos((Math.PI * x) / TAPS);
+      row.push(x === 0 ? 1 : (Math.sin(Math.PI * x) / (Math.PI * x)) * w);
+    }
+    k.push(row);
+  }
+  return k;
+})();
+function truePeakOf(ch, from, to) {
+  let peak = 0;
+  for (let i = from + TAPS; i < to - TAPS; i++) {
+    for (let p = 0; p < UP; p++) {
+      const row = KERNEL[p];
+      let s = 0;
+      for (let j = 0; j < row.length; j++) s += row[j] * ch[i + j - TAPS + 1];
+      const a = Math.abs(s);
+      if (a > peak) peak = a;
+    }
+  }
+  return peak;
+}
 /** what left the app while `run` ran, recorded at the speaker, measured */
 async function recorded(run) {
-  await page.eval(`Object.assign(window.__meter, { rec: true, l: [], r: [] })`);
+  await page.eval(`Object.assign(window.__meter, { rec: true, l: [], r: [], at: [] })`);
   await run();
   await page.eval(`window.__meter.rec = false`);
   const n = await page.eval(`window.__meter.l.length`), rate = await page.eval(`window.__meter.rate`);
+  const at = await page.eval(`window.__meter.at`), size = await page.eval(`window.__meter.l[0]?.length ?? 4096`);
   const bufs = [];
   for (let i = 0; i < n; i += 64) bufs.push(Buffer.from(await page.eval(`window.__meter.take(${i}, 64)`), 'base64'));
+  const all = Buffer.concat(bufs);
   const raw = join(tmp, 'out-' + Date.now() + '.f32');
-  writeFileSync(raw, Buffer.concat(bufs));
-  return { seconds: Buffer.concat(bufs).length / 8 / rate, ...r128(['-f', 'f32le', '-ar', String(rate), '-ac', '2', '-i', raw]) };
+  writeFileSync(raw, all);
+  /* unbroken stretches: a block whose time is not one block after the last starts a new one */
+  const breaks = [0];
+  for (let i = 1; i < at.length; i++) if (Math.abs(at[i] - at[i - 1] - size / rate) > 1.5 / rate) breaks.push(i);
+  breaks.push(at.length);
+  const f = new Float32Array(all.buffer, all.byteOffset, all.length / 4);
+  const len = f.length / 2, l = new Float32Array(len), r = new Float32Array(len);
+  for (let i = 0; i < len; i++) { l[i] = f[2 * i]; r[i] = f[2 * i + 1]; }
+  let tp = 0;
+  for (let b = 0; b + 1 < breaks.length; b++) {
+    const from = breaks[b] * size, to = breaks[b + 1] * size;
+    tp = Math.max(tp, truePeakOf(l, from, to), truePeakOf(r, from, to));
+  }
+  const whole = r128(['-f', 'f32le', '-ar', String(rate), '-ac', '2', '-i', raw]);
+  return { seconds: all.length / 8 / rate, ...whole, meterTruePeak: whole.truePeak, truePeak: 20 * Math.log10(tp), missed: breaks.length - 2 };
 }
 const show = (m) => `your voice at the speaker ${dB(m.out)} for ${dB(m.mic)} at the mic (x${m.ratio.toFixed(2)})`;
 
@@ -545,8 +594,11 @@ try {
       await slide('#monitor-volume', 70);
       await hearOn(false);
       all = all && rideOk && ride.seconds > 25 && ride.truePeak < -1 && ride.samplePeak < -1 && ok && m.seconds > 10 && m.truePeak < -1 && m.samplePeak < -1;
-      rows.push(`Ride's chorus at ${v}, over ${ride.seconds.toFixed(0)} s: true peak ${ride.truePeak.toFixed(1)} dBFS, sample peak ${ride.samplePeak.toFixed(1)} dBFS, ${ride.lufs.toFixed(1)} LUFS; ` +
-        `the song at ${v} and your voice back at 100, over ${m.seconds.toFixed(0)} s: true peak ${m.truePeak.toFixed(1)} dBFS, sample peak ${m.samplePeak.toFixed(1)} dBFS, ${m.lufs.toFixed(1)} LUFS`);
+      /* at most two blocks missed (each 0.09 s), so nearly all of it is read */
+      all = all && ride.missed <= 2 && m.missed <= 2;
+      const tp = (x) => `true peak ${x.truePeak.toFixed(2)} dBFS (the standard meter over the whole: ${x.meterTruePeak.toFixed(1)}; blocks missed by the recorder: ${x.missed})`;
+      rows.push(`Ride's chorus at ${v}, over ${ride.seconds.toFixed(0)} s: ${tp(ride)}, sample peak ${ride.samplePeak.toFixed(1)} dBFS, ${ride.lufs.toFixed(1)} LUFS; ` +
+        `the song at ${v} and your voice back at 100, over ${m.seconds.toFixed(0)} s: ${tp(m)}, sample peak ${m.samplePeak.toFixed(1)} dBFS, ${m.lufs.toFixed(1)} LUFS`);
     }
     check('peaks-held', all, rows.join('; '));
   }

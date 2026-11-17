@@ -84,7 +84,11 @@ async function render(v, song, g, mon, off) {
     const ws = ctx.createWaveShaper(); ws.curve = curve; ws.oversample = v.os;
     half.connect(ws);
     let last = ws;
-    if (v.trim) { const t = gain(v.trim); ws.connect(t); last = t; }
+    /* a second ceiling after the first (v.second: knee, top, os), for the ringing the first leaves */
+    if (v.second) { const w = v.second, s2 = (u) => { const a = Math.abs(u); return a <= w.knee ? u : Math.sign(u) * (w.knee + (w.top - w.knee) * Math.tanh((a - w.knee) / (w.top - w.knee))); };
+      const c2 = new Float32Array(n); for (let i = 0; i < n; i++) c2[i] = s2(2 * ((i / (n - 1)) * 2 - 1));
+      const h2 = gain(0.5), w2 = ctx.createWaveShaper(); w2.curve = c2; w2.oversample = w.os; last.connect(h2); h2.connect(w2); last = w2; }
+    if (v.trim) { const t = gain(v.trim); last.connect(t); last = t; }
     /* channels 0-1 the way out, 2-3 the sound going into the ceiling (to see how much it rounds off: its curve takes twice that) */
     const merge = ctx.createChannelMerger(4), so = ctx.createChannelSplitter(2), si = ctx.createChannelSplitter(2);
     last.connect(so); so.connect(merge, 0, 0); so.connect(merge, 1, 1);
