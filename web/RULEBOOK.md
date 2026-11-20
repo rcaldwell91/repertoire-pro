@@ -14,7 +14,7 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
   - Nothing outside web/ and app/ changes.
 - **Seven tabs, all kept:** Home, Train, Sing, Coach, Learn, Library, Profile.
   - Every tab has an icon. Library's icon is a record (disc).
-  - The label shows on the active tab only.
+  - Every tab shows its icon with its name underneath (Robert, 21 Nov: people didn't know what they were pressing; this replaces 30 Sep's "the label shows on the active tab only"). The active tab's icon sits in the gradient pill and its name is bold. All seven names fit whole at 360 wide, at 13 px.
   - The app gets a browser-tab icon (favicon) and a home-screen icon.
 - **Learn** holds theory, ear work and how the voice works (phonation, resonance, registers, posture). **Train** holds singing exercises.
 - **Separator:** live on Modal since 4 Oct (services/separator/).
@@ -48,7 +48,7 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
   - Your songs: purple
   - Green: only a note you hit
   - In Learn: Theory blue, Your voice pink, Ear teal
-- **Tab bar:** 7 rounded-stroke icons. The active tab is a gradient pill with its name; the others are icon only. Library = a record.
+- **Tab bar:** 7 rounded-stroke icons, each with its name underneath (Robert, 21 Nov). The active tab's icon is in a gradient pill, its name bold. Library = a record.
 - **Exercise screens keep the tab bar** (Robert, 13 Nov: "the bottom menu is always there, on every screen", so a singer can get anywhere in one tap; leaving by it stops the sound and the mic at once, and keeps the rounds sung as Close does. This replaces "Exercise screens hide the tab bar".) The preview page has the name, tags, a note preview that plays only on tap, a one-line goal, a one-line how, and a big Start. (Robert, 3 Nov, replacing the goal and how: on the page, the title, the plain line, You'll need, How to do it as numbered steps, and Start; behind "More about this", in this order, You're doing it right when, Watch out for, Why it helps; the care points move to the end of Watch out for, so nothing is lost.) The singing screen has smaller bubbles, a white ring on the current note, and the gradient voice line. While singing, every singing screen gets Pause (stops sound and mic; Resume carries on from the start of the current repeat with the count-in; nothing scored is lost), Restart (the exercise from the first repeat, score cleared), and the gear (the sound sheet: Hear yourself on/off and its volume, Any octave, Count-in sound). Pausing to open the gear and resuming must work. Close stays. The controls are built once, shared by every singing screen, with their placement in ONE layout place that can be moved without touching the exercises; the layout is provisional until the path map sets it. The note map is smaller to make room; the progress dots stay. (Robert, 28 Oct: this replaces "✕ as the only control".)
 - **Learn a song is ONE screen.**
   - The note map shows the singer's line (thick, soft) and your line (thin, gradient) on top. No bubbles, because they never matched the words.

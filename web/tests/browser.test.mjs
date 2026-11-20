@@ -112,23 +112,38 @@ try {
   }
 
   if (want('tabs')) {
+    /* every tab its icon with its name underneath (Robert, 21 Nov, replacing
+       the name on the active tab only); the active one marked, and only it;
+       all seven names whole and at least 12 px at 360 wide */
     await fresh(env, '#/home');
     const order = ['home', 'train', 'sing', 'coach', 'learn', 'library', 'profile'];
-    let reached = 0;
-    const seen = [];
+    let reached = 0, named = 0, marked = 0;
     for (const t of order) {
       await page.tap(sel.tab(t));
       const ok = await page.waitFor(`${H1} === ${JSON.stringify(copy.tabs[t])} &&
         document.querySelector("#tab-${t}").getAttribute("aria-current") === "page"`, 2000);
       if (ok) reached++;
-      seen.push(await page.eval(`[...document.querySelectorAll(".tab")].map((b) => b.innerText.trim()).filter(Boolean).join("|")`));
+      const look = await page.eval(`[...document.querySelectorAll(".tab")].map((b) => {
+        const i = b.querySelector("svg").getBoundingClientRect(), n = b.querySelector(".tab-name"), r = n.getBoundingClientRect();
+        return { name: n.textContent, under: r.top >= i.bottom - 1, on: b.getAttribute("aria-current") === "page",
+          pill: getComputedStyle(b.querySelector(".tab-icon")).backgroundImage.includes("gradient") };
+      })`);
+      if (look.map((x) => x.name).join('|') === order.map((o) => copy.tabs[o]).join('|') && look.every((x) => x.under)) named++;
+      if (look.filter((x) => x.on && x.pill).length === 1 && look[order.indexOf(t)].on && look.filter((x) => x.pill).length === 1) marked++;
     }
-    const labelsOk = seen.every((s, i) => s === copy.tabs[order[i]]);
     const icons = await page.eval(`[...document.querySelectorAll(".tab")].map((b) => b.querySelector("svg")?.getAttribute("class") || "")`);
     const allIcons = icons.length === 7 && icons.every((c) => c.includes('lucide'));
     const disc = icons[5].includes('disc');
-    check('tabs', reached === 7 && labelsOk && allIcons && disc,
-      `${reached} of 7 reached by tap; label only on the active tab: ${labelsOk}; icons ${icons.filter((c) => c.includes('lucide')).length} of 7, Library a disc: ${disc}`);
+    await page.c.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 740, deviceScaleFactor: 1, mobile: true });
+    await sleep(300);
+    const fit = await page.eval(`[...document.querySelectorAll(".tab")].map((b) => { const n = b.querySelector(".tab-name");
+      return { name: n.textContent, whole: n.scrollWidth <= b.clientWidth && n.getBoundingClientRect().left >= b.getBoundingClientRect().left - 0.5 && n.getBoundingClientRect().right <= b.getBoundingClientRect().right + 0.5,
+        px: parseFloat(getComputedStyle(n).fontSize), w: Math.round(n.scrollWidth), tab: Math.round(b.clientWidth), tall: b.getBoundingClientRect().height }; })`);
+    await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    const fits = fit.length === 7 && fit.every((f) => f.whole && f.px >= 12 && f.tall >= 48);
+    check('tabs', reached === 7 && named === 7 && marked === 7 && allIcons && disc && fits,
+      `${reached} of 7 reached by tap; all seven names under their icons on ${named} of 7; the active one marked, and only it, on ${marked} of 7; ` +
+      `icons ${icons.filter((c) => c.includes('lucide')).length} of 7, Library a disc: ${disc}; at 360 wide ${fit.map((f) => `${f.name} ${f.w} of ${f.tab} px at ${f.px} px`).join(', ')}, tabs ${fit[0]?.tall} px tall`);
   }
 
   if (want('back')) {

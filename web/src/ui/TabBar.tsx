@@ -2,7 +2,10 @@ import { copy } from '../core/copy';
 import { TABS, type Tab } from '../shell/router';
 import { TAB_ICONS } from './icons';
 
-/* Seven tabs, an icon each; the label shows on the active tab only. */
+/* Seven tabs, each its icon with its name underneath (Robert, 21 Nov:
+   people didn't know what they were pressing; this replaces the 30 Sep
+   label on the active tab only). The active tab: its icon in the gradient
+   pill and its name in bold ink. */
 export function TabBar(props: { active: Tab; onPick: (t: Tab) => void }) {
   return (
     <nav className="tabs" aria-label={copy.app.tabsLabel}>
@@ -15,12 +18,11 @@ export function TabBar(props: { active: Tab; onPick: (t: Tab) => void }) {
             type="button"
             className="tab"
             id={'tab-' + t}
-            aria-label={copy.tabs[t]}
             aria-current={on ? 'page' : undefined}
             onClick={() => props.onPick(t)}
           >
-            <Icon size={24} strokeWidth={2} aria-hidden="true" />
-            {on && <span>{copy.tabs[t]}</span>}
+            <span className="tab-icon"><Icon size={22} strokeWidth={2} aria-hidden="true" /></span>
+            <span className="tab-name">{copy.tabs[t]}</span>
           </button>
         );
       })}
