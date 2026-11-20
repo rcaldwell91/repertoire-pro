@@ -148,22 +148,22 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   };
   const [seed] = useState(() => Math.random());
   const plan = useMemo<{ notes: Note[]; played: Note[]; beat: number; labels?: readonly string[]; shapes?: ReadonlyArray<{ id: string; down: boolean }>;
-    reveal?: readonly number[] }>(() => {
+    reveal?: readonly number[]; pattern?: Note[] }>(() => {
     const rand = seeded(seed);
     if (kind === 'interval') return intervalRound(level, range, rand);
     if (matchMode === 'window' || matchMode === 'blind') return matchRound(range, rand, matchMode);
-    const n = notesFor(e, range, { down });
-    return { ...n, played: n.notes };
+    return notesFor(e, range, { down });
   }, [e, kind, matchMode, range, level, seed, down]);
   const parts = useMemo<Part[]>(() => {
     const rand = seeded(seed);
-    return kind === 'steady' ? steadyParts(range, rand) : kind === 'vfe' ? vfeParts(range) : kind === 'tone' ? toneParts(range, rand)
+    return kind === 'steady' ? steadyParts(range, rand) : kind === 'vfe' ? vfeParts(range) : e.engine.kind === 'tone' ? toneParts(range, rand, e.engine.mode)
       : matchMode === 'wait' ? waitParts(range) : [];
-  }, [kind, matchMode, range, seed]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, matchMode, range, seed, e]);
   /* the pattern card: one repeat; for a round, its first jump or note */
   const pattern = useMemo(() => (kind === 'interval' ? [plan.played[0], ...firstRung(plan.notes).map((n) => ({ ...n, d: 1.2 }))]
     : matchMode === 'wait' && parts[0]?.kind === 'wait' ? [{ m: parts[0].m, t: 0, d: MATCH_PLAY, syl: keyName(parts[0].m) + ' · ' + keyName(parts[0].m) }]
-      : kind === 'match' ? [plan.played[0]] : firstRung(plan.notes)), [kind, matchMode, plan, parts]);
+      : kind === 'match' ? [plan.played[0]] : plan.pattern ?? firstRung(plan.notes)), [kind, matchMode, plan, parts]);
   const rungs = useMemo(() => rungStarts(plan.notes).length, [plan]);
   const [partAt, setPartAt] = useState(0);
   /* what each part left: a share held steady, seconds held, a slide done; null if not measured */
@@ -457,6 +457,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           if (steady) setToneHeard(true);
         }
         if (at >= lead + p.secs) {
+          /* Match the tone, scored (Robert, 20 Nov): how it landed, as Match the note's, from the first sound */
+          if (p.kind === 'tone') partLanding.current[partAt] = landing(line.t, line.m, p.m, 0, lead + p.secs, anyOctave);
           return end(voiced(lead, lead + p.secs) ? steadyShare(line.t, line.m, HOP, p.m, lead, p.secs, anyOctave) : -1);
         }
       } else if (p.kind === 'wait') {
@@ -621,10 +623,12 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     }
   }
 
-  /* where a sung exercise's rung begins: its first note, or the note heard before it */
+  /* where a sung exercise's rung begins: its lead note (Robert, 20 Nov), or the note heard before it */
   function rungTime(r: number): number {
     const i = rungStarts(plan.notes)[r] ?? 0;
-    return plan.labels || kind === 'match' ? plan.played[r]?.t ?? 0 : plan.notes[i]?.t ?? 0;
+    if (plan.labels || kind === 'match') return plan.played[r]?.t ?? 0;
+    const leads = plan.played.filter((n) => n.lead);
+    return leads[r]?.t ?? plan.notes[i]?.t ?? 0;
   }
 
   /* Pause (Robert, 28 Oct): sound and mic stop, the screen stays */
@@ -699,8 +703,12 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     if (kind === 'steady' || kind === 'tone') {
       /* a note left without a sound doesn't count (Robert, 4 Nov) */
       const sungParts = done.map((_, i) => res[i]).filter((x): x is number => x != null && x >= 0);
+      /* Match the tone: and how each landed, beside last time (Robert, 20 Nov) */
+      const landed = kind === 'tone'
+        ? { landing: averaged(done.flatMap((_, i) => (res[i] != null && (res[i] as number) >= 0 && partLanding.current[i] ? [partLanding.current[i]] : []))) }
+        : {};
       return sungParts.length ? { kind: 'pitch', hits: sungParts.filter((x) => x >= STEADY_SHARE).length, n: sungParts.length,
-        rounds: sungParts.length < done.length ? { sung: sungParts.length, of: done.length } : undefined } : { kind: 'none' };
+        rounds: sungParts.length < done.length ? { sung: sungParts.length, of: done.length } : undefined, ...landed } : { kind: 'none' };
     }
     if (matchMode === 'wait') {
       /* held, missed (sung but not held), or skipped with no sound: not counted */
@@ -819,7 +827,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     const o = shown?.o;
     const pct = o?.kind === 'pitch' ? Math.round((100 * o.hits) / Math.max(1, o.n)) : null;
     void saveTake({ ...toStored(take, exerciseKey(e.id), name), rightPct: pct,
-      exercise: { id: e.id, notes: plan.played.map((n) => [n.m, n.t, n.d] as const) }, delays: delaysAt.current ?? c.delays() });
+      exercise: { id: e.id, notes: plan.played.filter((n) => !n.lead).map((n) => [n.m, n.t, n.d] as const) }, delays: delaysAt.current ?? c.delays() });
     setTakeSaved(true);
   }
 
@@ -881,7 +889,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
              note at Beginner fills by its own rule, 1.2 s on the note */
           <Bubbles notes={partNotes(parts[partAt])} you={line} now={() => c.sinceStart() ?? 0}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
-            scored={parts[partAt].kind === 'wait'} />
+            scored={parts[partAt].kind === 'wait'}
+            hideYou={e.engine.kind === 'tone' && e.engine.mode === 'hidden' && !partDone} />
         ) : undefined}
         dots={sung && (
           <div className="dots" id="ex-dots" role="img" aria-label={copy.train.rungs}>
@@ -1014,7 +1023,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
       )}
 
       {view === 'result' && shown && (
-        <section className="card ex-result" id="ex-result">
+        <section className="card ex-result" id="ex-result"
+          data-hit={sung && line.t.length ? bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave).hit.map((h) => (h ? 1 : 0)).join('') : undefined}>
           {shown.o.kind === 'pitch' && (
             <>
               <p className="ex-score" id="ex-score">{fill(copy.train.notesHit, { hits: shown.o.hits, n: shown.o.n })}</p>
@@ -1126,6 +1136,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
             data-round={sung ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
             data-rounds={kind === 'ladder' ? JSON.stringify(rungStarts(plan.notes).map((i) => plan.notes[i].m)) : undefined}
             data-played={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
+            data-piano={kind === 'ladder' || kind === 'hold' ? JSON.stringify(plan.played.map((n) => [n.m, n.t, n.d, n.lead ? 1 : 0])) : undefined}
             data-shapes={plan.shapes ? JSON.stringify(plan.shapes) : undefined}
             data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
             {copy.train.start}

@@ -114,6 +114,12 @@ const SAFETY_CURVE: Float32Array<ArrayBuffer> = (() => {
   return c;
 })();
 
+/** how a piano note is let go at its length: a fade with this time
+    constant (s), quicker for a note this short or shorter (Robert, 20 Nov) */
+export const NOTE_FADE = 0.04;
+export const SHORT_NOTE = 0.3;
+export const SHORT_FADE = 0.012;
+
 /** "Hear yourself" is lifted at most this much (the slider stops at MONITOR_MAX) */
 export const MONITOR_ROOM = 8;
 
@@ -517,11 +523,13 @@ export class WebEngine implements AudioEngine {
       const at = opts.from >= begins ? when : when + (begins - opts.from);
       src.start(at, opts.from >= begins ? opts.from - begins : 0);
       if (len != null) {
-        /* let go at its length, with a short fade so it does not click */
+        /* let go at its length, with a short fade so it does not click;
+           a short note (Robert, 20 Nov: "short notes should sound short")
+           a quicker one, so it stops rather than rings on */
         const off = at + len - Math.max(0, opts.from - begins);
         const g = gains[i];
         g.gain.setValueAtTime(opts.gains[i] ?? 1, off);
-        g.gain.setTargetAtTime(0, off, 0.04);
+        g.gain.setTargetAtTime(0, off, len <= SHORT_NOTE ? SHORT_FADE : NOTE_FADE);
         src.stop(off + 0.3);
       }
     });

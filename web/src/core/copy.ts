@@ -1147,11 +1147,13 @@ export const copy = {
     matchtone: {
       steps: [
         "Put your headphones in.",
-        "A plain tone plays and keeps playing.",
+        "A plain tone plays. Your job: hear the wobble between your voice and the tone, and make it disappear.",
         "Sing \"ooh\" against it, softly.",
-        "If you hear a wobble between your voice and the tone, you're slightly off. Slide slowly until the wobble disappears and it feels smooth.",
-        "Hold it there until the tone stops.",
+        "A wobble means you're slightly off. Slide slowly until it disappears and the sound is smooth.",
+        "Hold it there, smooth, until the tone stops. Then tap Next for the next one.",
       ],
+      /* Robert, 20 Nov: at Advanced the notes come at random and your line stays hidden */
+      byLevel: { 3: { steps: { 3: "Sing \"ooh\" against it, softly. Your line stays hidden until the tone stops, so go by the wobble." } } },
       right: "The wobble disappears, the sound feels smooth and settled, and your line sits on the note.",
       why: "A plain tone has nothing in it to hide behind, so when you're slightly off you hear a wobble, and it vanishes when you're on. It teaches you to hear \"in tune\" without looking at the screen.",
       watch: "Singing too loudly to hear the tone, jumping instead of sliding, and skipping the headphones (the microphone would hear the tone).",
@@ -1254,7 +1256,7 @@ export const copy = {
     neckrelease: { name: 'Neck and shoulder release', syl: '', goal: 'Loosen your neck and shoulders before you sing.',
       how: 'Knead the tops of your shoulders with both hands for a few seconds.' },
     threestep: { name: 'Three-note steps', syl: 'ah', goal: 'Move between notes, smooth and in tune.', how: 'Listen to the first note.' },
-    matchtone: { name: 'Match the tone', syl: 'ooh', need: 'Headphones.', goal: 'Sing against a plain tone until the wobble disappears.',
+    matchtone: { name: 'Match the tone', syl: 'ooh', need: 'Headphones.', goal: 'Hear the wobble against a plain tone, and make it disappear.',
       how: 'Put your headphones in.' },
     brighta: { name: 'Tongue-out bright "a"', syl: 'a', need: 'A clean cloth, washcloth or paper towel.',
       goal: 'Find the bright, cutting part of your voice with your tongue held out.', how: 'Stick out your tongue and hold the tip with the cloth.' },

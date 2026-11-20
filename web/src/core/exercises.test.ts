@@ -3,6 +3,7 @@ import { copy } from './copy';
 import {
   CATEGORIES, EXERCISES, PATTERNS, ROUTINES, DAILY, exercise, measures, ladderNotes, holdNotes, bubbleScore, HOLD_NOTES,
   MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, notesFor, atLevel, levelsOf, stepsFor, type Exercise,
+  SING_LAG, LEAD_MIN, SHORT_LEN,
 } from './exercises';
 import { DEFAULT_RANGE, rangeFrom, RANGE_POINTS } from './range';
 import { SoundClock, LOUD_RMS, QUIET_END } from './timed';
@@ -109,7 +110,8 @@ describe('the exercises, as data', () => {
        headphone test (4 Nov). Straw and Cheek puffs scored since his real-straw test on his phone (13 Nov) */
     const lineOnly = EXERCISES.filter((e) => e.lineOnly).map((e) => e.id).sort();
     /* Note bends too (16 Nov): a flick is only about three of the line's readings */
-    expect(lineOnly).toEqual(['bends', 'blah', 'chewhum', 'matchtone', 'tensioncheck']);
+    /* Match the tone scored since Robert's headphone check (20 Nov) */
+    expect(lineOnly).toEqual(['bends', 'blah', 'chewhum', 'tensioncheck']);
     for (const id of lineOnly) expect(measures(exercise(id) as Exercise), id).toBe('none');
     expect(new Set(by('ladder').filter((_, i) => !EXERCISES.filter((e) => e.engine.kind === 'ladder')[i].lineOnly))).toEqual(new Set(['pitch']));
     expect(new Set(by('hold'))).toEqual(new Set(['pitch']));
@@ -186,9 +188,14 @@ describe('the ladder climbs your range as the old app did (3700-3752)', () => {
         const want = oldLadder(p.deg, p.dur, p.span, range.lo, range.hi);
         const got = ladderNotes(e, range);
         expect(got.notes.map((n) => n.m), e.id).toEqual(want.map((n) => n.m));
+        /* Robert, 20 Nov: each round after a lead note (a beat, at least
+           LEAD_MIN) in place of the rest's second beat, and every note
+           sung SING_LAG after the piano; a short note clipped to SHORT_LEN */
+        const lead = Math.max(beat, LEAD_MIN), len = p.deg.length;
         got.notes.forEach((n, i) => {
-          expect(n.t, e.id).toBeCloseTo(want[i].t * beat, 6);
-          expect(n.d, e.id).toBeCloseTo(want[i].d * beat, 6);
+          const r = Math.floor(i / len);
+          expect(n.t, e.id).toBeCloseTo(want[i].t * beat + (r + 1) * lead - r * beat + SING_LAG, 6);
+          expect(n.d, e.id).toBeCloseTo(e.shortNotes ? Math.min(SHORT_LEN, want[i].d * beat) : want[i].d * beat, 6);
         });
       }
     }
@@ -328,7 +335,7 @@ describe('the rungs of an exercise (the progress dots, the pattern card)', () =>
   });
   it('knows which rung is being sung', () => {
     expect(rungAt(notes, -1)).toBe(-1);
-    expect(rungAt(notes, 0)).toBe(0);
+    expect(rungAt(notes, notes[0].t)).toBe(0);
     expect(rungAt(notes, notes[PATTERNS.five.deg.length].t)).toBe(1);
     expect(rungAt(notes, notes[PATTERNS.five.deg.length].t - 0.01)).toBe(0);
     const last = notes[notes.length - 1];
@@ -517,10 +524,13 @@ describe('the 3 Nov Train update', () => {
     expect(lv('liptrill')).toEqual([[1, 'five', 100], [2, 'oct', 100], [3, 'oct15', 100]]);
     /* the rest with levels are the runs, the nine-tone scale, the twisters and Match the note (4 Nov), and Tongue trill (16 Nov); the others have one */
     const many = ['laga', 'nay', 'straw', 'liptrill', 'ninetone', 'run5', 'minor5', 'penta', 'chrom', 'turns', 'redleather', 'uniqueny', 'peterpiper',
-      'lipstongue', 'match', 'tonguetrill', 'threerun'];
+      'lipstongue', 'match', 'tonguetrill', 'threerun', 'matchtone'];
     for (const e of EXERCISES) if (!many.includes(e.id)) expect(levelsOf(e).length, e.id).toBe(1);
     expect(levelsOf(exercise('match') as Exercise).map((x) => x.engine)).toEqual([{ kind: 'match', mode: 'wait' }, { kind: 'match', mode: 'window' },
       { kind: 'match', mode: 'blind' }]);
+    /* Match the tone (Robert, 20 Nov): like Match the note, in order, then at random */
+    expect(levelsOf(exercise('matchtone') as Exercise).map((x) => [x.level, x.engine])).toEqual([[1, { kind: 'tone', mode: 'order' }],
+      [2, { kind: 'tone', mode: 'random' }], [3, { kind: 'tone', mode: 'hidden' }]]);
   });
 
   it('a routine step uses its own level, capped at the exercise\'s top (Robert, 3 and 4 Nov)', () => {
@@ -581,7 +591,8 @@ describe('the 3 Nov Train update', () => {
     expect(list('pitch')).toEqual(['match', 'interval', 'holdnote', 'threestep', 'matchtone']);
     expect(exercise('neckrelease')).toMatchObject({ category: 'warmup', level: 1, quiet: true, engine: { kind: 'guided', mins: 1 } });
     expect(exercise('threestep')).toMatchObject({ category: 'pitch', level: 1, quiet: true, everyStep: true, engine: { kind: 'ladder', pattern: 'three', bpm: 110 } });
-    expect(exercise('matchtone')).toMatchObject({ category: 'pitch', level: 2, quiet: true, lineOnly: true, engine: { kind: 'tone' } });
+    expect(exercise('matchtone')).toMatchObject({ category: 'pitch', level: 1, quiet: true, engine: { kind: 'tone', mode: 'order' } });
+    expect(exercise('matchtone')?.lineOnly).toBeUndefined();
     expect(copy.ex.matchtone.need).toBe('Headphones.');
     expect(exercise('posture')?.engine).toEqual({ kind: 'guided', mins: 1 });
     expect(measures(exercise('posture') as Exercise)).toBe('none');

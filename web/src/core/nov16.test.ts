@@ -48,15 +48,22 @@ describe('four new exercises (Robert, 16 Nov), none in a routine', () => {
     expect(measures(ex('threerun'))).toBe('pitch');
   });
 
-  it('Note bends: the note, four flicks of a quarter beat out and three quarters back, the note held two beats; up, then down, by rounds', () => {
-    const { notes, beat } = ladderNotes(ex('bends'), range);
+  it('Note bends: a fast twitch, note, neighbour, note, neighbour, note, neighbour, note, each flick 0.15 to 0.2 s and no long hold between (Robert, 20 Nov); up, then down, by rounds', () => {
+    const { notes, played, beat } = ladderNotes(ex('bends'), range);
     expect(beat).toBeCloseTo(0.6, 6);
     const starts = rungStarts(notes);
     const round = (r: number) => notes.slice(starts[r], starts[r + 1] ?? notes.length);
     const r0 = round(0), r1 = round(1), root0 = r0[0].m, root1 = r1[0].m;
-    expect(r0.map((n) => n.m - root0)).toEqual([0, 1, 0, 1, 0, 1, 0, 1, 0, 0]);
-    expect(r1.map((n) => n.m - root1)).toEqual([0, -1, 0, -1, 0, -1, 0, -1, 0, 0]);
-    expect(r0.map((n) => +(n.d / beat).toFixed(2))).toEqual([1, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 2]);
+    expect(r0.map((n) => n.m - root0)).toEqual([0, 1, 0, 1, 0, 1, 0]);
+    expect(r1.map((n) => n.m - root1)).toEqual([0, -1, 0, -1, 0, -1, 0]);
+    for (const n of r0.slice(1, -1)) {
+      expect(n.d).toBeGreaterThanOrEqual(0.15);
+      expect(n.d).toBeLessThanOrEqual(0.2);
+    }
+    /* back to back: each flick starts where the one before ends */
+    for (let i = 1; i < r0.length; i++) expect(r0[i].t).toBeCloseTo(r0[i - 1].t + r0[i - 1].d, 6);
+    /* the piano plays the same short notes */
+    expect(played.filter((n) => !n.lead).slice(1, 6).every((n) => n.d >= 0.15 && n.d <= 0.2)).toBe(true);
     expect(root1 - root0).toBe(1);
     expect(Math.min(...notes.map((n) => n.m))).toBeGreaterThanOrEqual(range.lo);
     expect(Math.max(...notes.map((n) => n.m))).toBeLessThanOrEqual(range.hi);

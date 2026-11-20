@@ -70,12 +70,16 @@ export const PROBE = `(() => {
     /* the one silent sample that opens the way out (RULEBOOK 4, Sound, Android 3): not a sound */
     if (this.buffer && this.buffer.length <= 1) { P.kicks++; note('kick'); return start.apply(this, a); }
     P.started++; P.live.add(this); note('play');
-    P.starts.push({ when: a[0] ?? 0, offset: a[1] ?? 0, seconds: this.buffer ? this.buffer.duration : 0, loop: this.loop, loopStart: this.loopStart, loopEnd: this.loopEnd,
+    P.starts.push(this.__start = { when: a[0] ?? 0, offset: a[1] ?? 0, seconds: this.buffer ? this.buffer.duration : 0, loop: this.loop, loopStart: this.loopStart, loopEnd: this.loopEnd,
       rate: this.playbackRate ? this.playbackRate.value : 1 });
     this.addEventListener('ended', () => { P.live.delete(this); checkQuiet(); });
     return start.apply(this, a);
   };
-  S.stop = function (...a) { P.live.delete(this); note('stop'); const r = stop.apply(this, a); checkQuiet(); return r; };
+  /* a stop set for later (a note let go at its length) is when it falls silent, not now */
+  S.stop = function (...a) {
+    if (a[0] != null && this.__start && a[0] > this.context.currentTime + 0.01) { this.__start.stopAt = a[0]; return stop.apply(this, a); }
+    P.live.delete(this); note('stop'); const r = stop.apply(this, a); checkQuiet(); return r;
+  };
   /* which volume each sound goes through, to read what each slider did */
   const connect = AudioNode.prototype.connect;
   /* everything that reaches the speaker, summed as the speaker sums it:

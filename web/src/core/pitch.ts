@@ -183,18 +183,36 @@ export function waitParts(range: Range): Part[] {
   return Array.from({ length: ROUND }, (_, k) => ({ kind: 'wait' as const, m: lo + (k % (hi - lo + 1)) }));
 }
 
-/** Match the tone (Robert, 4 Nov): a plain tone on real notes in the
-    range, five in order a whole step apart from the lower middle, then
-    five drawn at random; each 2 s to find, then 8 s held with it */
+/** Match the tone (Robert, 4 and 20 Nov): a plain tone on real notes in
+    the range, ten of them, each 2 s to find, then held with it TONE_SECS.
+    Its levels, like Match the note's: Beginner in order, a whole step
+    apart from the lower middle (to get familiar); Intermediate drawn at
+    random; Advanced drawn at random, your line hidden until the tone
+    stops, so the wobble is all you have to go on.
+    The hold (20 Nov: "one long note held for a long time"): long enough to
+    hear the wobble and settle it out. Ten hundredths of a half step off,
+    near A3, the wobble beats about 1.3 times a second; 4 s holds two or
+    three of those, the slide that stills it, and over a second still. */
 export const TONE_LEAD = 2;
-export const TONE_SECS = 8;
-export function toneParts(range: Range, rand: () => number = Math.random): Part[] {
+export const TONE_SECS = 4;
+export const TONE_NOTES = 10;
+export type ToneMode = 'order' | 'random' | 'hidden';
+export function toneParts(range: Range, rand: () => number = Math.random, mode: ToneMode = 'order'): Part[] {
   const lo = Math.round(range.lo) + 2, hi = Math.max(lo, Math.round(range.hi) - 2);
-  const start = Math.min(Math.round(range.lo + (range.hi - range.lo) / 3), Math.max(lo, hi - 8));
   const out: Part[] = [];
-  for (let k = 0; k < 5; k++) out.push({ kind: 'tone', m: Math.min(hi, start + 2 * k), secs: TONE_SECS });
-  let last = out[out.length - 1].kind === 'tone' ? (out[out.length - 1] as { m: number }).m : NaN;
-  for (let k = 0; k < 5; k++) {
+  if (mode === 'order') {
+    const start = Math.min(Math.round(range.lo + (range.hi - range.lo) / 3), Math.max(lo, hi - 8));
+    /* up a whole step a note, back to the start when the top is passed */
+    let m = start;
+    for (let k = 0; k < TONE_NOTES; k++) {
+      if (m > hi) m = start;
+      out.push({ kind: 'tone', m, secs: TONE_SECS });
+      m += 2;
+    }
+    return out;
+  }
+  let last = NaN;
+  for (let k = 0; k < TONE_NOTES; k++) {
     let m = lo + Math.floor(rand() * (hi - lo + 1));
     for (let i = 0; i < 20 && m === last && hi > lo; i++) m = lo + Math.floor(rand() * (hi - lo + 1));
     last = m;

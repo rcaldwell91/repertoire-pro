@@ -34,7 +34,7 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'singing-screen',
+const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'one-zoom', 'short-piano', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'pause-resume', 'ex-take', 'ex-takes-page', 'restart', 'pause-gear', 'pause-others',
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
@@ -65,20 +65,26 @@ const HOME = Math.round(STEADY.m);
 /* the range the checks sing in: around the singer's own note */
 const RANGE = { lo: HOME - 4, hi: HOME + 5 };
 
-/* the old app's ladder (next.html 3706-3740), for the notes the singer must sing */
+/* the old app's ladder (next.html 3706-3740), for the notes the singer must sing.
+   Robert, 20 Nov, written here as he said it (not read from the app): before
+   every round a beat's quiet and the round's first note alone (a beat, never
+   under half a second), and each note sung and checked 0.14 s after the piano
+   plays it (from his takes). `piano` is when the piano plays it. */
+const LAG = 0.14, LEAD_MIN = 0.5;
 const PATTERNS = { five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 } };
 function ladder(pattern, bpm, range) {
-  const p = PATTERNS[pattern], beat = 60 / bpm;
+  const p = PATTERNS[pattern], beat = 60 / bpm, lead = Math.max(beat, LEAD_MIN);
   const lo = range.lo + 1, top = range.hi - p.span;
   let roots = [];
   for (let r = lo; r <= top; r++) roots.push(r);
   if (!roots.length) roots = [lo];
   const notes = [];
-  let b = 0;
-  for (const root of roots) {
-    p.deg.forEach((dg, i) => { notes.push({ m: root + dg, t: b * beat, d: p.dur[i] * beat }); b += p.dur[i]; });
-    b += 2;
-  }
+  let t = 0;
+  roots.forEach((root, r) => {
+    if (r) t += beat;
+    t += lead;
+    p.deg.forEach((dg, i) => { notes.push({ m: root + dg, t: t + LAG, d: p.dur[i] * beat, piano: t, lead: t - lead }); t += p.dur[i] * beat; });
+  });
   return notes;
 }
 /** a key's name, as the app writes it (core/notemap) */
@@ -569,6 +575,94 @@ try {
     check('narrow-controls', fits.every((f) => f.ok), fits.map((f) => `${f.q} ${f.ok ? 'inside' : 'OFF THE SCREEN'}`).join(', '));
   }
 
+  /* Robert, 20 Nov: before every round the piano plays its first note alone
+     (the lead), and each bubble starts, is checked and meets the white line
+     0.14 s after its piano note. The piano heard: every lead note at its
+     place, the round's first note, never a bubble of its own; the white line
+     reaching each bubble's start 0.14 s after its note sounded */
+  if (want('lead-pause')) {
+    await openEx('mum');
+    await noSinger();
+    await page.eval(`window.__probe.starts.length = 0`);
+    await page.tap('#ex-start');
+    await page.waitFor(`!!document.querySelector('#ex-run')`, 3000);
+    /* the white line's moment as each bubble becomes the one to sing */
+    const seen = await page.eval(`new Promise((ok) => { const cv = () => document.querySelector('#bubbles'); const out = {}; let last = -1;
+      const t0 = performance.now(); const tick = () => { const c = cv(); if (c) { const k = +c.dataset.current; if (k >= 0 && k !== last && out[k] == null) out[k] = +c.dataset.now; last = k; }
+        if (performance.now() - t0 < 14000) requestAnimationFrame(tick); else ok(out); }; tick(); })`);
+    const starts = await page.eval(P('starts.filter((x) => x.seconds > 0.2).map((x) => ({ when: x.when, rate: x.rate, stopAt: x.stopAt ?? null }))'));
+    const bubbles = await page.eval(`+document.querySelector('#bubbles').dataset.visible`);
+    await page.tap('#ex-close');
+    /* the piano, from its first sound: leads and notes in order */
+    const z = starts.length ? starts[0].when : 0;
+    const heard = starts.map((s) => ({ at: s.when - z, rate: s.rate }));
+    const want2 = [];
+    MUM.slice(0, 18).forEach((n, i) => { if (i % 9 === 0) want2.push({ at: n.lead, m: n.m, lead: true }); want2.push({ at: n.piano, m: n.m }); });
+    const placed = want2.every((w, i) => heard[i] && Math.abs(heard[i].at - w.at) < 0.02);
+    /* the lead is the round's first note: the same sample at the same rate */
+    const sameNote = want2.every((w, i) => !w.lead || (heard[i] && heard[i + 1] && Math.abs(heard[i].rate - heard[i + 1].rate) < 1e-6));
+    /* each bubble the one to sing when the line reaches it: 0.14 s after the piano */
+    const lags = Object.entries(seen).filter(([k]) => +k < 18).map(([k, at]) => at - MUM[+k].piano);
+    const onLine = lags.length >= 10 && lags.every((d) => d >= LAG - 0.04 && d <= LAG + 0.04);
+    check('lead-pause', placed && sameNote && onLine && bubbles > 0,
+      `the piano's first ${want2.length} sounds at ${heard.slice(0, want2.length).map((h) => h.at.toFixed(2)).join(' ')} s, wanted ${want2.map((w) => (w.lead ? 'lead ' : '') + w.at.toFixed(2)).join(' ')} ${placed}; ` +
+      `each lead the round's own first note ${sameNote}; the line meets each bubble ${lags.map((d) => d.toFixed(2)).join(' ')} s after its note (wanted ${LAG}) ${onLine}`);
+  }
+
+  /* Robert, 20 Nov: one zoom everywhere, the same on every exercise and
+     every round; a round too tall for it is followed, never zoomed; the
+     bubbles exactly the band that counts. Five-note scales, the octave,
+     the biggest pattern (19 half steps), a held note, Match the note */
+  if (want('one-zoom')) {
+    const views = [];
+    for (const [id, level] of [['mum', 1], ['arp19', 3], ['sustain', 1], ['straw', 3], ['guh', 2]]) {
+      await page.eval(`localStorage.setItem('rp.level.${id}', '${level}')`);
+      await openEx(id);
+      await noSinger();
+      await page.tap('#ex-start');
+      await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
+      const look = [];
+      for (let k = 0; k < 8; k++) {
+        look.push(await page.eval(`(() => { const d = document.querySelector('#bubbles').dataset; return { lo: +d.viewLo, hi: +d.viewHi, zoom: +d.zoom, bubble: +d.bubble, row: +d.row, now: +d.now }; })()`));
+        await sleep(450);
+      }
+      await page.tap('#ex-close');
+      views.push({ id, look });
+    }
+    const all = views.flatMap((v) => v.look);
+    const oneZoom = all.every((v) => Math.abs(v.zoom - 16) < 0.05);
+    const bands = all.every((v) => Math.abs(v.bubble - v.row) <= 0.15);
+    /* the biggest pattern: the view moves to follow it */
+    const big = views.find((v) => v.id === 'arp19').look;
+    const follows = Math.max(...big.map((v) => v.lo)) - Math.min(...big.map((v) => v.lo)) >= 2;
+    check('one-zoom', oneZoom && bands && follows,
+      views.map((v) => `${v.id}: ${[...new Set(v.look.map((x) => x.zoom.toFixed(1)))].join('/')} half steps tall, view from ${v.look.map((x) => x.lo.toFixed(1)).join(' ')}`).join('; ') +
+      `; one zoom ${oneZoom}; every bubble one row tall ${bands}; the biggest pattern followed ${follows}`);
+  }
+
+  /* Robert, 20 Nov: "short notes should sound short": Bwoop's, Staccato's and
+     Consonant pops' piano notes are let go after 0.25 s at most, Bwoop's
+     bubbles as short; a long note as long as its beat */
+  if (want('short-piano')) {
+    const lens = {};
+    for (const id of ['bwoop', 'staccato', 'pops', 'mum']) {
+      await openEx(id);
+      await noSinger();
+      await page.eval(`window.__probe.starts.length = 0`);
+      const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+      await page.tap('#ex-start');
+      await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
+      await sleep(2500);
+      const st = await page.eval(P('starts.filter((x) => x.seconds > 0.2 && x.stopAt != null).map((x) => x.stopAt - x.when)'));
+      await page.tap('#ex-close');
+      /* the engine lets a note go 0.3 s after its length (the fade's room): its length is what is left */
+      lens[id] = { piano: st.slice(1, 8).map((x) => +(x - 0.3).toFixed(3)), bubbles: round.slice(0, 7).map((n) => +n[2].toFixed(3)) };
+    }
+    const short = ['bwoop', 'staccato', 'pops'].every((id) => lens[id].piano.length >= 5 && lens[id].piano.every((x) => x <= 0.25 + 0.01) && lens[id].bubbles.every((x) => x <= 0.25 + 0.001));
+    const long = lens.mum.piano.length >= 5 && lens.mum.piano.every((x) => x >= 0.49);
+    check('short-piano', short && long, Object.entries(lens).map(([id, v]) => `${id}: piano ${v.piano.join(' ')} s, bubbles ${v.bubbles.join(' ')} s`).join('; '));
+  }
+
   /* 3b. The singing screen (Robert, 24 Oct): the note map fills the screen,
          the ladder of note names at the left, every bubble with its syllable,
          the current one bigger, the dots along the bottom one per rung */
@@ -593,18 +687,20 @@ try {
     const c = await look();
     await page.tap('#ex-close');
     const rungs = MUM.length / 9;
-    /* zoomed to the rung (Robert, 25 Oct): three semitones round the first rung's notes, then gliding up a
-       half step with the second, never in one jump */
+    /* one zoom (Robert, 20 Nov): 16 half steps tall on every rung, centred on
+       the first rung's notes, then gliding up a half step with the second, never in one jump */
     const r0 = MUM.slice(0, 9), r1 = MUM.slice(9, 18);
     const near = (x, y) => Math.abs(+x - y) <= 0.3;
-    const zoomed = near(a.viewLo, Math.min(...r0.map((n) => n.m)) - 3) && near(a.viewHi, Math.max(...r0.map((n) => n.m)) + 3) &&
-      near(c.viewLo, Math.min(...r1.map((n) => n.m)) - 3) && near(c.viewHi, Math.max(...r1.map((n) => n.m)) + 3);
+    const mid = (r) => (Math.min(...r.map((n) => n.m)) + Math.max(...r.map((n) => n.m))) / 2;
+    const zoomed = [a, c].every((v) => near(+v.viewHi - +v.viewLo, 16)) && near((+a.viewLo + +a.viewHi) / 2, mid(r0)) && near((+c.viewLo + +c.viewHi) / 2, mid(r1));
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
+    /* each bubble exactly the band that counts: one row, within half a half step either side; the current one no taller */
+    const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +a.nowBubble === +a.bubble;
     /* the map smaller, to make room for the controls along the bottom (Robert, 28 Oct), and still the larger part of the screen */
     /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after), and back to 40 on 16 Nov, inside rows of 42 px or more */
     check('singing-screen', a.top <= 1 && a.height >= a.inner - 70 && a.canvas >= 0.55 * a.inner && a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner &&
       +a.visible > 0 && a.labelled === a.visible && +a.names >= 6 &&
-      +a.bubble >= 40 && +a.row >= 42 && +a.nowBubble > +a.bubble && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
+      band && +a.row >= 20 && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
       `fills the screen above the menu: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px down to ${a.mapEnd}, the controls under it from ${a.barTop} to ${a.bar} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
       `${a.names} note names; bubbles ${a.bubble} px on ${a.row} px rows, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
       `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}`);
@@ -1590,13 +1686,13 @@ try {
     await page.waitFor(`!document.querySelector('#count-in')`, 6000);
     await sleep(800);
     const during = await box('#bubbles');
-    /* Straw's three notes zoom in further: its rows are taller, so its bubbles bigger than 40 */
+    /* Straw's three notes at the same zoom as everything else (Robert, 20 Nov): the same bubbles as Mum's */
     const strawBubble = await page.eval(`+(document.querySelector('#bubbles')?.dataset.bubble ?? 0)`);
     const tabs = await box('.tabs');
     const ctrls = await Promise.all(['#ex-pause', '#ex-restart', '#ex-gear-run', '#ex-close', '#ex-cue'].map(box));
     const fits = ctrls.every((b) => b && b.l >= 0 && b.r <= 360 && b.b <= tabs.t) && tabs.b <= 740 && during.b <= tabs.t;
     await page.tap('#ex-close');
-    /* Mum at 360 x 740, its five-note pattern zoomed as on any phone: bubbles still 40 px (Robert, 16 Nov) */
+    /* Mum at 360 x 740: bubbles one row tall, easy to see (Robert, 20 Nov: they replace 16 Nov's 40 px) */
     await openEx('mum');
     await noSinger();
     await page.tap('#ex-start');
@@ -1605,7 +1701,7 @@ try {
     await page.tap('#ex-close');
     await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     check('menu-everywhere', !!page1 && !!step && !!takesPage && page1.on === 'page' && fits && before && during && before.h === during.h && before.t === during.t &&
-      narrow.bubble >= 40 && strawBubble > 41,
+      Math.abs(narrow.bubble - narrow.row) <= 0.15 && narrow.bubble >= 24 && Math.abs(strawBubble - narrow.bubble) <= 0.15,
       `the menu on an exercise page ${!!page1} (Train lit ${page1?.on}), a routine step ${!!step}, an exercise's takes ${!!takesPage}; ` +
       `at 360 px singing: the controls and the cue inside and above the menu ${fits}; the map ${before?.h} px before the count-in, ${during?.h} px singing, ` +
       `the same place ${before?.t === during?.t}; Mum's bubbles at 360 x 740 ${narrow.bubble} px on ${narrow.row} px rows, Straw's ${strawBubble} px`);

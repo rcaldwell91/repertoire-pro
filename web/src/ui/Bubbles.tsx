@@ -2,14 +2,18 @@ import { useEffect, useRef } from 'react';
 import type { Note } from '../core/exercises';
 import { bubbleScore, rungAt, rungStarts, sylOf } from '../core/exercises';
 import { foldTo, keyName } from '../core/notemap';
+import { RIGHT_WITHIN } from '../core/takes';
 import { drawLine } from './NoteMap';
 
 /* The singing screen (RULEBOOK 1b; Robert, 24 and 25 Oct): the note map
-   fills the screen and is zoomed to the notes of the rung being sung, about
-   three semitones of room above and below, gliding smoothly as the pattern
-   climbs; the ladder of note names at the left; the old app's syllable
-   bubbles with every syllable inside, the one to sing now bigger with a
-   ring, your line with the voice gradient on top. Each bubble fills green
+   fills the screen at one zoom, the same on every exercise and every round
+   (Robert, 20 Nov), centred on the rung being sung and gliding smoothly as
+   the pattern climbs, following the notes when a rung is taller than the
+   view; the ladder of note names at the left; the old app's syllable
+   bubbles, each exactly as tall as the band that counts with a line at its
+   note, its syllable inside or just above it, the one to sing now ringed,
+   your line with the voice gradient on top. The white line is the moment
+   a bubble starts and is checked, SING_LAG after its piano note. Each bubble fills green
    with the share of it you sang on the note: the same rule as the score
    (RULEBOOK 4, Bubbles). With no notes (a siren), only your line.
    Sing the interval (Robert, 28 Oct): the note that plays before each turn
@@ -19,24 +23,24 @@ import { drawLine } from './NoteMap';
 const SPAN = 4;          /* seconds across: wide enough for a syllable in a one-beat note */
 const NOW_AT = 0.3;
 const GUTTER = 44;
-/** room above the highest and below the lowest note of the rung, in semitones */
-export const ROOM = 3;
-/** the view never shows fewer semitones than this (a single held note) */
-export const MIN_WINDOW = 10;
-/** the view glides to a new rung: this far toward it each second's quarter */
+/** One zoom, the same on every exercise and every round (Robert, 20 Nov:
+    "so singers get used to it and learn to be exact"): this many half
+    steps from the top of the map to the bottom, one spacing between notes
+    everywhere. On a 360 x 740 phone a row is 28 px (the map is 463 px). */
+export const ZOOM = 16;
+/** room kept above the highest and below the lowest note in view, in half steps */
+export const ROOM = 2;
+/** the view moves to a new rung, or follows the notes: this far toward it each second's quarter */
 export const GLIDE_SECONDS = 0.25;
-/** a bubble's height, in px: never under this, never over that. At least
-    40 px with the menu on screen (Robert, 16 Nov): on a 390 x 844 phone a
-    row is taller than that; on a shorter one a bubble can stand a little
-    taller than its row, which never hides another, as no two notes sound
-    at once */
-export const BUBBLE_MIN = 40;
-const BUBBLE_MAX = 48;
+/** A bubble is exactly as tall as the band that counts (Robert, 20 Nov:
+    "a singer will think anywhere inside counts"): within half a half step
+    either side of its note (core/takes RIGHT_WITHIN), one row at this
+    zoom, never more; a line through it marks the note itself. This
+    replaces 16 Nov's "at least 40 px". */
+export const BAND = 2 * RIGHT_WITHIN;
 /** the map's own margin above the top row and below the bottom one, in px:
     enough for half a note name (16 Nov: 14 before, the room given to the rows) */
 const PAD = 6;
-/** the bubble to sing now, bigger than the rest */
-const NOW_SCALE = 1.3;
 
 export interface YouLine {
   readonly t: number[];
@@ -51,7 +55,9 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
   scored?: boolean;
   /** one per rung (Match the note, Advanced: Robert 4 Nov): until this time the
       rung's line and fill are hidden, then they appear as the note plays again */
-  reveal?: readonly number[] }) {
+  reveal?: readonly number[];
+  /** your line not shown at all, until this is false (Match the tone at Advanced, Robert 20 Nov) */
+  hideYou?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -66,7 +72,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
     if (!cv) return;
     let raf = 0;
     const draw = () => {
-      const { notes, you, now, anyOctave, colour, heard, scored = true, reveal } = propsRef.current;
+      const { notes, you, now, anyOctave, colour, heard, scored = true, reveal, hideYou } = propsRef.current;
       const css = getComputedStyle(cv);
       const dpr = window.devicePixelRatio || 1;
       const W = cv.clientWidth, H = cv.clientHeight;
@@ -79,9 +85,11 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       const at = now();
-      /* the view's target: the notes of the rung being sung (the first before
-         it starts, the last after), ROOM either side, never under MIN_WINDOW;
-         with no notes (a siren), what has been sung */
+      /* the view's target, always ZOOM half steps tall: the notes of the rung
+         being sung (the first before it starts, the last after), ROOM
+         either side, centred; a rung too tall for that, the notes about to
+         be sung, and the view follows them (Robert, 20 Nov: "it never
+         zooms"); with no notes (a siren), what has been sung */
       let tlo = 48, thi = 72;
       /* a turn heard then sung: its whole time across the view */
       let turn: { a: number; b: number; heard: Note } | null = null;
@@ -98,20 +106,30 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         const rung = notes.slice(from, to);
         const h = heard?.[r];
         const all = h ? [h, ...rung] : rung;
-        tlo = Math.min(...all.map((n) => n.m)) - ROOM;
-        thi = Math.max(...all.map((n) => n.m)) + ROOM;
+        let a = Math.min(...all.map((n) => n.m)) - ROOM, b = Math.max(...all.map((n) => n.m)) + ROOM;
+        if (b - a > ZOOM) {
+          /* too tall: the notes sounding now and in the next second and a half, kept inside the rung */
+          const near = rung.filter((n) => n.t + n.d >= at && n.t <= at + 1.5);
+          const pick = near.length ? near : [rung[at < rung[0].t ? 0 : rung.length - 1]];
+          const mid = (Math.min(...pick.map((n) => n.m)) + Math.max(...pick.map((n) => n.m))) / 2;
+          const c = Math.max(a + ZOOM / 2, Math.min(b - ZOOM / 2, mid));
+          a = c - ZOOM / 2;
+          b = c + ZOOM / 2;
+        }
+        tlo = a;
+        thi = b;
         if (h) turn = { a: h.t - 0.3, b: Math.max(...rung.map((n) => n.t + n.d)) + 0.3, heard: h };
       } else if (you.m.length) {
-        const sung = you.m.filter(Number.isFinite);
+        const sung = you.m.slice(-40).filter(Number.isFinite);
         if (sung.length) {
-          tlo = Math.min(tlo, Math.floor(Math.min(...sung)) - 2);
-          thi = Math.max(thi, Math.ceil(Math.max(...sung)) + 2);
+          tlo = Math.floor(Math.min(...sung)) - ROOM;
+          thi = Math.ceil(Math.max(...sung)) + ROOM;
         }
       }
-      if (thi - tlo < MIN_WINDOW) {
+      {
         const mid = (thi + tlo) / 2;
-        tlo = mid - MIN_WINDOW / 2;
-        thi = mid + MIN_WINDOW / 2;
+        tlo = mid - ZOOM / 2;
+        thi = mid + ZOOM / 2;
       }
       /* glide there: the first frame jumps, every later one closes a share of the gap */
       const wall = performance.now() / 1000;
@@ -170,17 +188,18 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       };
       const hiddenNote = (i: number) => !!reveal && at < (reveal[rungOf(i)] ?? -Infinity);
       const hiddenAt = (t: number) => {
+        if (hideYou) return true;
         if (!reveal) return false;
         const k = notes.findIndex((q) => t >= q.t - 0.2 && t < (reveal[rungOf(notes.indexOf(q))] ?? -Infinity));
         return k >= 0 && hiddenNote(k);
       };
       let hiddenPts = 0;
-      const h = Math.max(BUBBLE_MIN, Math.min(BUBBLE_MAX, rowH * 0.95));
+      const h = rowH * BAND;
       const tint = css.getPropertyValue('--' + colour).trim();
-      let current = -1, visible = 0, labelled = 0;
+      let current = -1, visible = 0, labelled = 0, outside = 0;
       const bubble = (n: Note, i: number, isNow: boolean) => {
-        const bh = isNow ? h * NOW_SCALE : h;
-        const bx = x(n.t), bw = Math.max(14, n.d * pxs - 3), by = y(n.m) - bh / 2;
+        const bh = h;
+        const bx = x(n.t), bw = Math.max(6, n.d * pxs - 2), by = y(n.m) - bh / 2;
         const shape = () => {
           g.beginPath();
           if (g.roundRect) g.roundRect(bx, by, bw, bh, bh / 2);
@@ -199,16 +218,32 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
           g.fillRect(bx, by, bw * score.fill[i], bh);
           g.restore();
         }
+        /* the note itself: a line through the middle of its band */
+        g.globalAlpha = 0.55;
+        g.fillStyle = css.getPropertyValue('--ink');
+        g.fillRect(bx + 2, Math.round(y(n.m)) - 0.5, Math.max(1, bw - 4), 1);
+        g.globalAlpha = 1;
         shape();
         /* the ring on the note to sing now: white in the dark, ink in the
-           light, so it shows on both (the --now token) */
+           light, so it shows on both (the --now token); the same height as
+           the rest, as the band is the same */
         g.lineWidth = isNow ? 3 : 1;
         g.strokeStyle = isNow ? css.getPropertyValue('--now') : tint;
         g.stroke();
-        g.fillStyle = css.getPropertyValue('--ink');
+        /* the syllable inside when it fits, otherwise just above the bubble
+           (below, at the top of the map) */
+        const syl = sylOf(n);
         g.font = `700 ${isNow ? 14 : 12}px Quicksand, system-ui, sans-serif`;
+        const tw = g.measureText(syl).width;
+        const inside = tw + 6 <= bw && bh >= 15;
+        g.fillStyle = css.getPropertyValue('--ink');
         g.textAlign = 'center';
-        g.fillText(sylOf(n), bx + bw / 2, by + bh / 2, bw + 8);
+        if (inside) g.fillText(syl, bx + bw / 2, by + bh / 2);
+        else {
+          outside++;
+          const above = by - 9 >= 8;
+          g.fillText(syl, bx + bw / 2, above ? by - 9 : by + bh + 9);
+        }
         g.textAlign = 'left';
         labelled++;
       };
@@ -223,7 +258,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       /* the note heard first: hollow, its name inside, never scored */
       let heardShown = 0;
       if (turn) {
-        const n = turn.heard, bx = x(n.t), bw = Math.max(14, n.d * pxs - 3), by = y(n.m) - h / 2;
+        const n = turn.heard, bx = x(n.t), bw = Math.max(6, n.d * pxs - 2), by = y(n.m) - h / 2;
         g.beginPath();
         if (g.roundRect) g.roundRect(bx, by, bw, h, h / 2);
         else g.rect(bx, by, bw, h);
@@ -275,9 +310,11 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.visible = String(visible);
       cv.dataset.labelled = String(labelled);
       cv.dataset.names = String(names);
-      cv.dataset.bubble = h.toFixed(0);
+      cv.dataset.bubble = h.toFixed(1);
       cv.dataset.row = rowH.toFixed(1);
-      cv.dataset.nowBubble = (h * NOW_SCALE).toFixed(0);
+      cv.dataset.nowBubble = h.toFixed(1);
+      cv.dataset.zoom = (hi - lo).toFixed(2);
+      cv.dataset.outside = String(outside);
       cv.dataset.viewLo = lo.toFixed(2);
       cv.dataset.viewHi = hi.toFixed(2);
       cv.dataset.viewStep = v.step.toFixed(3);

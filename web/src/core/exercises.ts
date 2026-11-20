@@ -1,6 +1,7 @@
 import { copy } from './copy';
 import { keyName, type Range } from './notemap';
 import { isRight } from './takes';
+import { TONE_LEAD, TONE_NOTES, TONE_SECS } from './pitch';
 
 /* The Train tab's exercises, as data (RULEBOOK 2.6: the old app is the
    checklist). Every exercise of the old app's library (next.html
@@ -65,9 +66,11 @@ export const PATTERNS: Record<PatternId, Pattern> = {
   three: { deg: [0, 2, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 4 },
   /* Robert, 16 Nov: 3-2-1, then 1-2-3, in one round */
   threerun: { deg: [4, 2, 0, 0, 2, 4], dur: [1, 1, 2, 1, 1, 2], span: 4 },
-  /* Robert, 16 Nov: the note, four flicks (a quarter beat on the note a half
-     step away, three quarters back), the note held; up one round, down the next */
-  bend: { deg: [0, 1, 0, 1, 0, 1, 0, 1, 0, 0], dur: [1, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 0.25, 0.75, 2], span: 1, flip: true },
+  /* Robert, 20 Nov: a fast twitch, note, neighbour, note, neighbour, note,
+     neighbour, note, back to back, each flick about as quick as the
+     course's (0.15 to 0.2 s: 0.3 of a beat at 100 is 0.18 s), with no long
+     hold between them; up one round, down the next (16 Nov) */
+  bend: { deg: [0, 1, 0, 1, 0, 1, 0], dur: [1, 0.3, 0.3, 0.3, 0.3, 0.3, 1], span: 1, flip: true },
 };
 
 /** how an exercise runs. ladder: the pattern up your range, sung back over
@@ -97,7 +100,8 @@ export type Engine =
   | { kind: 'interval' }
   | { kind: 'match'; mode: 'wait' | 'window' | 'blind' }
   | { kind: 'steady' }
-  | { kind: 'tone' }
+  /* Match the tone's levels (Robert, 20 Nov; core/pitch toneParts) */
+  | { kind: 'tone'; mode: 'order' | 'random' | 'hidden' }
   | { kind: 'vfe' };
 
 /** how an exercise's syllables (copy.ex[id].syls) fall on its notes
@@ -243,8 +247,11 @@ export const EXERCISES: readonly Exercise[] = [
   ex('interval', 'pitch', 1, true, { kind: 'interval' }),
   ex('holdnote', 'pitch', 1, true, { kind: 'steady' }),
   climbing(ex('threestep', 'pitch', 1, true, ladder('three', 110))),
-  /* the line shown, not scored, until Robert's test with headphones (4 Nov) */
-  { ...ex('matchtone', 'pitch', 2, true, { kind: 'tone' }), lineOnly: true },
+  /* scored since Robert's test with headphones (20 Nov: the headphone check
+     passed); levels like Match the note's: in order, at random, at random
+     with your line hidden */
+  leveled('matchtone', 'pitch', true, [{ level: 1, engine: { kind: 'tone', mode: 'order' } }, { level: 2, engine: { kind: 'tone', mode: 'random' } },
+    { level: 3, engine: { kind: 'tone', mode: 'hidden' } }]),
 ];
 
 export function exercise(id: string): Exercise | undefined {
@@ -323,12 +330,43 @@ export interface Note {
       note to land in a longer time (Match the note, 5 s; Robert 4 Nov)
       still counts after 1.2 s on it, as it always has */
   readonly need?: number;
+  /** the round's first note played alone before it (Robert, 20 Nov): never sung, never scored */
+  readonly lead?: boolean;
 }
 
 export const MAX_RUNGS = 14;
 /** a short note counts once this long on it (seconds) */
 export const SHORT_NEED = 0.1;
 export const REST_BEATS = 2;
+/** How long after its piano note a note is checked, its bubble starts and
+    the white line meets it (Robert, 13 and 20 Nov: "not a whole second"):
+    the voice's arrival as measured from his saved takes (20 Nov, the
+    Five-note run at 160 and Bwoop, 117 notes reached after the first of
+    each round): on the note a median 0.14 s after the piano by the app's
+    own line, which reads the voice about 0.05 s late, so the voice itself
+    is there about 0.09 s after it. Every note's whole window moves by it,
+    so it keeps its length. */
+export const SING_LAG = 0.14;
+/** the lead note (Robert, 20 Nov): before every round, the first one
+    included, the round's first note played alone so it can be found before
+    it is checked; a beat long, never under this (s); a beat's quiet before it */
+export const LEAD_MIN = 0.5;
+/** a short note (Staccato, Consonant pops, Bwoop) plays and is drawn this
+    long at most, clipped, however long its beat (Robert, 20 Nov: "the
+    piano notes ring on"; "the bubbles should be as short as the notes") */
+export const SHORT_LEN = 0.25;
+
+/** what an exercise sings: the notes sung and checked (each SING_LAG after
+    its piano note), what the piano plays (the lead notes and the pattern),
+    the first round's pattern as the piano plays it from 0 (the pattern
+    card), the length to the last piano note's end, and the beat */
+export interface Sung {
+  notes: Note[];
+  played: Note[];
+  pattern: Note[];
+  length: number;
+  beat: number;
+}
 
 /** The old app's ladder (3706-3740): the pattern from one note above the
     bottom of your range, a half step higher each rung, up to where the
@@ -336,9 +374,12 @@ export const REST_BEATS = 2;
     Robert's 3 Nov exercises climb a half step every round, however many.
     `down` (the Cool-down, Robert 4 Nov): the pattern starts in the middle
     of the range and moves down a half step a round, to one note above the
-    bottom. */
-export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } = {}): { notes: Note[]; length: number; beat: number } {
-  if (e.engine.kind !== 'ladder') return { notes: [], length: 0, beat: 1 };
+    bottom.
+    Robert, 20 Nov: the rest before each round, the first included, is a
+    beat's quiet and then the round's first note played alone (the lead);
+    each note is sung and checked SING_LAG after the piano plays it. */
+export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } = {}): Sung {
+  if (e.engine.kind !== 'ladder') return { notes: [], played: [], pattern: [], length: 0, beat: 1 };
   const p = PATTERNS[e.engine.pattern];
   const beat = 60 / e.engine.bpm;
   const lo = range.lo + 1;
@@ -353,19 +394,27 @@ export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } 
     const step = Math.ceil(roots.length / MAX_RUNGS);
     roots = roots.filter((_, i) => i % step === 0);
   }
-  const notes: Note[] = [];
-  let b = 0;
+  const notes: Note[] = [], played: Note[] = [], pattern: Note[] = [];
+  const lead = Math.max(beat, LEAD_MIN);
+  let t = 0;
   roots.forEach((root, r) => {
     const way = p.flip && r % 2 ? -1 : 1;
+    if (r > 0) t += beat;
+    played.push({ m: root + way * p.deg[0], t, d: lead, syl: '', lead: true });
+    t += lead;
+    const from = t;
     p.deg.forEach((dg, i) => {
       const syl = sylFor(e, i, r);
-      notes.push({ m: root + way * dg, t: b * beat, d: p.dur[i] * beat, syl: i === 0 ? keyName(root) + ' · ' + syl : syl,
-        ...(e.shortNotes ? { need: SHORT_NEED } : {}) });
-      b += p.dur[i];
+      const len = p.dur[i] * beat;
+      const d = e.shortNotes ? Math.min(len, SHORT_LEN) : len;
+      const n: Note = { m: root + way * dg, t, d, syl: i === 0 ? keyName(root) + ' · ' + syl : syl, ...(e.shortNotes ? { need: SHORT_NEED } : {}) };
+      played.push(n);
+      notes.push({ ...n, t: t + SING_LAG });
+      if (r === 0) pattern.push({ ...n, t: t - from });
+      t += len;
     });
-    b += REST_BEATS;
   });
-  return { notes, length: (b - REST_BEATS) * beat, beat };
+  return { notes, played, pattern, length: t, beat };
 }
 
 /** the syllable for a note: the exercise's one syllable, or one of its
@@ -383,20 +432,31 @@ export function sylFor(e: Exercise, i: number, r: number): string {
     from each end, three seconds' rest between */
 export const HOLD_NOTES = 5;
 export const HOLD_REST = 3;
-export function holdNotes(e: Exercise, range: Range): { notes: Note[]; length: number; beat: number } {
-  if (e.engine.kind !== 'hold') return { notes: [], length: 0, beat: 1 };
+/** a held note's lead (Robert, 20 Nov): the note played alone for this
+    long at the end of the rest before it, the first included */
+export const HOLD_LEAD = 1;
+export function holdNotes(e: Exercise, range: Range): Sung {
+  if (e.engine.kind !== 'hold') return { notes: [], played: [], pattern: [], length: 0, beat: 1 };
   const secs = e.engine.secs;
   const a = range.lo + 3, b = Math.max(range.lo + 3, range.hi - Math.max(3, e.topGap ?? 0));
-  const notes: Note[] = [];
+  const notes: Note[] = [], played: Note[] = [], pattern: Note[] = [];
+  let t = 0;
   for (let i = 0; i < HOLD_NOTES; i++) {
     const m = Math.round(a + ((b - a) * i) / (HOLD_NOTES - 1));
-    notes.push({ m, t: i * (secs + HOLD_REST), d: secs, syl: keyName(m) + ' · ' + sylFor(e, 0, i) });
+    if (i > 0) t += HOLD_REST - HOLD_LEAD;
+    played.push({ m, t, d: HOLD_LEAD, syl: '', lead: true });
+    t += HOLD_LEAD;
+    const n: Note = { m, t, d: secs, syl: keyName(m) + ' · ' + sylFor(e, 0, i) };
+    played.push(n);
+    notes.push({ ...n, t: t + SING_LAG });
+    if (i === 0) pattern.push({ ...n, t: 0 });
+    t += secs;
   }
-  return { notes, length: HOLD_NOTES * secs + (HOLD_NOTES - 1) * HOLD_REST, beat: 1 };
+  return { notes, played, pattern, length: t, beat: 1 };
 }
 
 /** the notes an exercise sings, in your range (stepping down in the Cool-down) */
-export function notesFor(e: Exercise, range: Range, opts: { down?: boolean } = {}): { notes: Note[]; length: number; beat: number } {
+export function notesFor(e: Exercise, range: Range, opts: { down?: boolean } = {}): Sung {
   return e.engine.kind === 'hold' ? holdNotes(e, range) : ladderNotes(e, range, opts);
 }
 
@@ -527,7 +587,9 @@ export function stepsFor(id: Exercise['id'], opts: { cooldown?: boolean; level?:
     slide 45 s, Match the note at Beginner 70 s ...); and 15 s a step for
     reading and tapping (Robert, 4 Nov: listed lengths from real timings). */
 export const STEP_SECS = 15;
-const ALLOW: Partial<Record<Engine['kind'], number>> = { timed: 25, cycle: 90, glide: 45, range: 20, interval: 90, steady: 85, vfe: 240, tone: 120 };
+const ALLOW: Partial<Record<Engine['kind'], number>> = { timed: 25, cycle: 90, glide: 45, range: 20, interval: 90, steady: 85, vfe: 240 };
+/** Match the tone: ten notes, each its count-in, 2 s to find and 4 s held, and a tap (Robert, 20 Nov: shorter holds) */
+const TONE_PART_SECS = 3 + TONE_LEAD + TONE_SECS + 3;
 export function exerciseSecs(e: Exercise, range: Range, opts: { down?: boolean } = {}): number {
   const k = e.engine.kind;
   if (k === 'ladder' || k === 'hold') {
@@ -536,6 +598,7 @@ export function exerciseSecs(e: Exercise, range: Range, opts: { down?: boolean }
   }
   if (k === 'guided') return e.engine.mins * 60;
   if (k === 'match') return e.engine.mode === 'wait' ? 70 : 78;
+  if (k === 'tone') return TONE_NOTES * TONE_PART_SECS;
   return ALLOW[k] ?? 60;
 }
 export function routineSecs(steps: readonly RoutineStep[], range: Range, down = false): number {
