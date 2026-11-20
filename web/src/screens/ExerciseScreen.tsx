@@ -562,8 +562,10 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   const [rungNow, setRungNow] = useState(-1);
   useEffect(() => {
     if (!running || !sung) return;
-    const t = setInterval(() => setRungNow(rungAt(plan.notes, c.position() ?? -1)), 100);
+    const t = setInterval(() => setRungNow(rungOf(c.position() ?? -1)), 100);
     return () => clearInterval(t);
+    /* rungOf reads only the plan */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, sung, plan, c]);
   /* paused: the repeat it will carry on from */
   const rung = running ? rungNow : paused && sung ? resumeRung.current : -1;
@@ -631,6 +633,17 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     return leads[r]?.t ?? plan.notes[i]?.t ?? 0;
   }
 
+  /* the rung being sung at this moment: a rung begins with its lead note
+     (Robert, 20 Nov), so its dot is lit, and Pause carries on from it,
+     from the lead on; -1 before the first, `rungs` once all are sung */
+  function rungOf(at: number): number {
+    const r = rungAt(plan.notes, at);
+    if (r >= rungs) return r;
+    let k = r;
+    while (k + 1 < rungs && rungTime(k + 1) <= at) k++;
+    return k;
+  }
+
   /* Pause (Robert, 28 Oct): sound and mic stop, the screen stays */
   function pause() {
     if (kind === 'cycle' || kind === 'guided') {
@@ -640,7 +653,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     }
     if (sung) {
       const at = c.position();
-      if (at != null) resumeRung.current = Math.max(0, Math.min(rungs - 1, rungAt(plan.notes, at)));
+      if (at != null) resumeRung.current = Math.max(0, Math.min(rungs - 1, rungOf(at)));
     }
     c.stop();
     if (sung) keepStretch();

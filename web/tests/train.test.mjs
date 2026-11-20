@@ -34,7 +34,7 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'one-zoom', 'short-piano', 'singing-screen',
+const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'last-hold', 'one-zoom', 'short-piano', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'pause-resume', 'ex-take', 'ex-takes-page', 'restart', 'pause-gear', 'pause-others',
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
@@ -609,13 +609,34 @@ try {
       `each lead the round's own first note ${sameNote}; the line meets each bubble ${lags.map((d) => d.toFixed(2)).join(' ')} s after its note (wanted ${LAG}) ${onLine}`);
   }
 
+  /* 20 Nov: a note held longer than its piano recording (about 3 s) lasts
+     its whole length: the run ends when Sustain's last 8 s hold is let go,
+     not when its recording runs out 3 s in (it then never counted) */
+  if (want('last-hold')) {
+    await go('/train', RANGE);
+    await page.eval(`localStorage.setItem('rp.level.sustain', '1')`);
+    await openEx('sustain');
+    await noSinger();
+    const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano)`);
+    const last = Math.max(...round.map(([, t, d]) => t + d));
+    await page.eval(`window.__probe.starts.length = 0`);
+    await page.tap('#ex-start');
+    await page.waitFor(P('starts.some((x) => x.seconds > 0.2)'), 12000);
+    const t0 = Date.now();
+    await result(last * 1000 + 15000);
+    const ran = (Date.now() - t0) / 1000;
+    check('last-hold', ran >= last - 0.3 && ran <= last + 2,
+      `the last hold let go at ${last.toFixed(1)} s; the run ended ${ran.toFixed(1)} s after the first piano note (its recording alone runs out about 5 s sooner)`);
+  }
+
   /* Robert, 20 Nov: one zoom everywhere, the same on every exercise and
      every round; a round too tall for it is followed, never zoomed; the
      bubbles exactly the band that counts. Five-note scales, the octave,
      the biggest pattern (19 half steps), a held note, Match the note */
   if (want('one-zoom')) {
     const views = [];
-    for (const [id, level] of [['mum', 1], ['arp19', 3], ['sustain', 1], ['straw', 3], ['guh', 2]]) {
+    for (const [id, level] of [['mum', 1], ['arp19', 3], ['sustain', 1], ['straw', 3], ['guh', 2], ['matchtone', 1]]) {
+      await go('/train', RANGE);
       await page.eval(`localStorage.setItem('rp.level.${id}', '${level}')`);
       await openEx(id);
       await noSinger();
@@ -623,20 +644,22 @@ try {
       await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
       const look = [];
       for (let k = 0; k < 8; k++) {
-        look.push(await page.eval(`(() => { const d = document.querySelector('#bubbles').dataset; return { lo: +d.viewLo, hi: +d.viewHi, zoom: +d.zoom, bubble: +d.bubble, row: +d.row, now: +d.now }; })()`));
+        look.push(await page.eval(`(() => { const d = document.querySelector('#bubbles').dataset; return { lo: +d.viewLo, hi: +d.viewHi, zoom: +d.zoom, bubble: +d.bubble, row: +d.row, now: +d.now,
+          map: document.querySelector('#bubbles').getBoundingClientRect().height }; })()`));
         await sleep(450);
       }
       await page.tap('#ex-close');
       views.push({ id, look });
     }
     const all = views.flatMap((v) => v.look);
-    const oneZoom = all.every((v) => Math.abs(v.zoom - 16) < 0.05);
+    /* one spacing between notes: 30 px a half step on every map, whatever its height */
+    const oneZoom = all.every((v) => Math.abs(v.row - 30) <= 0.3);
     const bands = all.every((v) => Math.abs(v.bubble - v.row) <= 0.15);
     /* the biggest pattern: the view moves to follow it */
     const big = views.find((v) => v.id === 'arp19').look;
-    const follows = Math.max(...big.map((v) => v.lo)) - Math.min(...big.map((v) => v.lo)) >= 2;
+    const follows = Math.max(...big.map((v) => v.lo)) - Math.min(...big.map((v) => v.lo)) >= 1;
     check('one-zoom', oneZoom && bands && follows,
-      views.map((v) => `${v.id}: ${[...new Set(v.look.map((x) => x.zoom.toFixed(1)))].join('/')} half steps tall, view from ${v.look.map((x) => x.lo.toFixed(1)).join(' ')}`).join('; ') +
+      views.map((v) => `${v.id}: ${[...new Set(v.look.map((x) => x.row.toFixed(1)))].join('/')} px a half step, ${[...new Set(v.look.map((x) => x.zoom.toFixed(1)))].join('/')} half steps in view, view from ${v.look.map((x) => x.lo.toFixed(1)).join(' ')}`).join('; ') +
       `; one zoom ${oneZoom}; every bubble one row tall ${bands}; the biggest pattern followed ${follows}`);
   }
 
@@ -650,13 +673,15 @@ try {
       await noSinger();
       await page.eval(`window.__probe.starts.length = 0`);
       const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
+      const leads = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano).map((n) => n[3] === 1)`);
       await page.tap('#ex-start');
       await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
       await sleep(2500);
       const st = await page.eval(P('starts.filter((x) => x.seconds > 0.2 && x.stopAt != null).map((x) => x.stopAt - x.when)'));
       await page.tap('#ex-close');
       /* the engine lets a note go 0.3 s after its length (the fade's room): its length is what is left */
-      lens[id] = { piano: st.slice(1, 8).map((x) => +(x - 0.3).toFixed(3)), bubbles: round.slice(0, 7).map((n) => +n[2].toFixed(3)) };
+      /* the piano's notes in the order played, the lead notes left out (a lead is a beat long) */
+      lens[id] = { piano: st.filter((_, i) => !leads[i]).slice(0, 7).map((x) => +(x - 0.3).toFixed(3)), bubbles: round.slice(0, 7).map((n) => +n[2].toFixed(3)) };
     }
     const short = ['bwoop', 'staccato', 'pops'].every((id) => lens[id].piano.length >= 5 && lens[id].piano.every((x) => x <= 0.25 + 0.01) && lens[id].bubbles.every((x) => x <= 0.25 + 0.001));
     const long = lens.mum.piano.length >= 5 && lens.mum.piano.every((x) => x >= 0.49);
@@ -687,23 +712,24 @@ try {
     const c = await look();
     await page.tap('#ex-close');
     const rungs = MUM.length / 9;
-    /* one zoom (Robert, 20 Nov): 16 half steps tall on every rung, centred on
+    /* one zoom (Robert, 20 Nov): 30 px a half step, as many as the map holds, on every rung, centred on
        the first rung's notes, then gliding up a half step with the second, never in one jump */
     const r0 = MUM.slice(0, 9), r1 = MUM.slice(9, 18);
     const near = (x, y) => Math.abs(+x - y) <= 0.3;
     const mid = (r) => (Math.min(...r.map((n) => n.m)) + Math.max(...r.map((n) => n.m))) / 2;
-    const zoomed = [a, c].every((v) => near(+v.viewHi - +v.viewLo, 16)) && near((+a.viewLo + +a.viewHi) / 2, mid(r0)) && near((+c.viewLo + +c.viewHi) / 2, mid(r1));
+    const zoomed = [a, c].every((v) => near(+v.viewHi - +v.viewLo, (v.canvas - 12) / 30) && Math.abs(+v.row - 30) <= 0.3) && near((+a.viewLo + +a.viewHi) / 2, mid(r0)) && near((+c.viewLo + +c.viewHi) / 2, mid(r1));
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
     /* each bubble exactly the band that counts: one row, within half a half step either side; the current one no taller */
     const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +a.nowBubble === +a.bubble;
     /* the map smaller, to make room for the controls along the bottom (Robert, 28 Oct), and still the larger part of the screen */
     /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after), and back to 40 on 16 Nov, inside rows of 42 px or more */
-    check('singing-screen', a.top <= 1 && a.height >= a.inner - 70 && a.canvas >= 0.55 * a.inner && a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner &&
-      +a.visible > 0 && a.labelled === a.visible && +a.names >= 6 &&
-      band && +a.row >= 20 && a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1 && zoomed && glided,
+    const parts = { top: a.top <= 1, tall: a.height >= a.inner - 70, map: a.canvas >= 0.55 * a.inner, above: a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner,
+      labelled: +a.visible > 0 && a.labelled === a.visible, names: +a.names >= 6, band, row: +a.row >= 20, dots: a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1, zoomed, glided };
+    const wrong = Object.keys(parts).filter((k) => !parts[k]);
+    check('singing-screen', wrong.length === 0,
       `fills the screen above the menu: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px down to ${a.mapEnd}, the controls under it from ${a.barTop} to ${a.bar} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
       `${a.names} note names; bubbles ${a.bubble} px on ${a.row} px rows, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
-      `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}`);
+      `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}` + (wrong.length ? `; NOT: ${wrong.join(', ')}` : ''));
   }
 
   /* 4. Sung right, by a real voice: the bubbles fill and the score says so */

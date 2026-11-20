@@ -511,6 +511,7 @@ export class WebEngine implements AudioEngine {
       gains.push(g);
       nodes.push(src);
     });
+    let letGo = 0;
     nodes.forEach((src, i) => {
       /* a part that begins later in the song (a take, a note) waits for its place */
       const begins = opts.starts?.[i] ?? 0;
@@ -531,8 +532,38 @@ export class WebEngine implements AudioEngine {
         g.gain.setValueAtTime(opts.gains[i] ?? 1, off);
         g.gain.setTargetAtTime(0, off, len <= SHORT_NOTE ? SHORT_FADE : NOTE_FADE);
         src.stop(off + 0.3);
+        letGo = Math.max(letGo, off + 0.3);
       }
     });
+    /* A note held longer than its recording (the piano's are about 3 s; a
+       Sustain hold is 8 s) still lasts its whole length: the exercise ends
+       when the last note is let go, not when its recording runs out
+       (20 Nov: Sustain's last hold was cut off 3 s in and never counted).
+       A silent keeper, one sample looped, runs until then. */
+    if (opts.untilLast && letGo > when) {
+      const keep = ctx.createBufferSource();
+      keep.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      keep.loop = true;
+      const quiet = ctx.createGain();
+      quiet.gain.value = 0;
+      keep.connect(quiet);
+      quiet.connect(this.way(ctx));
+      this.sources.add(keep);
+      ends.push(new Promise<void>((done) => {
+        keep.onended = () => {
+          this.sources.delete(keep);
+          try {
+            quiet.disconnect();
+          } catch {
+            /* gone */
+          }
+          done();
+        };
+      }));
+      nodes.push(keep);
+      keep.start(when);
+      keep.stop(letGo);
+    }
     this.watch();
     const stop = () =>
       nodes.forEach((src) => {

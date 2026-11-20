@@ -37,7 +37,7 @@ spawnSync(FFMPEG, ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:c
 const STEADY = steadyNote(pcm(FFMPEG, SOURCE30));
 const POOL = syllables(pcm(FFMPEG, SOURCE));
 const HOME = Math.round(STEADY.m);
-const RANGE = { lo: HOME - 6, hi: HOME + 7 };
+const RANGE = { lo: HOME - 6 + +(process.env.SHIFT || 0), hi: HOME + 7 + +(process.env.SHIFT || 0) };
 const b64 = (v) => v.buffer.toString('base64');
 
 const { server, ORIGIN, URL_APP } = await serve(REPO, APP);
@@ -75,6 +75,7 @@ async function run(id, level, voiceOf, label, range = RANGE) {
   const hits = m ? +m[1] : 0, n = m ? +m[2] : notes.length;
   const firsts = first.filter(Boolean).length;
   const firstHits = hitStr ? first.filter((f, i) => f && hitStr[i] === '1').length : null;
+  if (process.env.DEBUG) console.log(JSON.stringify({ notes, hitStr, range, voiceSecs: await page.eval(`window.__mirror.buffer?.duration`), at: await page.eval(`window.__mirror.at`) }));
   console.log(`${label}: ${hits} of ${n} (${Math.round((100 * hits) / Math.max(1, n))}%)` +
     (firstHits == null ? '' : `; first notes of rounds ${firstHits} of ${firsts}`));
   await sleep(300);
@@ -85,7 +86,8 @@ const ARRIVE = 0.09, LATE = 0.2;
 const at = (dt) => (notes) => notes.map((x) => ({ ...x, t: x.t + dt }));
 if (ONLY.includes('a')) {
   console.log('A. sung from silence each round: on the beat, at the measured arrival, late; and three half steps off');
-  for (const [id, level] of [['run5', 1], ['run5', 2], ['run5', 3], ['mum', 1], ['nay', 2], ['ninetone', 3], ['sustain', 1]]) {
+  const IDS = process.env.IDS ? process.env.IDS.split(',') : null;
+  for (const [id, level] of [['run5', 1], ['run5', 2], ['run5', 3], ['mum', 1], ['nay', 2], ['ninetone', 3], ['sustain', 1]].filter(([i]) => !IDS || IDS.includes(i))) {
     await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, notes, tmp), `${id} level ${level} right, on the beat`);
     await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, at(ARRIVE)(notes), tmp), `${id} level ${level} right, ${ARRIVE * 1000} ms after the piano`);
     await run(id, level, (notes) => singNotes(FFMPEG, SOURCE30, STEADY, at(LATE)(notes), tmp), `${id} level ${level} right, ${LATE * 1000} ms after the piano`);

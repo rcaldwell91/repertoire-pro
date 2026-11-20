@@ -24,10 +24,14 @@ const SPAN = 4;          /* seconds across: wide enough for a syllable in a one-
 const NOW_AT = 0.3;
 const GUTTER = 44;
 /** One zoom, the same on every exercise and every round (Robert, 20 Nov:
-    "so singers get used to it and learn to be exact"): this many half
-    steps from the top of the map to the bottom, one spacing between notes
-    everywhere. On a 360 x 740 phone a row is 28 px (the map is 463 px). */
-export const ZOOM = 16;
+    "so singers get used to it and learn to be exact"): one spacing between
+    notes everywhere, this many px from one half step to the next. A map
+    shows as many half steps as its height holds (on a 360 x 740 phone, 14
+    on Mum's, 8 on Match the tone's, which has its readout under it) and
+    follows the notes; it never zooms. Easy to see on a 360-wide phone: the
+    bubbles are 30 px tall. (A fixed 16 half steps a map, first tried, made
+    the spacing 15 to 31 px as the maps' heights differ.) */
+export const ROW_PX = 30;
 /** room kept above the highest and below the lowest note in view, in half steps */
 export const ROOM = 2;
 /** the view moves to a new rung, or follows the notes: this far toward it each second's quarter */
@@ -65,7 +69,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
   });
 
   /* where the view is now (it glides toward the rung being sung) */
-  const view = useRef<{ lo: number; hi: number; at: number; step: number } | null>(null);
+  const view = useRef<{ mid: number; at: number; step: number } | null>(null);
 
   useEffect(() => {
     const cv = ref.current;
@@ -85,6 +89,8 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       const at = now();
+      /* how many half steps this map holds at the one spacing */
+      const ZOOM = Math.max(1, (H - 2 * PAD) / ROW_PX);
       /* the view's target, always ZOOM half steps tall: the notes of the rung
          being sung (the first before it starts, the last after), ROOM
          either side, centred; a rung too tall for that, the notes about to
@@ -126,24 +132,21 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
           thi = Math.ceil(Math.max(...sung)) + ROOM;
         }
       }
-      {
-        const mid = (thi + tlo) / 2;
-        tlo = mid - ZOOM / 2;
-        thi = mid + ZOOM / 2;
-      }
-      /* glide there: the first frame jumps, every later one closes a share of the gap */
+      /* glide the view's middle there: the first frame jumps, every later
+         one closes a share of the gap; its height is always the one
+         spacing, even while the map itself changes size */
+      const target = (thi + tlo) / 2;
       const wall = performance.now() / 1000;
       let v = view.current;
-      if (!v) v = view.current = { lo: tlo, hi: thi, at: wall, step: 0 };
+      if (!v) v = view.current = { mid: target, at: wall, step: 0 };
       else {
         const k = 1 - Math.exp(-(wall - v.at) / GLIDE_SECONDS);
-        const nlo = v.lo + (tlo - v.lo) * k, nhi = v.hi + (thi - v.hi) * k;
-        v.step = Math.max(v.step, Math.abs(nlo - v.lo), Math.abs(nhi - v.hi));
-        v.lo = nlo;
-        v.hi = nhi;
+        const next = v.mid + (target - v.mid) * k;
+        v.step = Math.max(v.step, Math.abs(next - v.mid));
+        v.mid = next;
         v.at = wall;
       }
-      const lo = v.lo, hi = v.hi;
+      const lo = v.mid - ZOOM / 2, hi = v.mid + ZOOM / 2;
       const pad = PAD;
       const rowH = (H - 2 * pad) / (hi - lo);
       const y = (m: number) => pad + ((hi - m) / (hi - lo)) * (H - 2 * pad);
