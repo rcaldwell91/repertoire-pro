@@ -153,6 +153,13 @@ async function openEx(id, range = RANGE) {
   await page.goto(URL_APP + '?load=' + ++loads + '#/train/ex/' + id);
   await page.waitFor(`!!document.querySelector('#ex-start')`, 8000);
 }
+/** Mum at Intermediate, today's 120 a minute, as MUM is sung (Robert, 21 Nov:
+    each exercise opens at its lowest level until another is picked) */
+async function openMum() {
+  await go('/train');
+  await page.eval(`localStorage.setItem('rp.level.mum', '2')`);
+  await openEx('mum');
+}
 /** signed in as the test singer, on this browser */
 async function signIn() {
   await page.goto(URL_APP + '?load=' + ++loads + '#/profile/account');
@@ -328,7 +335,7 @@ try {
     }
     const mum = seen.tone.rows[0];
     const ok = Object.entries(GROUPS).every(([id, n]) => seen[id].title === copy.cats[id] && seen[id].coloured && seen[id].rows.length === n) &&
-      mum === fill(copy.train.tagLineQuiet, { level: copy.levels[1], measure: copy.train.tagPitch }) && seen.range.range === fill(copy.train.rangeIs, { lo: 'G♯3', hi: 'F4' }).replace('G♯3', keyNameOf(RANGE.lo)).replace('F4', keyNameOf(RANGE.hi));
+      mum === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[3] }), measure: copy.train.tagPitch }) && seen.range.range === fill(copy.train.rangeIs, { lo: 'G♯3', hi: 'F4' }).replace('G♯3', keyNameOf(RANGE.lo)).replace('F4', keyNameOf(RANGE.hi));
     check('category', ok, Object.entries(seen).map(([id, v]) => `${v.title} (${v.coloured ? 'in its colour' : 'wrong colour'}): ${v.rows.length} rows`).join('; ') +
       `; Mum's row "${mum}"; the range check's row "${seen.range.range}"`);
   }
@@ -356,7 +363,7 @@ try {
         only on its button, with no mic; the current bar lights and the
         syllable shows under the card; a second tap stops them */
   if (want('preview')) {
-    await openEx('mum');
+    await openMum();
     const v = await page.eval(`({ back: !!document.querySelector('.back'), name: document.querySelector('#ex-name')?.textContent,
       tags: [...document.querySelectorAll('#ex-tags .tag')].map((t) => t.textContent), bars: document.querySelectorAll('#pattern .pdash').length,
       lit: document.querySelectorAll('#pattern .pdash[data-now]').length, syl: document.querySelector('#pattern-syl')?.textContent,
@@ -436,15 +443,15 @@ try {
   /* 2b. The gear's sound sheet: Any octave (off at first, remembered for
          this exercise alone), Count-in sound, Hear yourself and its volume */
   if (want('sound-sheet')) {
-    await openEx('mum');
+    await openMum();
     await page.eval(`Object.keys(localStorage).filter((k) => k.startsWith('rp.anyOctave')).forEach((k) => localStorage.removeItem(k))`);
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     const opened = await page.waitFor(`!!document.querySelector('#sound-sheet')`, 3000);
     const sheet = await page.eval(`({ any: document.querySelector('#sound-sheet #any-octave')?.checked ?? null, count: document.querySelector('#sound-sheet #count-in-sound')?.checked ?? null,
       hear: document.querySelector('#sound-sheet #hear-yourself')?.checked ?? null, vol: document.querySelector('#sound-sheet #monitor-volume')?.value ?? null })`);
     await page.tap('#any-octave');
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     const mumAgain = await page.eval(`document.querySelector('#any-octave')?.checked ?? null`);
     await openEx('mee');
@@ -452,7 +459,7 @@ try {
     const mee = await page.eval(`document.querySelector('#any-octave')?.checked ?? null`);
     await page.tap('#ex-gear');
     const closed = await page.eval(`!document.querySelector('#sound-sheet')`);
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     await page.tap('#any-octave');
     check('sound-sheet', opened && sheet.any === false && sheet.count === true && sheet.hear === false && sheet.vol === '70' && mumAgain === true && mee === false && closed,
@@ -462,7 +469,7 @@ try {
 
   /* 2c. "More about this" opens the old app's why, watch for and care */
   if (want('more-about')) {
-    await openEx('mum');
+    await openMum();
     const before = await page.eval(`!!document.querySelector('#ex-about')`);
     await page.tap('#ex-more');
     const after = await page.waitFor(`!!document.querySelector('#ex-about')`, 3000);
@@ -513,13 +520,13 @@ try {
       await page.waitFor(P('live.size === 0'), 3000);
       return { before: st.slice(0, first).filter(isBeep).length, all: st.filter(isBeep).length };
     };
-    await openEx('mum');
+    await openMum();
     const on = await countIn();
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     await page.tap('#count-in-sound');
     const off = await countIn();
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     const remembered = await page.eval(`document.querySelector('#count-in-sound').checked`);
     await page.tap('#count-in-sound');
@@ -540,7 +547,7 @@ try {
 
   /* 3. Robert, 1 Oct: nothing starts until Start; the 3-2-1 count-in; the controls while singing (28 Oct): Close, Pause, Restart, the gear */
   if (want('start-only')) {
-    await openEx('mum');
+    await openMum();
     await sleep(2000);
     const before = await page.eval(`({ s: window.__probe.started, gum: window.__probe.gum })`);
     await noSinger();
@@ -563,7 +570,7 @@ try {
   /* 3a. On a narrow phone (360 px), every control along the bottom inside the screen (3 Nov) */
   if (want('narrow-controls')) {
     await page.c.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 780, deviceScaleFactor: 2, mobile: true });
-    await openEx('mum');
+    await openMum();
     await noSinger();
     await page.tap('#ex-start');
     await page.waitFor(`!!document.querySelector('#ex-run')`, 3000);
@@ -581,7 +588,7 @@ try {
      place, the round's first note, never a bubble of its own; the white line
      reaching each bubble's start 0.14 s after its note sounded */
   if (want('lead-pause')) {
-    await openEx('mum');
+    await openMum();
     await noSinger();
     await page.eval(`window.__probe.starts.length = 0`);
     await page.tap('#ex-start');
@@ -695,7 +702,7 @@ try {
      first two rounds' first sung note, the line has drawn on the map, and
      nothing has been scored. */
   if (want('lead-line')) {
-    await openEx('mum');
+    await openMum();
     const all = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano)`);
     const leads = all.filter((n) => n[3]).map(([m, t, d]) => ({ m, t, d }));
     const sungAt = all.filter((n) => !n[3]).map((n) => n[1]);
@@ -780,7 +787,7 @@ try {
          the ladder of note names at the left, every bubble with its syllable,
          the current one no bigger, the dots along the bottom one per rung */
   if (want('singing-screen')) {
-    await openEx('mum');
+    await openMum();
     await noSinger();
     await page.tap('#ex-start');
     await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
@@ -829,7 +836,7 @@ try {
 
   /* 4. Sung right, by a real voice: the bubbles fill and the score says so */
   if (want('ladder-sung')) {
-    await openEx('mum');
+    await openMum();
     await singer(sing(MUM));
     await page.tap('#ex-start');
     const shown = await result(exLength(MUM) * 1000 + 12000);
@@ -841,7 +848,7 @@ try {
 
   /* 5. Sung three semitones off: the score says so */
   if (want('ladder-wrong')) {
-    await openEx('mum');
+    await openMum();
     await singer(sing(MUM, { shift: 3 }));
     await page.tap('#ex-start');
     await result(exLength(MUM) * 1000 + 12000);
@@ -852,14 +859,14 @@ try {
   /* 6. An octave down: wrong, octave exact; right with Any octave */
   if (want('any-octave')) {
     const low = sing(MUM, { shift: -12 });
-    await openEx('mum');
+    await openMum();
     await page.eval(`localStorage.removeItem('rp.anyOctave.mum')`);
-    await openEx('mum');
+    await openMum();
     await singer(low);
     await page.tap('#ex-start');
     await result(exLength(MUM) * 1000 + 12000);
     const exact = await scoreOf();
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     await page.tap('#any-octave');
     await page.tap('#ex-gear');
@@ -1035,7 +1042,7 @@ try {
 
   /* 13. Close: silence and the mic closed at once, back to the preview */
   if (want('close')) {
-    await openEx('mum');
+    await openMum();
     await singer(sing(MUM));
     await page.tap('#ex-start');
     await page.waitFor(P('live.size > 0'), 8000);
@@ -1275,7 +1282,7 @@ try {
           lost; the take is the voice of both stretches, saved on the phone */
   let savedTake = null;
   if (want('pause-resume', 'ex-take', 'ex-takes-page')) {
-    await openEx('mum');
+    await openMum();
     await singer(sing(MUM));
     await page.tap('#ex-start');
     await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 20000);
@@ -1328,7 +1335,7 @@ try {
 
   /* 14a'. "Your takes" on the exercise page: the take heard over the exercise's piano notes */
   if (want('ex-takes-page')) {
-    await openEx('mum');
+    await openMum();
     await page.waitFor(`!!document.querySelector('#ex-takes')`, 5000);
     const line = await text('#ex-takes');
     if (line) await page.tap('#ex-takes');
@@ -1354,7 +1361,7 @@ try {
 
   /* 14a''. Restart: from the first repeat, the score cleared */
   if (want('restart')) {
-    await openEx('mum');
+    await openMum();
     await singer(sing(MUM));
     await page.tap('#ex-start');
     await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 20000);
@@ -1375,7 +1382,7 @@ try {
 
   /* 14a'''. The gear while paused: the same sound sheet; what is set there holds when it resumes */
   if (want('pause-gear')) {
-    await openEx('mum');
+    await openMum();
     await noSinger();
     await page.tap('#ex-start');
     await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
@@ -1400,7 +1407,7 @@ try {
       (await page.eval(`+document.querySelector('#bubbles').dataset.now`)) > back.at + 1;
     await page.tap('#ex-close');
     /* the count-in sound back on, as it was */
-    await openEx('mum');
+    await openMum();
     await page.tap('#ex-gear');
     if (!(await page.eval(`document.querySelector('#count-in-sound').checked`))) await page.tap('#count-in-sound');
     check('pause-gear', JSON.stringify(sheet) === JSON.stringify(['any-octave', 'count-in-sound', 'hear-yourself', 'monitor-volume']) && wasOn === true && closed &&
@@ -1699,7 +1706,7 @@ try {
          the takes table with its kind set to exercise, private to the singer */
   if (want('ex-take-offline', 'ex-take-online') && ONLINE) {
     await signIn();
-    await openEx('mum');
+    await openMum();
     await singer(sing(MUM));
     await page.tap('#ex-start');
     await page.waitFor(P('starts.some((x) => x.seconds > 1)'), 12000);
@@ -1788,7 +1795,7 @@ try {
   if (want('menu-everywhere')) {
     const has = () => page.eval(`(() => { const t = document.querySelector('.tabs'); if (!t) return null; const r = t.getBoundingClientRect();
       return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight, on: document.querySelector('#tab-train')?.getAttribute('aria-current') }; })()`);
-    await openEx('mum');
+    await openMum();
     const page1 = await has();
     await page.goto(URL_APP + '?load=' + ++loads + '#/train/routine/quiet/0');
     await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
@@ -1814,7 +1821,7 @@ try {
     const fits = ctrls.every((b) => b && b.l >= 0 && b.r <= 360 && b.b <= tabs.t) && tabs.b <= 740 && during.b <= tabs.t;
     await page.tap('#ex-close');
     /* Mum at 360 x 740: bubbles one row tall, easy to see (Robert, 20 Nov: they replace 16 Nov's 40 px) */
-    await openEx('mum');
+    await openMum();
     await noSinger();
     await page.tap('#ex-start');
     await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 8000);
@@ -1831,7 +1838,7 @@ try {
   /* leaving a running exercise by the menu: the sound and the mic stop at
      once, the rounds sung are kept as a result, and Train opens its list */
   if (want('menu-leave')) {
-    await openEx('mum');
+    await openMum();
     await page.eval(`localStorage.removeItem('rp.results')`);
     const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
     const notes = round.map(([m, t, d]) => ({ m, t, d }));
@@ -1857,7 +1864,7 @@ try {
 
   /* rounds you didn't sing don't count; Close once a round is sung shows the result for the rounds sung */
   if (want('rounds-sung', 'stop-early')) {
-    await openEx('mum');
+    await openMum();
     const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
     const rounds = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.rounds)`);
     const notes = round.map(([m, t, d]) => ({ m, t, d }));
@@ -1874,7 +1881,7 @@ try {
     }
     if (want('stop-early')) {
       /* a fresh page, so the test's voice plays again from the first note */
-      await openEx('mum');
+      await openMum();
       await singer(sing(notes));
       await page.tap('#ex-start');
       await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 20000);
@@ -2180,7 +2187,7 @@ try {
     const { arrivals, spread } = await import('../src/core/timing.ts');
     const out = [];
     for (const late of [0, 0.25]) {
-      await openEx('mum');
+      await openMum();
       /* the voice placed on the piano's notes (the lead notes left out), as the take keeps them */
       const piano = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano).filter((n) => !n[3])`);
       const notes = piano.map(([m, t, d]) => ({ m, t, d }));
@@ -2326,7 +2333,7 @@ try {
     const levelsOk = tags.restnote === fill(copy.train.tagLineQuiet, { level: copy.levels[1], measure: copy.train.tagNone }) &&
       tags.threerun === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[2] }), measure: copy.train.tagPitch }) &&
       tags.bends === fill(copy.train.tagLineQuiet, { level: copy.levels[3], measure: copy.train.tagNone }) &&
-      tags.bwoop === fill(copy.train.tagLine, { level: copy.levels[3], measure: copy.train.tagPitch });
+      tags.bwoop === fill(copy.train.tagLine, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[3] }), measure: copy.train.tagPitch });
     /* Bwoop: "bwoop" in every bubble, from the middle of the range; Note bends: the line shown, nothing filled */
     await openEx('bwoop');
     const bwoopRound = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
