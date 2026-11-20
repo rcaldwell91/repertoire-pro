@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
 import {
   CATEGORIES, EXERCISES, PATTERNS, ROUTINES, DAILY, exercise, measures, ladderNotes, holdNotes, bubbleScore, HOLD_NOTES,
-  MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, notesFor, atLevel, levelsOf, stepsFor, type Exercise,
+  MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, notesFor, atLevel, levelsOf, stepsFor, listed, type Exercise,
   SING_LAG, LEAD_MIN, SHORT_LEN,
 } from './exercises';
 import { DEFAULT_RANGE, rangeFrom, RANGE_POINTS } from './range';
@@ -46,8 +46,9 @@ describe('the exercises, as data', () => {
       tonguecresc: ['tone', 2, false], blah: ['agility', 1, true], yawnsigh: ['tone', 1, true], messa: ['breath', 3, false],
       sustain: ['breath', 1, true], ninetone: ['agility', 2, false], descend: ['range', 1, true], octrep: ['range', 3, false], vfe: ['breath', 1, true],
     };
+    /* as listed: since 21 Nov every scored one is sung at three levels, its own speed the Intermediate */
     for (const [id, [cat, level, quiet]] of Object.entries(old)) {
-      expect(exercise(id), id).toMatchObject({ category: cat, level, quiet });
+      expect(listed(id), id).toMatchObject({ category: cat, level, quiet });
     }
   });
 
@@ -57,7 +58,11 @@ describe('the exercises, as data', () => {
       gee: ['five', 120], staccato: ['arp', 120], wah: ['down3', 100], octleap: ['leap', 100],
       tongueout: ['down5', 110], descend: ['down5', 120], octrep: ['octrep', 112],
     };
-    for (const [id, [pattern, bpm]] of Object.entries(ladders)) expect(exercise(id)?.engine, id).toEqual({ kind: 'ladder', pattern, bpm });
+    /* the old app's speed is the Intermediate level now (Robert, 21 Nov) */
+    for (const [id, [pattern, bpm]] of Object.entries(ladders)) {
+      expect(listed(id)?.engine, id).toEqual({ kind: 'ladder', pattern, bpm });
+      expect(atLevel(exercise(id) as Exercise, 2).engine, id).toEqual({ kind: 'ladder', pattern, bpm });
+    }
     /* the old app's pattern kept as a level: La-Ga's five-note scale, Bratty Nay's octave (Robert, 3 Nov) */
     expect(atLevel(exercise('laga') as Exercise, 2).engine).toEqual({ kind: 'ladder', pattern: 'five', bpm: 132 });
     expect(atLevel(exercise('nay') as Exercise, 2).engine).toEqual({ kind: 'ladder', pattern: 'oct', bpm: 120 });
@@ -66,6 +71,8 @@ describe('the exercises, as data', () => {
     expect(atLevel(exercise('ninetone') as Exercise, 3).engine).toEqual({ kind: 'ladder', pattern: 'nine', bpm: 160 });
     expect(exercise('messa')?.engine).toEqual({ kind: 'hold', secs: 10 });
     expect(exercise('sustain')?.engine).toEqual({ kind: 'hold', secs: 8 });
+    /* a held note keeps its length at every level (21 Nov) */
+    for (const lv of levelsOf(exercise('sustain') as Exercise)) expect(lv.engine).toEqual({ kind: 'hold', secs: 8 });
     /* no set target: your best instead; counts that grow from 4 to 8 (Robert, 4 Nov) */
     expect(exercise('hiss')?.engine).toEqual({ kind: 'timed' });
     expect(exercise('farinelli')?.engine).toEqual({ kind: 'cycle', from: 4, to: 8 });
@@ -78,6 +85,8 @@ describe('the exercises, as data', () => {
     /* on notes, with the microphone (Robert, 4 Nov) */
     expect(exercise('tonguecresc')).toMatchObject({ engine: { kind: 'hold', secs: 8 }, topGap: 5 });
     expect(exercise('blah')).toMatchObject({ engine: { kind: 'ladder', pattern: 'five', bpm: 110 }, lineOnly: true });
+    /* not scored, so one level as before */
+    expect(levelsOf(exercise('blah') as Exercise).length).toBe(1);
   });
 
   it('runs each pattern as the old app did (8063-8075)', () => {
@@ -305,8 +314,10 @@ describe('the timed hiss (9110-9135; Robert, 1 Oct)', () => {
 
 describe('a result, with only what was measured (rp-cloud.js 870-905, rp-score.js)', () => {
   it('a sung exercise: notes hit of notes, and the %', () => {
+    /* with the level it was sung at (Robert, 21 Nov), in the label too, as the table has no column for it */
     expect(resultRow(exercise('mum') as Exercise, { kind: 'pitch', hits: 7, n: 9 })).toEqual(
-      { kind: 'practice', label: 'Mum', app_ex_id: 'mum', score: 7, out_of: 9, pct: 78 });
+      { kind: 'practice', label: 'Mum · Beginner', level: 1, app_ex_id: 'mum', score: 7, out_of: 9, pct: 78 });
+    expect(resultRow(atLevel(exercise('mum') as Exercise, 3), { kind: 'pitch', hits: 7, n: 9 })).toMatchObject({ label: 'Mum · Advanced', level: 3 });
   });
   it('the hiss: the seconds held', () => {
     expect(resultRow(exercise('hiss') as Exercise, { kind: 'time', seconds: 12.34 })).toEqual(
@@ -314,8 +325,11 @@ describe('a result, with only what was measured (rp-cloud.js 870-905, rp-score.j
       { kind: 'practice', label: 'Steady hiss', app_ex_id: 'hiss', score: 12, seconds: 12.3 });
   });
   it('anything not measured: that it was done, and no number', () => {
-    expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.straw.name, app_ex_id: 'straw' });
-    expect(resultRow(exercise('mum') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Mum', app_ex_id: 'mum' });
+    expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.straw.name + ' · Beginner', level: 1, app_ex_id: 'straw' });
+    expect(resultRow(exercise('mum') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Mum · Beginner', level: 1, app_ex_id: 'mum' });
+    /* one with no levels: its name alone */
+    expect(resultRow(exercise('hum') as Exercise, { kind: 'none' })).toMatchObject({ label: copy.ex.hum.name + ' · Beginner' });
+    expect(resultRow(exercise('yawnsigh') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.yawnsigh.name, app_ex_id: 'yawnsigh' });
   });
 });
 
@@ -474,7 +488,7 @@ describe('the content round (Robert, 28 Oct)', () => {
       arp19: ['range', 3, [0, 4, 7, 12, 16, 19, 16, 12, 7, 4, 0], ['nay']],
     };
     for (const [id, [cat, level, deg, syls]] of Object.entries(want)) {
-      expect(exercise(id), id).toMatchObject({ category: cat, level });
+      expect(listed(id), id).toMatchObject({ category: cat, level });
       const r = rung(id);
       expect(r.map((n) => n.m - r[0].m + deg[0]), id).toEqual(deg);
       expect([...new Set(r.map(sylOf))], id).toEqual(syls);
@@ -525,7 +539,12 @@ describe('the 3 Nov Train update', () => {
     /* the rest with levels are the runs, the nine-tone scale, the twisters and Match the note (4 Nov), and Tongue trill (16 Nov); the others have one */
     const many = ['laga', 'nay', 'straw', 'liptrill', 'ninetone', 'run5', 'minor5', 'penta', 'chrom', 'turns', 'redleather', 'uniqueny', 'peterpiper',
       'lipstongue', 'match', 'tonguetrill', 'threerun', 'matchtone'];
-    for (const e of EXERCISES) if (!many.includes(e.id)) expect(levelsOf(e).length, e.id).toBe(1);
+    /* since 21 Nov every other scored one has three (Hold the note two), each its band; the rest one */
+    for (const e of EXERCISES) {
+      if (many.includes(e.id)) continue;
+      const scoredOne = measures(e) === 'pitch' && e.engine.kind !== 'interval';
+      expect(levelsOf(e).length, e.id).toBe(!scoredOne ? 1 : e.engine.kind === 'steady' ? 2 : 3);
+    }
     expect(levelsOf(exercise('match') as Exercise).map((x) => x.engine)).toEqual([{ kind: 'match', mode: 'wait' }, { kind: 'match', mode: 'window' },
       { kind: 'match', mode: 'blind' }]);
     /* Match the tone (Robert, 20 Nov): like Match the note, in order, then at random */
@@ -553,7 +572,9 @@ describe('the 3 Nov Train update', () => {
     expect(at('intermediate', 'ninetone')).toBe('nine@130');
     expect(at('advanced', 'ninetone')).toBe('nine@160');
     expect(at('daily', 'match')).toBe('match');
-    expect(atLevel(exercise('mum') as Exercise, 3).engine).toEqual(exercise('mum')?.engine);
+    /* Mum: three levels since 21 Nov, a notch slower and faster round its own 120 */
+    expect(atLevel(exercise('mum') as Exercise, 3).engine).toEqual({ kind: 'ladder', pattern: 'five', bpm: 144 });
+    expect(at('daily', 'mum')).toBe('five@96');
   });
 
   it('its climbing exercises go up a half step every round, however many; the rest keep the old app\'s 14', () => {
@@ -581,7 +602,7 @@ describe('the 3 Nov Train update', () => {
   it('the six new ones, in their groups, levels and places in the lists', () => {
     const want: Record<string, [string, number, boolean]> = { posture: ['warmup', 1, false], tensioncheck: ['warmup', 1, true],
       cheekpuffs: ['warmup', 1, true], chewhum: ['warmup', 1, true], tonguefwd: ['warmup', 2, true], brighta: ['tone', 2, false] };
-    for (const [id, [cat, level, quiet]] of Object.entries(want)) expect(exercise(id), id).toMatchObject({ category: cat, level, quiet });
+    for (const [id, [cat, level, quiet]] of Object.entries(want)) expect(listed(id), id).toMatchObject({ category: cat, level, quiet });
     const list = (cat: string) => EXERCISES.filter((e) => e.category === cat).map((e) => e.id);
     expect(list('warmup')).toEqual(['posture', 'neckrelease', 'tensioncheck', 'restnote', 'liptrill', 'buzz', 'raspberry', 'tonguetrill', 'straw', 'cheekpuffs',
       'chewhum', 'hum', 'tonguefwd', 'siren']);
@@ -590,14 +611,14 @@ describe('the 3 Nov Train update', () => {
     expect(EXERCISES.length).toBe(62);
     expect(list('pitch')).toEqual(['match', 'interval', 'holdnote', 'threestep', 'matchtone']);
     expect(exercise('neckrelease')).toMatchObject({ category: 'warmup', level: 1, quiet: true, engine: { kind: 'guided', mins: 1 } });
-    expect(exercise('threestep')).toMatchObject({ category: 'pitch', level: 1, quiet: true, everyStep: true, engine: { kind: 'ladder', pattern: 'three', bpm: 110 } });
+    expect(listed('threestep')).toMatchObject({ category: 'pitch', level: 1, quiet: true, everyStep: true, engine: { kind: 'ladder', pattern: 'three', bpm: 110 } });
     expect(exercise('matchtone')).toMatchObject({ category: 'pitch', level: 1, quiet: true, engine: { kind: 'tone', mode: 'order' } });
     expect(exercise('matchtone')?.lineOnly).toBeUndefined();
     expect(copy.ex.matchtone.need).toBe('Headphones.');
     expect(exercise('posture')?.engine).toEqual({ kind: 'guided', mins: 1 });
     expect(measures(exercise('posture') as Exercise)).toBe('none');
-    for (const id of ['cheekpuffs', 'tensioncheck']) expect(exercise(id)?.engine).toMatchObject({ pattern: 'three', bpm: 110 });
-    for (const id of ['chewhum', 'tonguefwd', 'brighta']) expect(exercise(id)?.engine).toMatchObject({ pattern: 'five', bpm: 110 });
+    for (const id of ['cheekpuffs', 'tensioncheck']) expect(listed(id)?.engine).toMatchObject({ pattern: 'three', bpm: 110 });
+    for (const id of ['chewhum', 'tonguefwd', 'brighta']) expect(listed(id)?.engine).toMatchObject({ pattern: 'five', bpm: 110 });
     expect(copy.ex.brighta.syl).toBe('a');
   });
 

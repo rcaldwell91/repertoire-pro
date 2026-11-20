@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { copy, fill } from './copy';
 import {
-  EXERCISES, PATTERNS, ROUTINES, atLevel, bubbleScore, exercise, ladderNotes, levelsOf, measures, rightFor, rungStarts, stepsFor, SHORT_NEED,
+  EXERCISES, PATTERNS, ROUTINES, atLevel, bubbleScore, exercise, ladderNotes, levelsOf, listed, measures, rightFor, rungStarts, stepsFor, SHORT_NEED,
   type Exercise, type Level,
 } from './exercises';
 import { REST_DONE, REST_MIN, restNote, restSlides } from './rest';
@@ -27,7 +27,8 @@ describe('four new exercises (Robert, 16 Nov), none in a routine', () => {
     expect(list('range').indexOf('bwoop')).toBe(list('range').indexOf('descend') + 1);
     expect(ex('restnote')).toMatchObject({ category: 'warmup', level: 1, quiet: true, engine: { kind: 'glide', rest: true } });
     expect(ex('bends')).toMatchObject({ category: 'agility', level: 3, lineOnly: true, everyStep: true, engine: { kind: 'ladder', pattern: 'bend', bpm: 100 } });
-    expect(ex('bwoop')).toMatchObject({ category: 'range', level: 3, quiet: false, shortNotes: true, fromMiddle: true, everyStep: true,
+    /* as listed; since 21 Nov sung at three levels, 120 its Intermediate */
+    expect(listed('bwoop')).toMatchObject({ category: 'range', level: 3, quiet: false, shortNotes: true, fromMiddle: true, everyStep: true,
       engine: { kind: 'ladder', pattern: 'five', bpm: 120 } });
     expect(levelsOf(ex('threerun')).map((l) => [l.level, l.engine])).toEqual([[1, { kind: 'ladder', pattern: 'threerun', bpm: 100 }],
       [2, { kind: 'ladder', pattern: 'threerun', bpm: 130 }]]);

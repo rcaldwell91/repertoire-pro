@@ -8,10 +8,11 @@ import { foldTo } from './notemap.ts';
     when "Any octave" is on) */
 export const RIGHT_WITHIN = 0.5;
 
-export function isRight(m: number, singer: number, anyOctave: boolean): boolean {
+/** `within`: the band at an exercise's level (core/exercises BANDS); a song's takes use RIGHT_WITHIN */
+export function isRight(m: number, singer: number, anyOctave: boolean, within = RIGHT_WITHIN): boolean {
   if (!Number.isFinite(m) || !Number.isFinite(singer)) return false;
   const you = anyOctave ? foldTo(m, singer) : m;
-  return Math.abs(you - singer) < RIGHT_WITHIN;
+  return Math.abs(you - singer) < within;
 }
 
 /** the singer's note at time t, if they are singing then */

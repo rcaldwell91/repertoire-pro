@@ -116,7 +116,7 @@ describe('short notes (Robert, 20 Nov: "the piano notes ring on"; "the bubbles s
       expect(notes.every((n) => n.d <= SHORT_LEN + 1e-9), id).toBe(true);
       expect(played.filter((n) => !n.lead).every((n) => n.d <= SHORT_LEN + 1e-9), id).toBe(true);
     }
-    expect(ladderNotes(ex('mum'), range).notes[0].d).toBeCloseTo(0.5, 9);
+    expect(ladderNotes(atLevel(ex('mum'), 2), range).notes[0].d).toBeCloseTo(0.5, 9);
   });
   it('Bwoop is still "bwoop", scored by the short-note rule', () => {
     expect(copy.ex.bwoop.syl).toBe('bwoop');

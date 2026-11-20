@@ -40,7 +40,9 @@ export const GLIDE_SECONDS = 0.25;
     "a singer will think anywhere inside counts"): within half a half step
     either side of its note (core/takes RIGHT_WITHIN), one row at this
     zoom, never more; a line through it marks the note itself. This
-    replaces 16 Nov's "at least 40 px". */
+    replaces 16 Nov's "at least 40 px". Robert, 21 Nov: each level has its
+    own band (core/exercises BANDS), and the bubble is drawn as exactly that
+    (the `within` given); this is Intermediate's, today's. */
 export const BAND = 2 * RIGHT_WITHIN;
 /** the map's own margin above the top row and below the bottom one, in px:
     enough for half a note name (16 Nov: 14 before, the room given to the rows) */
@@ -61,7 +63,9 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       rung's line and fill are hidden, then they appear as the note plays again */
   reveal?: readonly number[];
   /** your line not shown at all, until this is false (Match the tone at Advanced, Robert 20 Nov) */
-  hideYou?: boolean }) {
+  hideYou?: boolean;
+  /** the band that counts at the exercise's level, half of it either side of the note (Robert, 21 Nov) */
+  within?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   useEffect(() => {
@@ -76,7 +80,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
     if (!cv) return;
     let raf = 0;
     const draw = () => {
-      const { notes, you, now, anyOctave, colour, heard, scored = true, reveal, hideYou } = propsRef.current;
+      const { notes, you, now, anyOctave, colour, heard, scored = true, reveal, hideYou, within = RIGHT_WITHIN } = propsRef.current;
       const css = getComputedStyle(cv);
       const dpr = window.devicePixelRatio || 1;
       const W = cv.clientWidth, H = cv.clientHeight;
@@ -179,7 +183,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       g.clip();
       /* the bubbles: the share sung on the note filled green, every
          syllable inside, the one to sing now bigger with a white ring */
-      const score = bubbleScore(notes, you.t, you.m, 0.05, anyOctave);
+      const score = bubbleScore(notes, you.t, you.m, 0.05, anyOctave, within);
       /* a hidden try: its rung's notes and line are not shown until it is revealed */
       const starts0 = rungStarts(notes);
       const rungOf = (i: number) => {
@@ -197,7 +201,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         return k >= 0 && hiddenNote(k);
       };
       let hiddenPts = 0;
-      const h = rowH * BAND;
+      const h = rowH * 2 * within;
       const tint = css.getPropertyValue('--' + colour).trim();
       let current = -1, visible = 0, labelled = 0, outside = 0, crossed = 0, nowH = h;
       const bubble = (n: Note, i: number, isNow: boolean) => {
@@ -323,6 +327,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.labelled = String(labelled);
       cv.dataset.names = String(names);
       cv.dataset.bubble = h.toFixed(1);
+      cv.dataset.within = within.toFixed(2);
       cv.dataset.row = rowH.toFixed(1);
       cv.dataset.nowBubble = nowH.toFixed(1);
       cv.dataset.zoom = (hi - lo).toFixed(2);

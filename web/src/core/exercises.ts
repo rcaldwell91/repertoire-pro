@@ -1,6 +1,6 @@
 import { copy } from './copy';
 import { keyName, type Range } from './notemap';
-import { isRight } from './takes';
+import { isRight, RIGHT_WITHIN } from './takes';
 import { TONE_LEAD, TONE_NOTES, TONE_SECS } from './pitch';
 
 /* The Train tab's exercises, as data (RULEBOOK 2.6: the old app is the
@@ -142,6 +142,9 @@ export interface Exercise {
   readonly shortNotes?: boolean;
   /** starts in the middle of the range and climbs to the top (Bwoop, Robert 16 Nov) */
   readonly fromMiddle?: boolean;
+  /** the band that counts at the level picked: half its height either side
+      of the note (Robert, 21 Nov; BANDS); set by atLevel */
+  readonly within?: number;
 }
 
 const ex = (id: Exercise['id'], category: CategoryId, level: Level, quiet: boolean, engine: Engine, sylsBy: SylsBy = 'note'): Exercise =>
@@ -159,7 +162,7 @@ const speeds = (bpms: ReadonlyArray<readonly [Level, number]>, pattern: PatternI
 
 /* In each group's order (Robert's 4 Nov review): the list on Train is this
    array, a group at a time. */
-export const EXERCISES: readonly Exercise[] = [
+const LISTED: readonly Exercise[] = [
   /* Warm-up: the body first (posture, then the neck and shoulders), then the tension check */
   ex('posture', 'warmup', 1, false, guided(1)),
   ex('neckrelease', 'warmup', 1, true, guided(1)),
@@ -254,6 +257,38 @@ export const EXERCISES: readonly Exercise[] = [
     { level: 3, engine: { kind: 'tone', mode: 'hidden' } }]),
 ];
 
+/** A speed notch (Robert, 21 Nov, after his 28 Oct note: Beginner one
+    notch slower, Advanced one notch faster): a fifth of the speed either
+    way, the middle of the steps Train's own speed levels already take
+    (100 to 130 to 160 on the runs, 23 to 30%; the tongue twisters' 100 for
+    today's 110 to 120, 9 to 17%). */
+export const NOTCH = 0.2;
+/** Every scored exercise is something to level up on (Robert, 21 Nov): one
+    with a single level gets all three, each its own band (BANDS) and, on a
+    pattern sung to the piano, its own speed: Beginner a notch slower,
+    Intermediate today's, Advanced a notch faster. A held note keeps its
+    length (a longer hold is harder, not easier), so its levels are the band
+    alone; Hold the note gets no Advanced (BANDS: none narrower passes real
+    held notes). One with levels already keeps them; its band comes on top
+    (atLevel). Sing the interval's level is its own (its shapes, Robert
+    28 Oct), and its band goes with it. Exercises that aren't scored stay
+    as they are. Each starts at its lowest level, as levels do today. */
+function everyLevel(e: Exercise): Exercise {
+  if (e.levels || e.lineOnly || e.engine.kind === 'interval' || measures(e) !== 'pitch') return e;
+  const en = e.engine;
+  const at = (level: Level, engine: Engine) => ({ level, engine });
+  const levels = en.kind === 'ladder'
+    ? [at(1, ladder(en.pattern, Math.round(en.bpm * (1 - NOTCH)))), at(2, en), at(3, ladder(en.pattern, Math.round(en.bpm * (1 + NOTCH))))]
+    : en.kind === 'steady' ? [at(1, en), at(2, en)] : [at(1, en), at(2, en), at(3, en)];
+  return { ...e, level: 1, engine: levels[0].engine, levels };
+}
+export const EXERCISES: readonly Exercise[] = LISTED.map(everyLevel);
+/** an exercise as listed, before everyLevel: its own level and speed,
+    which became its Intermediate (the old app's, where it had one) */
+export function listed(id: string): Exercise | undefined {
+  return LISTED.find((e) => e.id === id);
+}
+
 export function exercise(id: string): Exercise | undefined {
   return EXERCISES.find((e) => e.id === id);
 }
@@ -276,7 +311,35 @@ export function levelsOf(e: Exercise): ReadonlyArray<{ level: Level; engine: Eng
 export function atLevel(e: Exercise, level: Level): Exercise {
   const all = levelsOf(e);
   const pick = [...all].reverse().find((x) => x.level <= level) ?? all[0];
-  return { ...e, level: pick.level, engine: pick.engine };
+  const at = { ...e, level: pick.level, engine: pick.engine };
+  return { ...at, within: bandAt(at, pick.level) };
+}
+
+/** The band that counts at each level (Robert, 21 Nov: "the level sets how
+    exact you have to be ... what the singer sees is what's scored"), half
+    of it either side of the note, in half steps. From 296 notes held 0.3 s
+    or more by two real singers (tests/bands.mjs):
+    - notes (a bubble counts with half its time on the note): Intermediate
+      is today's half a half step. Beginner 0.65: no note sung a half step
+      off counts up to 0.7 (1.7% do at 0.75), so one step inside that.
+      Advanced 0.35: 97% of real held notes still count (99.7% at 0.5;
+      93% at 0.3, 81% at 0.25), and all 53 held 0.8 s or more.
+    - holds (Hold the note and Match the tone: 70% of the hold within):
+      Intermediate is today's 0.35. Beginner 0.5: every real note held
+      0.8 s or more counts, and none a half step off up to 0.75. No
+      narrower Advanced: at 0.35 only 64% of those real held notes count
+      (their vibrato), so Advanced keeps 0.35 (Robert: a level that can't
+      pass doesn't ship). */
+export const BANDS = {
+  notes: { 1: 0.65, 2: RIGHT_WITHIN, 3: 0.35 },
+  holds: { 1: 0.5, 2: 0.35, 3: 0.35 },
+} as const satisfies Record<string, Record<Level, number>>;
+export function bandAt(e: Exercise, level: Level): number {
+  return (e.engine.kind === 'steady' || e.engine.kind === 'tone' ? BANDS.holds : BANDS.notes)[level];
+}
+/** an exercise's band: its level's (atLevel), or today's at its own level */
+export function bandOf(e: Exercise): number {
+  return e.within ?? bandAt(e, e.level);
 }
 
 /** what the app can measure about it, and so all it will say (7672-7684) */
@@ -510,7 +573,7 @@ const ms = (s: number) => Math.round(s * 1000);
     run of the pattern, a held note, a turn) counts once your voice was
     heard on any of its notes, and then a silent note in it is a miss. A
     round with no voice on any note is left out of the score. */
-export function bubbleScore(notes: readonly Note[], t: ArrayLike<number>, m: ArrayLike<number>, hop: number, anyOctave: boolean):
+export function bubbleScore(notes: readonly Note[], t: ArrayLike<number>, m: ArrayLike<number>, hop: number, anyOctave: boolean, within = RIGHT_WITHIN):
   { fill: number[]; hit: boolean[]; hits: number; n: number; sung: boolean; counted: boolean[]; rounds: { sung: number; of: number } } {
   const fill = notes.map(() => 0);
   const heard = notes.map(() => false);
@@ -525,7 +588,7 @@ export function bubbleScore(notes: readonly Note[], t: ArrayLike<number>, m: Arr
       if (at >= ms(n.t) && at < ms(n.t + n.d)) {
         heard[k] = true;
         heardFor[k] += hop;
-        if (isRight(m[i], n.m, anyOctave)) {
+        if (isRight(m[i], n.m, anyOctave, within)) {
           onFor[k] += hop;
           fill[k] += hop / (n.need ?? n.d * HIT_SHARE) * HIT_SHARE;
         }

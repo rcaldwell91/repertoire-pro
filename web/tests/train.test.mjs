@@ -34,7 +34,7 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'last-hold', 'one-zoom', 'short-piano', 'singing-screen',
+const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'lead-line', 'levels', 'last-hold', 'one-zoom', 'short-piano', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'pause-resume', 'ex-take', 'ex-takes-page', 'restart', 'pause-gear', 'pause-others',
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
@@ -630,6 +630,90 @@ try {
       `the last hold let go at ${last.toFixed(1)} s; the run ended ${ran.toFixed(1)} s after the first piano note (its recording alone runs out about 5 s sooner)`);
   }
 
+  /* Robert, 21 Nov: the level sets how exact and how fast. Mum, which had
+     one level: three in the gear, remembered; at Beginner its bubbles 1.3
+     rows tall and a notch slower (96 a minute), at Advanced 0.7 rows and a
+     notch faster (144); sung right at Advanced by a real voice, it counts,
+     and the result says the level and keeps it. Hold the note's bubble is
+     its own band (0.35 either side at Intermediate), what it scores. */
+  if (want('levels')) {
+    const look = async (id, level) => {
+      await go('/train');
+      await page.eval(`localStorage.setItem('rp.level.${id}', '${level}')`);
+      await openEx(id);
+      const piano = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano).filter((n) => !n[3])`);
+      return { piano, beat: +(piano[1][1] - piano[0][1]).toFixed(3) };
+    };
+    await go('/train');
+    await page.eval(`localStorage.removeItem('rp.level.mum')`);
+    await openEx('mum');
+    await page.tap('#ex-gear');
+    const options = await page.eval(`[...document.querySelectorAll('#jump-level .choice')].map((b) => b.textContent + (b.getAttribute('aria-checked') === 'true' ? '*' : ''))`);
+    await page.tap('#level-3');
+    const kept = await page.eval(`localStorage.getItem('rp.level.mum')`);
+    const seen = {};
+    for (const level of [1, 3]) {
+      const { piano, beat } = await look('mum', level);
+      await noSinger();
+      await page.tap('#ex-start');
+      await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
+      const d = await page.eval(`(() => { const x = document.querySelector('#bubbles').dataset; return { bubble: +x.bubble, row: +x.row, within: +x.within }; })()`);
+      await page.tap('#ex-close');
+      seen[level] = { beat, ...d, piano };
+    }
+    /* sung right at Advanced, at the arrival a singer's takes show */
+    await look('mum', 3);
+    await singer(sing(seen[3].piano.map(([m, t, d]) => ({ m, t: t + 0.09, d }))));
+    await page.tap('#ex-start');
+    await result(exLength(seen[3].piano.map(([m, t, d]) => ({ m, t, d }))) * 1000 + 15000);
+    const sc = await scoreOf();
+    const said = await text('#ex-level');
+    const row = await page.eval(`JSON.parse(localStorage.getItem('rp.results') || '[]').find((r) => r.app_ex_id === 'mum')`);
+    /* Hold the note at Intermediate: the bubble is the 0.35 band it scores */
+    await go('/train');
+    await page.eval(`localStorage.setItem('rp.level.holdnote', '2')`);
+    await openEx('holdnote');
+    await noSinger();
+    await page.tap('#ex-start');
+    await page.waitFor(`+(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
+    const hold = await page.eval(`(() => { const x = document.querySelector('#bubbles').dataset; return { bubble: +x.bubble, row: +x.row, within: +x.within }; })()`);
+    await page.tap('#ex-close');
+    for (const id of ['mum', 'holdnote']) await page.eval(`localStorage.removeItem('rp.level.${id}')`);
+    const near = (a, b) => Math.abs(a - b) <= 0.15;
+    check('levels', options.join('|') === 'Beginner*|Intermediate|Advanced' && kept === '3' &&
+      seen[1].beat === 0.625 && near(seen[1].bubble, seen[1].row * 1.3) && Math.abs(seen[3].beat - 60 / 144) < 0.002 && near(seen[3].bubble, seen[3].row * 0.7) &&
+      !!sc && sc.hits >= sc.n * 0.85 && said === 'Sung at Advanced' && row?.level === 3 && row?.label === 'Mum · Advanced' &&
+      near(hold.within, 0.35) && near(hold.bubble, hold.row * 0.7),
+      `the gear offers ${options.join(', ')}, Advanced picked and kept ${kept === '3'}; Beginner: a beat ${seen[1].beat} s, bubbles ${seen[1].bubble} px on ${seen[1].row} px rows; ` +
+      `Advanced: a beat ${seen[3].beat} s, bubbles ${seen[3].bubble} px; sung right at Advanced ${sc ? sc.hits + ' of ' + sc.n : '-'}, the result says "${said}", kept as ${row?.label} (level ${row?.level}); ` +
+      `Hold the note at Intermediate: bubbles ${hold.bubble} px on ${hold.row} px rows`);
+  }
+
+  /* Robert, 21 Nov: the lead note isn't scored, but the singer's line draws
+     while it plays, so the note can be found before the round starts. A
+     real voice sings each lead note and nothing else: before each of the
+     first two rounds' first sung note, the line has drawn on the map, and
+     nothing has been scored. */
+  if (want('lead-line')) {
+    await openEx('mum');
+    const all = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano)`);
+    const leads = all.filter((n) => n[3]).map(([m, t, d]) => ({ m, t, d }));
+    const sungAt = all.filter((n) => !n[3]).map((n) => n[1]);
+    /* each round's first sung note: the first piano note after each lead */
+    const firstSung = leads.map((l) => sungAt.find((t) => t >= l.t + l.d - 1e-6));
+    await singer(sing(leads.map((l) => ({ ...l, t: l.t + 0.05, d: l.d - 0.1 }))));
+    await page.eval(`window.__seen = []; (function tick() { const c = document.querySelector('#bubbles'); if (c) window.__seen.push({ now: +c.dataset.now, you: +c.dataset.you, hits: +c.dataset.hits }); requestAnimationFrame(tick); })()`);
+    await page.tap('#ex-start');
+    await page.waitFor(`(window.__seen || []).some((x) => x.now > ${(firstSung[1] ?? 0) + 0.2})`, 20000);
+    const seen = await page.eval(`window.__seen`);
+    await page.tap('#ex-close');
+    /* the line drawn by the end of each of the first two leads (just before its round's first note), and drawn more during the second */
+    const by = (t) => seen.filter((x) => x.now < t - 0.05).pop() ?? { you: 0, hits: 0 };
+    const r1 = by(firstSung[0]), endR1 = by(leads[1].t), r2 = by(firstSung[1]);
+    check('lead-line', r1.you > 0 && r2.you > endR1.you && r1.hits === 0,
+      `a real voice singing only the lead notes: ${r1.you} points of the line drawn before round 1's first note, ${r2.you - endR1.you} more during round 2's lead; scored by then: ${r1.hits}`);
+  }
+
   /* Robert, 20 Nov: one zoom everywhere, the same on every exercise and
      every round; a round too tall for it is followed, never zoomed; the
      bubbles exactly the band that counts. Five-note scales, the octave,
@@ -645,7 +729,7 @@ try {
       await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
       const look = [];
       for (let k = 0; k < 8; k++) {
-        look.push(await page.eval(`(() => { const d = document.querySelector('#bubbles').dataset; return { lo: +d.viewLo, hi: +d.viewHi, zoom: +d.zoom, bubble: +d.bubble, row: +d.row, now: +d.now,
+        look.push(await page.eval(`(() => { const d = document.querySelector('#bubbles').dataset; return { lo: +d.viewLo, hi: +d.viewHi, zoom: +d.zoom, bubble: +d.bubble, row: +d.row, within: +d.within, now: +d.now,
           map: document.querySelector('#bubbles').getBoundingClientRect().height }; })()`));
         await sleep(450);
       }
@@ -657,7 +741,8 @@ try {
     const all = views.flatMap((v) => v.look);
     /* one spacing between notes: 30 px a half step on every map, whatever its height */
     const oneZoom = all.every((v) => Math.abs(v.row - 30) <= 0.3);
-    const bands = all.every((v) => Math.abs(v.bubble - v.row) <= 0.15);
+    /* each bubble the band at its level (Robert, 21 Nov): 2 x within rows tall */
+    const bands = all.every((v) => Math.abs(v.bubble - v.row * 2 * v.within) <= 0.15);
     /* the biggest pattern: the view moves to follow it */
     const big = views.find((v) => v.id === 'arp19').look;
     const follows = Math.max(...big.map((v) => v.lo)) - Math.min(...big.map((v) => v.lo)) >= 1;
@@ -727,7 +812,7 @@ try {
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
     /* each bubble exactly the band that counts: one row, within half a half step either side; the current one no taller */
     /* the line at each note broken around a syllable inside it, so no word looks crossed out */
-    const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +n.current >= 0 && +n.nowBubble === +n.bubble && +a.crossed === 0 && +c.crossed === 0;
+    const band = Math.abs(+a.bubble - +a.row * 2 * +a.within) <= 0.15 && +n.current >= 0 && +n.nowBubble === +n.bubble && +a.crossed === 0 && +c.crossed === 0;
     /* at 30 px a row there is room for every white key's name: as many names as white keys in view */
     let whites = 0;
     for (let m = Math.ceil(+a.viewLo); m <= Math.floor(+a.viewHi); m++) if (![1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12)) whites++;
@@ -1733,11 +1818,11 @@ try {
     await noSinger();
     await page.tap('#ex-start');
     await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 8000);
-    const narrow = await page.eval(`({ bubble: +document.querySelector('#bubbles').dataset.bubble, row: +document.querySelector('#bubbles').dataset.row })`);
+    const narrow = await page.eval(`({ bubble: +document.querySelector('#bubbles').dataset.bubble, row: +document.querySelector('#bubbles').dataset.row, within: +document.querySelector('#bubbles').dataset.within })`);
     await page.tap('#ex-close');
     await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     check('menu-everywhere', !!page1 && !!step && !!takesPage && page1.on === 'page' && fits && before && during && before.h === during.h && before.t === during.t &&
-      Math.abs(narrow.bubble - narrow.row) <= 0.15 && narrow.bubble >= 24 && Math.abs(strawBubble - narrow.bubble) <= 0.15,
+      Math.abs(narrow.bubble - narrow.row * 2 * narrow.within) <= 0.15 && narrow.bubble >= 20 && Math.abs(strawBubble - narrow.bubble) <= 0.15,
       `the menu on an exercise page ${!!page1} (Train lit ${page1?.on}), a routine step ${!!step}, an exercise's takes ${!!takesPage}; ` +
       `at 360 px singing: the controls and the cue inside and above the menu ${fits}; the map ${before?.h} px before the count-in, ${during?.h} px singing, ` +
       `the same place ${before?.t === during?.t}; Mum's bubbles at 360 x 740 ${narrow.bubble} px on ${narrow.row} px rows, Straw's ${strawBubble} px`);

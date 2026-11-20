@@ -4,7 +4,7 @@ import type { SyntheticEvent } from 'react';
 import { Settings } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
-  CATEGORIES, ROUTINES, atLevel, bubbleScore, exercise, firstRung, levelsOf, measures, nextInGroup, notesFor, rungAt, rungStarts,
+  CATEGORIES, ROUTINES, atLevel, bandAt, bandOf, bubbleScore, exercise, firstRung, levelsOf, measures, nextInGroup, notesFor, rungAt, rungStarts,
   rightFor, stepsFor, type Exercise, type Level, type Note, type RoutineId,
 } from '../core/exercises';
 import { keyName, type Range } from '../core/notemap';
@@ -17,7 +17,7 @@ import {
 import { isRight } from '../core/takes';
 import { cueFor, pickReminder, SPOTS, type Spot } from '../core/tension';
 import { clock as clockText } from '../core/time';
-import { resultRow, type Outcome } from '../core/results';
+import { hasLevels, levelOfRow, resultRow, type Outcome } from '../core/results';
 import { cycleAt, SoundClock } from '../core/timed';
 import { restSlides, type Slide } from '../core/rest';
 import type { Plan, Take } from '../audio/conductor/conductor';
@@ -146,6 +146,11 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     setLevelNow(v);
     setJumpLevel(v);
   };
+  /* the band that counts at this level (Robert, 21 Nov), drawn as each bubble;
+     Sing the interval's goes with its own level */
+  const within = kind === 'interval' ? bandAt(e, level) : bandOf(e);
+  /* the level it is sung at, shown on the result and kept with it */
+  const sungLevel: Level = kind === 'interval' ? level : e.level;
   const [seed] = useState(() => Math.random());
   const plan = useMemo<{ notes: Note[]; played: Note[]; beat: number; labels?: readonly string[]; shapes?: ReadonlyArray<{ id: string; down: boolean }>;
     reveal?: readonly number[]; pattern?: Note[] }>(() => {
@@ -234,11 +239,12 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   useEffect(() => {
     let live = true;
     if (kind === 'timed' || kind === 'vfe') void bestHiss().then((b) => live && setBestBefore(b));
-    if (kind === 'match') void myResults('match').then((rs) => live && setLastLands(rs.filter((r) => r.cents != null).slice(0, 3)));
+    /* last time at this same level only (Robert, 21 Nov) */
+    if (kind === 'match') void myResults('match').then((rs) => live && setLastLands(rs.filter((r) => r.cents != null && levelOfRow(r) === e.level).slice(0, 3)));
     return () => {
       live = false;
     };
-  }, [kind]);
+  }, [kind, e.level]);
   const readDays = () => void myResults('vfe').then((rs) => {
     const by = new Map<string, number>();
     for (const r of rs) {
@@ -292,7 +298,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     const out: Outcome = noMic ? { kind: 'none' } : o;
     setShown({ o: out, noMic, where: null, ...extra });
     setView('result');
-    const where = await saveResult(resultRow(e, out));
+    const where = await saveResult(resultRow(e, out, sungLevel));
     setShown((s) => (s ? { ...s, where } : s));
     if (kind === 'vfe') readDays();
   };
@@ -324,7 +330,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
      rounds you didn't sing don't count), and how each try landed on Match
      the note. The line shown but not scored measures nothing (3 Nov). */
   function sungOutcome(): Outcome {
-    const s = bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave);
+    const s = bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave, within);
     if (!s.sung || e.lineOnly || !s.n) return { kind: 'none' };
     const rounds = s.rounds.sung < s.rounds.of ? s.rounds : undefined;
     if (kind !== 'match') return { kind: 'pitch', hits: s.hits, n: s.n, rounds };
@@ -355,7 +361,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   }
   /* whether any round has been sung yet: Close then shows what was (13 Nov) */
   function anyRoundSung(): boolean {
-    if (sung) return bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave).rounds.sung > 0;
+    if (sung) return bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave, within).rounds.sung > 0;
     if (inParts) return partRes.some((x, i) => i < partAt + (partDone ? 1 : 0) && x !== undefined);
     return false;
   }
@@ -459,13 +465,13 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
         if (at >= lead + p.secs) {
           /* Match the tone, scored (Robert, 20 Nov): how it landed, as Match the note's, from the first sound */
           if (p.kind === 'tone') partLanding.current[partAt] = landing(line.t, line.m, p.m, 0, lead + p.secs, anyOctave);
-          return end(voiced(lead, lead + p.secs) ? steadyShare(line.t, line.m, HOP, p.m, lead, p.secs, anyOctave) : -1);
+          return end(voiced(lead, lead + p.secs) ? steadyShare(line.t, line.m, HOP, p.m, lead, p.secs, anyOctave, within * 100) : -1);
         }
       } else if (p.kind === 'wait') {
         for (let k = seen + 1; k < line.t.length; k++) {
           seen = k;
           if (line.t[k] < MATCH_PLAY) continue;
-          if (Number.isFinite(line.m[k]) && isRight(line.m[k], p.m, anyOctave)) onFor += HOP;
+          if (Number.isFinite(line.m[k]) && isRight(line.m[k], p.m, anyOctave, within)) onFor += HOP;
         }
         setHeldNow(onFor);
         if (onFor >= HOLD_TO_COUNT - 1e-6) {
@@ -822,7 +828,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     let o: Outcome = { kind: 'none' };
     if (sung && e.id !== 'tensioncheck' && anyRoundSung()) o = sungOutcome();
     else if (inParts && partsDone() > 0) o = partsOutcome(partRes, partsDone());
-    if (o.kind !== 'none') void saveResult(resultRow(e, o));
+    if (o.kind !== 'none') void saveResult(resultRow(e, o, sungLevel));
   };
   useEffect(() => () => leaving.current(), []);
 
@@ -896,13 +902,13 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           <Bubbles notes={sung ? plan.notes : []} you={line}
             now={() => c.position() ?? (!sung ? 0 : paused ? rungTime(resumeRung.current) : keepFrom.current ?? 0)}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
-            heard={kind === 'interval' ? plan.played : undefined} scored={!e.lineOnly} reveal={plan.reveal} />
+            heard={kind === 'interval' ? plan.played : undefined} scored={!e.lineOnly} reveal={plan.reveal} within={within} />
         ) : partMap && parts[partAt] && parts[partAt].kind !== 'slide' ? (
           /* a held note: its bubble and your line (Robert, 13 Nov); Match the
              note at Beginner fills by its own rule, 1.2 s on the note */
           <Bubbles notes={partNotes(parts[partAt])} you={line} now={() => c.sinceStart() ?? 0}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
-            scored={parts[partAt].kind === 'wait'}
+            scored={parts[partAt].kind === 'wait'} within={within}
             hideYou={e.engine.kind === 'tone' && e.engine.mode === 'hidden' && !partDone} />
         ) : undefined}
         dots={sung && (
@@ -1037,7 +1043,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
 
       {view === 'result' && shown && (
         <section className="card ex-result" id="ex-result"
-          data-hit={sung && line.t.length ? bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave).hit.map((h) => (h ? 1 : 0)).join('') : undefined}>
+          data-hit={sung && line.t.length ? bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave, within).hit.map((h) => (h ? 1 : 0)).join('') : undefined}>
+          {shown.o.kind === 'pitch' && hasLevels(e) && <p className="hint" id="ex-level" data-level={sungLevel}>{fill(copy.train.sungAt, { level: copy.levels[sungLevel] })}</p>}
           {shown.o.kind === 'pitch' && (
             <>
               <p className="ex-score" id="ex-score">{fill(copy.train.notesHit, { hits: shown.o.hits, n: shown.o.n })}</p>

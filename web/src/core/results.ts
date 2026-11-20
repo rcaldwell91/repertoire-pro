@@ -1,5 +1,5 @@
 import { copy } from './copy';
-import { exercise, measures, type Exercise } from './exercises';
+import { exercise, levelsOf, measures, type Exercise, type Level } from './exercises';
 
 /* What an exercise left behind, as the old app kept it (rp-cloud.js
    870-905, the results table): only numbers that were measured
@@ -27,10 +27,32 @@ export interface ResultRow {
   readonly cents?: number;
   /** Match the note: how close it settled, on average (cents; 13 Nov) */
   readonly settle_cents?: number;
+  /** the level it was sung at (Robert, 21 Nov), on an exercise with levels.
+      Kept on the phone; online it rides in the label ("Mum · Advanced"),
+      as the results table has no level of its own */
+  readonly level?: Level;
 }
 
-export function resultRow(e: Exercise, o: Outcome): ResultRow {
-  const base = { kind: 'practice' as const, label: copy.ex[e.id].name, app_ex_id: e.id };
+/** the level of a saved result: its own, or the one its label carries;
+    null for one saved before levels were kept (21 Nov) */
+export function levelOfRow(r: { level?: Level; label?: string }): Level | null {
+  if (r.level) return r.level;
+  const at = r.label?.lastIndexOf(LEVEL_SEP) ?? -1;
+  if (at < 0) return null;
+  const word = r.label!.slice(at + LEVEL_SEP.length);
+  const k = (Object.keys(copy.levels) as unknown as Level[]).find((v) => copy.levels[v] === word);
+  return k ? (Number(k) as Level) : null;
+}
+export const LEVEL_SEP = ' · ';
+/** whether an exercise is sung at a level the singer picks */
+export function hasLevels(e: Exercise): boolean {
+  return levelsOf(e).length > 1 || e.engine.kind === 'interval';
+}
+
+export function resultRow(e: Exercise, o: Outcome, level: Level = e.level): ResultRow {
+  const name = copy.ex[e.id].name;
+  const base = { kind: 'practice' as const, app_ex_id: e.id,
+    ...(hasLevels(e) ? { label: name + LEVEL_SEP + copy.levels[level], level } : { label: name }) };
   if (o.kind === 'pitch' && o.n > 0) {
     const l = o.landing;
     return { ...base, score: o.hits, out_of: o.n, pct: Math.round((100 * o.hits) / o.n),

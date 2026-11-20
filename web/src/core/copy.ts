@@ -365,6 +365,7 @@ export const copy = {
     settleIn: 'Time to settle: {s} s on average',
     settled: 'Once settled: {how}',
     lastTime: '{line} (last time {was})',
+    sungAt: 'Sung at {level}',
     near: { veryClose: 'very close', close: 'close', bitOff: 'a bit off', farOff: 'far off' },
     /* Robert's words, a sentence a line */
     toneHeard: ['I can hear the tone.', 'Put your headphones in.'],

@@ -199,13 +199,15 @@ describe('the Cool-down steps down; the routines\' lengths are worked out (Rober
     expect(routineSteps('daily', true)[0].id).toBe('hiss');
     expect(routineSteps('quiet', false)[0].id).toBe('hiss');
   });
-  it('lengths from the exercises: at the default range, about 9, 15, 16, 10 and 3 minutes', () => {
-    expect(routineMins(ROUTINES.daily.steps, DEFAULT_RANGE)).toBe(9);
+  /* 21 Nov: each step at the routine's own level, now a notch slower at
+     Beginner and faster at Advanced on the exercises that had one speed */
+  it('lengths from the exercises: at the default range, about 10, 15, 15, 11 and 4 minutes', () => {
+    expect(routineMins(ROUTINES.daily.steps, DEFAULT_RANGE)).toBe(10);
     expect(routineMins(routineSteps('daily', false), DEFAULT_RANGE)).toBe(11);
     expect(routineMins(ROUTINES.intermediate.steps, DEFAULT_RANGE)).toBe(15);
-    expect(routineMins(ROUTINES.advanced.steps, DEFAULT_RANGE)).toBe(16);
-    expect(routineMins(ROUTINES.quiet.steps, DEFAULT_RANGE)).toBe(10);
-    expect(routineMins(ROUTINES.cooldown.steps, DEFAULT_RANGE, true)).toBe(3);
+    expect(routineMins(ROUTINES.advanced.steps, DEFAULT_RANGE)).toBe(15);
+    expect(routineMins(ROUTINES.quiet.steps, DEFAULT_RANGE)).toBe(11);
+    expect(routineMins(ROUTINES.cooldown.steps, DEFAULT_RANGE, true)).toBe(4);
     /* a wider range sings more rounds: longer */
     expect(routineSecs(ROUTINES.daily.steps, { lo: 40, hi: 76 })).toBeGreaterThan(routineSecs(ROUTINES.daily.steps, DEFAULT_RANGE));
   });

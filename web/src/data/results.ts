@@ -41,7 +41,10 @@ export async function saveResult(row: ResultRow): Promise<'online' | 'phone'> {
     const { data } = await supabase.auth.getSession();
     const id = data.session?.user?.id;
     if (id) {
-      const { error } = await supabase.from('results').insert({ student_id: id, ...row });
+      /* the level rides in the label: the table has no column for it */
+      const { level: _level, ...cols } = row;
+      void _level;
+      const { error } = await supabase.from('results').insert({ student_id: id, ...cols });
       online = !error;
     }
   } catch {
