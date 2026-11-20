@@ -1200,8 +1200,8 @@ try {
     await sleep(1500);
     const peak = await page.eval(`window.__probe.outPeak`);
     const still = (await quietNow()) && peak < 0.005 && (await page.eval(`!!document.querySelector('#ex-run')`));
-    /* the singer sings on from the second repeat's start, as asked */
-    const from = MUM[9].t;
+    /* the singer sings on from the second repeat's start, as asked: from its lead note (Robert, 20 Nov) */
+    const from = MUM[9].lead;
     await singer(sing(MUM.slice(9).map((n) => ({ ...n, t: n.t - from }))));
     await page.tap('#ex-pause');
     const back = await countThenNow();
@@ -1212,7 +1212,7 @@ try {
     if (want('pause-resume')) {
       check('pause-resume', ok,
         `paused in the second repeat: silence and the mic closed in ${ms} ms, "${paused.label}", still on the singing screen ${paused.run}, ${paused.done} repeat done with ${paused.hits} notes hit; ` +
-        `quiet 1.5 s later ${still} (loudest at the speaker ${peak.toFixed(4)}); Resume counted in ${back.counted} and carried on at ${back.at.toFixed(2)} s (the second repeat starts at ${from} s); ` +
+        `quiet 1.5 s later ${still} (loudest at the speaker ${peak.toFixed(4)}); Resume counted in ${back.counted} and carried on at ${back.at.toFixed(2)} s (the second repeat's lead note at ${from} s); ` +
         `in the end "${await text('#ex-score')}" of ${MUM.length}`);
     }
     /* Save take, next to the score with Try again and Next */
@@ -2089,8 +2089,9 @@ try {
     const out = [];
     for (const late of [0, 0.25]) {
       await openEx('mum');
-      const round = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
-      const notes = round.map(([m, t, d]) => ({ m, t, d }));
+      /* the voice placed on the piano's notes (the lead notes left out), as the take keeps them */
+      const piano = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano).filter((n) => !n[3])`);
+      const notes = piano.map(([m, t, d]) => ({ m, t, d }));
       await singer(sing(notes.map((n) => ({ ...n, t: n.t + late }))));
       await page.tap('#ex-start');
       await result(exLength(notes) * 1000 + 15000);
@@ -2246,11 +2247,14 @@ try {
     const fromMid = bwoopRound[0][0] === Math.round((RANGE.lo + RANGE.hi) / 2 - 3.5) && bwoopRound[bwoopRound.length - 1][0] <= RANGE.hi;
     await openEx('bends');
     const bendRound = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);
-    const ups = bendRound.slice(0, 10).map(([m]) => m - bendRound[0][0]), downs = bendRound.slice(10, 20).map(([m]) => m - bendRound[10][0]);
+    /* a fast twitch (Robert, 20 Nov): note, neighbour, note, neighbour, note, neighbour, note, each round */
+    const shapes = [];
+    for (let k = 0; k + 7 <= bendRound.length; k += 7) shapes.push(bendRound.slice(k, k + 7).map(([m]) => m - bendRound[k][0]).join(','));
+    const ups = shapes.filter((x) => x === '0,1,0,1,0,1,0'), downs = shapes.filter((x) => x === '0,-1,0,-1,0,-1,0');
     check('new-four', placed && levelsOk && bw.title === 'Bwoop' && bw.labelled === bw.visible && bw.visible > 0 && fromMid &&
-      JSON.stringify(ups) === '[0,1,0,1,0,1,0,1,0,0]' && JSON.stringify(downs) === '[0,-1,0,-1,0,-1,0,-1,0,0]',
+      ups.length > 0 && ups.length + downs.length === shapes.length && bendRound.length % 7 === 0,
       `in their places ${placed}; rows ${JSON.stringify(tags)}; Bwoop's title "${bw.title}", ${bw.labelled} of ${bw.visible} bubbles with "bwoop", from the middle ${fromMid}; ` +
-      `Note bends up ${ups.join(',')} then down ${downs.join(',')}`);
+      `Note bends: ${shapes.length} rounds of seven, ${ups.length} with the neighbour above, ${downs.length} below, ${shapes.length - ups.length - downs.length} otherwise`);
   }
 
   check('no-page-errors', page.errors.length === 0, page.errors.join(' | '));
