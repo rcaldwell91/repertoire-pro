@@ -693,7 +693,7 @@ try {
 
   /* 3b. The singing screen (Robert, 24 Oct): the note map fills the screen,
          the ladder of note names at the left, every bubble with its syllable,
-         the current one bigger, the dots along the bottom one per rung */
+         the current one no bigger, the dots along the bottom one per rung */
   if (want('singing-screen')) {
     await openEx('mum');
     await noSinger();
@@ -709,6 +709,9 @@ try {
         now: [...document.querySelectorAll('#ex-dots .dot')].findIndex((d) => d.dataset.now) };
     })()`);
     const a = await look();
+    /* the current bubble measured while a note is current (none is during the lead) */
+    await page.waitFor(`+document.querySelector('#bubbles').dataset.current >= 0`, 8000);
+    const n = await look();
     await page.waitFor(`document.querySelectorAll('#ex-dots .dot[data-done]').length >= 1`, 12000);
     const b = await look();
     await sleep(1500);
@@ -724,15 +727,18 @@ try {
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
     /* each bubble exactly the band that counts: one row, within half a half step either side; the current one no taller */
     /* the line at each note broken around a syllable inside it, so no word looks crossed out */
-    const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +a.nowBubble === +a.bubble && +a.crossed === 0 && +c.crossed === 0;
+    const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +n.current >= 0 && +n.nowBubble === +n.bubble && +a.crossed === 0 && +c.crossed === 0;
+    /* at 30 px a row there is room for every white key's name: as many names as white keys in view */
+    let whites = 0;
+    for (let m = Math.ceil(+a.viewLo); m <= Math.floor(+a.viewHi); m++) if (![1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12)) whites++;
     /* the map smaller, to make room for the controls along the bottom (Robert, 28 Oct), and still the larger part of the screen */
     /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after), and back to 40 on 16 Nov, inside rows of 42 px or more */
     const parts = { top: a.top <= 1, tall: a.height >= a.inner - 70, map: a.canvas >= 0.55 * a.inner, above: a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner,
-      labelled: +a.visible > 0 && a.labelled === a.visible, names: +a.names >= 6, band, row: +a.row >= 20, dots: a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1, zoomed, glided };
+      labelled: +a.visible > 0 && a.labelled === a.visible, names: +a.names >= 6 && +a.names === whites, band, row: +a.row >= 20, dots: a.dots === rungs && a.now === 0 && a.done === 0 && b.done === 1 && b.now === 1, zoomed, glided };
     const wrong = Object.keys(parts).filter((k) => !parts[k]);
     check('singing-screen', wrong.length === 0,
       `fills the screen above the menu: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px down to ${a.mapEnd}, the controls under it from ${a.barTop} to ${a.bar} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
-      `${a.names} note names; bubbles ${a.bubble} px on ${a.row} px rows, the current ${a.nowBubble} px, ${a.crossed} syllables crossed by the note's line; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
+      `${a.names} note names for ${whites} white keys in view; bubbles ${a.bubble} px on ${a.row} px rows, the current ${n.nowBubble} px (note ${n.current}), ${a.crossed} syllables crossed by the note's line; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
       `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}` + (wrong.length ? `; NOT: ${wrong.join(', ')}` : ''));
   }
 
