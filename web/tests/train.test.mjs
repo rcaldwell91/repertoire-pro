@@ -723,7 +723,8 @@ try {
     const zoomed = [a, c].every((v) => near(+v.viewHi - +v.viewLo, (v.canvas - 12) / 30) && Math.abs(+v.row - 30) <= 0.3) && near((+a.viewLo + +a.viewHi) / 2, mid(r0)) && near((+c.viewLo + +c.viewHi) / 2, mid(r1));
     const glided = +c.viewStep > 0 && +c.viewStep <= 0.3;
     /* each bubble exactly the band that counts: one row, within half a half step either side; the current one no taller */
-    const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +a.nowBubble === +a.bubble;
+    /* the line at each note broken around a syllable inside it, so no word looks crossed out */
+    const band = Math.abs(+a.bubble - +a.row) <= 0.15 && +a.nowBubble === +a.bubble && +a.crossed === 0 && +c.crossed === 0;
     /* the map smaller, to make room for the controls along the bottom (Robert, 28 Oct), and still the larger part of the screen */
     /* above the menu, which stays on every screen since 13 Nov (Robert); the bubbles a little smaller for it (44 px at 390 x 844 before, 39 after), and back to 40 on 16 Nov, inside rows of 42 px or more */
     const parts = { top: a.top <= 1, tall: a.height >= a.inner - 70, map: a.canvas >= 0.55 * a.inner, above: a.mapEnd != null && a.bar != null && a.mapEnd < a.barTop && a.bar <= a.inner,
@@ -731,7 +732,7 @@ try {
     const wrong = Object.keys(parts).filter((k) => !parts[k]);
     check('singing-screen', wrong.length === 0,
       `fills the screen above the menu: top ${a.top}, ${a.height} of ${a.inner} px, the map ${a.canvas} px down to ${a.mapEnd}, the controls under it from ${a.barTop} to ${a.bar} px; ${a.labelled} of ${a.visible} bubbles with their syllable; ` +
-      `${a.names} note names; bubbles ${a.bubble} px on ${a.row} px rows, the current ${a.nowBubble} px; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
+      `${a.names} note names; bubbles ${a.bubble} px on ${a.row} px rows, the current ${a.nowBubble} px, ${a.crossed} syllables crossed by the note's line; ${a.dots} dots for ${rungs} rungs, the first current; later ${b.done} done, the second current ${b.now === 1}; ` +
       `the view ${a.viewLo}-${a.viewHi} on the first rung, ${c.viewLo}-${c.viewHi} on the second ${zoomed}, in steps of at most ${c.viewStep} of a semitone ${glided}` + (wrong.length ? `; NOT: ${wrong.join(', ')}` : ''));
   }
 

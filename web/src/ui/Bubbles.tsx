@@ -199,7 +199,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       let hiddenPts = 0;
       const h = rowH * BAND;
       const tint = css.getPropertyValue('--' + colour).trim();
-      let current = -1, visible = 0, labelled = 0, outside = 0, nowH = h;
+      let current = -1, visible = 0, labelled = 0, outside = 0, crossed = 0, nowH = h;
       const bubble = (n: Note, i: number, isNow: boolean) => {
         const bh = h;
         if (isNow) nowH = bh;
@@ -222,10 +222,24 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
           g.fillRect(bx, by, bw * score.fill[i], bh);
           g.restore();
         }
-        /* the note itself: a line through the middle of its band */
+        /* the syllable inside when it fits, otherwise just above the bubble
+           (below, at the top of the map) */
+        const syl = sylOf(n);
+        g.font = `700 ${isNow ? 14 : 12}px Quicksand, system-ui, sans-serif`;
+        const tw = g.measureText(syl).width;
+        const inside = tw + 6 <= bw && bh >= 15;
+        /* the note itself: a line through the middle of its band, broken
+           around a syllable inside, so the word never looks crossed out */
         g.globalAlpha = 0.55;
         g.fillStyle = css.getPropertyValue('--ink');
-        g.fillRect(bx + 2, Math.round(y(n.m)) - 0.5, Math.max(1, bw - 4), 1);
+        const ly = Math.round(y(n.m)) - 0.5;
+        const broken = inside;
+        if (inside && !broken) crossed++;
+        if (broken) {
+          const gapA = bx + bw / 2 - tw / 2 - 3, gapB = bx + bw / 2 + tw / 2 + 3;
+          if (gapA - (bx + 2) >= 1) g.fillRect(bx + 2, ly, gapA - (bx + 2), 1);
+          if (bx + bw - 2 - gapB >= 1) g.fillRect(gapB, ly, bx + bw - 2 - gapB, 1);
+        } else g.fillRect(bx + 2, ly, Math.max(1, bw - 4), 1);
         g.globalAlpha = 1;
         shape();
         /* the ring on the note to sing now: white in the dark, ink in the
@@ -234,12 +248,6 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
         g.lineWidth = isNow ? 3 : 1;
         g.strokeStyle = isNow ? css.getPropertyValue('--now') : tint;
         g.stroke();
-        /* the syllable inside when it fits, otherwise just above the bubble
-           (below, at the top of the map) */
-        const syl = sylOf(n);
-        g.font = `700 ${isNow ? 14 : 12}px Quicksand, system-ui, sans-serif`;
-        const tw = g.measureText(syl).width;
-        const inside = tw + 6 <= bw && bh >= 15;
         g.fillStyle = css.getPropertyValue('--ink');
         g.textAlign = 'center';
         if (inside) g.fillText(syl, bx + bw / 2, by + bh / 2);
@@ -319,6 +327,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.nowBubble = nowH.toFixed(1);
       cv.dataset.zoom = (hi - lo).toFixed(2);
       cv.dataset.outside = String(outside);
+      cv.dataset.crossed = String(crossed);
       cv.dataset.viewLo = lo.toFixed(2);
       cv.dataset.viewHi = hi.toFixed(2);
       cv.dataset.viewStep = v.step.toFixed(3);
