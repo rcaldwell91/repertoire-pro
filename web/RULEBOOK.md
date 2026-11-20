@@ -82,7 +82,7 @@ This is the single source for the rebuild. Copy it into the repo as web/RULEBOOK
   - Deleting accounts needs an approval Robert can't reliably give from his phone.
 - One permanent test COACH account, rp-coach@example.com, created once, linked as coach to rp-test@example.com, and reused for every test of sending to a coach.
 - Never create any other accounts.
-- Never touch Robert's (lyonxdewitt@gmail.com) or Briar's (briarmlocke@gmail.com) accounts.
+- Never touch Robert's (lyonxdewitt@gmail.com) or Briar's (briarmlocke@gmail.com) accounts. The one exception Robert has given (20 Nov): his takes saved after the 14 Nov build may be read, read only, and nothing else on his account.
 
 ## 2. Architecture rules
 
@@ -110,7 +110,7 @@ web/src/
    - caps instruction lines at 8 words
 5. **No fix without a failing test first.** Every test runs against the built app.
 6. **For any part the old app already has, read the old app's version of it in next.html and the comments around it first. Write down every rule that code enforces and every failure it guards against. The new version must have a test for each one before it's built. The old code is the checklist, never the source.** The lists live in CHECKLIST.md, each rule with the test that guards it; a unit test checks every named test exists.
-7. **Every merge to main gets a report for Robert, in plain words.** It is written to REPORTS/latest.md (overwritten) and appended to REPORTS/log.md with the date and the commit. REPORTS lives at the top of the repo, never inside app/. Every report says what works, what was measured, what wasn't tried on a real phone, and the exact taps for Robert. A unit test checks each part is there and that the latest report is in the log.
+7. **Every merge to main gets a report for Robert, in plain words.** It is written to REPORTS/latest.md (overwritten) and appended to REPORTS/log.md with the date and the commit. REPORTS lives at the top of the repo, never inside app/. Every report says what works, what was measured, what wasn't tried on a real phone, and the exact taps for Robert. A unit test checks each part is there and that the latest report is in the log. Robert always sings with wired headphones (20 Nov): never ask what he listens through, and never ask him to test without them, except for Match the tone's headphone check.
 8. **Knowledge is carried between builds by copying the source doc into web/docs, never by summarising it. A later entry that withdraws an earlier one wins.** A unit test holds each copied doc to its exact bytes.
 
 ## 3. Product must-haves

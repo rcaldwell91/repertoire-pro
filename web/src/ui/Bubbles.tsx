@@ -196,9 +196,10 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       let hiddenPts = 0;
       const h = rowH * BAND;
       const tint = css.getPropertyValue('--' + colour).trim();
-      let current = -1, visible = 0, labelled = 0, outside = 0;
+      let current = -1, visible = 0, labelled = 0, outside = 0, nowH = h;
       const bubble = (n: Note, i: number, isNow: boolean) => {
         const bh = h;
+        if (isNow) nowH = bh;
         const bx = x(n.t), bw = Math.max(6, n.d * pxs - 2), by = y(n.m) - bh / 2;
         const shape = () => {
           g.beginPath();
@@ -312,7 +313,7 @@ export function Bubbles(props: { notes: readonly Note[]; you: YouLine; now: () =
       cv.dataset.names = String(names);
       cv.dataset.bubble = h.toFixed(1);
       cv.dataset.row = rowH.toFixed(1);
-      cv.dataset.nowBubble = h.toFixed(1);
+      cv.dataset.nowBubble = nowH.toFixed(1);
       cv.dataset.zoom = (hi - lo).toFixed(2);
       cv.dataset.outside = String(outside);
       cv.dataset.viewLo = lo.toFixed(2);

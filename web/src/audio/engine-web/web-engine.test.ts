@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CEILING, heardDelay, LOUD, safety, STAGE_DELAY, toConstraints, WebEngine } from './web-engine';
+import { CEILING, heardDelay, LOUD, NOTE_FADE, safety, SHORT_FADE, SHORT_NOTE, STAGE_DELAY, toConstraints, WebEngine } from './web-engine';
 import { MIC_MODES, modeIndex } from '../mic-modes';
 
 /* RULEBOOK 4, Mic, and Sound, Android 11: "Ask for the mic once, raw." */
@@ -78,5 +78,16 @@ describe('the way out\'s own delay', () => {
     const e = new WebEngine();
     (e as unknown as { ctx: unknown }).ctx = { outputLatency: 0.12, baseLatency: 0.01 };
     expect(e.outputLatency()).toBeCloseTo(0.13 + STAGE_DELAY, 6);
+  });
+});
+
+/* Robert, 20 Nov: "short notes should sound short": a piano note of 0.3 s
+   or less is let go with a fade that is 60 dB down within 0.1 s (a time
+   constant is 6.9 of itself to fall 60 dB); a longer one as before */
+describe('a piano note let go at its length', () => {
+  it('stops rather than rings when it is short', () => {
+    expect(SHORT_NOTE).toBeGreaterThanOrEqual(0.25);
+    expect(SHORT_FADE * Math.log(1000)).toBeLessThan(0.1);
+    expect(NOTE_FADE).toBe(0.04);
   });
 });

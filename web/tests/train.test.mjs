@@ -1857,19 +1857,23 @@ try {
     check('hold-map', drawn.map && drawn.you > 0 && drawn.visible === 1, `holding: the map ${drawn.map}, the note's bubble ${drawn.visible}, your line ${drawn.you} points`);
   }
 
-  /* Match the tone: the plain tone plays; the line shown, not scored; the tone heard by the mic is called out */
+  /* Match the tone (Robert, 20 Nov): scored now, 4 s holds after 2 s to
+     find the tone, Beginner in order; how each hold landed, beside last
+     time; the tone heard by the mic is called out */
   if (want('match-tone')) {
+    await page.eval(`localStorage.setItem('rp.level.matchtone', '1')`);
     await openEx('matchtone');
     const need = await text('#ex-needs');
     const parts = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.parts)`);
-    /* a voice: no warning */
-    await singer(sing([{ m: parts[0], t: 0.5, d: 9 }]));
+    const inOrder = parts.length === 10 && parts.every((m, i) => i === 0 || m - parts[i - 1] === 2 || m < parts[i - 1]);
+    /* a voice on the note: no warning, and a score for the hold */
+    await singer(sing([{ m: parts[0], t: 0.5, d: 5.5 }]));
     await page.tap('#ex-start');
-    await page.waitFor(`window.__probe.starts.some((x) => x.seconds > 9)`, 8000);
-    const tone = await page.eval(`window.__probe.starts.find((x) => x.seconds > 9)?.seconds ?? 0`);
+    await page.waitFor(`window.__probe.starts.some((x) => x.seconds > 5)`, 8000);
+    const tone = await page.eval(`window.__probe.starts.find((x) => x.seconds > 5)?.seconds ?? 0`);
     await page.waitFor(`!!document.querySelector('#ex-next-part')`, 16000);
     const voiceWarned = await page.eval(`!!document.querySelector('#tone-heard')`);
-    const scoredLine = await page.eval(`!!document.querySelector('#ex-part-result')`);
+    const scoredLine = await text('#ex-part-result');
     /* the tone itself in the mic, as a speaker without headphones would give it: warned */
     const sr = 48000, n = sr * 10, amp = 0.2, f = 440 * Math.pow(2, (parts[1] - 69) / 12);
     const x = new Float32Array(n);
@@ -1881,11 +1885,31 @@ try {
     const words = await text('#tone-heard');
     await page.tap('#ex-close');
     await result(3000);
-    const un = await text('#ex-unscored');
-    check('match-tone', need === copy.ex.matchtone.need && tone >= 9 && !voiceWarned && !scoredLine && warned && words === copy.train.toneHeard.join(' ') &&
-      un === copy.train.lineOnly,
-      `"You'll need: ${need}"; a plain tone played for ${tone.toFixed(1)} s; sung by a real voice: no warning ${!voiceWarned}, no score ${!scoredLine}; ` +
-      `the tone itself in the mic: "${words}"; at the end "${un}"`);
+    const score = await text('#ex-score');
+    const landed = await page.eval(`!!document.querySelector('#ex-landed #ex-first-on')`);
+    /* Intermediate: at random; Advanced: at random, your line hidden until the tone stops */
+    await page.eval(`localStorage.setItem('rp.level.matchtone', '2')`);
+    await openEx('matchtone');
+    const random = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.parts)`);
+    await page.eval(`localStorage.setItem('rp.level.matchtone', '3')`);
+    await openEx('matchtone');
+    const hiddenParts = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.parts)`);
+    await singer(sing([{ m: hiddenParts[0], t: 0.5, d: 5.5 }]));
+    await page.tap('#ex-start');
+    await page.waitFor(`window.__probe.starts.some((x) => x.seconds > 5)`, 8000);
+    await sleep(3500);
+    const hiddenYou = await page.eval(`+(document.querySelector('#bubbles')?.dataset.you ?? -1)`);
+    await page.waitFor(`!!document.querySelector('#ex-next-part')`, 16000);
+    await sleep(600);
+    const shownYou = await page.eval(`+(document.querySelector('#bubbles')?.dataset.you ?? -1)`);
+    await page.tap('#ex-close');
+    await page.eval(`localStorage.removeItem('rp.level.matchtone')`);
+    const atRandom = (p) => p.length === 10 && !p.every((m, i) => i === 0 || m - p[i - 1] === 2 || m < p[i - 1]);
+    check('match-tone', need === copy.ex.matchtone.need && inOrder && tone >= 5.9 && tone < 6.5 && !voiceWarned && /\d+%/.test(scoredLine) && warned &&
+      words === copy.train.toneHeard.join(' ') && /\d+ of \d+/.test(score) && landed && atRandom(random) && atRandom(hiddenParts) && hiddenYou === 0 && shownYou > 0,
+      `"You'll need: ${need}"; Beginner's notes ${parts.join(' ')} in order ${inOrder}; a plain tone played for ${tone.toFixed(1)} s; sung by a real voice: no warning ${!voiceWarned}, ` +
+      `the hold "${scoredLine}"; the tone itself in the mic: "${words}"; at the end "${score}", how it landed shown ${landed}; ` +
+      `Intermediate ${random.join(' ')}, Advanced ${hiddenParts.join(' ')} at random; at Advanced your line hidden while singing (${hiddenYou} points drawn), shown once the tone stopped (${shownYou})`);
   }
 
   /* your best Steady hiss, not a set target; the goal it sets for Vocal Function Exercises */
