@@ -678,6 +678,8 @@ const MUTATIONS = [
     from: '    if (opts.untilLast && letGo > when) {', to: '    if (false) {', checks: ['last-hold'] },
   { test: 'train', what: 'a round\'s dot lit only from its first sung note', file: E,
     from: '    while (k + 1 < rungs && rungTime(k + 1) <= at) k++;', to: '', checks: ['singing-screen'] },
+  { test: 'train', what: 'Close counts the rounds done without their lead notes', file: E,
+    from: '        const done = at != null ? rungOf(at) : paused ? resumeRung.current : 0;', to: '        const done = at != null ? rungAt(plan.notes, at) : paused ? resumeRung.current : 0;', checks: ['next-moves-on'] },
   { test: 'train', what: 'a rung too tall for the view is not followed', file: 'src/ui/Bubbles.tsx', from: '        if (b - a > ZOOM) {', to: '        if (false) {', checks: ['one-zoom'] },
   { test: 'train', what: 'no lead note before a round', file: 'src/core/exercises.ts',
     from: "    played.push({ m: root + way * p.deg[0], t, d: lead, syl: '', lead: true });\n", to: '', checks: ['lead-pause'] },

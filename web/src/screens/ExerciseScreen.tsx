@@ -779,7 +779,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
       /* the tension check stopped early: the tick list still, once a round was sung */
       if (e.id === 'tensioncheck') {
         const at = c.position();
-        const done = at != null ? rungAt(plan.notes, at) : paused ? resumeRung.current : 0;
+        const done = at != null ? rungOf(at) : paused ? resumeRung.current : 0;
         if (done >= 1) {
           if (playing) c.stop();
           c.dropTake();
