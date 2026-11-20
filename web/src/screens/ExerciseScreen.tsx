@@ -171,6 +171,9 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
       : kind === 'match' ? [plan.played[0]] : plan.pattern ?? firstRung(plan.notes)), [kind, matchMode, plan, parts]);
   const rungs = useMemo(() => rungStarts(plan.notes).length, [plan]);
   const [partAt, setPartAt] = useState(0);
+  /* a part shown on the map (a held note, not a slide): its panel kept compact and one height, so the map
+     shows over an octave and never changes size (Robert, 21 Nov) */
+  const partShown = partMap && !!parts[partAt] && parts[partAt].kind !== 'slide';
   /* what each part left: a share held steady, seconds held, a slide done; null if not measured */
   const [partRes, setPartRes] = useState<Array<number | null>>([]);
   const [partDone, setPartDone] = useState(false);
@@ -903,7 +906,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
             now={() => c.position() ?? (!sung ? 0 : paused ? rungTime(resumeRung.current) : keepFrom.current ?? 0)}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
             heard={kind === 'interval' ? plan.played : undefined} scored={!e.lineOnly} reveal={plan.reveal} within={within} />
-        ) : partMap && parts[partAt] && parts[partAt].kind !== 'slide' ? (
+        ) : partShown ? (
           /* a held note: its bubble and your line (Robert, 13 Nov); Match the
              note at Beginner fills by its own rule, 1.2 s on the note */
           <Bubbles notes={partNotes(parts[partAt])} you={line} now={() => c.sinceStart() ?? 0}
@@ -918,13 +921,14 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
             ))}
           </div>
         )}>
-        {!sung && kind !== 'glide' && counting != null && <div className="ex-big" id="count-in">{counting}</div>}
+        {/* the count-in: over the map when there is one (the map shows it), else here */}
+        {!sung && kind !== 'glide' && !partShown && counting != null && <div className="ex-big" id="count-in">{counting}</div>}
         {inParts && parts[partAt] && (() => {
           const p = parts[partAt];
           const res = partRes[partAt];
           const held = p.kind === 'steady' || p.kind === 'tone' || p.kind === 'wait';
           return (
-            <div className="ex-part" id="ex-part" data-m={p.kind === 'slide' ? '' : p.m} data-kind={p.kind}>
+            <div className="ex-part" id="ex-part" data-m={p.kind === 'slide' ? '' : p.m} data-kind={p.kind} data-map={partShown ? 'true' : undefined}>
               <p className="hint" id="ex-part-at">
                 {held ? fill(copy.train.noteOf, { i: partAt + 1, n: parts.length }) : fill(copy.train.stepOf, { step: p.step, k: p.round })}
               </p>
@@ -950,20 +954,22 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
               )}
               {partDone && p.kind === 'wait' && res === 1 && <p className="ex-line" id="ex-part-result">{copy.train.heldIt}</p>}
               {partDone && p.kind === 'slide' && res != null && <p className="ex-line" id="ex-part-result">{copy.train.slid}</p>}
-              {/* Match the note at Beginner: no time limit; Next moves on whenever you like */}
-              {p.kind === 'wait' && !partDone && counting == null && (
-                <button type="button" className="btn" id="ex-wait-next" onClick={waitNext}>{copy.train.nextOne}</button>
-              )}
-              {partDone && (
-                <>
-                  {/* Pause has nothing to pause now: say what to do (13 Nov: no silent taps) */}
-                  <p className="hint" id="ex-wait-hint">{copy.train.waitNext}</p>
-                  <button type="button" className="btn btn-start" id="ex-next-part" onClick={nextPart}>{copy.train.nextOne}</button>
-                </>
-              )}
-              {!partDone && !withMic && counting == null && (
-                <button type="button" className="btn" id="ex-done" onClick={partByHand}>{copy.train.done}</button>
-              )}
+              <div className="part-act">
+                {/* Match the note at Beginner: no time limit; Next moves on whenever you like */}
+                {p.kind === 'wait' && !partDone && counting == null && (
+                  <button type="button" className="btn" id="ex-wait-next" onClick={waitNext}>{copy.train.nextOne}</button>
+                )}
+                {partDone && (
+                  <>
+                    {/* Pause has nothing to pause now: say what to do (13 Nov: no silent taps) */}
+                    <p className="hint" id="ex-wait-hint">{copy.train.waitNext}</p>
+                    <button type="button" className="btn btn-start" id="ex-next-part" onClick={nextPart}>{copy.train.nextOne}</button>
+                  </>
+                )}
+                {!partDone && !withMic && counting == null && (
+                  <button type="button" className="btn" id="ex-done" onClick={partByHand}>{copy.train.done}</button>
+                )}
+              </div>
             </div>
           );
         })()}

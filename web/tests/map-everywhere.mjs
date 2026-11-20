@@ -19,7 +19,7 @@ const APP = resolve(process.env.APP_DIR || join(REPO, 'app'));
 const MIN = Number(process.env.MIN || 13);
 const SIZES = (process.env.SIZES || '390x844,360x740').split(',').map((s) => s.split('x').map(Number));
 const src = readFileSync(join(WEB, 'src/core/exercises.ts'), 'utf8');
-const body = src.slice(src.indexOf('export const EXERCISES'), src.indexOf('export function exercise('));
+const body = src.slice(src.indexOf('const LISTED'), src.indexOf('export function exercise('));
 /* each exercise's id and how many levels it has */
 const IDS = [...body.matchAll(/(?:ex|leveled)\('([a-z0-9]+)'/g)].map((m) => m[1]).filter((id) => !process.env.IDS || process.env.IDS.split(',').includes(id));
 const tmp = mkdtempSync(join(tmpdir(), 'rp-map-'));
