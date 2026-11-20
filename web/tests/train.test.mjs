@@ -625,6 +625,7 @@ try {
     const t0 = Date.now();
     await result(last * 1000 + 15000);
     const ran = (Date.now() - t0) / 1000;
+    await page.eval(`localStorage.removeItem('rp.level.sustain')`);
     check('last-hold', ran >= last - 0.3 && ran <= last + 2,
       `the last hold let go at ${last.toFixed(1)} s; the run ended ${ran.toFixed(1)} s after the first piano note (its recording alone runs out about 5 s sooner)`);
   }
@@ -651,6 +652,8 @@ try {
       await page.tap('#ex-close');
       views.push({ id, look });
     }
+    /* the levels set back as they were, for the checks after */
+    await page.eval(`['mum', 'arp19', 'sustain', 'straw', 'guh', 'matchtone'].forEach((id) => localStorage.removeItem('rp.level.' + id))`);
     const all = views.flatMap((v) => v.look);
     /* one spacing between notes: 30 px a half step on every map, whatever its height */
     const oneZoom = all.every((v) => Math.abs(v.row - 30) <= 0.3);
