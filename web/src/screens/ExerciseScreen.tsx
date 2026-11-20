@@ -17,7 +17,7 @@ import {
 import { isRight } from '../core/takes';
 import { cueFor, pickReminder, SPOTS, type Spot } from '../core/tension';
 import { clock as clockText } from '../core/time';
-import { hasLevels, levelOfRow, resultRow, type Outcome } from '../core/results';
+import { atSameLevel, hasLevels, resultRow, type Outcome } from '../core/results';
 import { cycleAt, SoundClock } from '../core/timed';
 import { restSlides, type Slide } from '../core/rest';
 import type { Plan, Take } from '../audio/conductor/conductor';
@@ -240,7 +240,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     let live = true;
     if (kind === 'timed' || kind === 'vfe') void bestHiss().then((b) => live && setBestBefore(b));
     /* last time at this same level only (Robert, 21 Nov) */
-    if (kind === 'match') void myResults('match').then((rs) => live && setLastLands(rs.filter((r) => r.cents != null && levelOfRow(r) === e.level).slice(0, 3)));
+    if (kind === 'match') void myResults('match').then((rs) => live && setLastLands(atSameLevel(rs, e.level).filter((r) => r.cents != null).slice(0, 3)));
     return () => {
       live = false;
     };

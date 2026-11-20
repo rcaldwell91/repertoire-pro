@@ -44,6 +44,11 @@ export function levelOfRow(r: { level?: Level; label?: string }): Level | null {
   return k ? (Number(k) as Level) : null;
 }
 export const LEVEL_SEP = ' · ';
+/** the saved results sung at this level, newest first as given: "your best"
+    and "last time" compare within a level only (Robert, 21 Nov) */
+export function atSameLevel<T extends { level?: Level; label?: string }>(rows: readonly T[], level: Level): T[] {
+  return rows.filter((r) => levelOfRow(r) === level);
+}
 /** whether an exercise is sung at a level the singer picks */
 export function hasLevels(e: Exercise): boolean {
   return levelsOf(e).length > 1 || e.engine.kind === 'interval';

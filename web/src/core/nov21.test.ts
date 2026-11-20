@@ -3,7 +3,7 @@ import {
   BANDS, EXERCISES, NOTCH, ROUTINES, atLevel, bandAt, bandOf, bubbleScore, exercise, levelsOf, listed, measures, type Exercise, type Level, type Note,
 } from './exercises';
 import { RIGHT_WITHIN } from './takes';
-import { hasLevels, levelOfRow, resultRow } from './results';
+import { atSameLevel, hasLevels, levelOfRow, resultRow } from './results';
 
 /* Robert, 21 Nov: "the level sets how exact you have to be and how fast it
    goes ... every exercise becomes something to level up on" */
@@ -89,5 +89,12 @@ describe('a result shows the level it was sung at; best and last time compare wi
     expect(hasLevels(ex('hiss'))).toBe(false);
     expect(hasLevels(ex('interval'))).toBe(true);
     expect(resultRow(ex('interval'), { kind: 'pitch', hits: 3, n: 6 }, 3)).toMatchObject({ level: 3, label: 'Sing the interval · Advanced' });
+  });
+  it('last time is the last at the same level, never another level\'s, nor one from before levels were kept', () => {
+    const rows = [{ label: 'Match the note · Advanced', cents: 80 }, { label: 'Match the note · Beginner', level: 1 as Level, cents: 20 },
+      { label: 'Match the note', cents: 5 }, { label: 'Match the note · Beginner', cents: 40 }];
+    expect(atSameLevel(rows, 1).map((r) => r.cents)).toEqual([20, 40]);
+    expect(atSameLevel(rows, 3).map((r) => r.cents)).toEqual([80]);
+    expect(atSameLevel(rows, 2)).toEqual([]);
   });
 });
