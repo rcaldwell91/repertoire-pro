@@ -1305,7 +1305,7 @@ https://rcaldwell91.github.io/repertoire-pro/app/
 2. When you noticed the timing, were you listening through the phone's speaker, wired headphones, or Bluetooth?
 
 
-# Report, 20 Nov 2026, commit 4d09f95
+# Report, 20 Nov 2026, commit 8b3d87f
 
 All seven parts of this round are built and live. Main hadn't moved since 151bf8d apart from my own report commits, so this round was built on exactly what went live on 17 Nov.
 
@@ -1371,7 +1371,7 @@ The first note of every round counted in every "right" row, and in no "off" row.
 
 | | Right (eight tries per exercise) | Late (0.2 s) | Three half steps off |
 |---|---|---|---|
-| Bwoop | 97 to 100% | 62 of 63 | 0% |
+| Bwoop | 98 to 100% | 62 of 63 | 0% |
 | Staccato | 97 to 100% | 30 of 30 | 0% |
 | Consonant pops | 96 to 100% | 103 of 104 | 0% |
 
@@ -1400,18 +1400,21 @@ I also haven't seen the new map spacing there. Screenshots at 390 and 360 wide a
 
 ## Checks
 
-- The unit tests: TODO.
-- Every browser suite: TODO.
-- The old app: TODO.
+- The unit tests: 329 of 329 pass.
+- Every browser suite passes: Train 81, browser 15, Android 28, library 7, note map 13, song 19, takes 20, loudness 13.
+- The old app: 187 of 187.
 - Broken builds:
-  - TODO core and app broken builds, each caught.
-  - New this round: no lead note, a lead on another note, no pause, a whole-second pause, short notes ringing, a changing zoom, a map with its own spacing, a run that ends when the recording runs out, the round's dot lit late, and Match the tone's level, score and hidden line.
+  - I broke the app's core rules 224 ways, and the checks caught all 224.
+  - I broke the app itself 313 ways, and the checks caught all 313.
+  - New this round: no lead note, a lead on another note, no pause, a whole-second pause, short notes ringing, a changing zoom, a map with its own spacing, a run that ends when the recording runs out, the round's dot lit late, a syllable crossed by its note's line, and Match the tone's level, score and hidden line.
 
 ## Mistakes of mine
 
 - The 17 Nov report was missing the sections the rulebook asks for ("What works", "What was measured", "Not tried on a real phone", "Your taps"). The check that requires them failed after that merge, and I didn't catch it before going live. This report has them, and the check passes again.
 - My first try at "one zoom" gave every map the same 16 half steps. Because maps differ in height, the gap between notes still varied from 15 to 31 px. The browser check caught it before anything went live, and it's now one fixed spacing.
 - When I made a round's dot light up from its lead note, I didn't change the Close button to count rounds the same way. Closing the tension check during the second round's lead note skipped its tick list. The full check run caught it before anything went live, and it's fixed. My first guess at the cause was wrong, which cost one extra full run.
+- Two broken builds got past the map check: a current bubble bigger than the band, and fewer note names. The check looked during the lead note, when no bubble is current, and asked for only six names. It now looks while a note is being sung and wants every white key named. Both are caught now.
+- My first run of the broken builds gave the loudness checks the wrong voice recording, so 22 of them couldn't start. I ran those 22 again with the right one.
 
 ## Your taps
 
@@ -1419,5 +1422,5 @@ I also haven't seen the new map spacing there. Screenshots at 390 and 360 wide a
 2. While that runs, look at the map: thin bubbles with a line through the middle, one row tall, and the view sliding up as the rounds climb.
 3. Bwoop, Start: the piano notes should sound short and clipped, and the bubbles should be short. Sing it through and look at the score.
 4. Note bends, Start: a quick flick between note and neighbour, three times, ending on the note, with short piano notes. Your line is shown and there's no score.
-5. Match the tone, Beginner, Start, with headphones in. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
+5. Match the tone, Beginner, Start. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
 6. Match the tone, Advanced: your line stays hidden while the tone plays, and appears once it stops.
