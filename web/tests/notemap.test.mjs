@@ -21,6 +21,7 @@ import { launch, sleep } from './chrome.mjs';
 import { MIRROR, PROBE, serve } from './harness.mjs';
 import { copy } from '../src/core/copy.ts';
 import { pinnedRange } from '../src/core/notemap.ts';
+import { songView } from '../src/core/songview.ts';
 import { LINE_VER } from '../src/audio/pitch/core.ts';
 
 const WEB = fileURLToPath(new URL('..', import.meta.url));
@@ -42,7 +43,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
 const RECORDING = process.env.RP_SPLIT_NAME || 'All of Me (separated)';
 const expected = BAKEOFF.rows.find((r) => r.song === RECORDING && r.method === BAKEOFF.winner);
 
-const ALL = ['line-read', 'line-shared', 'line-follows', 'pinned', 'voice-zero', 'placement', 'octave-switch', 'hear-yourself', 'mic-leave', 'mic-hidden',
+const ALL = ['line-read', 'line-shared', 'line-follows', 'map-follows', 'voice-zero', 'placement', 'octave-switch', 'hear-yourself', 'mic-leave', 'mic-hidden',
   'mic-refused', 'reopen-line', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -234,26 +235,27 @@ try {
     return 60;
   })();
 
-  if (want('pinned', 'voice-zero')) {
+  if (want('map-follows', 'voice-zero')) {
     /* the Voice slider all the way down: the singer's line is still there */
     await page.eval(`document.querySelector('#voice-volume').focus()`);
     await page.key('Home');
     await startAt(sungAt, false);
-    const views = new Set();
+    const views = [];
+    const look = () => page.eval(`({ lo: +${MAP}.dataset.lo, hi: +${MAP}.dataset.hi, now: +${MAP}.dataset.now, row: ${MAP}.dataset.row, h: ${MAP}.clientHeight })`);
     let singerMin = Infinity, gains = null;
     for (let i = 0; i < 20; i++) {
       await sleep(250);
-      const d = await page.eval(`({ lo: ${MAP}.dataset.lo, hi: ${MAP}.dataset.hi, singer: +${MAP}.dataset.singer, playing: window.__probe.playing() })`);
-      views.add(d.lo + '–' + d.hi);
+      const d = await page.eval(`({ singer: +${MAP}.dataset.singer, playing: window.__probe.playing() })`);
+      views.push(await look());
       singerMin = Math.min(singerMin, d.singer);
       gains = d.playing.map((p) => p.gain);
     }
-    /* somewhere else in the song: the view does not move */
+    /* somewhere else in the song: the view is the path's there too */
     await stopSong();
     await startAt(Math.max(5, seconds - 40), false);
     for (let i = 0; i < 8; i++) {
       await sleep(250);
-      views.add(await page.eval(`${MAP}.dataset.lo + '–' + ${MAP}.dataset.hi`));
+      views.push(await look());
     }
     await stopSong();
     await page.eval(`document.querySelector('#voice-volume').focus()`);
@@ -262,10 +264,18 @@ try {
       check('voice-zero', gains && gains[0] === 0 && gains[1] > 0 && singerMin > 20,
         `Voice at 0 (voice / music volume ${gains?.map((g) => g.toFixed(2)).join(' / ')}): the singer's line still drawn, at least ${singerMin} points on screen throughout 5 s`);
     }
-    if (want('pinned')) {
-      const want = range ? `${range.lo}–${range.hi}` : '?';
-      check('pinned', views.size === 1 && views.has(want),
-        `the view across two places in the song: ${[...views].join(', ')}; the song's own range ±3 from its line: ${want}`);
+    if (want('map-follows')) {
+      /* Robert, 22 Nov: one map everywhere: 30 px a half step, never zooming,
+         the view where the song's path (core/songview) has it */
+      const m = Float32Array.from(line?.m ?? [], (x) => (x == null ? NaN : x));
+      const span = (views[0].h - 20) / 30;
+      const path = songView(m, line?.hop ?? 0.05, span);
+      const off = Math.max(...views.map((d) => Math.abs((d.lo + d.hi) / 2 - path.mid(d.now))));
+      const zoom = Math.max(...views.map((d) => Math.abs(d.hi - d.lo - span)));
+      const mids = new Set(views.map((d) => ((d.lo + d.hi) / 2).toFixed(1)));
+      check('map-follows', views.every((d) => d.row === '30') && zoom < 0.02 && off < 0.06 && path.moves.length > 0,
+        `${views.length} looks at two places in the song: 30 px a row ${views.every((d) => d.row === '30')}, the height ${span.toFixed(1)} half steps (never off by more than ${zoom.toFixed(3)}), ` +
+        `the view's middle at ${[...mids].join(', ')}, off the song's path by at most ${off.toFixed(3)} half steps; the path moves ${path.moves.length} times in ${clock(seconds)}`);
     }
   }
 

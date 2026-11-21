@@ -145,13 +145,17 @@ export interface Exercise {
   /** the band that counts at the level picked: half its height either side
       of the note (Robert, 21 Nov; BANDS); set by atLevel */
   readonly within?: number;
+  /** how hard it is on its own, whatever level it's sung at: the level it
+      was listed at (the old app's, where it had one). The list shows it
+      beside the level span (Robert, 22 Nov) */
+  readonly own: Level;
 }
 
 const ex = (id: Exercise['id'], category: CategoryId, level: Level, quiet: boolean, engine: Engine, sylsBy: SylsBy = 'note'): Exercise =>
-  ({ id, category, level, quiet, engine, sylsBy });
+  ({ id, category, level, own: level, quiet, engine, sylsBy });
 /** an exercise with a level inside it for each pattern, the lowest first */
 const leveled = (id: Exercise['id'], category: CategoryId, quiet: boolean, levels: ReadonlyArray<{ level: Level; engine: Engine }>,
-  more: Partial<Exercise> = {}): Exercise => ({ id, category, level: levels[0].level, quiet, engine: levels[0].engine, sylsBy: 'note', levels, ...more });
+  more: Partial<Exercise> = {}): Exercise => ({ id, category, level: levels[0].level, own: levels[0].level, quiet, engine: levels[0].engine, sylsBy: 'note', levels, ...more });
 /** Robert's 3 Nov exercises climb a half step every round */
 const climbing = (e: Exercise, more: Partial<Exercise> = {}): Exercise => ({ ...e, everyStep: true, ...more });
 const ladder = (pattern: PatternId, bpm: number): Engine => ({ kind: 'ladder', pattern, bpm });
@@ -175,7 +179,9 @@ const LISTED: readonly Exercise[] = [
   ex('buzz', 'warmup', 1, true, ladder('five', 110), 'rung'),
   ex('raspberry', 'warmup', 1, true, { kind: 'glide' }),
   /* Robert, 16 Nov: an Advanced level, the trill through puffed cheeks, same pattern and speed */
-  leveled('tonguetrill', 'warmup', true, [{ level: 2, engine: ladder('five', 120) }, { level: 3, engine: ladder('five', 120) }]),
+  /* Robert, 22 Nov: each two-level exercise gets its missing level, a notch
+     (NOTCH) slower or faster than the level next to it */
+  leveled('tonguetrill', 'warmup', true, [{ level: 1, engine: ladder('five', 96) }, { level: 2, engine: ladder('five', 120) }, { level: 3, engine: ladder('five', 120) }], { own: 2 }),
   /* Robert, 3 Nov: sung patterns in place of the clock; scored since his
      real-straw test on his phone ("the straw test was good", 13 Nov) */
   leveled('straw', 'warmup', true, [{ level: 1, engine: ladder('three', 110) }, { level: 2, engine: ladder('five', 110) },
@@ -197,7 +203,7 @@ const LISTED: readonly Exercise[] = [
   ex('mee', 'tone', 1, true, ladder('five', 120)),
   ex('noo', 'tone', 1, true, ladder('five', 120)),
   ex('gee', 'tone', 2, false, ladder('five', 120)),
-  leveled('nay', 'tone', false, [{ level: 1, engine: ladder('five', 120) }, { level: 2, engine: ladder('oct', 120) }], { everyStep: true }),
+  leveled('nay', 'tone', false, [{ level: 1, engine: ladder('five', 120) }, { level: 2, engine: ladder('oct', 120) }, { level: 3, engine: ladder('oct', 144) }], { everyStep: true }),
   ex('wah', 'tone', 1, true, ladder('down3', 100)),
   ex('tongueout', 'tone', 1, true, ladder('down5', 110)),
   /* Robert, 4 Nov: on held notes with the line, scored, the top five half steps clear */
@@ -213,11 +219,11 @@ const LISTED: readonly Exercise[] = [
     { level: 3, engine: ladder('arp19', 132) }], { everyStep: true }),
   /* Robert, 4 Nov: on notes, the line shown, not scored, like Chew and hum */
   { ...ex('blah', 'agility', 1, true, ladder('five', 110)), lineOnly: true },
-  leveled('ninetone', 'agility', false, speeds([[2, 130], [3, 160]], 'nine')),
+  leveled('ninetone', 'agility', false, speeds([[1, 104], [2, 130], [3, 160]], 'nine'), { own: 2 }),
   /* the runs, all on "my": a speed for each level (Robert, 4 Nov); the
      chromatic run and the turns stay advanced, with no 100 (13 Nov) */
   /* Robert, 16 Nov: the smallest run, 3-2-1 then 1-2-3, a half step a round */
-  leveled('threerun', 'agility', true, speeds([[1, 100], [2, 130]], 'threerun'), { everyStep: true }),
+  leveled('threerun', 'agility', true, speeds([[1, 100], [2, 130], [3, 156]], 'threerun'), { everyStep: true }),
   leveled('run5', 'agility', true, speeds([[1, 100], [2, 130], [3, 160]], 'run5')),
   leveled('minor5', 'agility', true, speeds([[1, 100], [2, 130], [3, 160]], 'minor5')),
   leveled('penta', 'agility', true, speeds([[1, 100], [2, 130], [3, 160]], 'penta')),
@@ -238,10 +244,10 @@ const LISTED: readonly Exercise[] = [
      words; the four tongue twisters together, each with a slower Beginner
      level at 100 and today's speed as Intermediate (Robert, 4 Nov) */
   ex('vowels', 'words', 1, true, ladder('same5', 100)),
-  leveled('redleather', 'words', true, speeds([[1, 100], [2, 120]], 'twist7')),
-  leveled('uniqueny', 'words', true, speeds([[1, 100], [2, 110]], 'twist8')),
-  leveled('peterpiper', 'words', true, speeds([[1, 100], [2, 120]], 'twist7')),
-  leveled('lipstongue', 'words', true, speeds([[1, 100], [2, 112]], 'five')),
+  leveled('redleather', 'words', true, speeds([[1, 100], [2, 120], [3, 144]], 'twist7')),
+  leveled('uniqueny', 'words', true, speeds([[1, 100], [2, 110], [3, 132]], 'twist8')),
+  leveled('peterpiper', 'words', true, speeds([[1, 100], [2, 120], [3, 144]], 'twist7')),
+  leveled('lipstongue', 'words', true, speeds([[1, 100], [2, 112], [3, 134]], 'five')),
   { ...ex('pops', 'words', 1, true, ladder('pops', 100)), shortNotes: true },
   ex('tonguetip', 'words', 1, true, ladder('five', 120)),
   /* Pitch (Robert, 28 Oct; his 4 Nov order): Match the note first, with its three levels */

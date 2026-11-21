@@ -22,7 +22,8 @@ export interface SingerLine {
   readonly seconds: number;
   /** still reading */
   readonly reading: boolean;
-  /** the view: the song's own range, pinned (RULEBOOK 4, Pitch). Worked
+  /** the song's own range: where the map sits before any of the line is
+      read (since 22 Nov the view slides with the song: core/songview). Worked
       out from the line once it is settled - the first 30 seconds, then the
       whole song - never from where the song has got to. */
   readonly range: Range | null;

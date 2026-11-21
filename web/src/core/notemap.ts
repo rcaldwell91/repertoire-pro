@@ -1,6 +1,7 @@
 /* The note map, as numbers (RULEBOOK 1b, Learn a song): the singer's line
-   and your line on rows of keys, a now-line, the view pinned to the song's
-   own range. Drawn by ui/NoteMap; the sums are here so they can be tested. */
+   and your line on rows of keys, a now-line; the view slides with the
+   song (core/songview, Robert 22 Nov). Drawn by ui/NoteMap; the sums are
+   here so they can be tested. */
 
 const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
 
@@ -22,13 +23,25 @@ export const AROUND = 30;
 export const SLIP = 10;
 
 /** The song's own range, from its singer's line, 3 semitones either side.
-    Pinned: it depends only on the whole line, never on where the song is
-    (RULEBOOK 4, Pitch: "Pin the view; don't recentre"). Brief slips - a
+    It depends only on the whole line, never on where the song is. Since
+    22 Nov the view slides with the song (core/songview); this range only
+    places the map before any of the line is read. Brief slips - a
     reading an octave or more away from the notes sung around it - are left
     out, and so are the lowest and highest 1%, so stray readings cannot
     stretch it. */
 export function pinnedRange(line: ArrayLike<number>): Range | null {
-  const v: number[] = [];
+  const v = Array.from(cleanLine(line)).filter(Number.isFinite);
+  if (v.length < 5) return null;
+  v.sort((a, b) => a - b);
+  const lo = v[Math.floor(v.length * 0.01)];
+  const hi = v[Math.min(v.length - 1, Math.ceil(v.length * 0.99) - 1)];
+  return widthOk(Math.floor(lo) - 3, Math.ceil(hi) + 3);
+}
+
+/** The singer's line without its brief slips: a reading an octave or more
+    from the notes sung around it is left out (NaN), as for the range. */
+export function cleanLine(line: ArrayLike<number>): Float32Array {
+  const out = new Float32Array(line.length).fill(NaN);
   const near: number[] = [];
   for (let i = 0; i < line.length; i++) {
     const m = line[i];
@@ -36,13 +49,9 @@ export function pinnedRange(line: ArrayLike<number>): Range | null {
     near.length = 0;
     for (let j = Math.max(0, i - AROUND); j <= Math.min(line.length - 1, i + AROUND); j++) if (Number.isFinite(line[j])) near.push(line[j]);
     near.sort((a, b) => a - b);
-    if (Math.abs(m - near[near.length >> 1]) < SLIP) v.push(m);
+    if (Math.abs(m - near[near.length >> 1]) < SLIP) out[i] = m;
   }
-  if (v.length < 5) return null;
-  v.sort((a, b) => a - b);
-  const lo = v[Math.floor(v.length * 0.01)];
-  const hi = v[Math.min(v.length - 1, Math.ceil(v.length * 0.99) - 1)];
-  return widthOk(Math.floor(lo) - 3, Math.ceil(hi) + 3);
+  return out;
 }
 
 /* never so tight the lanes fuse, nor so wide nothing reads (the old app's

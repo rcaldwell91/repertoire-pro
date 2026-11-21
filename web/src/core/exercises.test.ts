@@ -44,7 +44,7 @@ describe('the exercises, as data', () => {
       loo: ['agility', 1, true], gee: ['tone', 2, false], staccato: ['agility', 2, false], nay: ['tone', 1, false],
       wah: ['tone', 1, true], octleap: ['range', 3, false], laga: ['agility', 1, true], tongueout: ['tone', 1, true],
       tonguecresc: ['tone', 2, false], blah: ['agility', 1, true], yawnsigh: ['tone', 1, true], messa: ['breath', 3, false],
-      sustain: ['breath', 1, true], ninetone: ['agility', 2, false], descend: ['range', 1, true], octrep: ['range', 3, false], vfe: ['breath', 1, true],
+      sustain: ['breath', 1, true], ninetone: ['agility', 1, false], /* the old app's 2, until it got a Beginner (Robert, 22 Nov) */ descend: ['range', 1, true], octrep: ['range', 3, false], vfe: ['breath', 1, true],
     };
     /* as listed: since 21 Nov every scored one is sung at three levels, its own speed the Intermediate */
     for (const [id, [cat, level, quiet]] of Object.entries(old)) {
@@ -476,7 +476,7 @@ describe('the content round (Robert, 28 Oct)', () => {
   it('the new exercises: their groups, levels, patterns and syllables', () => {
     const want: Record<string, [string, number, number[], string[]]> = {
       buzz: ['warmup', 1, [0, 2, 4, 5, 7, 5, 4, 2, 0], ['vvv']],
-      tonguetrill: ['warmup', 2, [0, 2, 4, 5, 7, 5, 4, 2, 0], ['rrr']],
+      tonguetrill: ['warmup', 1, /* Beginner since 22 Nov */ [0, 2, 4, 5, 7, 5, 4, 2, 0], ['rrr']],
       goo: ['tone', 1, [0, 4, 7, 4, 0], ['goo']],
       guh: ['tone', 2, [0, 4, 7, 12, 7, 4, 0], ['guh']],
       /* the runs' lowest level (Robert, 4 Nov: speed levels; 13 Nov: no 100 on the chromatic run and the turns) */
@@ -507,11 +507,12 @@ describe('the content round (Robert, 28 Oct)', () => {
     const speeds = (id: string) => levelsOf(exercise(id) as Exercise).map((x) => [x.level, x.engine.kind === 'ladder' ? x.engine.bpm : 0]);
     for (const id of ['run5', 'minor5', 'penta']) expect(speeds(id), id).toEqual([[1, 100], [2, 130], [3, 160]]);
     for (const id of ['chrom', 'turns']) expect(speeds(id), id).toEqual([[2, 130], [3, 160]]);
-    expect(speeds('ninetone')).toEqual([[2, 130], [3, 160]]);
-    expect(speeds('redleather')).toEqual([[1, 100], [2, 120]]);
-    expect(speeds('uniqueny')).toEqual([[1, 100], [2, 110]]);
-    expect(speeds('peterpiper')).toEqual([[1, 100], [2, 120]]);
-    expect(speeds('lipstongue')).toEqual([[1, 100], [2, 112]]);
+    /* each two-level one got its missing level, a notch away (Robert, 22 Nov) */
+    expect(speeds('ninetone')).toEqual([[1, 104], [2, 130], [3, 160]]);
+    expect(speeds('redleather')).toEqual([[1, 100], [2, 120], [3, 144]]);
+    expect(speeds('uniqueny')).toEqual([[1, 100], [2, 110], [3, 132]]);
+    expect(speeds('peterpiper')).toEqual([[1, 100], [2, 120], [3, 144]]);
+    expect(speeds('lipstongue')).toEqual([[1, 100], [2, 112], [3, 134]]);
   });
   it('Loo is sung on "loo", by its plain name', () => {
     expect(copy.ex.loo.name).toBe('Loo');
@@ -531,7 +532,7 @@ describe('the 3 Nov Train update', () => {
   it('levels inside La-Ga, Bratty Nay and Straw, with their speeds; Big climb\'s arpeggio as the top', () => {
     const lv = (id: string) => levelsOf(exercise(id) as Exercise).map((x) => [x.level, x.engine.kind === 'ladder' ? x.engine.pattern : '', x.engine.kind === 'ladder' ? x.engine.bpm : 0]);
     expect(lv('laga')).toEqual([[1, 'three', 132], [2, 'five', 132], [3, 'arp19', 132]]);
-    expect(lv('nay')).toEqual([[1, 'five', 120], [2, 'oct', 120]]);
+    expect(lv('nay')).toEqual([[1, 'five', 120], [2, 'oct', 120], [3, 'oct', 144]]); /* Advanced: 22 Nov */
     expect(lv('straw')).toEqual([[1, 'three', 110], [2, 'five', 110], [3, 'arp19', 120]]);
     expect(exercise('arp19')?.engine).toMatchObject({ pattern: 'arp19' });
     /* Lip trills (Robert, 4 Nov) */

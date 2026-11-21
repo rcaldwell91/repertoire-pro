@@ -723,6 +723,16 @@ const MUTATIONS = [
     from: '    const where = await saveResult(resultRow(e, out, sungLevel));', to: '    const where = await saveResult(resultRow({ ...e, levels: undefined, engine: { kind: \'guided\', mins: 1 } }, out, sungLevel));', checks: ['levels'] },
   { test: 'train', what: 'the level picked is not remembered', file: E,
     from: '    setLevelFor(base.id, v);\n', to: '', checks: ['levels'] },
+  /* Robert, 22 Nov */
+  { test: 'train', what: 'the list shows the level span without its own difficulty', file: 'src/screens/TrainCategory.tsx',
+    from: "const level = lv.length > 1 ? fill(copy.train.ownAndSpan, { own: copy.levels[e.own], span }) : copy.levels[e.own];", to: "const level = lv.length > 1 ? span : copy.levels[e.own];", checks: ['own-tag'] },
+  { test: 'train', what: 'the list shows the starting level as its difficulty', file: 'src/screens/TrainCategory.tsx',
+    from: "{ own: copy.levels[e.own], span }", to: "{ own: copy.levels[e.level], span }", checks: ['own-tag'] },
+  { test: 'notemap', what: 'the song map squeezes the song\'s range in again', file: 'src/ui/NoteMap.tsx',
+    from: "      const r = { lo: mid - span / 2, hi: mid + span / 2 };\n      const y = (m: number) => pad + (r.hi - m) * ROW_PX;",
+    to: "      const r = range ?? { lo: mid - span / 2, hi: mid + span / 2 };\n      const y = (m: number) => pad + ((r.hi - m) / (r.hi - r.lo)) * (H - 2 * pad);", checks: ['map-follows'] },
+  { test: 'notemap', what: 'the song map pinned in place', file: 'src/ui/NoteMap.tsx',
+    from: "const mid = path.current!.has ? view.mid(at) : fallback;", to: "const mid = path.current!.has ? view.mid(0) : fallback;", checks: ['map-follows'] },
 ];
 
 function edit(dir, { file, from, to }) {

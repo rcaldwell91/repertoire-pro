@@ -17,6 +17,8 @@ import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
 import { firstNote, pcm, pitchTrack, restingSlides, singNotes, steadyNote } from './voice.mjs';
 import { copy, fill } from '../src/core/copy.ts';
+/** a list row's level: its own difficulty, then its level span (Robert, 22 Nov) */
+const ownSpan = (own, from, to) => fill(copy.train.ownAndSpan, { own: copy.levels[own], span: fill(copy.train.levelSpan, { from: copy.levels[from], to: copy.levels[to] }) });
 import { SUPABASE_KEY, SUPABASE_URL } from '../src/data/config.ts';
 import { COACH_EMAIL, EMAIL, password } from './test-account.mjs';
 
@@ -40,7 +42,7 @@ const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'prev
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
   'next-moves-on', 'no-silent-taps', 'menu-everywhere', 'menu-leave', 'rounds-sung', 'stop-early', 'match-wait', 'match-window', 'match-blind', 'hold-map', 'match-tone',
-  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
+  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'own-tag', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
 const GROUPS = { warmup: 14, breath: 6, tone: 12, agility: 12, range: 6, words: 7, pitch: 5 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
@@ -335,7 +337,7 @@ try {
     }
     const mum = seen.tone.rows[0];
     const ok = Object.entries(GROUPS).every(([id, n]) => seen[id].title === copy.cats[id] && seen[id].coloured && seen[id].rows.length === n) &&
-      mum === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[3] }), measure: copy.train.tagPitch }) && seen.range.range === fill(copy.train.rangeIs, { lo: 'G♯3', hi: 'F4' }).replace('G♯3', keyNameOf(RANGE.lo)).replace('F4', keyNameOf(RANGE.hi));
+      mum === fill(copy.train.tagLineQuiet, { level: ownSpan(1, 1, 3), measure: copy.train.tagPitch }) && seen.range.range === fill(copy.train.rangeIs, { lo: 'G♯3', hi: 'F4' }).replace('G♯3', keyNameOf(RANGE.lo)).replace('F4', keyNameOf(RANGE.hi));
     check('category', ok, Object.entries(seen).map(([id, v]) => `${v.title} (${v.coloured ? 'in its colour' : 'wrong colour'}): ${v.rows.length} rows`).join('; ') +
       `; Mum's row "${mum}"; the range check's row "${seen.range.range}"`);
   }
@@ -1134,8 +1136,8 @@ try {
     const noPicker = await page.eval(`!document.querySelector('#jump-level')`);
     await page.eval(`localStorage.removeItem('rp.level.laga')`);
     check('levels', first === 5 && JSON.stringify(options) === JSON.stringify([copy.levels[1], copy.levels[2], copy.levels[3]]) && top === 11 && kept === 11 &&
-      nay === 9 && JSON.stringify(nayOptions) === JSON.stringify([copy.levels[1], copy.levels[2]]) &&
-      row === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[3] }), measure: copy.train.tagPitch }) &&
+      nay === 9 && JSON.stringify(nayOptions) === JSON.stringify([copy.levels[1], copy.levels[2], copy.levels[3]]) &&
+      row === fill(copy.train.tagLineQuiet, { level: ownSpan(1, 1, 3), measure: copy.train.tagPitch }) &&
       inRoutine === 9 && noPicker,
       `La-Ga at first ${first} notes (1-2-3-2-1); levels ${options.join(', ')}; Advanced ${top} notes, remembered ${kept}; Bratty Nay ${nay} notes (${nayOptions.join(', ')}); ` +
       `the list row "${row}"; in the Intermediate warm-up ${inRoutine} notes, no level picker there ${noPicker}`);
@@ -2329,10 +2331,30 @@ try {
     await openEx('tonguetrill');
     const top = { step: await step3(), right: await right() };
     await page.eval(`localStorage.removeItem('rp.level.tonguetrill')`);
-    check('trill-advanced', row?.startsWith(fill(copy.train.levelSpan, { from: copy.levels[2], to: copy.levels[3] })) &&
+    check('trill-advanced', row?.startsWith(ownSpan(2, 1, 3)) &&
       mid.step === copy.about.tonguetrill.steps[2] && mid.right === copy.about.tonguetrill.right &&
       top.step === copy.about.tonguetrill.byLevel[3].steps[3] && top.right === copy.about.tonguetrill.byLevel[3].right,
       `the row "${row}"; Intermediate: "${mid.step}" / "${mid.right}"; Advanced: "${top.step}" / "${top.right}"`);
+  }
+
+  /* Robert, 22 Nov: each exercise's own difficulty beside its level span,
+     so the list still shows which are harder on their own */
+  if (want('own-tag')) {
+    const tagsOf = async (cat) => {
+      await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/' + cat);
+      await page.waitFor(`document.querySelectorAll('.ex-row').length > 0`, 5000);
+      return page.eval(`Object.fromEntries([...document.querySelectorAll('.ex-row')].map((r) => [r.id.replace(/^ex-/, ''), r.querySelector('.ex-tags').textContent]))`);
+    };
+    const rng = await tagsOf('range'), agil = await tagsOf('agility'), tone = await tagsOf('tone');
+    const want = {
+      octleap: fill(copy.train.tagLine, { level: ownSpan(3, 1, 3), measure: copy.train.tagPitch }),
+      ninetone: fill(copy.train.tagLine, { level: ownSpan(2, 1, 3), measure: copy.train.tagPitch }),
+      chrom: fill(copy.train.tagLineQuiet, { level: ownSpan(2, 2, 3), measure: copy.train.tagPitch }),
+      mum: fill(copy.train.tagLineQuiet, { level: ownSpan(1, 1, 3), measure: copy.train.tagPitch }),
+      yawnsigh: fill(copy.train.tagLineQuiet, { level: copy.levels[1], measure: copy.train.tagNone }),
+    };
+    const got = { octleap: rng.octleap, ninetone: agil.ninetone, chrom: agil.chrom, mum: tone.mum, yawnsigh: tone.yawnsigh };
+    check('own-tag', Object.keys(want).every((k) => got[k] === want[k]), Object.entries(got).map(([k, v]) => `${k} "${v}"${v === want[k] ? '' : ' (wanted "' + want[k] + '")'}`).join('; '));
   }
 
   /* the four new ones on their lists (Robert, 16 Nov), each in its place with its level, and how each runs */
@@ -2349,9 +2371,9 @@ try {
     const tags = { restnote: warm[at(warm, 'restnote')]?.tags, threerun: agil[at(agil, 'threerun')]?.tags, bends: agil[at(agil, 'bends')]?.tags,
       bwoop: rng[at(rng, 'bwoop')]?.tags };
     const levelsOk = tags.restnote === fill(copy.train.tagLineQuiet, { level: copy.levels[1], measure: copy.train.tagNone }) &&
-      tags.threerun === fill(copy.train.tagLineQuiet, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[2] }), measure: copy.train.tagPitch }) &&
+      tags.threerun === fill(copy.train.tagLineQuiet, { level: ownSpan(1, 1, 3), measure: copy.train.tagPitch }) &&
       tags.bends === fill(copy.train.tagLineQuiet, { level: copy.levels[3], measure: copy.train.tagNone }) &&
-      tags.bwoop === fill(copy.train.tagLine, { level: fill(copy.train.levelSpan, { from: copy.levels[1], to: copy.levels[3] }), measure: copy.train.tagPitch });
+      tags.bwoop === fill(copy.train.tagLine, { level: ownSpan(3, 1, 3), measure: copy.train.tagPitch });
     /* Bwoop: "bwoop" in every bubble, from the middle of the range; Note bends: the line shown, nothing filled */
     await openEx('bwoop');
     const bwoopRound = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round)`);

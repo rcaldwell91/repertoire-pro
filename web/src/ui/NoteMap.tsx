@@ -1,11 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { foldTo, keyName, penDown, singerAt, type Range } from '../core/notemap';
+import { songView, type SongView } from '../core/songview';
 import { isRight, singerNow } from '../core/takes';
+import { ROW_PX } from './Bubbles';
 
 /* The note map (RULEBOOK 1b): key names down the side, the singer's line
    thick and soft, your line thin with the voice gradient on top, and a
-   now-line. The view is pinned to the song's range; time moves past the
-   now-line. One drawing function draws both lines (RULEBOOK 4, Pitch). */
+   now-line. Time moves past the now-line. The view is Train's: ROW_PX a
+   half step, never zooming, sliding up and down with the song's notes a
+   moment ahead of them (Robert, 22 Nov; core/songview). One drawing
+   function draws both lines (RULEBOOK 4, Pitch). */
 
 export interface Lines {
   /** the singer's line: a note every `hop` seconds, NaN where nobody sings */
@@ -54,6 +58,8 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
   count?: number | null }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
+  /* the view's path, worked out once for this line and this map's height */
+  const path = useRef<{ line: Float32Array; len: number; span: number; v: SongView; has: boolean } | null>(null);
   useEffect(() => {
     propsRef.current = props;
   });
@@ -76,9 +82,17 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       const at = now();
-      const r = range ?? { lo: 55, hi: 72 };
       const pad = 10;
-      const y = (m: number) => pad + ((r.hi - m) / (r.hi - r.lo)) * (H - 2 * pad);
+      const span = Math.max(1, (H - 2 * pad) / ROW_PX);
+      const p = path.current;
+      if (!p || p.line !== lines.singer || p.len !== lines.singer.length || Math.abs(p.span - span) > 0.01) {
+        path.current = { line: lines.singer, len: lines.singer.length, span, v: songView(lines.singer, lines.hop, span), has: lines.singer.some(Number.isFinite) };
+      }
+      const view = path.current!.v;
+      const fallback = range ? (range.lo + range.hi) / 2 : 63.5;
+      const mid = path.current!.has ? view.mid(at) : fallback;
+      const r = { lo: mid - span / 2, hi: mid + span / 2 };
+      const y = (m: number) => pad + (r.hi - m) * ROW_PX;
       const pxs = (W - GUTTER) / SPAN;
       const nowX = GUTTER + NOW_AT * (W - GUTTER);
       const x = (t: number) => nowX + (t - at) * pxs;
@@ -89,7 +103,7 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       g.textBaseline = 'middle';
       /* every white key named when there is room; otherwise C, E, G and A,
          so no two names touch */
-      const roomy = (H - 2 * pad) / (r.hi - r.lo) >= 14;
+      const roomy = ROW_PX >= 14;
       for (let m = Math.ceil(r.lo); m <= Math.floor(r.hi); m++) {
         const pc = ((m % 12) + 12) % 12;
         const isC = pc === 0;
@@ -140,8 +154,10 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       g.fillRect(Math.round(nowX) - 1, 0, 2, H);
 
       /* what was drawn, for the tests that check it */
-      cv.dataset.lo = String(r.lo);
-      cv.dataset.hi = String(r.hi);
+      cv.dataset.lo = r.lo.toFixed(2);
+      cv.dataset.hi = r.hi.toFixed(2);
+      cv.dataset.row = String(ROW_PX);
+      cv.dataset.moves = String(view.moves.length);
       cv.dataset.now = at.toFixed(2);
       cv.dataset.singer = String(singerDrawn);
       cv.dataset.you = String(youDrawn);

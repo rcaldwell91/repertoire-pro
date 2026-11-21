@@ -31,8 +31,8 @@ describe('four new exercises (Robert, 16 Nov), none in a routine', () => {
     expect(listed('bwoop')).toMatchObject({ category: 'range', level: 3, quiet: false, shortNotes: true, fromMiddle: true, everyStep: true,
       engine: { kind: 'ladder', pattern: 'five', bpm: 120 } });
     expect(levelsOf(ex('threerun')).map((l) => [l.level, l.engine])).toEqual([[1, { kind: 'ladder', pattern: 'threerun', bpm: 100 }],
-      [2, { kind: 'ladder', pattern: 'threerun', bpm: 130 }]]);
-    expect(span('threerun')).toBe('Beginner to Intermediate');
+      [2, { kind: 'ladder', pattern: 'threerun', bpm: 130 }], [3, { kind: 'ladder', pattern: 'threerun', bpm: 156 }]]); /* Advanced: 22 Nov */
+    expect(span('threerun')).toBe('Beginner to Advanced');
     for (const r of Object.values(ROUTINES)) for (const id of ['restnote', 'threerun', 'bends', 'bwoop']) expect(r.steps.map((s) => s.id)).not.toContain(id);
   });
 
@@ -174,10 +174,10 @@ describe('Find your resting note: where each slide came to rest (core/rest)', ()
 });
 
 describe('Tongue trill: an Advanced level, the trill through puffed cheeks (Robert, 16 Nov)', () => {
-  it('Intermediate to Advanced, the same pattern and speed', () => {
-    expect(levelsOf(ex('tonguetrill')).map((l) => [l.level, l.engine])).toEqual([[2, { kind: 'ladder', pattern: 'five', bpm: 120 }],
-      [3, { kind: 'ladder', pattern: 'five', bpm: 120 }]]);
-    expect(span('tonguetrill')).toBe('Intermediate to Advanced');
+  it('Intermediate to Advanced, the same pattern and speed; a Beginner a notch slower (22 Nov)', () => {
+    expect(levelsOf(ex('tonguetrill')).map((l) => [l.level, l.engine])).toEqual([[1, { kind: 'ladder', pattern: 'five', bpm: 96 }],
+      [2, { kind: 'ladder', pattern: 'five', bpm: 120 }], [3, { kind: 'ladder', pattern: 'five', bpm: 120 }]]);
+    expect(span('tonguetrill')).toBe('Beginner to Advanced');
   });
 
   it('at Advanced its own step 3 and doing-right line; at Intermediate today\'s', () => {

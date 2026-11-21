@@ -145,7 +145,7 @@ web/src/
 
 - Lift the pen across big jumps, and centre the view on a median, not the newest sample.
 - Use one shared drawing function.
-- Pin the view; don't recentre.
+- **One map everywhere** (Robert, 22 Nov: "so singers learn where their voice sits"; this replaces "Pin the view; don't recentre" for Learn a song). Learn a song's map has Train's spacing, 30 px a half step, and never zooms. It slides up and down with the song's notes a moment before they come, so the next phrase is already in view when it starts, and it never moves so that a note about to be sung is off screen. The view stays put while the next 2 seconds of notes fit, and moves only when they don't, gliding over 0.6 s. A glide waits until any note it would push off screen has been sung, and it finishes before the first note it moved for. It only changes the view: the song's line, the singer's line, the bubbles and the scoring stay as they are. Checked on real songs (tests/lab-songmap.mjs).
 - One pitch core for files and mic.
 - Loudness gate: use Otsu on the file's own loudness, not a guessed threshold. Bridge gaps of 0.15 s or less, and don't loosen the gate.
 - Keep median-of-five (unsmoothed was measured worse).

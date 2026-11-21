@@ -299,6 +299,8 @@ export const copy = {
     whyHelps: 'Why it helps',
     level: 'Level',
     levelSpan: '{from} to {to}',
+    /* each exercise's own difficulty beside its level span (Robert, 22 Nov) */
+    ownAndSpan: '{own} · Levels {span}',
     lineOnly: 'Not scored. The line was there to watch.',
     /* the "Ah" tension check's ticks, and the reminders they bring */
     tensionHead: 'Tick where you felt tension.',

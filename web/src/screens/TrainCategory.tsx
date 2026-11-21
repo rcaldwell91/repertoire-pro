@@ -39,9 +39,12 @@ export function TrainCategory(props: { id: string }) {
     if (e.engine.kind === 'range') {
       return <span className="ex-tags" id="range-value">{range ? fill(copy.train.rangeIs, { lo: keyName(range.lo), hi: keyName(range.hi) }) : copy.train.notMeasured}</span>;
     }
-    /* an exercise with levels inside it shows their span (Robert, 3 Nov) */
+    /* an exercise with levels inside it shows their span (Robert, 3 Nov),
+       after how hard it is on its own (Robert, 22 Nov: "so the list still
+       shows which exercises are harder on their own") */
     const lv = levelsOf(e);
-    const level = lv.length > 1 ? fill(copy.train.levelSpan, { from: copy.levels[lv[0].level], to: copy.levels[lv[lv.length - 1].level] }) : copy.levels[e.level];
+    const span = fill(copy.train.levelSpan, { from: copy.levels[lv[0].level], to: copy.levels[lv[lv.length - 1].level] });
+    const level = lv.length > 1 ? fill(copy.train.ownAndSpan, { own: copy.levels[e.own], span }) : copy.levels[e.own];
     const tag = { level, measure: measureTag(e) };
     return <span className="ex-tags">{fill(e.quiet ? copy.train.tagLineQuiet : copy.train.tagLine, tag)}</span>;
   };
