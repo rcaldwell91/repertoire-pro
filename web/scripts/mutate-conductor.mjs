@@ -50,7 +50,7 @@ export const MUTATIONS = [
   { rule: 'time is compared unrounded', file: X,
     from: 'const ms = (s: number) => Math.round(s * 1000);', to: 'const ms = (s: number) => s * 1000;' },
   { rule: 'the bubbles fold every octave', file: X,
-    from: '        if (isRight(m[i], n.m, anyOctave)) {', to: '        if (isRight(m[i], n.m, true)) {' },
+    from: '        if (isRight(m[i], n.m, anyOctave, within)) {', to: '        if (isRight(m[i], n.m, true, within)) {' },
   { rule: 'something unsung is scored', file: X,
     from: '    sung = true;\n', to: '' },
   /* Robert, 25 Oct: Articulation, the syllables note by note, the How lines */
