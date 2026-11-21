@@ -314,10 +314,10 @@ describe('the timed hiss (9110-9135; Robert, 1 Oct)', () => {
 
 describe('a result, with only what was measured (rp-cloud.js 870-905, rp-score.js)', () => {
   it('a sung exercise: notes hit of notes, and the %', () => {
-    /* with the level it was sung at (Robert, 21 Nov), in the label too, as the table has no column for it */
+    /* with the level it was sung at (Robert, 21 Nov), in its own column online, the name plain (22 Nov) */
     expect(resultRow(exercise('mum') as Exercise, { kind: 'pitch', hits: 7, n: 9 })).toEqual(
-      { kind: 'practice', label: 'Mum · Beginner', level: 1, app_ex_id: 'mum', score: 7, out_of: 9, pct: 78 });
-    expect(resultRow(atLevel(exercise('mum') as Exercise, 3), { kind: 'pitch', hits: 7, n: 9 })).toMatchObject({ label: 'Mum · Advanced', level: 3 });
+      { kind: 'practice', label: 'Mum', level: 1, app_ex_id: 'mum', score: 7, out_of: 9, pct: 78 });
+    expect(resultRow(atLevel(exercise('mum') as Exercise, 3), { kind: 'pitch', hits: 7, n: 9 })).toMatchObject({ label: 'Mum', level: 3 });
   });
   it('the hiss: the seconds held', () => {
     expect(resultRow(exercise('hiss') as Exercise, { kind: 'time', seconds: 12.34 })).toEqual(
@@ -325,10 +325,10 @@ describe('a result, with only what was measured (rp-cloud.js 870-905, rp-score.j
       { kind: 'practice', label: 'Steady hiss', app_ex_id: 'hiss', score: 12, seconds: 12.3 });
   });
   it('anything not measured: that it was done, and no number', () => {
-    expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.straw.name + ' · Beginner', level: 1, app_ex_id: 'straw' });
-    expect(resultRow(exercise('mum') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Mum · Beginner', level: 1, app_ex_id: 'mum' });
-    /* one with no levels: its name alone */
-    expect(resultRow(exercise('hum') as Exercise, { kind: 'none' })).toMatchObject({ label: copy.ex.hum.name + ' · Beginner' });
+    expect(resultRow(exercise('straw') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.straw.name, level: 1, app_ex_id: 'straw' });
+    expect(resultRow(exercise('mum') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: 'Mum', level: 1, app_ex_id: 'mum' });
+    /* scored on pitch, so it has levels too (21 Nov); one not scored has its name alone */
+    expect(resultRow(exercise('hum') as Exercise, { kind: 'none' })).toMatchObject({ label: copy.ex.hum.name, level: 1 });
     expect(resultRow(exercise('yawnsigh') as Exercise, { kind: 'none' })).toEqual({ kind: 'practice', label: copy.ex.yawnsigh.name, app_ex_id: 'yawnsigh' });
   });
 });

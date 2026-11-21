@@ -79,20 +79,22 @@ describe('how fast: a notch slower at Beginner, today\'s at Intermediate, a notc
 });
 
 describe('a result shows the level it was sung at; best and last time compare within a level', () => {
-  it('kept with the result, and in its label online', () => {
+  it('kept with the result, in its own level column online (Robert, 22 Nov), its name plain', () => {
     const r = resultRow(atLevel(ex('octleap'), 2), { kind: 'pitch', hits: 3, n: 6 });
-    expect(r).toMatchObject({ label: 'Octave leaps · Intermediate', level: 2 });
+    expect(r).toMatchObject({ label: 'Octave leaps', level: 2 });
     expect(levelOfRow(r)).toBe(2);
-    expect(levelOfRow({ label: 'Octave leaps · Advanced' })).toBe(3);
-    /* one saved before levels were kept: no level, so compared with none */
-    expect(levelOfRow({ label: 'Match the note' })).toBeNull();
+    /* one saved before the column: no level, so compared with none, even
+       if its name carried one (only test accounts' did, 21 Nov) */
+    expect(levelOfRow({ label: 'Octave leaps · Advanced' } as never)).toBeNull();
+    expect(levelOfRow({ level: null })).toBeNull();
     expect(hasLevels(ex('hiss'))).toBe(false);
+    expect(resultRow(ex('hiss'), { kind: 'time', seconds: 20 })).not.toHaveProperty('level');
     expect(hasLevels(ex('interval'))).toBe(true);
-    expect(resultRow(ex('interval'), { kind: 'pitch', hits: 3, n: 6 }, 3)).toMatchObject({ level: 3, label: 'Sing the interval · Advanced' });
+    expect(resultRow(ex('interval'), { kind: 'pitch', hits: 3, n: 6 }, 3)).toMatchObject({ level: 3, label: 'Sing the interval' });
   });
   it('last time is the last at the same level, never another level\'s, nor one from before levels were kept', () => {
-    const rows = [{ label: 'Match the note · Advanced', cents: 80 }, { label: 'Match the note · Beginner', level: 1 as Level, cents: 20 },
-      { label: 'Match the note', cents: 5 }, { label: 'Match the note · Beginner', cents: 40 }];
+    const rows = [{ level: 3 as Level, cents: 80 }, { level: 1 as Level, cents: 20 },
+      { level: null, cents: 5 }, { cents: 6 }, { level: 1 as Level, cents: 40 }];
     expect(atSameLevel(rows, 1).map((r) => r.cents)).toEqual([20, 40]);
     expect(atSameLevel(rows, 3).map((r) => r.cents)).toEqual([80]);
     expect(atSameLevel(rows, 2)).toEqual([]);

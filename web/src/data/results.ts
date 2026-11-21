@@ -41,10 +41,8 @@ export async function saveResult(row: ResultRow): Promise<'online' | 'phone'> {
     const { data } = await supabase.auth.getSession();
     const id = data.session?.user?.id;
     if (id) {
-      /* the level rides in the label: the table has no column for it */
-      const { level: _level, ...cols } = row;
-      void _level;
-      const { error } = await supabase.from('results').insert({ student_id: id, ...cols });
+      /* the level in its own column (Robert, 22 Nov) */
+      const { error } = await supabase.from('results').insert({ student_id: id, ...row });
       online = !error;
     }
   } catch {
@@ -65,7 +63,7 @@ export async function myResults(id: string): Promise<Array<ResultRow & { created
     const { data: s } = await supabase.auth.getSession();
     const me = s.session?.user?.id;
     if (me) {
-      const { data, error } = await supabase.from('results').select('kind,label,app_ex_id,score,out_of,pct,seconds,cents,settle_cents,created_at')
+      const { data, error } = await supabase.from('results').select('kind,label,app_ex_id,score,out_of,pct,seconds,cents,settle_cents,level,created_at')
         .eq('student_id', me).eq('app_ex_id', id).order('created_at', { ascending: false }).limit(200);
       if (!error && data) {
         const clean = (r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).filter(([, v]) => v != null));

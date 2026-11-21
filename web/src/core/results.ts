@@ -27,26 +27,19 @@ export interface ResultRow {
   readonly cents?: number;
   /** Match the note: how close it settled, on average (cents; 13 Nov) */
   readonly settle_cents?: number;
-  /** the level it was sung at (Robert, 21 Nov), on an exercise with levels.
-      Kept on the phone; online it rides in the label ("Mum · Advanced"),
-      as the results table has no level of its own */
+  /** the level it was sung at (Robert, 21 Nov), on an exercise with levels;
+      online in the results table's own level column (Robert, 22 Nov) */
   readonly level?: Level;
 }
 
-/** the level of a saved result: its own, or the one its label carries;
-    null for one saved before levels were kept (21 Nov) */
-export function levelOfRow(r: { level?: Level; label?: string }): Level | null {
-  if (r.level) return r.level;
-  const at = r.label?.lastIndexOf(LEVEL_SEP) ?? -1;
-  if (at < 0) return null;
-  const word = r.label!.slice(at + LEVEL_SEP.length);
-  const k = (Object.keys(copy.levels) as unknown as Level[]).find((v) => copy.levels[v] === word);
-  return k ? (Number(k) as Level) : null;
+/** the level of a saved result; null for one saved before it had its own
+    level (Robert, 22 Nov: those stay without one) */
+export function levelOfRow(r: { level?: Level | null }): Level | null {
+  return r.level === 1 || r.level === 2 || r.level === 3 ? r.level : null;
 }
-export const LEVEL_SEP = ' · ';
 /** the saved results sung at this level, newest first as given: "your best"
     and "last time" compare within a level only (Robert, 21 Nov) */
-export function atSameLevel<T extends { level?: Level; label?: string }>(rows: readonly T[], level: Level): T[] {
+export function atSameLevel<T extends { level?: Level | null }>(rows: readonly T[], level: Level): T[] {
   return rows.filter((r) => levelOfRow(r) === level);
 }
 /** whether an exercise is sung at a level the singer picks */
@@ -56,8 +49,7 @@ export function hasLevels(e: Exercise): boolean {
 
 export function resultRow(e: Exercise, o: Outcome, level: Level = e.level): ResultRow {
   const name = copy.ex[e.id].name;
-  const base = { kind: 'practice' as const, app_ex_id: e.id,
-    ...(hasLevels(e) ? { label: name + LEVEL_SEP + copy.levels[level], level } : { label: name }) };
+  const base = { kind: 'practice' as const, app_ex_id: e.id, label: name, ...(hasLevels(e) ? { level } : {}) };
   if (o.kind === 'pitch' && o.n > 0) {
     const l = o.landing;
     return { ...base, score: o.hits, out_of: o.n, pct: Math.round((100 * o.hits) / o.n),

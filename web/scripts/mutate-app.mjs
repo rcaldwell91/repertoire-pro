@@ -583,6 +583,8 @@ const MUTATIONS = [
   { test: 'train', what: 'the readout has high and low the wrong way round', file: E,
     from: ': readout.d > 0 ? copy.train.readHigh', to: ': readout.d < 0 ? copy.train.readHigh', checks: ['long-soft'] },
   /* signed in (run with RP_ONLINE=1) */
+  { test: 'train', online: true, what: 'the level never reaches the results table (22 Nov)', file: 'src/data/results.ts',
+    from: "insert({ student_id: id, ...row });", to: "insert({ student_id: id, ...row, level: null });", checks: ['level-online'] },
   { test: 'train', online: true, what: 'an exercise take goes up as a song take', file: 'src/data/takes.ts',
     from: "kind: t.exercise ? 'exercise' : 'song'", to: "kind: 'song'", checks: ['ex-take-online'] },
   { test: 'train', online: true, what: 'an exercise take is listed with the songs\' takes', file: 'src/data/takes.ts',

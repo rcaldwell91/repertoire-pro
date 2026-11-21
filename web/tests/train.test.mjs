@@ -40,7 +40,7 @@ const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'prev
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
   'next-moves-on', 'no-silent-taps', 'menu-everywhere', 'menu-leave', 'rounds-sung', 'stop-early', 'match-wait', 'match-window', 'match-blind', 'hold-map', 'match-tone',
-  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'progress-phone', 'progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
+  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
 const GROUPS = { warmup: 14, breath: 6, tone: 12, agility: 12, range: 6, words: 7, pitch: 5 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
@@ -689,7 +689,7 @@ try {
     const near = (a, b) => Math.abs(a - b) <= 0.15;
     check('levels', options.join('|') === 'Beginner*|Intermediate|Advanced' && kept === '3' &&
       seen[1].beat === 0.625 && near(seen[1].bubble, seen[1].row * 1.3) && Math.abs(seen[3].beat - 60 / 144) < 0.002 && near(seen[3].bubble, seen[3].row * 0.7) &&
-      !!sc && sc.hits >= sc.n * 0.85 && said === 'Sung at Advanced' && row?.level === 3 && row?.label === 'Mum · Advanced' &&
+      !!sc && sc.hits >= sc.n * 0.85 && said === 'Sung at Advanced' && row?.level === 3 && row?.label === 'Mum' &&
       near(hold.within, 0.35) && near(hold.bubble, hold.row * 0.7),
       `the gear offers ${options.join(', ')}, Advanced picked and kept ${kept === '3'}; Beginner: a beat ${seen[1].beat} s, bubbles ${seen[1].bubble} px on ${seen[1].row} px rows; ` +
       `Advanced: a beat ${seen[3].beat} s, bubbles ${seen[3].bubble} px; sung right at Advanced ${sc ? sc.hits + ' of ' + sc.n : '-'}, the result says "${said}", kept as ${row?.label} (level ${row?.level}); ` +
@@ -1699,6 +1699,23 @@ try {
       '-H', 'apikey: ' + SUPABASE_KEY, '-H', 'authorization: Bearer ' + token], { encoding: 'utf8' }));
     check('progress-online', saidWhere === copy.train.saved && rows.length >= 1 && rows[0].label === copy.ex.pulses.name && rows[0].score == null,
       `said "${saidWhere}"; on the account: ${rows.length} row(s) ${rows[0] ? JSON.stringify({ label: rows[0].label, kind: rows[0].kind, score: rows[0].score }) : ''}`);
+  }
+
+  /* 16b. Robert, 22 Nov: the level a result was sung at reaches the results
+          table's own level column, and its name stays plain (RP_ONLINE=1) */
+  if (want('level-online') && ONLINE) {
+    await signIn();
+    const t0 = new Date(Date.now() - 5000).toISOString();
+    await openMum();
+    await singer(sing(MUM));
+    await page.tap('#ex-start');
+    await result(exLength(MUM) * 1000 + 12000);
+    await page.waitFor(`!!document.querySelector('#ex-saved')`, 10000);
+    const saidWhere = await text('#ex-saved');
+    const rows = JSON.parse(execFileSync('curl', ['-sS', SUPABASE_URL + `/rest/v1/results?select=app_ex_id,label,level,score,created_at&app_ex_id=eq.mum&created_at=gte.${encodeURIComponent(t0)}`,
+      '-H', 'apikey: ' + SUPABASE_KEY, '-H', 'authorization: Bearer ' + singerToken()], { encoding: 'utf8' }));
+    check('level-online', saidWhere === copy.train.saved && rows.length === 1 && rows[0].label === copy.ex.mum.name && rows[0].level === 2 && rows[0].score > 0,
+      `said "${saidWhere}"; on the account: ${rows.length} row(s) ${rows[0] ? JSON.stringify({ label: rows[0].label, level: rows[0].level, score: rows[0].score }) : JSON.stringify(rows).slice(0, 200)}`);
   }
 
   /* 17. An exercise's take, signed in as the test singer (RP_ONLINE=1): saved

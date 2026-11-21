@@ -517,11 +517,17 @@ export const MUTATIONS = [
   { rule: 'the holds take the notes\' bands', file: X,
     from: "  return (e.engine.kind === 'steady' || e.engine.kind === 'tone' ? BANDS.holds : BANDS.notes)[level];", to: '  return BANDS.notes[level];' },
   { rule: 'a result forgets the level it was sung at', file: 'src/core/results.ts',
-    from: "    ...(hasLevels(e) ? { label: name + LEVEL_SEP + copy.levels[level], level } : { label: name }) };", to: '    label: name };' },
+    from: "  const base = { kind: 'practice' as const, app_ex_id: e.id, label: name, ...(hasLevels(e) ? { level } : {}) };", to: "  const base = { kind: 'practice' as const, app_ex_id: e.id, label: name };" },
   { rule: 'last time from another level', file: 'src/core/results.ts',
     from: '  return rows.filter((r) => levelOfRow(r) === level);', to: '  return rows.filter(() => level > 0);' },
   { rule: 'a result saved before levels counts as Beginner', file: 'src/core/results.ts',
-    from: '  if (at < 0) return null;', to: '  if (at < 0) return 1;' },
+    from: '  return r.level === 1 || r.level === 2 || r.level === 3 ? r.level : null;', to: '  return r.level === 1 || r.level === 2 || r.level === 3 ? r.level : 1;' },
+
+  /* Robert, 22 Nov */
+  { rule: 'the level rides in the name again', file: 'src/core/results.ts',
+    from: "app_ex_id: e.id, label: name, ...(hasLevels(e) ? { level } : {}) };", to: "app_ex_id: e.id, label: hasLevels(e) ? name + ' · ' + copy.levels[level] : name, ...(hasLevels(e) ? { level } : {}) };" },
+  { rule: 'an unscored exercise keeps a level', file: 'src/core/results.ts',
+    from: "...(hasLevels(e) ? { level } : {}) };", to: "level };" },
 ];
 
 function run() {
