@@ -1814,8 +1814,9 @@ try {
     await page.waitFor(`!document.querySelector('#count-in')`, 6000);
     await sleep(800);
     const during = await box('#bubbles');
-    /* Straw's three notes at the same zoom as everything else (Robert, 20 Nov): the same bubbles as Mum's */
-    const strawBubble = await page.eval(`+(document.querySelector('#bubbles')?.dataset.bubble ?? 0)`);
+    /* Straw's three notes at the same zoom as everything else (Robert, 20 Nov): the same rows as Mum's, each bubble its own level's band (21 Nov) */
+    const straw = await page.eval(`(() => { const x = document.querySelector('#bubbles')?.dataset ?? {}; return { bubble: +(x.bubble ?? 0), row: +(x.row ?? 0), within: +(x.within ?? 0) }; })()`);
+    const strawBubble = straw.bubble;
     const tabs = await box('.tabs');
     const ctrls = await Promise.all(['#ex-pause', '#ex-restart', '#ex-gear-run', '#ex-close', '#ex-cue'].map(box));
     const fits = ctrls.every((b) => b && b.l >= 0 && b.r <= 360 && b.b <= tabs.t) && tabs.b <= 740 && during.b <= tabs.t;
@@ -1829,10 +1830,10 @@ try {
     await page.tap('#ex-close');
     await page.c.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     check('menu-everywhere', !!page1 && !!step && !!takesPage && page1.on === 'page' && fits && before && during && before.h === during.h && before.t === during.t &&
-      Math.abs(narrow.bubble - narrow.row * 2 * narrow.within) <= 0.15 && narrow.bubble >= 20 && Math.abs(strawBubble - narrow.bubble) <= 0.15,
+      Math.abs(narrow.bubble - narrow.row * 2 * narrow.within) <= 0.15 && narrow.bubble >= 20 && Math.abs(straw.row - narrow.row) <= 0.15 && Math.abs(strawBubble - straw.row * 2 * straw.within) <= 0.15,
       `the menu on an exercise page ${!!page1} (Train lit ${page1?.on}), a routine step ${!!step}, an exercise's takes ${!!takesPage}; ` +
       `at 360 px singing: the controls and the cue inside and above the menu ${fits}; the map ${before?.h} px before the count-in, ${during?.h} px singing, ` +
-      `the same place ${before?.t === during?.t}; Mum's bubbles at 360 x 740 ${narrow.bubble} px on ${narrow.row} px rows, Straw's ${strawBubble} px`);
+      `the same place ${before?.t === during?.t}; Mum's bubbles at 360 x 740 ${narrow.bubble} px on ${narrow.row} px rows, Straw's ${strawBubble} px on ${straw.row} px rows (its band ${straw.within})`);
   }
 
   /* leaving a running exercise by the menu: the sound and the mic stop at
