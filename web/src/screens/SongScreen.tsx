@@ -306,6 +306,8 @@ export function SongScreen(props: { id: string }) {
   /* your line: the take being heard, or the take just made, or as you sing */
   const shownLine = heard ?? (rv && !playing ? rv : null);
   const lines = useMemo(() => ({ singer: singer?.m ?? new Float32Array(0), hop: singer?.hop ?? 0.05,
+    /* how far it's read; Infinity once finished, so the map plans its view once more on the whole line */
+    readTo: singer ? (singer.reading ? singer.readTo : Infinity) : 0,
     youT: shownLine ? Array.from(shownLine.t) : you.t, youM: shownLine ? Array.from(shownLine.m) : you.m }), [singer, you, shownLine]);
   const hearingTake = playing && !!heard;
   const now = () => (playing ? c.position() ?? pos : seeking ?? pos);
@@ -348,10 +350,6 @@ export function SongScreen(props: { id: string }) {
           <p className="hint map-line" id="map-line" role="status">
             {singer?.reading ? fill(copy.song.reading, { at: clock(singer.readTo), of: clock(singer.seconds) }) : ''}
           </p>
-          <label className="switch-row">
-            <span>{copy.song.anyOctave}</span>
-            <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(e) => setAnyOctave(e.target.checked)} />
-          </label>
         </>
       )}
 
@@ -443,6 +441,14 @@ export function SongScreen(props: { id: string }) {
           <span>{copy.train.countSound}</span>
           <input type="checkbox" role="switch" id="count-in-sound" checked={countSound} onChange={(e) => setCountSound(e.target.checked)} />
         </label>
+        {/* in the sound card, as in Train's gear sheet, so the map has the room
+            for Train's spacing (Robert, 22 Nov) */}
+        {voiceParts > 0 && (
+          <label className="switch-row">
+            <span>{copy.song.anyOctave}</span>
+            <input type="checkbox" role="switch" id="any-octave" checked={anyOctave} onChange={(e) => setAnyOctave(e.target.checked)} />
+          </label>
+        )}
         <LevelBar on={listening} fill={listening ? level : 0} label={copy.song.yourLevel} />
         {headphones && <p className="hint" id="headphones">{copy.song.headphones}</p>}
         {listening && noHeadphones && <p className="hint" id="use-headphones">{copy.song.useHeadphones}</p>}

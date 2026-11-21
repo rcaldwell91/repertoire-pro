@@ -18,6 +18,9 @@ export interface Lines {
   /** your line, in song time */
   youT: number[];
   youM: number[];
+  /** seconds of the singer's line read so far: the line is filled in place
+      while it is read, so the view's path is worked out again as it grows */
+  readTo?: number;
 }
 
 const SPAN = 8;          /* seconds across the map */
@@ -59,7 +62,7 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
   const ref = useRef<HTMLCanvasElement>(null);
   const propsRef = useRef(props);
   /* the view's path, worked out once for this line and this map's height */
-  const path = useRef<{ line: Float32Array; len: number; span: number; v: SongView; has: boolean } | null>(null);
+  const path = useRef<{ line: Float32Array; len: number; readTo: number; span: number; v: SongView; has: boolean } | null>(null);
   useEffect(() => {
     propsRef.current = props;
   });
@@ -85,8 +88,8 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       const pad = 10;
       const span = Math.max(1, (H - 2 * pad) / ROW_PX);
       const p = path.current;
-      if (!p || p.line !== lines.singer || p.len !== lines.singer.length || Math.abs(p.span - span) > 0.01) {
-        path.current = { line: lines.singer, len: lines.singer.length, span, v: songView(lines.singer, lines.hop, span), has: lines.singer.some(Number.isFinite) };
+      if (!p || p.line !== lines.singer || p.len !== lines.singer.length || p.readTo !== (lines.readTo ?? 0) || Math.abs(p.span - span) > 0.01) {
+        path.current = { line: lines.singer, len: lines.singer.length, readTo: lines.readTo ?? 0, span, v: songView(lines.singer, lines.hop, span), has: lines.singer.some(Number.isFinite) };
       }
       const view = path.current!.v;
       const fallback = range ? (range.lo + range.hi) / 2 : 63.5;

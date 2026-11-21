@@ -411,7 +411,11 @@ input[type='range'] {
 
 /* the note map */
 .notemap { position: relative; margin: 8px 0 4px; }
-.notemap canvas { display: block; width: 100%; height: 260px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
+/* Learn a song's map: Train's 30 px a half step (Robert, 22 Nov), so as tall
+   as the screen allows with Start still above the menu (423 px: the title,
+   the line under it, the play bar, the buttons and the menu), never less
+   than it was */
+.notemap canvas { display: block; width: 100%; height: clamp(260px, calc(100dvh - 423px), 620px); border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--tap); }
 .switch-row input[role='switch'] {
   appearance: none;

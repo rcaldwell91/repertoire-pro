@@ -547,13 +547,15 @@ export const MUTATIONS = [
   { rule: 'the song view does not look ahead', file: 'src/core/songview.ts',
     from: 'export const LOOK = 2;', to: 'export const LOOK = 0;' },
   { rule: 'the song view jumps instead of gliding', file: 'src/core/songview.ts',
-    from: '    const b = Math.min(due * dt, Math.max(i * dt, a + GLIDE));', to: '    const b = Math.min(due * dt, a);' },
+    from: '    let s = Math.max(freeK, i - back), to = NaN;', to: '    let s = i, to = NaN;' },
   { rule: 'the song view glides while a note it pushes off is sung', file: 'src/core/songview.ts',
-    from: '    const a = Math.min(due * dt, Math.max(g * dt, free, (last + 1) * dt));', to: '    const a = Math.min(due * dt, Math.max(g * dt, free));' },
+    from: '        if (k <= i) return NaN;', to: '        if (k < s) return NaN;' },
   { rule: 'the song view chases slips', file: 'src/core/songview.ts',
     from: '  const clean = cleanLine(line);', to: '  const clean = Float32Array.from(line);' },
   { rule: 'the song view moves for every phrase', file: 'src/core/songview.ts',
-    from: '    if (!r || inside(mid, r)) continue;', to: '    if (!r || (inside(mid, r) && Math.abs(mid - (r[0] + r[1]) / 2) < 1)) continue;' },
+    from: '    if (ok(i, mid)) continue;', to: '    if (ok(i, mid) && i % 40) continue;' },
+  { rule: 'the song view lets a note it could show fall out', file: 'src/core/songview.ts',
+    from: '    while (r && r[1] - r[0] > span && j > i) r = reach(i, --j);', to: '    while (r && r[1] - r[0] > span / 2 && j > i) r = reach(i, --j);' },
 ];
 
 function run() {

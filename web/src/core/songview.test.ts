@@ -52,7 +52,10 @@ describe('Learn a song\'s view: one spacing, sliding ahead of the notes', () => 
     const m = line([[1, 6, 60]], 8);
     m[60] = 72;
     m[61] = 72;
-    expect(songView(m, HOP, 15).moves.length).toBe(0);
+    const v = songView(m, HOP, 15);
+    expect(v.moves.length).toBe(0);
+    /* and it sits on the phrase, not halfway to the slip */
+    expect(Math.abs(v.mid(3) - 60)).toBeLessThan(0.5);
   });
   it('no notes at all: no moves', () => {
     expect(songView(new Float32Array(100).fill(NaN), HOP, 15).moves).toEqual([]);
