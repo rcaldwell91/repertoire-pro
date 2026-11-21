@@ -710,7 +710,7 @@ const MUTATIONS = [
   { test: 'train', what: "the singer's line hidden during the lead note", file: 'src/ui/Bubbles.tsx',
     from: '        if (t < t0 - 1 || t > t1) continue;', to: '        if (t < t0 - 1 || t > t1 || !notes.some((q) => t >= q.t && t < q.t + q.d)) continue;', checks: ['lead-line'] },
   { test: 'train', what: "the bubble drawn at today's band whatever the level", file: 'src/ui/Bubbles.tsx',
-    from: '      const h = rowH * 2 * within;', to: '      const h = rowH * BAND;', checks: ['levels', 'singing-screen'] },
+    from: '      const h = rowH * 2 * within;', to: '      const h = rowH * BAND;', checks: ['levels'] },
   { test: 'train', what: "Hold the note's bubble a whole half step, not the band it scores", file: E,
     from: "            scored={parts[partAt].kind === 'wait'} within={within}\n", to: "            scored={parts[partAt].kind === 'wait'}\n", checks: ['levels'] },
   { test: 'train', what: 'the bubbles ignore the level', file: E,
