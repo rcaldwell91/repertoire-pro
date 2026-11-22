@@ -1,125 +1,130 @@
-# Report, 21 Nov 2026, commit 63dd31f
+# Report, 22 Nov 2026, commit a4ce773
 
-All four parts of this round are built and live. Main hadn't moved since 8b3d87f apart from my own 20 Nov report, so this round is built on exactly what went live on 20 Nov.
+Everything you answered on 21 Nov is built and live, and Learn a song's map now follows Train's rule. Main hadn't moved since 63dd31f apart from my own 21 Nov report. One clash on small phones is under "Held, and clashes".
 
 ## What works
 
-1. **Tab labels.** Every tab in the bottom menu now shows its icon with its name underneath: Home, Train, Sing, Coach, Learn, Library, Profile. The selected tab keeps its icon in the coloured pill, and its name is in bold. All seven names fit whole at 360 wide, at 13 px; "Library" is the tightest, at 45 of its 50 px. Nothing is shortened. The singing screen still fits at 360 wide: Pause, Restart, the gear, the cue and the map all sit whole above the menu on every exercise.
-2. **The note map.** The map slides up and down as you rise and never zooms. Every exercise and every round uses the same spacing, 30 px a half step. At least 13 half steps now show on every exercise at both widths (numbers below).
-3. **The singer's line during the lead note.** It draws while the lead note plays, before the round starts, and nothing is scored then. A real voice singing only the lead notes drew its line before the first round's first note, and again during the second round's lead.
-4. **Levels on every scored exercise.**
-   - Each level has its own band that counts, and every bubble is drawn as exactly that band, so what you see is what's scored. Beginner's bubbles are taller than today's, Advanced's thinner.
-   - Beginner is a notch slower, Intermediate is today's speed, and Advanced is a notch faster.
-   - It's one level setting in the gear, remembered for each exercise, as before.
-   - Exercises that had one level now have all three. Ones whose levels already change the pattern keep that, with the band added on top: Lip trills, Straw, La-Ga, Bratty Nay, Match the note, Match the tone, Tongue trill and Sing the interval. Ones with speed levels keep their speeds, with the band added.
-   - Chromatic run and Three-note turns still have no Beginner. No exercise's sound changed, and the timing pause is the same at every level. Exercises that aren't scored are unchanged.
-   - Every result now says the level it was sung at ("Sung at Advanced"). Match the note's "last time" compares only with the same level. In routines, each step keeps the level the routine gives it.
+1. **The spacing.** It stays 30 px a half step, as you said.
+2. **A level column for results.** The results table has a level column, and it can be left empty. Who can read or write results is exactly as before. Its definition is in the repo's database scripts, with the others. Results saved before it existed have no level. A result's name is plain again ("Mum", not "Mum · Advanced"), because the level now has its own place. Checked online: a real voice sang Mum at Intermediate on the test account, and the result reached the table as "Mum", level 2.
+3. **The missing levels.** Every two-level exercise now has three, a notch slower or faster as everywhere else:
+   - Advanced, a notch faster than Intermediate: Red leather 144, Unique New York 132, Peter Piper 144, Lips and tongue 134, Three-note run 156. Bratty Nay's Advanced is its Intermediate octave pattern at 144 (Intermediate is 120).
+   - Beginner, a notch slower than Intermediate: Nine-tone scale 104, Tongue trill 96.
+   - Chromatic run and Three-note turns still have no Beginner. Every new level passed the real-voice check, so all of them ship.
+4. **The difficulty tag.** Each exercise's own difficulty is back beside its level span. Octave leaps reads "Advanced · Levels Beginner to Advanced · Scored on pitch"; Mum reads "Beginner · Levels Beginner to Advanced · Quiet · Scored on pitch". Exercises without levels show their difficulty alone, as before.
+5. **Hold the note and Match the tone** keep the levels they had.
+6. **Learn a song's map follows the same rule as Train's.**
+   - It's 30 px a half step and never zooms.
+   - It slides up and down with the song's notes, moving a moment before them: every note of the next 2 seconds is in view, wherever the map can hold it.
+   - It stays put while the notes fit and moves only when they won't, gliding over up to 0.6 s.
+   - The song's line, your line and the scoring are unchanged; only the view changes.
 
 ## What was measured
 
-### The bands, from real singing
+### Every new level with a real voice
 
-I took every note held 0.3 s or longer by the two real singers in the test songs: 296 notes. For each band, I counted how many of them would count sung right, and how many would count if they'd been a half step off.
+Each new level, and the levels next to it, was sung by a real voice in the built app, arriving 0.09 s after each piano note, as in your takes. At Beginner it was also sung a half step off. The pass mark is the usual one: 85% or more counted when sung right, and 15% or less when sung a half step off.
 
-| Band (either side of the note) | Sung right, counted | A half step off, counted |
-|---|---|---|
-| 0.30 of a half step | 93% | 0% |
-| 0.35 (Advanced) | 97% | 0% |
-| 0.50 (Intermediate, today's) | 99.7% | 0% |
-| 0.65 (Beginner) | 100% | 0% |
-| 0.70 | 100% | 0% |
-| 0.75 | 100% | 1.7% |
-| 0.80 | 100% | 4.4% |
+| Exercise | Beginner | Intermediate | Advanced |
+|---|---|---|---|
+| Red leather | 100 a minute: 100% right (42 of 42), 0% a half step off | 120 a minute: 100% right (42 of 42) | **144 a minute: 100% right (42 of 42)** (new) |
+| Unique New York | 100 a minute: 100% right (48 of 48), 0% a half step off | 110 a minute: 100% right (48 of 48) | **132 a minute: 100% right (48 of 48)** (new) |
+| Peter Piper | 100 a minute: 100% right (42 of 42), 0% a half step off | 120 a minute: 100% right (42 of 42) | **144 a minute: 100% right (42 of 42)** (new) |
+| Lips and tongue | 100 a minute: 100% right (54 of 54), 0% a half step off | 112 a minute: 100% right (54 of 54) | **134 a minute: 100% right (54 of 54)** (new) |
+| Three-note run | 100 a minute: 100% right (54 of 54), 0% a half step off | 130 a minute: 100% right (54 of 54) | **156 a minute: 100% right (54 of 54)** (new) |
+| Bratty Nay | 120 a minute: 100% right (54 of 54), 0% a half step off | 120 a minute: 100% right (7 of 7) | **144 a minute: 100% right (7 of 7)** (new) |
+| Nine-tone scale | **104 a minute: 100% right (17 of 17), 0% a half step off** (new) | 130 a minute: 100% right (17 of 17) | 160 a minute: 100% right (17 of 17) |
+| Tongue trill | **96 a minute: 100% right (54 of 54), 0% a half step off** (new) | 120 a minute: 100% right (54 of 54) | 120 a minute: 100% right (54 of 54) |
 
-- **Beginner: 0.65.** No note sung a half step off counts at 0.70 or below; at 0.75 some start to. I took one step inside that for safety.
-- **Advanced: 0.35.** 97% of real held notes still count, and all 53 held 0.8 s or longer do. At 0.30 it drops to 93%, and at 0.25 to 81%.
+Bratty Nay's Intermediate and Advanced were checked on 7 notes each. Its octave pattern fits only one round in the test voice's range, which was the same on 21 Nov.
 
-**Hold the note and Match the tone** need 70% of the hold in the band, not half, and today's band is 0.35. Beginner is 0.5: every real note held 0.8 s or longer counts, and none sung a half step off. Nothing narrower than 0.35 works for Advanced: at 0.35 only 64% of those real long notes count already, because of their natural vibrato. So Advanced keeps 0.35 on those two, and Hold the note, which had one level, gets Beginner and Intermediate only.
+### Learn a song's map
 
-### The speeds
+Three songs, each read by the app itself:
+- All of Me and Ride, the two test songs;
+- a wide-range song made from All of Me's real voice and music, cut into ten passages each moved up or down by up to an octave without changing its speed. It spans 44 half steps, over three and a half octaves, with shifts of up to 8 half steps between passages.
 
-A notch is a fifth of the speed (why under "What I decided"). Beats a minute, Beginner / Intermediate / Advanced:
-- 80 / 100 / 120: Wah, Octave leaps, Five vowels, Consonant pops
-- 88 / 110 / 132: Humming, Tongue-out singing, Tongue-out bright "a", Three-note steps, Buzzing, Cheek puffs, Tongue-forward hum
-- 90 / 112 / 134: Octave repeat
-- 96 / 120 / 144: Mum, Mee, Noo, Gee, Goo, Guh, Staccato, Descending five-tone, Bwoop, Octave-and-a-half arpeggio, Tip of the tongue
-- 104 / 130 / 156: Loo
+Every 0.05 s of each song, I checked whether each note of the next 2 seconds was in view. While each played, I also checked that the view on screen was where it should be (it never differed by more than a hundredth of a half step).
 
-Held notes (Sustained note, Messa di voce, Tongue-out with a crescendo) keep their length at every level.
+| Song | Screen | Half steps shown | Moves | Instant moves | Notes it could have shown but didn't | Jumps from one note straight to the next, wider than the map |
+|---|---|---|---|---|---|---|
+| All of Me | 390 x 844 | 13.3 | 36 (8.0 a minute) | 13 | 0 | 1 (0.08% of upcoming notes), in view 0.05 to 0.05 s before sung |
+| All of Me | 360 x 740 | 9.8 | 157 (34.9 a minute) | 123 | 0 | 7 (2.30% of upcoming notes), in view 0.00 to 0.40 s before sung |
+| Ride | 390 x 844 | 13.3 | 45 (12.2 a minute) | 24 | 0 | 3 (0.66% of upcoming notes), in view 0.05 to 0.30 s before sung |
+| Ride | 360 x 740 | 9.8 | 143 (38.8 a minute) | 119 | 0 | 11 (3.44% of upcoming notes), in view 0.00 to 0.55 s before sung |
+| Wide range | 390 x 844 | 13.3 | 58 (13.4 a minute) | 25 | 0 | 2 (0.80% of upcoming notes), in view 0.05 to 0.70 s before sung |
+| Wide range | 360 x 740 | 9.8 | 170 (39.2 a minute) | 133 | 0 | 14 (3.31% of upcoming notes), in view 0.00 to 0.90 s before sung |
 
-### Every level with a real voice
+- **Upcoming notes the map could have shown, but didn't: none, on every song, at both widths.**
+- **Instant moves.** Sometimes the note just sung and a note in the next 2 seconds are further apart than the map is tall, so they can't share the screen. Then the view moves the instant that note ends, so the next ones show up as early as they possibly can. That's the only time it moves without gliding. The last column counts the sharpest of these: a jump from one note straight to the next that's wider than the map, and how early the far note was in view.
+- **The moves.** Most are small, and a move comes about 2 s before the notes it's for (the median).
 
-Every level of every scored exercise was sung by a real voice in the built app, with the voice arriving 0.09 s after each piano note, as in your takes. That's 48 exercises and 131 levels. At Beginner, each was also sung a half step off. The pass mark is the usual one: 85% or more counted when sung right, and 15% or less when a half step off.
+### How tall the map is
 
-- **Every level passes, so every level ships.**
-- Sung right: every level counted 100%, except Bwoop at Advanced, at 94% (34 of 36 notes). Its notes are short, so the narrower band costs a little there.
-- A half step off at Beginner: no note counted on every exercise, except Bwoop (1 of 36), Consonant pops (1 of 104) and Sing the interval (1 of 9). All are well under 15%.
-- Match the note, Hold the note and Match the tone are sung one note at a time, so they had their own check: every level 100% right, and 0% at Beginner a half step off.
+At 30 px a half step, the map's height decides how much it shows. Until now it was a fixed 260 px on every phone: 8 half steps. That's too few: with the new movement, 6 to 8% of the next 2 seconds' notes still couldn't be shown, because so many leaps were wider than the map. So it now takes the height the screen allows while Start stays above the menu:
+- 13.3 half steps at 390 x 844;
+- 9.8 at 360 x 740.
 
-### The note map
-
-Half steps in view on every exercise, at 390 x 844 and at 360 x 740:
-- All the exercises sung over the piano: 18.5 to 20.3 at 390, and 15.0 to 16.9 at 360.
-- Sing the interval: 18.3 at 390, 14.9 at 360.
-- Hold the note, Match the tone, and Match the note at Beginner: 16.7 at 390 and 13.3 at 360, after the fix below. Before it they showed 8 to 16 at 360, and their view changed height while you sang.
-
-The map's spacing never changes anywhere. What varied on those three screens was the map's height: the count-in sat under the map instead of over it, and the panel under the map grew and shrank as its words changed. Now the count-in is over the map, as on every other exercise, and the panel is compact and always the same height. The note's name sits on the same row as "Note 1 of 10" and is smaller than before. Sing the interval's prompt lines now keep their room from the start, so its map doesn't change size either.
-
-**Learn a song and the Pitch Tracker.** Learn a song doesn't follow this rule today: its map fits the whole song's range at once, so its spacing changes from song to song and it never slides. The Pitch Tracker isn't built in the new app yet; its door on Sing is greyed out.
+To make room, "Any octave" moved from under the map into the sound card, next to Hear yourself, as in Train's gear.
 
 ## What I decided
 
-- **A notch is a fifth of the speed.** I couldn't find your 28 Oct note in the repo or the session's history, so I took the middle of the steps Train's own speed levels already use: the runs go 100, 130, 160 (23 to 30%), and the tongue twisters' Beginner is 9 to 17% below today's.
-- **Held notes keep their length.** A longer hold is harder, not easier, so on Sustained note, Messa di voce and Tongue-out with a crescendo the level changes only the band.
-- **Each exercise starts at its lowest level until you pick another,** as levels do today. So Mum, for one, now starts at Beginner: slower, with taller bubbles.
-- **Routines:** each step keeps the level the routine gives it. So the Daily warm-up's Mum, Mee and Descending five-tone are now at Beginner (slower and wider), and the Advanced warm-up's steps at Advanced (faster and narrower). Listed lengths changed: Daily 10 minutes (was 9), Quiet 11 (was 10), Cool-down 4 (was 3), Advanced 15 (was 16); Intermediate stays 15.
-- **Sing the interval** keeps its own level (which jumps it uses), and the band goes with it.
-- **The level is saved in the result's name online** ("Mum · Advanced"), because the results table has no level column and I didn't change the database without asking. On the phone it's kept as its own field.
-- **Match the note results saved before today** don't have a level, so "last time" doesn't compare with them.
+- **The tag's wording:** "Advanced · Levels Beginner to Advanced". "Levels" keeps the two from reading as one. Say if you want other words.
+- **Nine-tone scale and Tongue trill** now start at their new Beginner, but their own difficulty stays Intermediate, as it was.
+- **Bratty Nay's Advanced** is its octave pattern, a notch faster, since its Intermediate already moved up to the octave.
+- **How the song map moves:** it keeps the next 2 seconds in view and stays at least half a half step clear of its top and bottom where there's room. Of the settings I measured on the real songs, these moved the least without leaving an upcoming note out (a margin of a whole half step moved 1.6 to 2.7 times as often).
+- **Any octave** moved into the sound card to give the map room (above).
 
 ## Held, and clashes
 
-- **The spacing.** You said to fix the spacing for everything if fewer than 13 half steps showed anywhere. Fewer did show, but only on three screens, and the cause was their map's height, not the spacing. To fit 13 into those maps as they were, the spacing would have had to drop to about 19 px a half step everywhere, making every bubble about a third smaller. That would go against 20 Nov's "bubbles easy to see at 360 wide". So I kept 30 px and gave those three maps their room instead. **Suggestion:** keep it this way; say if you want the spacing smaller anyway.
-- **"A little over an octave."** At 30 px the map shows 15 to 17 half steps at 360 wide and 18 to 20 at 390, more than a little over an octave. Showing about 13 at 390 would need about 40 px a half step, but then a 360-wide phone would show only 11 or 12. **Suggestion:** keep 30 px.
-- **A level column for results.** **Suggestion:** with your OK, I'll add a level column to the results table, so your coach can sort by level without reading it out of the name.
-- **Exercises with two levels keep two:** the four tongue twisters and Three-note run (no Advanced), Nine-tone scale (no Beginner), Bratty Nay (no Advanced) and Tongue trill (no Beginner). You said existing levels keep theirs. **Suggestion:** give each its missing level, a notch slower or faster as everywhere else.
-- **Hold the note has no Advanced, and Match the tone's Advanced has the same band as its Intermediate,** because nothing narrower passes real held notes (above).
-- **The exercise list now says "Beginner to Advanced" on every scored exercise,** so it no longer shows how hard each one is on its own. For example, Octave leaps was tagged Advanced. **Suggestion:** say if you want that difficulty tag back beside the level span.
+- **The song map on a 360 x 740 phone.** There, the song screen has room for 9.8 half steps. Every upcoming note the map can hold stays in view, but the view moves often: 35 to 39 times a minute, mostly small instant steps. At 390 x 844 (13.3 half steps) it's 8 to 13 times a minute. On the real songs, moves drop sharply from about 13 half steps up (5 to 10 a minute at 15). **Suggestion:** on Learn a song, drop "Ready. Tap Start." once the song is ready (Start says it) and show the reading progress in that same line. That gives a 360 x 740 phone about 12 half steps. I haven't done it, because you said only the view changes.
+- **Found while doing this:** "Ready. Tap Start." stays on screen while the song plays. It was like this before this round. **Suggestion:** hide it while the song plays.
 
 ## Not tried on a real phone
 
 Everything was measured in Chrome made to behave like an Android phone, not on your Samsung. On the phone I haven't seen or heard:
-- the tab names;
-- the bubbles at each level;
-- Beginner's and Advanced's speeds;
-- the new layout of Hold the note, Match the tone and Match the note at Beginner.
+- the new levels' speeds;
+- the difficulty tags;
+- Learn a song's map moving with a song;
+- Any octave in its new place.
 
-Screenshots at 360 wide are in the repo: the tabs, Mum at Beginner and at Advanced, and Hold the note.
+Screenshots at 390 and 360 wide are in the repo: the three songs on Learn a song, and the list's tags.
 
 ## Checks
 
-- The unit tests: 338 of 338 pass.
-- Every browser suite passes: Train 83, browser 15, Android 28, library 7, note map 13, song 19, takes 20, loudness 13.
-- The old app: 187 of 187.
-- The real-voice level check: 131 of 131 levels pass (above).
+- The unit tests: 348 of 348 pass.
+- Every browser suite passes: browser 15, Android 28, library 7, note map 13, song 19, takes 20, loudness 13, Train 85 (with the online checks).
+- One Train online check failed once and then passed: a take saved with no signal hadn't reached your account within 60 seconds of the signal coming back. On the rerun it went up and was private to the singer. Nothing that uploads takes changed this round.
+- The old app: 186 of 187 (its checks stop at the first failure, so I ran the part after it on its own: 52 of 52). One check fails in both runs today: when a song he opens interrupts the Library's background reading, the background reading should wait where it stopped, but it carried on about 5 seconds further. It passed on 21 Nov, and the old app and its checks are exactly as they were then; nothing this round touches them. I haven't found why it behaves differently today, and the old app is frozen, so I've left it.
+- The real-voice level check: all 24 levels of the 8 changed exercises pass (above).
+- The real-song map check: all 3 songs at both widths pass (above).
 - Broken builds:
-  - I broke the app's core rules 237 ways, and the checks caught all 237.
-  - I broke the app itself 323 ways, and the checks caught all 323.
-  - New this round: tab names on the selected tab only, names too small or cut off at 360, the selected tab not marked, no line during the lead note, Advanced no narrower than today, Beginner so wide a half step off counts, a score or bubble that ignores the level's band, Beginner no slower, Advanced no faster, one-level exercises left with one level, an unscored exercise given levels, Hold the note given an Advanced that real held notes fail, the level not remembered, and a result without its level or a "last time" from another level.
+  - I broke the app's core rules 253 ways, and the checks caught all 253.
+  - I broke the app itself 328 ways, and the checks caught all 328.
+  - New this round: the level not reaching the results table, the level back in the name, an unscored exercise keeping a level; each missing level left out, or no faster or slower than the level next to it; Chromatic run given a Beginner; Bratty Nay's Advanced on the wrong pattern; the starting level shown as the difficulty, or the difficulty left out; and the song map pinned, squeezing the song in again, not looking ahead, jumping instead of gliding, gliding while a note it would push off is sung, chasing brief slips, moving for every phrase, and letting a note it could show fall out.
 
 ## Mistakes of mine
 
-- After I renamed the exercise list in the code, my map measurer silently measured nothing, because it looked for the list by its old name. I caught it from its empty output and fixed it before taking any numbers.
-- On my first run of the app's broken builds, I gave the loudness ones the wrong voice recording again (the same slip as 20 Nov), because I counted where they sit in the list wrongly. Seven older ones also no longer fitted the lines I'd changed. I fixed both and ran them all again. One new broken build also named a second check that can't tell the difference at Intermediate; the levels check catches it, so I took the second one off it.
-- My first real-voice check of every level skipped Match the note, Hold the note and Match the tone without saying so, because they're sung one note at a time rather than over the piano. I caught it reading the list of what it covered, and wrote a second check for those three.
+- My first version of the song map's movement left some upcoming notes out of view that it could have shown, and moved in many tiny steps. Two causes: it kept a whole half step clear of the edges even when the notes only fitted without that, and when the notes ahead exactly filled the map, a rounding hair made it think nowhere fitted, so it didn't move at all. The real-song check caught both; I rewrote the movement and measured it again.
+- The map worked out its movement from the song's line while the line was still being read, and never again, because the line fills in place. The note map suite caught it (the view was up to 7 half steps from where it should be); it now works it out again as the line grows.
+- I first wrote the song map's height without measuring the song screen: at 260 px the map held only 8 half steps on every phone. I caught it from the first numbers, before going further.
+- I started the app's broken builds without first checking that each still fitted the code. Two older ones were aimed at lines I'd changed, and the run stopped part-way. I re-aimed them, checked all 328 fit, and ran the rest.
+- One of the new broken builds (the map chasing brief octave slips) wasn't caught at first, because my check counted moves but not where the view sat. I tightened the check.
 
 ## Your taps
 
+From 21 Nov:
+
 1. Look at the bottom menu: every tab should show its name under its icon, with Train highlighted. Tap each tab once.
-2. Train, Five-note run, gear, Advanced, Start. Before each round you'll hear its first note on its own, then the round. Sing each round from its first note, on time. Its first bubble should fill green.
+2. Train, Agility, Five-note run, gear, Advanced, Start. Before each round you'll hear its first note on its own, then the round. Sing each round from its first note, on time. Its first bubble should fill green.
 3. While that runs, look at the map: thin bubbles with a line through the middle, and the view sliding up as the rounds climb.
-4. Mum, gear, Beginner, Start. Sing it for a round or two and note the taller bubbles and the slower speed. Close. Then gear, Advanced, Start: thinner bubbles and faster. At the end the result should say "Sung at Advanced".
-5. Bwoop, Start: the piano notes should sound short and clipped, and the bubbles short. Sing it through and look at the score.
-6. Note bends, Start: a quick flick between note and neighbour, three times, ending on the note, with short piano notes. Your line is shown and there's no score.
-7. Match the tone, Beginner, Start. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
+4. Tone, Mum, gear, Beginner, Start. Sing a round or two and note the taller bubbles and slower speed. Close. Then gear, Advanced, Start: thinner bubbles and faster. At the end the result should say "Sung at Advanced".
+5. Range, Bwoop, Start: the piano notes should sound short and clipped, and the bubbles short. Sing it through and look at the score.
+6. Agility, Note bends, Start: a quick flick between note and neighbour, three times, ending on the note, with short piano notes. Your line is shown and there's no score.
+7. Pitch, Match the tone, Beginner, Start. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
 8. Match the tone, Advanced: your line stays hidden while the tone plays, and appears once it stops.
+
+New this round:
+
+9. Range: the Octave leaps row should read "Advanced · Levels Beginner to Advanced · Scored on pitch".
+10. Agility, Three-note run, gear, Advanced, Start: a notch faster than Intermediate. Sing it through.
+11. Sing, Learn a song, open one of your songs, Start. The map's rows are as far apart as on Train. Before each phrase the view slides to show it, and it never shrinks. "Any octave" is now in the sound card below.
