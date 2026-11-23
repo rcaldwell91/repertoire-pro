@@ -389,10 +389,10 @@ try {
     await sleep(200);
     const sylGone = await text('#pattern-syl');
     /* a melody line (Robert, 25 Oct): the top note's dash highest, the first and last (the same note) lowest and level,
-       every dash short, the two-beat last note's dash wider than the first's; nothing between the card and Goal */
+       every dash short; every dash as wide as the others, as every note is as long (Robert, 23 Nov); nothing between the card and Goal */
     const d = v.dashes;
     const melody = d.length === 9 && d[4].top < Math.min(...d.filter((_, i) => i !== 4).map((x) => x.top)) && Math.abs(d[0].top - d[8].top) < 1 &&
-      d[0].top >= Math.max(...d.map((x) => x.top)) - 1 && d.every((x) => x.h <= 10) && d[8].w > 1.5 * d[0].w;
+      d[0].top >= Math.max(...d.map((x) => x.top)) - 1 && d.every((x) => x.h <= 10) && d.every((x) => Math.abs(x.w - d[0].w) < 1);
     check('preview', v.back && v.name === copy.ex.mum.name && v.tags.join('|') === copy.cats.tone && melody && v.gap <= 30 && v.bars === 9 && v.lit === 0 && v.syl === '' &&
       v.goal === copy.ex.mum.goal && JSON.stringify(v.how) === JSON.stringify(CORE.stepsFor('mum')) && v.start === copy.train.start && v.more === copy.train.moreAbout && !v.sheet && !v.anyOctave &&
       v.started === 0 && still === 0 && played && litUp && sylShown === copy.ex.mum.syl && gum === 0 && stopped && sylGone === '',
@@ -1187,8 +1187,12 @@ try {
     await openEx('mum', wide);
     const mumRounds = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.rounds || '[]')`);
     const steps = (r) => r.every((x, i) => i === 0 || x - r[i - 1] === 1);
-    check('climb', lagaRounds.length === wide.hi - 4 - wide.lo && lagaRounds[0] === wide.lo + 1 && steps(lagaRounds) && mumRounds.length <= 14,
-      `a two-octave range: La-Ga ${lagaRounds.length} rounds, from ${lagaRounds[0]} a half step each ${steps(lagaRounds)}; Mum keeps the old app's 14 at most (${mumRounds.length})`);
+    /* Mum as his course's (Robert, 23 Nov): a half step a round to the top, then back down to where it began */
+    const up = wide.hi - 7 - (wide.lo + 1) + 1;
+    const mumOk = mumRounds.length === 2 * up - 1 && mumRounds[0] === wide.lo + 1 && steps(mumRounds.slice(0, up)) &&
+      JSON.stringify(mumRounds.slice(up - 1)) === JSON.stringify(mumRounds.slice(0, up).reverse());
+    check('climb', lagaRounds.length === wide.hi - 4 - wide.lo && lagaRounds[0] === wide.lo + 1 && steps(lagaRounds) && mumOk,
+      `a two-octave range: La-Ga ${lagaRounds.length} rounds, from ${lagaRounds[0]} a half step each ${steps(lagaRounds)}; Mum a half step a round up and back down ${mumOk} (${mumRounds.length} rounds, ${mumRounds[0]} to ${Math.max(...mumRounds)})`);
   }
 
   /* 3 Nov: Cheek puffs (and Straw, Chew and hum, the tension check): the line shown, not scored */
