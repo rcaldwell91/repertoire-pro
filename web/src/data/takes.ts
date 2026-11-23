@@ -177,6 +177,23 @@ function put(path: string, body: Blob, token: string, onProgress: (f: number) =>
   });
 }
 
+/* Is the whole recording already stored? An upload whose answer was lost
+   (the signal went just as it ended) is stored all the same, and sending
+   it again is refused, since a take can't be overwritten (23 Nov: one such
+   take was stuck for good, and every take after it with it). */
+async function stored(path: string, size: number, token: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/info/authenticated/takes/${path}`, {
+      headers: { authorization: 'Bearer ' + token, apikey: SUPABASE_KEY },
+    });
+    if (!r.ok) return false;
+    const info = (await r.json()) as { size?: number };
+    return info.size === size;
+  } catch {
+    return false;
+  }
+}
+
 /* the last take sent to every coach chosen for it, for "Sent to …" */
 let sentNote: { songId: string; names: string; at: number } | null = null;
 export function lastSent(): { songId: string; names: string; at: number } | null {
@@ -216,11 +233,15 @@ async function sync(): Promise<void> {
       if (!path && t.audio) {
         const p = `${me}/${t.id}.wav`;
         let shown = -1;
-        await put(p, t.audio, session.access_token, (f) => {
-          if (f - shown < 0.02) return;              /* real progress, without a write per byte */
-          shown = f;
-          void patch(t.id, { progress: f });
-        });
+        try {
+          await put(p, t.audio, session.access_token, (f) => {
+            if (f - shown < 0.02) return;            /* real progress, without a write per byte */
+            shown = f;
+            void patch(t.id, { progress: f });
+          });
+        } catch (e) {
+          if (!(await stored(p, t.audio.size, session.access_token))) throw e;
+        }
         await patch(t.id, { path: p, progress: 1 });
         path = p;
       }

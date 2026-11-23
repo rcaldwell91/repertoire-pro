@@ -746,6 +746,9 @@ const MUTATIONS = [
     from: '  const lead = p.dur[0] * beat;', to: '  const lead = Math.max(p.dur[0] * beat, 0.5);', checks: ['lead-levels'] },
   { test: 'train', what: 'Mum\'s top note held twice as long again', file: 'src/core/exercises.ts',
     from: "  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1], span: 7 },", to: "  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 1], span: 7 },", checks: ['lead-pause'] },
+  /* 23 Nov: a take stored online whose answer was lost was stuck for good, and the takes after it */
+  { test: 'takes', online: true, what: 'a take whose answer was lost never counts as online', file: 'src/data/takes.ts',
+    from: '          if (!(await stored(p, t.audio.size, session.access_token))) throw e;', to: '          throw e;', checks: ['take-reply-lost'] },
 ];
 
 function edit(dir, { file, from, to }) {

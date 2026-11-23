@@ -36,7 +36,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
   process.exit(1);
 }
 
-const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-no-clip', 'take-leave', 'take-endings', 'take-removed-undo', 'take-saved-first', 'take-offline',
+const ALL = ['take-voice-only', 'take-lines-up', 'take-review', 'take-no-clip', 'take-leave', 'take-endings', 'take-removed-undo', 'take-saved-first', 'take-offline', 'take-reply-lost',
   'take-delete-undo', 'take-send', 'take-private', 'apps-side-by-side', 'take-new-phone', 'old-app-takes', 'take-send-kept', 'take-unlinked', 'take-no-coach', 'take-words', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
@@ -528,6 +528,50 @@ try {
         `back online it went up by itself, showing ${steps.map((n) => n + '%').join(' ')}; then "${finalRow.split('\n').pop()}"; in the takes store for its owner ${own === 200}; ` +
         `its recording still on the phone ${stillHere}`);
     }
+  }
+
+  /* 3b. the reply lost (23 Nov, seen in the train suite): a take is stored online but the answer
+     never comes back, as when the signal goes just as an upload ends. Sending it again is refused,
+     since a take can't be overwritten; it still counts as online, and the takes after it still go up */
+  if (want('take-reply-lost')) {
+    let cutting = true, cut = null;
+    const later = [];
+    page.c.on('Fetch.requestPaused', (p) => {
+      if (cutting && p.request.method === 'POST' && cut === null) {
+        cut = p.responseStatusCode;
+        void page.c.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'ConnectionReset' });
+        return;
+      }
+      if (p.request.method === 'POST') later.push(p.responseStatusCode);
+      void page.c.send('Fetch.continueRequest', { requestId: p.requestId });
+    });
+    await page.c.send('Fetch.enable', { patterns: [{ urlPattern: '*storage/v1/object/takes/*', requestStage: 'Response' }] });
+    const ids = [];
+    for (const from of [SUNG + 30, SUNG + 40]) {
+      const before = (await takesKept()).map((t) => t.id);
+      await singTake(from, 5);
+      await page.tap('#take-save');
+      await page.waitFor(`document.querySelectorAll('.take-row').length > ${before.length}`, 3000);
+      const t = (await takesKept()).find((x) => !before.includes(x.id));
+      if (t) { made.add(t.id); ids.push(t.id); }
+      await sleep(1500);
+    }
+    const tEnd = Date.now() + 60000;
+    let kept = [];
+    while (Date.now() < tEnd) {
+      kept = (await takesKept()).filter((t) => ids.includes(t.id));
+      if (kept.length === 2 && kept.every((t) => t.path)) break;
+      await sleep(500);
+    }
+    cutting = false;
+    await page.c.send('Fetch.disable');
+    const token = tokenOf(EMAIL);
+    const online = kept.map((t) => (t.path ? rest('GET', `/rest/v1/takes?select=id&audio_path=eq.${encodeURIComponent(t.path)}`, token).json?.length ?? -1 : 0));
+    const texts = await Promise.all(ids.map(async (id) => (await rows()).find((x) => x.id === id)?.text.split('\n').pop() || ''));
+    check('take-reply-lost', cut === 200 && kept.length === 2 && kept.every((t) => t.path) && online.length === 2 && online.every((n) => n === 1) &&
+      texts.every((x) => x.includes(copy.takes.saved)),
+      `the first take stored (${cut}) with its answer lost; uploads after it: ${later.join(', ') || 'none'}; online ${kept.filter((t) => t.path).length} of 2, ` +
+      `a row each ${online.join(', ')}; listed as "${texts.join('", "')}"`);
   }
 
   /* 4. delete, with undo */
