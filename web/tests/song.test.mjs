@@ -177,7 +177,7 @@ try {
     const t0 = Date.now();
     /* one look at the screen: the line under the title, and the reading progress */
     const look = async () => {
-      const s = await page.eval(`({ line: ${LINE}, play: !document.querySelector('#song-play').disabled, map: document.querySelector('#map-line')?.textContent || '' })`);
+      const s = await page.eval(`({ line: ${LINE}, play: !document.querySelector('#song-play').disabled, map: document.querySelector('#song-reading')?.textContent.replace(/^ · /, '') || '', ready: document.querySelector('#song-play')?.dataset.ready === '1' })`);
       if (seen[seen.length - 1] !== s.line) seen.push(s.line);
       const r = /^Reading the singer's line… (\d+):(\d\d) of (\d+:\d\d)$/.exec(s.map);
       if (r && reading[reading.length - 1]?.text !== s.map) reading.push({ text: s.map, at: +r[1] * 60 + +r[2], of: r[3], splitting: /^Splitting/.test(s.line || '') });
@@ -203,7 +203,7 @@ try {
         await page.tap('#song-play');
         early = { st, still };
       }
-      if (s.line === copy.song.ready) break;
+      if (s.ready) break;
       if (s.line && Object.values(copy.song).includes(s.line) && /Try again|again|Pick|Sign/.test(s.line)) break;
       if (Date.now() - t0 > 600_000) break;
       await sleep(100);
@@ -212,7 +212,8 @@ try {
     const ready = seen.map((l) => /^Splitting: ready to (\d+:\d\d) of (\d+:\d\d)$/.exec(l || '')).filter(Boolean);
     const readyS = ready.map((m) => m[1].split(':').reduce((a, b) => a * 60 + +b, 0));
     const ofOk = ready.length > 0 && ready.every((m) => m[2] === clock(total));
-    const done = seen[seen.length - 1] === copy.song.ready;
+    /* ready: the Start button's own mark; the line says nothing then (Robert, 23 Nov) */
+    const done = await page.eval(`document.querySelector('#song-play')?.dataset.ready === '1'`) && !seen[seen.length - 1];
     if (want('split-progress')) {
       check('split-progress', done && sending.length >= 2 && sending.join() === [...sending].sort((a, b) => a - b).join()
         && sending[sending.length - 1] >= 99 && new Set(readyS).size >= 3 && readyS.join() === [...readyS].sort((a, b) => a - b).join() && ofOk
@@ -234,7 +235,7 @@ try {
       })()`;
       const tEnd = Date.now() + 240000;
       while (Date.now() < tEnd && !(await page.eval(kept))) {
-        const m = await page.eval(`document.querySelector('#map-line')?.textContent || ''`);
+        const m = await page.eval(`document.querySelector('#song-reading')?.textContent.replace(/^ · /, '') || ''`);
         const r = /^Reading the singer's line… (\d+):(\d\d) of (\d+:\d\d)$/.exec(m);
         if (r && reading[reading.length - 1]?.text !== m) reading.push({ text: m, at: +r[1] * 60 + +r[2], of: r[3], splitting: false });
         await sleep(100);

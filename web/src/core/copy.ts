@@ -101,7 +101,6 @@ export const copy = {
     splitting: 'Splitting: ready to {at} of {of}',
     first30: 'The first 30 seconds are ready to play.',
     saving: 'Saving the voice and music…',
-    ready: 'Ready. Tap Start.',
     signIn: 'Sign in to split this song.',
     signInButton: 'Sign in',
     offline: "Can't reach the server. Try again soon.",

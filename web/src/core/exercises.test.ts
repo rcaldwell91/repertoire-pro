@@ -3,7 +3,7 @@ import { copy } from './copy';
 import {
   CATEGORIES, EXERCISES, PATTERNS, ROUTINES, DAILY, exercise, measures, ladderNotes, holdNotes, bubbleScore, HOLD_NOTES,
   MAX_RUNGS, REST_BEATS, rungStarts, firstRung, rungAt, sylOf, notesFor, atLevel, levelsOf, stepsFor, listed, type Exercise,
-  SING_LAG, LEAD_MIN, SHORT_LEN,
+  SING_LAG, SHORT_LEN,
 } from './exercises';
 import { DEFAULT_RANGE, rangeFrom, RANGE_POINTS } from './range';
 import { SoundClock, LOUD_RMS, QUIET_END } from './timed';
@@ -89,17 +89,23 @@ describe('the exercises, as data', () => {
     expect(levelsOf(exercise('blah') as Exercise).length).toBe(1);
   });
 
-  it('runs each pattern as the old app did (8063-8075)', () => {
-    expect(PATTERNS.five).toEqual({ deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 });
-    expect(PATTERNS.down5).toEqual({ deg: [7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 7 });
-    expect(PATTERNS.down3).toEqual({ deg: [4, 2, 0], dur: [1, 1, 2], span: 4 });
-    expect(PATTERNS.arp).toEqual({ deg: [0, 4, 7, 4, 0], dur: [1, 1, 2, 1, 2], span: 7 });
-    expect(PATTERNS.oct).toEqual({ deg: [0, 4, 7, 12, 7, 4, 0], dur: [1, 1, 1, 2, 1, 1, 2], span: 12 });
-    expect(PATTERNS.octrep).toEqual({ deg: [0, 4, 7, 12, 12, 12, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 12 });
-    expect(PATTERNS.nine).toEqual({ deg: [0, 2, 4, 5, 7, 9, 11, 12, 14, 12, 11, 9, 7, 5, 4, 2, 0],
-      dur: [1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2], span: 14 });
-    expect(PATTERNS.oct15).toEqual({ deg: [0, 4, 7, 12, 16, 19, 17, 14, 12, 9, 7, 5, 2, 0],
-      dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 19 });
+  it('runs each pattern\'s notes as the old app did (8063-8075), every note of a round the same length (Robert, 23 Nov)', () => {
+    const notes = (id: keyof typeof PATTERNS) => ({ deg: PATTERNS[id].deg, span: PATTERNS[id].span });
+    expect(notes('five')).toEqual({ deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], span: 7 });
+    expect(notes('down5')).toEqual({ deg: [7, 5, 4, 2, 0], span: 7 });
+    expect(notes('down3')).toEqual({ deg: [4, 2, 0], span: 4 });
+    expect(notes('arp')).toEqual({ deg: [0, 4, 7, 4, 0], span: 7 });
+    expect(notes('oct')).toEqual({ deg: [0, 4, 7, 12, 7, 4, 0], span: 12 });
+    expect(notes('octrep')).toEqual({ deg: [0, 4, 7, 12, 12, 12, 12, 7, 4, 0], span: 12 });
+    expect(notes('nine')).toEqual({ deg: [0, 2, 4, 5, 7, 9, 11, 12, 14, 12, 11, 9, 7, 5, 4, 2, 0], span: 14 });
+    expect(notes('oct15')).toEqual({ deg: [0, 4, 7, 12, 16, 19, 17, 14, 12, 9, 7, 5, 2, 0], span: 19 });
+    /* the top note and the last no longer twice as long: the old app had them so */
+    for (const [id, p] of Object.entries(PATTERNS)) {
+      expect(p.dur.length, id).toBe(p.deg.length);
+      expect(new Set(p.dur).size, id).toBe(1);
+    }
+    expect(PATTERNS.five.dur[0]).toBe(1);
+    expect(PATTERNS.leap.dur).toEqual([2, 2, 2]);
   });
 
   it('has a name, a syllable, a one-line goal and a one-line how for each, in the copy', () => {
@@ -197,10 +203,11 @@ describe('the ladder climbs your range as the old app did (3700-3752)', () => {
         const want = oldLadder(p.deg, p.dur, p.span, range.lo, range.hi);
         const got = ladderNotes(e, range);
         expect(got.notes.map((n) => n.m), e.id).toEqual(want.map((n) => n.m));
-        /* Robert, 20 Nov: each round after a lead note (a beat, at least
-           LEAD_MIN) in place of the rest's second beat, and every note
-           sung SING_LAG after the piano; a short note clipped to SHORT_LEN */
-        const lead = Math.max(beat, LEAD_MIN), len = p.deg.length;
+        /* Robert, 20 Nov: each round after a lead note in place of the
+           rest's second beat, and every note sung SING_LAG after the piano;
+           a short note sung SHORT_LEN at most. 23 Nov: the lead as long as
+           the round's first note */
+        const lead = p.dur[0] * beat, len = p.deg.length;
         got.notes.forEach((n, i) => {
           const r = Math.floor(i / len);
           expect(n.t, e.id).toBeCloseTo(want[i].t * beat + (r + 1) * lead - r * beat + SING_LAG, 6);
@@ -339,7 +346,8 @@ describe('the rungs of an exercise (the progress dots, the pattern card)', () =>
   const { notes } = ladderNotes(mum, range);
   it('begin at the notes that carry a note name, one per run of the pattern', () => {
     const starts = rungStarts(notes);
-    expect(starts.length).toBe(62 - 7 - 51 + 1);
+    /* up a half step a round to the top, and back down (Robert, 23 Nov) */
+    expect(starts.length).toBe(2 * (62 - 7 - 51 + 1) - 1);
     expect(starts[0]).toBe(0);
     expect(starts[1]).toBe(PATTERNS.five.deg.length);
   });
@@ -525,8 +533,8 @@ describe('the content round (Robert, 28 Oct)', () => {
    scored, and six new exercises in their places */
 describe('the 3 Nov Train update', () => {
   const wide = { lo: 40, hi: 76 };
-  it('a new three-note pattern, 1-2-3-2-1: four even notes and the last held', () => {
-    expect(PATTERNS.three).toEqual({ deg: [0, 2, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 4 });
+  it('a new three-note pattern, 1-2-3-2-1, every note even (the last held until 23 Nov)', () => {
+    expect(PATTERNS.three).toEqual({ deg: [0, 2, 4, 2, 0], dur: [1, 1, 1, 1, 1], span: 4 });
   });
 
   it('levels inside La-Ga, Bratty Nay and Straw, with their speeds; Big climb\'s arpeggio as the top', () => {
@@ -580,7 +588,8 @@ describe('the 3 Nov Train update', () => {
 
   it('its climbing exercises go up a half step every round, however many; the rest keep the old app\'s 14', () => {
     const climbing = EXERCISES.filter((e) => e.everyStep).map((e) => e.id).sort();
-    expect(climbing).toEqual(['bends', 'brighta', 'bwoop', 'cheekpuffs', 'chewhum', 'laga', 'nay', 'straw', 'tensioncheck', 'threerun', 'threestep', 'tonguefwd']);
+    /* Mum since 23 Nov, as his course's */
+    expect(climbing).toEqual(['bends', 'brighta', 'bwoop', 'cheekpuffs', 'chewhum', 'laga', 'mum', 'nay', 'straw', 'tensioncheck', 'threerun', 'threestep', 'tonguefwd']);
     /* Bwoop starts in the middle (16 Nov): its own test */
     for (const id of climbing.filter((x) => !exercise(x)?.fromMiddle)) {
       for (const level of [1, 2, 3] as const) {
@@ -588,16 +597,20 @@ describe('the 3 Nov Train update', () => {
         if (e.engine.kind !== 'ladder') continue;
         const p = PATTERNS[e.engine.pattern];
         const { notes } = ladderNotes(e, wide);
-        const roots = rungStarts(notes).map((i) => notes[i].m - p.deg[0]);
+        const all = rungStarts(notes).map((i) => notes[i].m - p.deg[0]);
+        const up = wide.hi - p.span - wide.lo;
+        /* Mum comes back down to where it began, a half step a round */
+        const roots = exercise(id)?.andBack ? all.slice(0, up) : all;
+        if (exercise(id)?.andBack) expect(all.slice(up - 1), id).toEqual([...roots].reverse());
         expect(roots[0], id).toBe(wide.lo + 1);
-        expect(roots.length, id).toBe(wide.hi - p.span - wide.lo);
+        expect(roots.length, id).toBe(up);
         roots.forEach((r, k) => k && expect(r - roots[k - 1], id).toBe(1));
       }
     }
     /* a two-octave range on 1-2-3-2-1: 20 rounds, not 10 in whole steps */
     const three = ladderNotes(atLevel(exercise('laga') as Exercise, 1), { lo: 48, hi: 72 });
     expect(rungStarts(three.notes).length).toBe(20);
-    expect(rungStarts(ladderNotes(exercise('mum') as Exercise, wide).notes).length).toBeLessThanOrEqual(MAX_RUNGS);
+    expect(rungStarts(ladderNotes(exercise('mee') as Exercise, wide).notes).length).toBeLessThanOrEqual(MAX_RUNGS);
   });
 
   it('the six new ones, in their groups, levels and places in the lists', () => {

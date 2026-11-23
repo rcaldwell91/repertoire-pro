@@ -276,6 +276,8 @@ export function SongScreen(props: { id: string }) {
   }
 
   const line = useMemo(() => (has ? songLine(has, split) : null), [has, split]);
+  const problem = !!line?.action && line.action !== 'split';
+  const reading = singer?.reading ? fill(copy.song.reading, { at: clock(singer.readTo), of: clock(singer.seconds) }) : '';
   const mic = playing && withMic ? micLine(snap.mic, micBlockedBrowser()) : null;
   /* while you sing: "Use headphones." unless the phone lists some (the old
      app; RULEBOOK 4, Mic: warn when headphones can't be confirmed) */
@@ -327,8 +329,14 @@ export function SongScreen(props: { id: string }) {
     <>
       <BackButton label={copy.song.back} onBack={() => back('/sing/learn')} />
       <h1 data-user="title">{song.title}</h1>
-      <div className="line" id="song-line">
-        <span className={line?.action && line.action !== 'split' ? 'problem' : ''} role="status">{line?.text}</span>
+      {/* the one line under the title (Robert, 23 Nov): what is happening, or
+          the singer's line being read; nothing once ready; hidden while the
+          song plays, its room kept so nothing moves under a finger; a
+          problem always shown */}
+      {(line?.text || reading || line?.action) && (
+      <div className="line" id="song-line" style={playing && !problem ? { visibility: 'hidden' } : undefined}>
+        <span className={problem ? 'problem' : ''} role="status">{line?.text}</span>
+        {reading && <span className="reading" id="song-reading" role="status">{line?.text ? ' · ' : ''}{reading}</span>}
         {line?.action === 'sign-in' && (
           <div><button type="button" className="btn btn-quiet" id="line-sign-in" onClick={() => navigate('/profile/account', 'screen')}>
             {copy.song.signInButton}</button></div>
@@ -342,14 +350,12 @@ export function SongScreen(props: { id: string }) {
             {copy.song.tryAgain}</button></div>
         )}
       </div>
+      )}
 
       {voiceParts > 0 && (
         <>
           <NoteMap lines={lines} range={singer?.range ?? null} now={now} live={playing} anyOctave={anyOctave} label={copy.song.map}
             count={playing && snap.state === 'counting-in' ? snap.count : null} />
-          <p className="hint map-line" id="map-line" role="status">
-            {singer?.reading ? fill(copy.song.reading, { at: clock(singer.readTo), of: clock(singer.seconds) }) : ''}
-          </p>
         </>
       )}
 
@@ -365,7 +371,7 @@ export function SongScreen(props: { id: string }) {
         <button type="button" className="round" id="back-10" aria-label={copy.song.back10} disabled={!parts} onClick={back10}>
           <RotateCcw size={24} strokeWidth={2} aria-hidden="true" />
         </button>
-        <button type="button" className="round play" id="song-play" disabled={!parts} onClick={toggle}>
+        <button type="button" className="round play" id="song-play" data-ready={has?.full ? '1' : '0'} disabled={!parts} onClick={toggle}>
           {sounding || (playing && snap.state === 'counting-in') ? copy.song.pause : playing ? copy.song.starting : copy.song.start}
         </button>
         <button type="button" className="round" id="repeat-part" aria-label={copy.song.repeat} aria-pressed={!!loop}

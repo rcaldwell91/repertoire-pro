@@ -68,7 +68,10 @@ export function songLine(has: SongHas, split: SplitPhase | null): Line {
         break;
     }
   }
-  if (has.full) return { text: copy.song.ready, action: null };
+  /* ready: nothing to say, Start says it (Robert, 23 Nov: drop "Ready. Tap
+     Start." once the song is ready; the line then shows the singer's line
+     being read, if it still is) */
+  if (has.full) return { text: '', action: null };
   if (has.first30) return { text: copy.song.first30, action: null };
   if (has.state === 'new') return { text: copy.songs.needsSplit, action: 'split' };
   if (has.state === 'splitting') return { text: copy.song.waiting, action: null };

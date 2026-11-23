@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EXERCISES, PATTERNS, atLevel, bubbleScore, exercise, exerciseSecs, holdNotes, ladderNotes, measures, notesFor, rungStarts,
-  HOLD_LEAD, HOLD_REST, LEAD_MIN, SHORT_LEN, SING_LAG, type Exercise,
+  HOLD_LEAD, HOLD_REST, SHORT_LEN, SING_LAG, type Exercise,
 } from './exercises';
 import { toneParts, seeded, TONE_LEAD, TONE_NOTES, TONE_SECS } from './pitch';
 import { copy } from './copy';
@@ -38,7 +38,9 @@ describe('the pause (Robert, 13 and 20 Nov): each note checked a moment after it
       expect(piano.length, e.id).toBe(notes.length);
       notes.forEach((n, i) => {
         expect(n.m, e.id).toBe(piano[i].m);
-        expect(n.d, e.id).toBeCloseTo(piano[i].d, 9);
+        /* a short note is sung short over the piano's whole note (23 Nov) */
+        if (e.shortNotes) expect(n.d, e.id).toBeCloseTo(Math.min(SHORT_LEN, piano[i].d), 9);
+        else expect(n.d, e.id).toBeCloseTo(piano[i].d, 9);
         expect(n.t - piano[i].t, e.id).toBeCloseTo(SING_LAG, 9);
       });
     }
@@ -87,7 +89,8 @@ describe('the lead note (Robert, 20 Nov): the round\'s first note alone before e
           /* the same note, ending as the round begins */
           expect(l.m, e.id).toBe(n.m);
           expect(l.t + l.d, e.id).toBeCloseTo(n.t, 9);
-          expect(l.d, e.id).toBeCloseTo(x.engine.kind === 'hold' ? HOLD_LEAD : Math.max(beat, LEAD_MIN), 9);
+          /* 23 Nov: as long as one note of the round (a hold's stays HOLD_LEAD) */
+          expect(l.d, e.id).toBeCloseTo(x.engine.kind === 'hold' ? HOLD_LEAD : PATTERNS[(x.engine as { pattern: keyof typeof PATTERNS }).pattern].dur[0] * beat, 9);
           /* in the rest: after the round before has ended, with room between */
           if (r > 0) {
             const prev = piano[firstOf[r] - 1];
@@ -108,13 +111,18 @@ describe('the lead note (Robert, 20 Nov): the round\'s first note alone before e
   });
 });
 
-describe('short notes (Robert, 20 Nov: "the piano notes ring on"; "the bubbles should be as short as the notes")', () => {
-  it('Staccato, Consonant pops and Bwoop: piano and bubbles a quarter second at most; others their beat', () => {
+describe('short notes (Robert, 20 Nov: "the bubbles should be as short as the notes"; 23 Nov: "short notes must not be chopped")', () => {
+  it('Staccato, Consonant pops and Bwoop: sung and drawn a quarter second at most; the piano plays each whole, its beat, as every note', () => {
     expect(SHORT_LEN).toBe(0.25);
     for (const id of ['staccato', 'pops', 'bwoop']) {
-      const { notes, played } = ladderNotes(ex(id), range);
+      const e = ex(id);
+      const { notes, played } = ladderNotes(e, range);
+      const beat = 60 / (e.engine as { bpm: number }).bpm, p = PATTERNS[(e.engine as { pattern: keyof typeof PATTERNS }).pattern];
       expect(notes.every((n) => n.d <= SHORT_LEN + 1e-9), id).toBe(true);
-      expect(played.filter((n) => !n.lead).every((n) => n.d <= SHORT_LEN + 1e-9), id).toBe(true);
+      expect(played.filter((n) => !n.lead).every((n) => Math.abs(n.d - p.dur[0] * beat) < 1e-9), id).toBe(true);
+      /* each key let go as the next is pressed: one after another at the pattern's timing */
+      const keys = played.filter((n) => !n.lead).slice(0, p.deg.length);
+      keys.slice(1).forEach((k, i) => expect(k.t, id).toBeCloseTo(keys[i].t + keys[i].d, 9));
     }
     expect(ladderNotes(atLevel(ex('mum'), 2), range).notes[0].d).toBeCloseTo(0.5, 9);
   });

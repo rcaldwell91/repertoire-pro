@@ -22,8 +22,8 @@ describe('the song screen line', () => {
     expect(songLine(has({ state: 'new' }), null)).toEqual({ text: copy.songs.needsSplit, action: 'split' });
     expect(songLine(has({ state: 'splitting' }), null).action).toBeNull();
   });
-  it('says ready when the parts are on the phone', () => {
-    expect(songLine(has({ state: 'ready', full: true }), null).text).toBe(copy.song.ready);
+  it('says nothing once the parts are on the phone: Start says it (Robert, 23 Nov)', () => {
+    expect(songLine(has({ state: 'ready', full: true }), null)).toEqual({ text: '', action: null });
     expect(songLine(has({ state: 'first30', first30: true }), null).text).toBe(copy.song.first30);
     expect(listLine(has({ full: true }), null)).toBe(copy.songs.ready);
     expect(listLine(has(), { phase: 'waiting' })).toBe(copy.songs.splitting);

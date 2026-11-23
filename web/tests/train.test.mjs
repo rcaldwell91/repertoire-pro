@@ -36,7 +36,7 @@ if (!existsSync(SOURCE)) {
   process.exit(1);
 }
 
-const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'lead-line', 'levels', 'last-hold', 'one-zoom', 'short-piano', 'singing-screen',
+const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'preview', 'articulation', 'syllables', 'sound-sheet', 'more-about', 'titles', 'count-in-sound', 'start-only', 'narrow-controls', 'lead-pause', 'lead-line', 'lead-levels', 'levels', 'last-hold', 'one-zoom', 'short-piano', 'singing-screen',
   'ladder-sung', 'ladder-wrong', 'any-octave', 'hold', 'timed', 'cycle', 'guided', 'range-check', 'range-used', 'mic-refused', 'close', 'routine',
   'pause-resume', 'ex-take', 'ex-takes-page', 'restart', 'pause-gear', 'pause-others',
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
@@ -69,23 +69,26 @@ const RANGE = { lo: HOME - 4, hi: HOME + 5 };
 
 /* the old app's ladder (next.html 3706-3740), for the notes the singer must sing.
    Robert, 20 Nov, written here as he said it (not read from the app): before
-   every round a beat's quiet and the round's first note alone (a beat, never
-   under half a second), and each note sung and checked 0.14 s after the piano
-   plays it (from his takes). `piano` is when the piano plays it. */
-const LAG = 0.14, LEAD_MIN = 0.5;
-const PATTERNS = { five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 } };
-function ladder(pattern, bpm, range) {
-  const p = PATTERNS[pattern], beat = 60 / bpm, lead = Math.max(beat, LEAD_MIN);
+   every round a beat's quiet and the round's first note alone, and each note
+   sung and checked 0.14 s after the piano plays it (from his takes). Robert,
+   23 Nov: every note of a round the same length, the lead as long as one of
+   them; Mum climbs a half step every round to the top and back down.
+   `piano` is when the piano plays it. */
+const LAG = 0.14;
+const PATTERNS = { five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], span: 7 } };
+function ladder(pattern, bpm, range, { andBack = false } = {}) {
+  const p = PATTERNS[pattern], beat = 60 / bpm, lead = beat;
   const lo = range.lo + 1, top = range.hi - p.span;
   let roots = [];
   for (let r = lo; r <= top; r++) roots.push(r);
   if (!roots.length) roots = [lo];
+  if (andBack) roots = [...roots, ...roots.slice(0, -1).reverse()];
   const notes = [];
   let t = 0;
   roots.forEach((root, r) => {
     if (r) t += beat;
     t += lead;
-    p.deg.forEach((dg, i) => { notes.push({ m: root + dg, t: t + LAG, d: p.dur[i] * beat, piano: t, lead: t - lead }); t += p.dur[i] * beat; });
+    p.deg.forEach((dg) => { notes.push({ m: root + dg, t: t + LAG, d: beat, piano: t, lead: t - lead }); t += beat; });
   });
   return notes;
 }
@@ -94,7 +97,7 @@ const keyNameOf = (m) => ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯
 /** a recording of the singer, as base64, for the mirror */
 const b64 = (v) => v.buffer.toString('base64');
 const sing = (notes, opts) => b64(singNotes(FFMPEG, SOURCE, STEADY, notes, tmp, opts));
-const MUM = ladder('five', 120, RANGE);
+const MUM = ladder('five', 120, RANGE, { andBack: true });
 /* Match the note: each try sung on the note the piano played just before it (not on the note the app
    scores, so a round that scores another note than it plays is caught) */
 const onPlayed = async (targets) => {
@@ -760,9 +763,12 @@ try {
       `; one zoom ${oneZoom}; every bubble one row tall ${bands}; the biggest pattern followed ${follows}`);
   }
 
-  /* Robert, 20 Nov: "short notes should sound short": Bwoop's, Staccato's and
-     Consonant pops' piano notes are let go after 0.25 s at most, Bwoop's
-     bubbles as short; a long note as long as its beat */
+  /* Robert, 23 Nov: "short notes must not be chopped": Bwoop's, Staccato's
+     and Consonant pops' piano keys are held for their whole note, each let
+     go as the next is pressed (one after another at the pattern's timing),
+     while the bubbles stay a quarter second at most (20 Nov); a long note as
+     long as its beat. The fade every key is let go with is the engine's own,
+     one for every note (unit:web-engine, and the waveforms of tests/lab-audio) */
   if (want('short-piano')) {
     const lens = {};
     for (const id of ['bwoop', 'staccato', 'pops', 'mum']) {
@@ -774,15 +780,43 @@ try {
       await page.tap('#ex-start');
       await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
       await sleep(2500);
-      const st = await page.eval(P('starts.filter((x) => x.seconds > 0.2 && x.stopAt != null).map((x) => x.stopAt - x.when)'));
+      const st = await page.eval(P('starts.filter((x) => x.seconds > 0.2 && x.stopAt != null).map((x) => [x.when, x.stopAt])'));
       await page.tap('#ex-close');
-      /* the engine lets a note go 0.3 s after its length (the fade's room): its length is what is left */
-      /* the piano's notes in the order played, the lead notes left out (a lead is a beat long) */
-      lens[id] = { piano: st.filter((_, i) => !leads[i]).slice(0, 7).map((x) => +(x - 0.3).toFixed(3)), bubbles: round.slice(0, 7).map((n) => +n[2].toFixed(3)) };
+      /* the engine stops a source 0.3 s after letting it go (the fade's room): its key is down for what is left */
+      const keys = st.filter((_, i) => !leads[i]).slice(0, 5);
+      lens[id] = { piano: keys.map(([w, s]) => +(s - 0.3 - w).toFixed(3)), next: keys.slice(1).map(([w], k) => +(w - keys[k][0]).toFixed(3)),
+        bubbles: round.slice(0, 5).map((n) => +n[2].toFixed(3)) };
     }
-    const short = ['bwoop', 'staccato', 'pops'].every((id) => lens[id].piano.length >= 5 && lens[id].piano.every((x) => x <= 0.25 + 0.01) && lens[id].bubbles.every((x) => x <= 0.25 + 0.001));
-    const long = lens.mum.piano.length >= 5 && lens.mum.piano.every((x) => x >= 0.49);
-    check('short-piano', short && long, Object.entries(lens).map(([id, v]) => `${id}: piano ${v.piano.join(' ')} s, bubbles ${v.bubbles.join(' ')} s`).join('; '));
+    const whole = ['bwoop', 'staccato', 'pops', 'mum'].every((id) => lens[id].piano.length >= 5 && lens[id].next.every((d, k) => Math.abs(d - lens[id].piano[k]) < 0.01));
+    const shortSung = ['bwoop', 'staccato', 'pops'].every((id) => lens[id].bubbles.every((x) => x <= 0.25 + 0.001) && lens[id].piano.every((x) => x > 0.3));
+    const long = lens.mum.piano.every((x) => x >= 0.49) && lens.mum.bubbles.every((x) => x >= 0.49);
+    check('short-piano', whole && shortSung && long, Object.entries(lens).map(([id, v]) => `${id}: keys down ${v.piano.join(' ')} s, the next pressed after ${v.next.join(' ')} s, bubbles ${v.bubbles.join(' ')} s`).join('; '));
+  }
+
+  /* Robert, 23 Nov: the lead note lasts exactly as long as one note of the
+     round at the level picked, so it is shorter at Advanced: for a round
+     starting on C, C on its own, then the round from C */
+  if (want('lead-levels')) {
+    const out = [];
+    for (const level of [1, 2, 3]) {
+      await go('/train');
+      await page.eval(`localStorage.setItem('rp.level.mum', '${level}')`);
+      await openEx('mum');
+      await noSinger();
+      await page.eval(`window.__probe.starts.length = 0`);
+      const marks = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano).map((n) => n[3] === 1)`);
+      await page.tap('#ex-start');
+      await page.waitFor(`!document.querySelector('#count-in') && +(document.querySelector('#bubbles')?.dataset.visible ?? 0) > 0`, 9000);
+      await sleep(2000);
+      const st = await page.eval(P('starts.filter((x) => x.seconds > 0.2 && x.stopAt != null).map((x) => [x.when, x.stopAt, x.rate])'));
+      await page.tap('#ex-close');
+      const len = ([w, s]) => s - 0.3 - w;
+      out.push({ level, lead: len(st[0]), first: len(st[1]), second: len(st[2]), same: Math.abs(st[0][2] - st[1][2]) < 1e-6, isLead: marks[0] && !marks[1], butted: Math.abs(st[1][0] - st[0][1] + 0.3) < 0.005 });
+    }
+    await page.eval(`localStorage.removeItem('rp.level.mum')`);
+    const ok = out.every((o) => o.isLead && o.same && o.butted && Math.abs(o.lead - o.first) < 0.005 && Math.abs(o.first - o.second) < 0.005) &&
+      out[0].lead > out[1].lead && out[1].lead > out[2].lead;
+    check('lead-levels', ok, out.map((o) => `level ${o.level}: the lead ${o.lead.toFixed(3)} s, the round's first note ${o.first.toFixed(3)} s and second ${o.second.toFixed(3)} s; the lead its first note ${o.same}, the round right after it ${o.butted}`).join('; '));
   }
 
   /* 3b. The singing screen (Robert, 24 Oct): the note map fills the screen,

@@ -35,42 +35,51 @@ export interface Pattern {
       turned upside down (Note bends: flicks up, then flicks down) */
   readonly flip?: boolean;
 }
+/* Robert, 23 Nov: every note of a round the same length, the top note and
+   the last included ("he knows no exercise that does that except ones built
+   to hold a note"); his course's tracks space every note evenly, about
+   0.41 s apart all the way up and down. The holds (Sustained note, Messa di
+   voce, Tongue-out with a crescendo, Hold the note, Match the tone, Long
+   soft notes) aren't patterns: they keep their long notes. */
 export const PATTERNS: Record<PatternId, Pattern> = {
-  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 2], span: 7 },
-  down5: { deg: [7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 7 },
-  down3: { deg: [4, 2, 0], dur: [1, 1, 2], span: 4 },
-  arp: { deg: [0, 4, 7, 4, 0], dur: [1, 1, 2, 1, 2], span: 7 },
-  oct: { deg: [0, 4, 7, 12, 7, 4, 0], dur: [1, 1, 1, 2, 1, 1, 2], span: 12 },
-  octrep: { deg: [0, 4, 7, 12, 12, 12, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 12 },
+  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1], span: 7 },
+  down5: { deg: [7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1], span: 7 },
+  down3: { deg: [4, 2, 0], dur: [1, 1, 1], span: 4 },
+  arp: { deg: [0, 4, 7, 4, 0], dur: [1, 1, 1, 1, 1], span: 7 },
+  oct: { deg: [0, 4, 7, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 1, 1], span: 12 },
+  octrep: { deg: [0, 4, 7, 12, 12, 12, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], span: 12 },
   nine: { deg: [0, 2, 4, 5, 7, 9, 11, 12, 14, 12, 11, 9, 7, 5, 4, 2, 0],
-    dur: [1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2], span: 14 },
+    dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], span: 14 },
   oct15: { deg: [0, 4, 7, 12, 16, 19, 17, 14, 12, 9, 7, 5, 2, 0],
-    dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 19 },
-  /* Articulation (Robert, 25 Oct): one held note sung five times; short repeated notes */
-  same5: { deg: [0, 0, 0, 0, 0], dur: [1, 1, 1, 1, 2], span: 0 },
+    dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], span: 19 },
+  /* Articulation (Robert, 25 Oct): one note sung five times; short repeated notes */
+  same5: { deg: [0, 0, 0, 0, 0], dur: [1, 1, 1, 1, 1], span: 0 },
   pops: { deg: [0, 0, 0, 0, 0, 0, 0, 0], dur: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], span: 0 },
-  /* Robert, 28 Oct: a true octave leap, 1-8-1 (the old app's own ladder, next.html 3704) */
-  leap: { deg: [0, 12, 0], dur: [1.5, 2, 2.5], span: 12 },
+  /* Robert, 28 Oct: a true octave leap, 1-8-1 (the old app's own ladder,
+     next.html 3704); its three notes were 1.5, 2 and 2.5 beats, now 2 each,
+     the same round length */
+  leap: { deg: [0, 12, 0], dur: [2, 2, 2], span: 12 },
   /* a tongue twister fits its pattern exactly, a syllable a note, ending on the last:
      seven syllables 1-2-3-5-3-2-1; eight (a phrase said twice) 1-2-3-5, 5-3-2-1 */
-  twist7: { deg: [0, 2, 4, 7, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 2], span: 7 },
-  twist8: { deg: [0, 2, 4, 7, 7, 4, 2, 0], dur: [1, 1, 1, 2, 1, 1, 1, 2], span: 7 },
-  /* the runs (Robert, 28 Oct), a note a beat, the last held */
-  run5: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 2], span: 7 },
-  minor5: { deg: [0, 2, 3, 5, 7, 5, 3, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 2], span: 7 },
-  penta: { deg: [0, 2, 4, 7, 9, 7, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 2], span: 9 },
-  chrom: { deg: [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 7 },
-  turns: { deg: [4, 2, 0, 5, 4, 2, 7, 5, 4, 9, 7, 5], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], span: 9 },
-  arp19: { deg: [0, 4, 7, 12, 16, 19, 16, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2], span: 19 },
-  /* Robert, 3 Nov: three notes up and back, 1-2-3-2-1, four even notes and the last held */
-  three: { deg: [0, 2, 4, 2, 0], dur: [1, 1, 1, 1, 2], span: 4 },
+  twist7: { deg: [0, 2, 4, 7, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1], span: 7 },
+  twist8: { deg: [0, 2, 4, 7, 7, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1], span: 7 },
+  /* the runs (Robert, 28 Oct), a note a beat */
+  run5: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1], span: 7 },
+  minor5: { deg: [0, 2, 3, 5, 7, 5, 3, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1], span: 7 },
+  penta: { deg: [0, 2, 4, 7, 9, 7, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1], span: 9 },
+  chrom: { deg: [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], span: 7 },
+  turns: { deg: [4, 2, 0, 5, 4, 2, 7, 5, 4, 9, 7, 5], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], span: 9 },
+  arp19: { deg: [0, 4, 7, 12, 16, 19, 16, 12, 7, 4, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], span: 19 },
+  /* Robert, 3 Nov: three notes up and back, 1-2-3-2-1 */
+  three: { deg: [0, 2, 4, 2, 0], dur: [1, 1, 1, 1, 1], span: 4 },
   /* Robert, 16 Nov: 3-2-1, then 1-2-3, in one round */
-  threerun: { deg: [4, 2, 0, 0, 2, 4], dur: [1, 1, 2, 1, 1, 2], span: 4 },
+  threerun: { deg: [4, 2, 0, 0, 2, 4], dur: [1, 1, 1, 1, 1, 1], span: 4 },
   /* Robert, 20 Nov: a fast twitch, note, neighbour, note, neighbour, note,
      neighbour, note, back to back, each flick about as quick as the
-     course's (0.15 to 0.2 s: 0.3 of a beat at 100 is 0.18 s), with no long
-     hold between them; up one round, down the next (16 Nov) */
-  bend: { deg: [0, 1, 0, 1, 0, 1, 0], dur: [1, 0.3, 0.3, 0.3, 0.3, 0.3, 1], span: 1, flip: true },
+     course's (0.15 to 0.2 s: 0.3 of a beat at 100 is 0.18 s); up one round,
+     down the next (16 Nov). Since 23 Nov the first and last notes are as
+     quick as the flicks: every note the same length */
+  bend: { deg: [0, 1, 0, 1, 0, 1, 0], dur: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3], span: 1, flip: true },
 };
 
 /** how an exercise runs. ladder: the pattern up your range, sung back over
@@ -142,6 +151,8 @@ export interface Exercise {
   readonly shortNotes?: boolean;
   /** starts in the middle of the range and climbs to the top (Bwoop, Robert 16 Nov) */
   readonly fromMiddle?: boolean;
+  /** climbs to the top, then comes back down a half step a round to where it began (Mum, Robert 23 Nov) */
+  readonly andBack?: boolean;
   /** the band that counts at the level picked: half its height either side
       of the note (Robert, 21 Nov; BANDS); set by atLevel */
   readonly within?: number;
@@ -199,7 +210,9 @@ const LISTED: readonly Exercise[] = [
   ex('sustain', 'breath', 1, true, { kind: 'hold', secs: 8 }),
   ex('vfe', 'breath', 1, true, { kind: 'vfe' }),
   /* Tone */
-  ex('mum', 'tone', 1, true, ladder('five', 120)),
+  /* Robert, 23 Nov (his course's Mum): a half step every round, up to the
+     top and back down again */
+  { ...ex('mum', 'tone', 1, true, ladder('five', 120)), everyStep: true, andBack: true },
   ex('mee', 'tone', 1, true, ladder('five', 120)),
   ex('noo', 'tone', 1, true, ladder('five', 120)),
   ex('gee', 'tone', 2, false, ladder('five', 120)),
@@ -416,13 +429,16 @@ export const REST_BEATS = 2;
     is there about 0.09 s after it. Every note's whole window moves by it,
     so it keeps its length. */
 export const SING_LAG = 0.14;
-/** the lead note (Robert, 20 Nov): before every round, the first one
-    included, the round's first note played alone so it can be found before
-    it is checked; a beat long, never under this (s); a beat's quiet before it */
-export const LEAD_MIN = 0.5;
-/** a short note (Staccato, Consonant pops, Bwoop) plays and is drawn this
-    long at most, clipped, however long its beat (Robert, 20 Nov: "the
-    piano notes ring on"; "the bubbles should be as short as the notes") */
+/* the lead note (Robert, 20 Nov): before every round, the first one
+   included, the round's first note played alone so it can be found before
+   it is checked, after a beat's quiet. Robert, 23 Nov: it lasts exactly as
+   long as one note of that round at the level picked, so it is shorter at
+   Advanced (it was never under half a second before). */
+/** a short note (Staccato, Consonant pops, Bwoop) is sung and drawn this
+    long at most, however long its beat (Robert, 20 Nov: "the bubbles should
+    be as short as the notes"). The piano plays the whole note, a key
+    pressed for its beat and let go like any other, never cut off (Robert,
+    23 Nov: "short notes must not be chopped") */
 export const SHORT_LEN = 0.25;
 
 /** what an exercise sings: the notes sung and checked (each SING_LAG after
@@ -458,13 +474,16 @@ export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } 
   if (opts.down) {
     for (let r = mid; r >= lo; r--) roots.push(r);
   } else for (let r = e.fromMiddle ? mid : lo; r <= top; r++) roots.push(r);
+  /* up to the top, then back down a half step a round (Mum, Robert 23 Nov) */
+  if (e.andBack && !opts.down) roots = [...roots, ...roots.slice(0, -1).reverse()];
   if (!roots.length) roots = [lo];
   if (roots.length > MAX_RUNGS && !e.everyStep) {
     const step = Math.ceil(roots.length / MAX_RUNGS);
     roots = roots.filter((_, i) => i % step === 0);
   }
   const notes: Note[] = [], played: Note[] = [], pattern: Note[] = [];
-  const lead = Math.max(beat, LEAD_MIN);
+  /* the lead: as long as the round's first note */
+  const lead = p.dur[0] * beat;
   let t = 0;
   roots.forEach((root, r) => {
     const way = p.flip && r % 2 ? -1 : 1;
@@ -475,9 +494,10 @@ export function ladderNotes(e: Exercise, range: Range, opts: { down?: boolean } 
     p.deg.forEach((dg, i) => {
       const syl = sylFor(e, i, r);
       const len = p.dur[i] * beat;
+      /* sung (and drawn) short on a short-note exercise; played whole */
       const d = e.shortNotes ? Math.min(len, SHORT_LEN) : len;
       const n: Note = { m: root + way * dg, t, d, syl: i === 0 ? keyName(root) + ' · ' + syl : syl, ...(e.shortNotes ? { need: SHORT_NEED } : {}) };
-      played.push(n);
+      played.push({ ...n, d: len });
       notes.push({ ...n, t: t + SING_LAG });
       if (r === 0) pattern.push({ ...n, t: t - from });
       t += len;

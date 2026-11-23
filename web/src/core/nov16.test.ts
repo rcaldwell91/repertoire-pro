@@ -36,8 +36,8 @@ describe('four new exercises (Robert, 16 Nov), none in a routine', () => {
     for (const r of Object.values(ROUTINES)) for (const id of ['restnote', 'threerun', 'bends', 'bwoop']) expect(r.steps.map((s) => s.id)).not.toContain(id);
   });
 
-  it('Three-note run: 3-2-1 then 1-2-3 in one round, beats 1-1-2, 1-1-2, a half step higher each round, on the runs\' "my" and steps', () => {
-    expect(PATTERNS.threerun).toMatchObject({ deg: [4, 2, 0, 0, 2, 4], dur: [1, 1, 2, 1, 1, 2] });
+  it('Three-note run: 3-2-1 then 1-2-3 in one round, every note a beat (23 Nov; was 1-1-2, 1-1-2), a half step higher each round, on the runs\' "my" and steps', () => {
+    expect(PATTERNS.threerun).toMatchObject({ deg: [4, 2, 0, 0, 2, 4], dur: [1, 1, 1, 1, 1, 1] });
     const { notes } = ladderNotes(atLevel(ex('threerun'), 1), range);
     const roots = rungStarts(notes).map((i) => notes[i].m - 4);
     roots.forEach((r, k) => k && expect(r - roots[k - 1]).toBe(1));

@@ -44,7 +44,7 @@ const RECORDING = process.env.RP_SPLIT_NAME || 'All of Me (separated)';
 const expected = BAKEOFF.rows.find((r) => r.song === RECORDING && r.method === BAKEOFF.winner);
 
 const ALL = ['line-read', 'line-shared', 'line-follows', 'map-follows', 'voice-zero', 'placement', 'octave-switch', 'hear-yourself', 'mic-leave', 'mic-hidden',
-  'mic-refused', 'reopen-line', 'no-page-errors'];
+  'mic-refused', 'reopen-line', 'status-line', 'no-page-errors'];
 const results = [];
 function check(name, ok, detail) {
   results.push({ name, ok });
@@ -119,7 +119,8 @@ await page.addInitScript(MIRROR);       /* before the probe, so the probe sees t
 await page.addInitScript(PROBE);
 const S = (expr) => `window.__probe.${expr}`;
 const MAP = `document.querySelector('#note-map')`;
-const MAPLINE = `document.querySelector('#map-line')?.textContent`;
+/* the singer's line being read: shown in the line under the title (Robert, 23 Nov) */
+const MAPLINE = `document.querySelector('#song-reading')?.textContent.replace(/^ · /, '')`;
 let loads = 0;
 async function open(id) {
   await page.goto(URL_APP + '?load=' + ++loads + '#/sing/learn/song/' + id);
@@ -392,6 +393,36 @@ try {
     check('mic-refused', said && carry === copy.song.carryOn && playing && gone && stillPlaying && asked === 1,
       `"${copy.song.micRefused}" ${said} with "${carry}"; the song kept playing ${playing}; after Carry on without it: message gone ${gone}, still playing ${stillPlaying}; ` +
       `the mic was asked for ${asked} time(s) over two Starts`);
+  }
+
+  /* Robert, 23 Nov: the line under the title says nothing once the song is
+     ready ("Ready. Tap Start." dropped), shows the singer's line being read
+     while it is, and is hidden while the song plays, its room kept so
+     nothing moves */
+  if (want('status-line')) {
+    await open(ID);
+    await sleep(800);
+    const ready = await page.eval(`({ line: !!document.querySelector('#song-line'), ready: document.querySelector('#song-play').dataset.ready,
+      words: document.body.innerText.includes('Ready. Tap Start') })`);
+    /* read again: the line kept on the phone taken away, the voice still there */
+    await page.eval(`(async () => { const db = await new Promise((ok, no) => { const q = indexedDB.open('repertoire-app'); q.onsuccess = () => ok(q.result); q.onerror = no; });
+      await new Promise((ok) => { const t = db.transaction('lines', 'readwrite'); t.objectStore('lines').delete(${JSON.stringify(ID)}); t.oncomplete = ok; }); db.close(); })()`);
+    await page.goto(URL_APP + '?load=' + ++loads + '#/sing');
+    await page.waitFor(`!!document.querySelector('main h1')`);
+    await open(ID);
+    const shown = await page.waitFor(`/^Reading the singer's line/.test(document.querySelector('#song-reading')?.textContent || '')`, 8000);
+    const before = await page.eval(`(() => { const l = document.querySelector('#song-line'), p = document.querySelector('#song-play');
+      return { text: document.querySelector('#song-reading')?.textContent, h: l.getBoundingClientRect().height, play: p.getBoundingClientRect().top + window.scrollY }; })()`);
+    await page.tap('#song-play');
+    await page.waitFor(S('live.size >= 2'), 8000);
+    await sleep(400);
+    const during = await page.eval(`(() => { const l = document.querySelector('#song-line'), p = document.querySelector('#song-play');
+      return { hidden: !l || getComputedStyle(l).visibility === 'hidden', h: l ? l.getBoundingClientRect().height : 0, play: p.getBoundingClientRect().top + window.scrollY }; })()`);
+    await stopSong();
+    await page.waitFor(`!document.querySelector('#song-reading')`, 240000);
+    check('status-line', !ready.line && ready.ready === '1' && !ready.words && shown && during.hidden && Math.abs(during.play - before.play) < 1,
+      `ready: a line under the title ${ready.line}, "Ready. Tap Start." on screen ${ready.words}; while reading it says "${before.text}"; ` +
+      `playing: the line hidden ${during.hidden}, Start's place ${before.play.toFixed(0)} then ${during.play.toFixed(0)} px`);
   }
 
   if (want('reopen-line')) {

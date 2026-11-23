@@ -412,10 +412,13 @@ input[type='range'] {
 /* the note map */
 .notemap { position: relative; margin: 8px 0 4px; }
 /* Learn a song's map: Train's 30 px a half step (Robert, 22 Nov), so as tall
-   as the screen allows with Start still above the menu (423 px: the title,
-   the line under it, the play bar, the buttons and the menu), never less
-   than it was */
-.notemap canvas { display: block; width: 100%; height: clamp(260px, calc(100dvh - 423px), 620px); border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
+   as the screen allows with Start still above the menu (334 px: the title,
+   the play bar, the buttons and the menu), never less than it was. While
+   the line under the title shows (62 px with its gap: splitting, reading,
+   a problem; Robert, 23 Nov: nothing once ready) the map is that much
+   shorter, so Start stays exactly where it was. */
+.notemap canvas { display: block; width: 100%; height: clamp(260px, calc(100dvh - 334px), 620px); border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
+main:has(#song-line) .notemap canvas { height: clamp(260px, calc(100dvh - 396px), 620px); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--tap); }
 .switch-row input[role='switch'] {
   appearance: none;
@@ -443,7 +446,6 @@ input[type='range'] {
 .switch-row input[role='switch']:checked { border-color: var(--accent); background: var(--accent); }
 .switch-row input[role='switch']:checked::after { background: var(--on-accent); transform: translateX(22px); }
 .hint { color: var(--muted); font-size: 0.9rem; margin: 4px 0 0; }
-.map-line { min-height: 1.4em; }
 .mic-line { text-align: center; }
 .mic-line p { margin: 0 0 8px; }
 .play { font: inherit; font-weight: 700; font-size: 1rem; }

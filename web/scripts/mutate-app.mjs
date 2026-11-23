@@ -733,6 +733,19 @@ const MUTATIONS = [
     to: "      const r = range ?? { lo: mid - span / 2, hi: mid + span / 2 };\n      const y = (m: number) => pad + ((r.hi - m) / (r.hi - r.lo)) * (H - 2 * pad);", checks: ['map-follows'] },
   { test: 'notemap', what: 'the song map pinned in place', file: 'src/ui/NoteMap.tsx',
     from: "const mid = path.current!.has ? view.mid(at) : fallback;", to: "const mid = path.current!.has ? view.mid(0) : fallback;", checks: ['map-follows'] },
+  /* Robert, 23 Nov */
+  { test: 'notemap', what: 'the line under the title shows while the song plays', file: 'src/screens/SongScreen.tsx',
+    from: " style={playing && !problem ? { visibility: 'hidden' } : undefined}>", to: ">", checks: ['status-line'] },
+  { test: 'notemap', what: 'the singer\'s line being read is not shown in the line', file: 'src/screens/SongScreen.tsx',
+    from: "{reading && <span className=\"reading\" id=\"song-reading\"", to: "{false && <span className=\"reading\" id=\"song-reading\"", checks: ['status-line', 'line-read'] },
+  { test: 'notemap', what: '"Ready. Tap Start." once the song is ready again', file: 'src/core/song.ts',
+    from: "  if (has.full) return { text: '', action: null };", to: "  if (has.full) return { text: 'Ready. Tap Start.', action: null };", checks: ['status-line'] },
+  { test: 'train', what: 'a short note\'s piano cut to a quarter second again', file: 'src/core/exercises.ts',
+    from: '      played.push({ ...n, d: len });', to: '      played.push(n);', checks: ['short-piano'] },
+  { test: 'train', what: 'the lead never under half a second again', file: 'src/core/exercises.ts',
+    from: '  const lead = p.dur[0] * beat;', to: '  const lead = Math.max(p.dur[0] * beat, 0.5);', checks: ['lead-levels'] },
+  { test: 'train', what: 'Mum\'s top note held twice as long again', file: 'src/core/exercises.ts',
+    from: "  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 1, 1, 1, 1, 1], span: 7 },", to: "  five: { deg: [0, 2, 4, 5, 7, 5, 4, 2, 0], dur: [1, 1, 1, 1, 2, 1, 1, 1, 1], span: 7 },", checks: ['lead-pause'] },
 ];
 
 function edit(dir, { file, from, to }) {

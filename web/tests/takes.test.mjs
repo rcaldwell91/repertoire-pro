@@ -186,7 +186,7 @@ try {
   })()`);
   await open();
   /* the singer's line first (for the take's right notes) */
-  await page.waitFor(`!document.querySelector('#map-line')?.textContent && +(document.querySelector('#note-map')?.dataset.lo || 0) !== 55`, 120000);
+  await page.waitFor(`!document.querySelector('#song-reading') && +(document.querySelector('#note-map')?.dataset.lo || 0) !== 55`, 120000);
   const SUNG = 62;          /* a stretch of the song with plenty of singing */
 
   /* 1. a take: what the mic heard, never the music, in its place */

@@ -115,10 +115,11 @@ const SAFETY_CURVE: Float32Array<ArrayBuffer> = (() => {
 })();
 
 /** how a piano note is let go at its length: a fade with this time
-    constant (s), quicker for a note this short or shorter (Robert, 20 Nov) */
+    constant (s), 40 dB down in 0.18 s and 60 dB in 0.28 s, a key let go
+    with its damper falling on the string. Every note, short ones too
+    (Robert, 23 Nov: "never a hard cut"; the 20 Nov quicker fade for short
+    notes, 60 dB in 0.08 s, chopped them off mid-sound) */
 export const NOTE_FADE = 0.04;
-export const SHORT_NOTE = 0.3;
-export const SHORT_FADE = 0.012;
 
 /** "Hear yourself" is lifted at most this much (the slider stops at MONITOR_MAX) */
 export const MONITOR_ROOM = 8;
@@ -524,13 +525,11 @@ export class WebEngine implements AudioEngine {
       const at = opts.from >= begins ? when : when + (begins - opts.from);
       src.start(at, opts.from >= begins ? opts.from - begins : 0);
       if (len != null) {
-        /* let go at its length, with a short fade so it does not click;
-           a short note (Robert, 20 Nov: "short notes should sound short")
-           a quicker one, so it stops rather than rings on */
+        /* let go at its length, as a key is: the damper's fade, never a cut */
         const off = at + len - Math.max(0, opts.from - begins);
         const g = gains[i];
         g.gain.setValueAtTime(opts.gains[i] ?? 1, off);
-        g.gain.setTargetAtTime(0, off, len <= SHORT_NOTE ? SHORT_FADE : NOTE_FADE);
+        g.gain.setTargetAtTime(0, off, NOTE_FADE);
         src.stop(off + 0.3);
         letGo = Math.max(letGo, off + 0.3);
       }
