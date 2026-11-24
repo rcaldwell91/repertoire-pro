@@ -5,7 +5,7 @@ import { Settings } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
   CATEGORIES, ROUTINES, atLevel, bandAt, bandOf, bubbleScore, exercise, firstRung, levelsOf, measures, nextInGroup, notesFor, rungAt, rungStarts,
-  rightFor, stepsFor, wobbleHolds, type Exercise, type Level, type Note, type RoutineId,
+  rightFor, stepsFor, sylOf, wobbleHolds, type Exercise, type Level, type Note, type RoutineId,
 } from '../core/exercises';
 import { hold as wobbleHold, measures as wobbleMeasures, type Part as WobblePart } from '../core/vibrato';
 import { keepWobble, lastWobbleFor, overall, type LastWobble } from '../data/wobble';
@@ -1186,6 +1186,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           </ol>
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
             data-round={sung ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
+            data-syls={kind === 'wobble' ? JSON.stringify([...new Set(plan.notes.map((n) => sylOf(n)))]) : undefined}
             data-rounds={kind === 'ladder' || kind === 'wobble' ? JSON.stringify(rungStarts(plan.notes).map((i) => plan.notes[i].m)) : undefined}
             data-played={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
             data-piano={kind === 'ladder' || kind === 'hold' || kind === 'wobble' ? JSON.stringify(plan.played.map((n) => [n.m, n.t, n.d, n.lead ? 1 : 0])) : undefined}
@@ -1245,9 +1246,9 @@ function Wobbles({ o, last }: { o: Extract<Outcome, { kind: 'wobble' }>; last: L
       <p className="ex-label">{t.wobbleHead}</p>
       {all ? (
         <>
-          <p className="ex-score" id="ex-wobble-speed">{was(fill(t.wobbleSpeed, { r: all.rate.toFixed(1) }), last ? fill(t.wobbleSpeed, { r: last.rate.toFixed(1) }).replace(/^[^:]*: /, '') : null)}</p>
+          <p className="ex-score" id="ex-wobble-speed">{was(fill(t.wobbleSpeed, { r: all.rate.toFixed(1) }), last ? fill(t.lastSpeed, { r: last.rate.toFixed(1) }) : null)}</p>
           <p className="hint" id="ex-typical-speed">{t.typicalSpeed}</p>
-          <p className="ex-score" id="ex-wobble-width">{was(fill(t.wobbleWidth, { c: Math.round(all.width) }), last ? fill(t.wobbleWidth, { c: Math.round(last.width) }).replace(/^[^:]*: /, '') : null)}</p>
+          <p className="ex-score" id="ex-wobble-width">{was(fill(t.wobbleWidth, { c: Math.round(all.width) }), last ? fill(t.lastWidth, { c: Math.round(last.width) }) : null)}</p>
           <p className="hint" id="ex-typical-width">{t.typicalWidth}</p>
           <p className="hint">{t.centsAre}</p>
           <p className="hint">{t.notTarget}</p>

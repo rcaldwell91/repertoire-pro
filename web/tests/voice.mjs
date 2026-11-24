@@ -235,3 +235,39 @@ export function restingSlides(ffmpeg, source, steady, slides, dir, { tail = 1.5 
   });
   return wav(out, join(dir, `rest-${Date.now()}-${Math.round(Math.random() * 1e6)}.wav`));
 }
+
+/** A real voice made to follow `want(t)` exactly (note numbers; NaN where
+    silent), from 0 to `secs` (24 Nov, Vibrato: a known wobble, or none, or
+    two notes taking turns, on a real voice). The steady stretch is made
+    long, its own pitch read every 10 ms and smoothed over 40 ms, and then
+    read faster or slower as it plays: a sound read 1% faster is 1% higher,
+    so its pitch is want(t) to within its own small unsteadiness. As a WAV. */
+export function followVoice(ffmpeg, source, steady, want, secs, dir) {
+  const long = pcm(ffmpeg, source, ['-af', `rubberband=tempo=${steady.secs / (1.6 * secs + 1)}:formant=preserved`],
+    ['-ss', String(steady.start), '-t', String(steady.secs)]);
+  const raw = pitchTrack(long);
+  let last = steady.m;
+  const filled = raw.map((v) => (Number.isFinite(v) ? (last = v) : last));
+  const own = filled.map((_, i) => {
+    const w = filled.slice(Math.max(0, i - 2), i + 3);
+    return w.reduce((a, b) => a + b, 0) / w.length;
+  });
+  const ownAt = (p) => own[Math.min(own.length - 1, Math.max(0, Math.round(p / (RATE / 100))))];
+  const out = new Float32Array(Math.round(secs * RATE));
+  let p = RATE * 0.1;
+  for (let n = 0; n < out.length; n++) {
+    const t = n / RATE, w = want(t);
+    const i = Math.floor(p);
+    if (i + 1 >= long.length) break;
+    if (Number.isFinite(w)) {
+      /* 20 ms fades where the voice starts and stops */
+      let fade = 1;
+      for (let k = 1; k <= 20; k++) {
+        if (!Number.isFinite(want(t - k / 1000)) || !Number.isFinite(want(t + k / 1000))) { fade = Math.min(fade, k / 20); break; }
+      }
+      out[n] = (long[i] + (long[i + 1] - long[i]) * (p - i)) * fade;
+      p += Math.pow(2, (w - ownAt(p)) / 12);
+    } else p += 1;
+  }
+  return wav(out, join(dir, `follow-${Date.now()}-${Math.round(Math.random() * 1e6)}.wav`));
+}

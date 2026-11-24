@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launch, sleep } from './chrome.mjs';
 import { ANDROID, MIRROR, PROBE, serve } from './harness.mjs';
-import { firstNote, pcm, pitchTrack, restingSlides, singNotes, steadyNote } from './voice.mjs';
+import { firstNote, followVoice, pcm, pitchTrack, restingSlides, singNotes, steadyNote } from './voice.mjs';
 import { copy, fill } from '../src/core/copy.ts';
 /** a list row's level: its own difficulty, then its level span (Robert, 22 Nov) */
 const ownSpan = (own, from, to) => fill(copy.train.ownAndSpan, { own: copy.levels[own], span: fill(copy.train.levelSpan, { from: copy.levels[from], to: copy.levels[to] }) });
@@ -42,9 +42,9 @@ const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'prev
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
   'next-moves-on', 'no-silent-taps', 'menu-everywhere', 'menu-leave', 'rounds-sung', 'stop-early', 'match-wait', 'match-window', 'match-blind', 'hold-map', 'match-tone',
-  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'own-tag', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'no-page-errors'];
+  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'own-tag', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'vibrato', 'vibrato-again', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
-const GROUPS = { warmup: 14, breath: 6, tone: 12, agility: 12, range: 6, words: 7, pitch: 5 };
+const GROUPS = { warmup: 14, breath: 6, tone: 13, agility: 12, range: 6, words: 7, pitch: 5 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
 /** the count-in beep: the one short sound the app makes itself */
 const isBeep = (x) => Math.abs(x.seconds - 0.08) < 0.01;
@@ -2401,6 +2401,130 @@ try {
   }
 
   /* the four new ones on their lists (Robert, 16 Nov), each in its place with its level, and how each runs */
+  /* pictures for the report, where RP_SHOTS names a folder outside the repo */
+  const SHOTS = process.env.RP_SHOTS || '';
+  const shot = async (name) => writeFileSync(join(SHOTS, name), await page.screenshot());
+  /* Vibrato (Robert, 16 Nov; built 24 Nov): its row and page, the vowel in
+     the gear, and a real voice singing three rounds through the mic: the
+     turns, then on the held note a known wobble (5.5 a second, 80 cents top
+     to bottom), then a steady hold, then turns carried on through the hold.
+     Each hold measured from the line's own readings, numbers beside the
+     typical ranges, never a verdict; last time's kept on this phone */
+  const vibratoRun = async (holds) => {
+    await openEx('vibrato');
+    const piano = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano)`);
+    /* each round: its lead, its turns, and its held note (the longest) */
+    const rounds = [];
+    for (const [m, t, d, lead] of piano) {
+      if (lead) rounds.push({ notes: [] });
+      else rounds[rounds.length - 1].notes.push({ m, t, d });
+    }
+    const end = rounds[holds.length - 1].notes.at(-1);
+    const want = (time) => {
+      for (let r = 0; r < holds.length; r++) {
+        const ns = rounds[r].notes;
+        for (let k = 0; k < ns.length; k++) {
+          const n = ns[k], from = n.t + LAG, to = n.t + n.d + LAG;
+          if (time < from || time >= to) continue;
+          if (k < ns.length - 1) return n.m;
+          const h = holds[r], into = time - from;
+          if (h.kind === 'wobble') return n.m + (h.width / 200) * Math.sin(2 * Math.PI * h.rate * into);
+          if (h.kind === 'turns') return n.m + (Math.floor(into * h.per * 2) % 2);
+          return n.m;
+        }
+      }
+      return NaN;
+    };
+    await singer(b64(followVoice(FFMPEG, SOURCE, STEADY, want, end.t + end.d + LAG + 0.5, tmp)));
+    await page.tap('#ex-start');
+    /* the run's clock: wait out the rounds sung, then Close (with RP_SHOTS, a
+       picture of the map during the first round's hold, after the count-in) */
+    await page.waitFor(`!!document.querySelector('#ex-close')`, 8000);
+    const hold1 = rounds[0].notes.at(-1);
+    /* three seconds into the first hold (after the count-in): your line as the map last drew it, its newest second */
+    const shotAt = hold1.t + LAG + 3.2 + 3;
+    await new Promise((r) => setTimeout(r, shotAt * 1000));
+    if (SHOTS && holds[0].kind === 'wobble') await shot('vibrato-3-hold.png');
+    const swing = await page.eval(`(() => {
+      const p = (window.__youPath || []).slice(-20).map((q) => q[1]);
+      let turns = 0;
+      for (let i = 2; i < p.length; i++) if ((p[i] - p[i - 1]) * (p[i - 1] - p[i - 2]) < 0 && Math.abs(p[i] - p[i - 1]) >= 3) turns++;
+      return { range: p.length ? Math.max(...p) - Math.min(...p) : 0, turns, n: p.length };
+    })()`);
+    await new Promise((r) => setTimeout(r, (end.t + end.d + LAG + 4.5 - shotAt) * 1000));
+    await page.tap('#ex-close');
+    const shown = await page.waitFor(`!!document.querySelector('#ex-wobble')`, 10000);
+    if (SHOTS) await shot(holds.length > 1 ? 'vibrato-4-result.png' : 'vibrato-5-again.png');
+    await noSinger();
+    const got = await page.eval(`({ holds: JSON.parse(document.querySelector('#ex-wobble')?.dataset.holds ?? '[]'),
+      speed: document.querySelector('#ex-wobble-speed')?.textContent ?? null, width: document.querySelector('#ex-wobble-width')?.textContent ?? null,
+      typical: [document.querySelector('#ex-typical-speed')?.textContent, document.querySelector('#ex-typical-width')?.textContent],
+      rounds: [...document.querySelectorAll('#ex-wobble-rounds li')].map((x) => x.textContent), kept: !!document.querySelector('#ex-wobble-kept'),
+      text: document.querySelector('#ex-result')?.textContent ?? '' })`);
+    return { shown, got, rounds, swing };
+  };
+  if (want('vibrato') || want('vibrato-again')) {
+    /* the points of your line as the map draws them (its one gradient stroke), for the checks */
+    await page.addInitScript(`(() => {
+      const P = CanvasRenderingContext2D.prototype, bp = P.beginPath, mt = P.moveTo, lt = P.lineTo, st = P.stroke;
+      let cur = [];
+      P.beginPath = function () { cur = []; return bp.apply(this, arguments); };
+      P.moveTo = function (x, y) { cur.push([x, y]); return mt.apply(this, arguments); };
+      P.lineTo = function (x, y) { cur.push([x, y]); return lt.apply(this, arguments); };
+      P.stroke = function () { if (this.strokeStyle instanceof CanvasGradient && this.canvas && this.canvas.id === 'bubbles') window.__youPath = cur.slice(); return st.apply(this, arguments); };
+    })()`);
+  }
+  if (want('vibrato')) {
+    await go('/train/cat/tone');
+    await page.waitFor(`!!document.querySelector('#ex-vibrato')`, 5000);
+    const row = await page.eval(`({ tags: document.querySelector('#ex-vibrato .ex-tags')?.textContent, last: [...document.querySelectorAll('.ex-row')].pop()?.id })`);
+    await page.eval(`localStorage.removeItem('rp.vowel.vibrato'); localStorage.removeItem('rp.wobble.vibrato')`);
+    await openEx('vibrato');
+    const page1 = await page.eval(`({ steps: [...document.querySelectorAll('#ex-how li')].map((x) => x.textContent), syls: JSON.parse(document.querySelector('#ex-start').dataset.syls),
+      rounds: JSON.parse(document.querySelector('#ex-start').dataset.rounds) })`);
+    if (SHOTS) await shot('vibrato-1-page.png');
+    await page.tap('#ex-gear');
+    await page.waitFor(`!!document.querySelector('#sound-sheet')`, 3000);
+    if (SHOTS) await shot('vibrato-2-gear.png');
+    const sheet = await page.eval(`({ vowels: [...document.querySelectorAll('#vowel .choice')].map((x) => x.textContent), on: document.querySelector('#vowel [aria-checked="true"]')?.id,
+      any: !!document.querySelector('#any-octave'), level: !!document.querySelector('#jump-level') })`);
+    await page.tap('#vowel-ee');
+    const ee = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.syls)`);
+    await openEx('vibrato');
+    const eeKept = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.syls)`);
+    await page.eval(`localStorage.removeItem('rp.vowel.vibrato')`);
+    const { shown, got, swing } = await vibratoRun([{ kind: 'wobble', rate: 5.5, width: 80 }, { kind: 'steady' }, { kind: 'turns', per: 2 }]);
+    const keptNow = JSON.parse((await page.eval(`localStorage.getItem('rp.wobble.vibrato')`)) || 'null');
+    const [w, st, tu] = got.holds;
+    const rightKinds = got.holds.length === 3 && w?.[1] === 'wobble' && st?.[1] === 'none' && tu?.[1] === 'turns';
+    const close = !!w && Math.abs(w[2] - 5.5) < 0.3 && Math.abs(w[3] - 80) < 15;
+    const steps = [...copy.about.vibrato.steps, copy.stepLines.stopEasy];
+    const verdict = /good|great|correct|well done|should/i.test(got.text);
+    check('vibrato', row.tags === 'Advanced · ' + copy.train.tagWobble && row.last === 'ex-vibrato' &&
+      JSON.stringify(page1.steps) === JSON.stringify(steps) && JSON.stringify(page1.syls) === '["ah"]' && page1.rounds[0] === RANGE.lo + 2 &&
+      sheet.vowels.join(' ') === '"ah" "oh" "ee"' && sheet.on === 'vowel-ah' && !sheet.any && !sheet.level &&
+      JSON.stringify(ee) === '["ee"]' && JSON.stringify(eeKept) === '["ee"]' &&
+      shown && rightKinds && close && got.typical[0] === copy.train.typicalSpeed && got.typical[1] === copy.train.typicalWidth && !got.kept && !verdict &&
+      !!keptNow && Math.abs(keptNow.rate - w[2]) < 1e-9 && Math.abs(keptNow.width - w[3]) < 1e-9 && swing.range >= 20 && swing.turns >= 4,
+      /* 20 px: two-thirds of a half step (30 px); the 80 cents sung show as about 23 px, the median of five flattens them to about 13 (24 Nov) */
+      `row "${row.tags}", last in Tone ${row.last === 'ex-vibrato'}; steps as written ${JSON.stringify(page1.steps) === JSON.stringify(steps)}; on ${JSON.stringify(page1.syls)}, ` +
+      `first round on ${page1.rounds[0]}; the gear: ${JSON.stringify(sheet.vowels)} (${sheet.on}), Any octave ${sheet.any}, level ${sheet.level}; "ee" picked: ${JSON.stringify(ee)}, kept ${JSON.stringify(eeKept)}; ` +
+      `sung (a 5.5/s 80-cent wobble, a steady hold, turns): ${JSON.stringify(got.holds)}; "${got.speed}", "${got.width}"; ${JSON.stringify(got.rounds)}; a verdict anywhere ${verdict}; ` +
+      `kept on this phone ${JSON.stringify(keptNow)}; the map's line over the newest second of the hold swings ${swing.range.toFixed(0)} px, turning ${swing.turns} times`);
+  }
+  if (want('vibrato-again')) {
+    /* the next time: last time's numbers (kept on this phone) beside this time's, then this time's kept */
+    await go('/train');
+    await page.eval(`localStorage.setItem('rp.wobble.vibrato', JSON.stringify({ at: '2026-11-23T10:00:00Z', rate: 5.2, width: 70 }))`);
+    const { got } = await vibratoRun([{ kind: 'wobble', rate: 6, width: 60 }]);
+    const w = got.holds[0];
+    const keptNow = JSON.parse((await page.eval(`localStorage.getItem('rp.wobble.vibrato')`)) || 'null');
+    check('vibrato-again', got.kept && got.speed === fill(copy.train.lastTime, { line: fill(copy.train.wobbleSpeed, { r: '6.0' }), was: fill(copy.train.lastSpeed, { r: '5.2' }) }) &&
+      /last time 70 cents\)$/.test(got.width || '') && !!w && w[1] === 'wobble' && Math.abs(w[2] - 6) < 0.3 && Math.abs(w[3] - 60) < 15 &&
+      !!keptNow && Math.abs(keptNow.rate - w[2]) < 1e-9,
+      `last time 5.2 a second and 70 cents; now "${got.speed}", "${got.width}", ${JSON.stringify(got.holds)}; then kept ${JSON.stringify(keptNow)}`);
+  }
+
   if (want('new-four')) {
     const rows = async (cat) => {
       await page.goto(URL_APP + '?load=' + ++loads + '#/train/cat/' + cat);

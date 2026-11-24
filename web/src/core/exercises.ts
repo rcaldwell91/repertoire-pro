@@ -572,14 +572,14 @@ export function wobbleNotes(e: Exercise, range: Range, vowel: string = sylFor(e,
   const notes: Note[] = [], played: Note[] = [], pattern: Note[] = [];
   let t = 0;
   for (let root = lo, r = 0; root <= hi; root++, r++) {
-    if (r > 0) t += beat;
+    if (r) t += beat;
     played.push({ m: root, t, d: beat, syl: '', lead: true });
     t += beat;
     const from = t;
     const add = (m: number, d: number, first: boolean) => {
       const n: Note = { m, t, d, syl: first ? keyName(root) + ' · ' + vowel : vowel };
       played.push(n);
-      notes.push({ ...n, t: t + SING_LAG });
+      notes.push({ ...n, t: n.t + SING_LAG });
       if (r === 0) pattern.push({ ...n, t: t - from });
       t += d;
     };

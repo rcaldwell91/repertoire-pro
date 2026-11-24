@@ -381,10 +381,12 @@ export const copy = {
     notTarget: 'Typical, not a target.',
     overHold: 'start {a}; middle {b}; end {c}',
     wobblePart: '{r} a second, {c} cents',
+    lastSpeed: '{r} a second',
+    lastWidth: '{c} cents',
     noPart: 'no wobble',
     perRound: '{note}: {what}',
     noWobble: 'No regular wobble on the held notes.',
-    stillTurns: 'Still two notes taking turns',
+    stillTurns: 'still two notes taking turns',
     noneHeard: 'Not heard',
     wobbleKept: 'Last time kept on this phone.',
 

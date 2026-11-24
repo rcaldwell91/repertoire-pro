@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
-import { exercise, measures, notesFor, stepsFor, wobbleHolds, wobbleNotes, WOBBLE_HOLD, WOBBLE_SPEEDS, type Exercise } from './exercises';
+import { exercise, measures, notesFor, stepsFor, wobbleHolds, wobbleNotes, SING_LAG, WOBBLE_HOLD, WOBBLE_SPEEDS, type Exercise } from './exercises';
 import { fitSecond, fitWave, hold, measures as wobbleMeasures, SETTLE, TYPICAL_RATE, TYPICAL_WIDTH } from './vibrato';
 import { resultRow } from './results';
 
@@ -141,6 +141,13 @@ describe('Vibrato, the exercise (Robert, 16 Nov)', () => {
     /* ends on the upper, then holds the lower */
     expect(rest[turnsN - 1].m).toBe(48);
     expect(rest[turnsN]).toMatchObject({ m: 47, d: WOBBLE_HOLD });
+    /* each note sung and checked SING_LAG after the piano plays it, as everywhere */
+    const sung = s.played.filter((n) => !n.lead);
+    expect(s.notes.every((n, i) => Math.abs(n.t - sung[i].t - SING_LAG) < 1e-9 && n.d === sung[i].d)).toBe(true);
+    /* a note's quiet before every round after the first, as everywhere */
+    const leads = s.played.filter((n) => n.lead);
+    const hold1 = rest[turnsN];
+    expect(leads[1].t - (hold1.t + hold1.d)).toBeCloseTo(WOBBLE_SPEEDS[0].d, 9);
   });
 
   it('climbs a half step a round, both notes two half steps inside the range', () => {
