@@ -766,8 +766,10 @@ const MUTATIONS = [
     from: 'wobbleHold(wobbleMeasures(line.t, line.r, n.t, n.t + n.d)', to: 'wobbleHold(wobbleMeasures(line.t, line.m, n.t, n.t + n.d)', checks: ['vibrato'] },
   { test: 'train', what: 'the live reader passes the smoothed point as its own reading', file: 'src/audio/pitch/core.ts',
     from: 'm: centred5(this.raw, j, n, 8), r: this.raw[j % 8] });', to: 'm: centred5(this.raw, j, n, 8), r: centred5(this.raw, j, n, 8) });', checks: ['vibrato'] },
-  { test: 'train', what: 'the singer\'s line drops each point\'s own reading', file: 'src/shell/your-line.ts',
-    from: '    this.r.push(p.r);', to: '    this.r.push(NaN);', checks: ['vibrato'] },
+  /* both places: a point's reading is stored when it arrives and again with each better reading of it, so dropping one alone changes nothing (24 Nov) */
+  { test: 'train', what: 'the singer\'s line keeps no reading of its own', file: 'src/shell/your-line.ts',
+    from: '    this.r.push(p.r);', to: '    this.r.push(NaN);',
+    and: { file: 'src/shell/your-line.ts', from: '      this.r[known] = p.r;', to: '' }, checks: ['vibrato'] },
   { test: 'train', what: 'Vibrato\'s numbers not kept for next time', file: 'src/screens/ExerciseScreen.tsx',
     from: '      keepWobble(e.id, out.holds);', to: '', checks: ['vibrato', 'vibrato-again'] },
   { test: 'train', what: 'last time\'s wobble not shown', file: 'src/screens/ExerciseScreen.tsx',
