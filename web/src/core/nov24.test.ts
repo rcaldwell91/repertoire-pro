@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { copy } from './copy';
 import { exercise, measures, notesFor, stepsFor, wobbleHolds, wobbleNotes, SING_LAG, WOBBLE_HOLD, WOBBLE_SPEEDS, type Exercise } from './exercises';
-import { fitSecond, fitWave, hold, measures as wobbleMeasures, SETTLE, TYPICAL_RATE, TYPICAL_WIDTH } from './vibrato';
+import { fitSecond, fitWave, hold, measures as wobbleMeasures, SETTLE, SPAN, TYPICAL_RATE, TYPICAL_WIDTH } from './vibrato';
 import { resultRow } from './results';
 
 /* Vibrato (Robert approved it on 16 Nov; built 24 Nov). The measuring was
@@ -94,7 +94,7 @@ describe('the wobble, measured (24 Nov)', () => {
     expect(h.middle.width as number).toBeLessThan(h.end.width as number);
     expect(Math.abs((h.rate as number) - 5.5)).toBeLessThan(0.15);
     /* the first part, while the note is found, isn't measured */
-    expect(wobbleMeasures(t, m, 0, 4)[0].at).toBeGreaterThanOrEqual(SETTLE);
+    expect(wobbleMeasures(t, m, 0, 4)[0].at - SPAN / 2).toBeCloseTo(SETTLE, 9);
     /* nothing heard: nothing said */
     expect(hold([], 0, 4).kind).toBe('unheard');
   });
@@ -137,7 +137,9 @@ describe('Vibrato, the exercise (Robert, 16 Nov)', () => {
     /* each speed's notes are the same length, and the speeds get faster */
     let k = 0;
     for (const sp of WOBBLE_SPEEDS) for (let i = 0; i < sp.n; i++, k++) expect(rest[k].d).toBe(sp.d);
-    expect(WOBBLE_SPEEDS.map((x) => x.d)).toEqual([...WOBBLE_SPEEDS.map((x) => x.d)].sort((a, b) => b - a));
+    /* each speed faster than the one before, up to 2.5 back and forths a second (slower than a wobble) */
+    expect(WOBBLE_SPEEDS.every((x, i) => i === 0 || x.d < WOBBLE_SPEEDS[i - 1].d)).toBe(true);
+    expect(1 / (2 * WOBBLE_SPEEDS.at(-1)!.d)).toBeCloseTo(2.5, 9);
     /* ends on the upper, then holds the lower */
     expect(rest[turnsN - 1].m).toBe(48);
     expect(rest[turnsN]).toMatchObject({ m: 47, d: WOBBLE_HOLD });
