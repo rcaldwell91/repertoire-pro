@@ -10,11 +10,15 @@ import type { LivePoint } from '../audio/pitch/core';
 export class YourLine {
   readonly t: number[] = [];
   readonly m: number[] = [];
+  /** each point's own reading, before the median of five (24 Nov: the
+      vibrato's wobble, which the median flattens); NaN where none */
+  readonly r: number[] = [];
   private readonly at = new Map<number, number>();
 
   clear(): void {
     this.t.length = 0;
     this.m.length = 0;
+    this.r.length = 0;
     this.at.clear();
   }
 
@@ -24,6 +28,7 @@ export class YourLine {
     while (keep > 0 && this.t[keep - 1] >= t - 0.01) keep--;
     this.t.length = keep;
     this.m.length = keep;
+    this.r.length = keep;
     this.at.clear();
   }
 
@@ -33,6 +38,7 @@ export class YourLine {
     for (let i = 0; i < t.length; i++) {
       this.t.push(t[i]);
       this.m.push(m[i]);
+      this.r.push(NaN);
     }
   }
 
@@ -41,6 +47,7 @@ export class YourLine {
     const known = this.at.get(p.i);
     if (known !== undefined) {
       this.m[known] = p.m;
+      this.r[known] = p.r;
       return;
     }
     if (songT == null) return;
@@ -51,6 +58,7 @@ export class YourLine {
     this.at.delete(p.i - 4);
     this.t.push(songT);
     this.m.push(p.m);
+    this.r.push(p.r);
   }
 }
 

@@ -27,10 +27,12 @@ const NEW_3NOV = ['posture', 'tensioncheck', 'cheekpuffs', 'chewhum', 'tonguefwd
 const NEW_4NOV = ['neckrelease', 'threestep', 'matchtone'];
 /* Robert, 16 Nov: four more */
 const NEW_16NOV = ['restnote', 'threerun', 'bends', 'bwoop'];
+/* Robert, 16 Nov (built 24 Nov): Vibrato, its own round */
+const NEW_24NOV = ['vibrato'];
 
 describe('the exercises, as data', () => {
   it('has every exercise of the old app, and the range check', () => {
-    const ours: string[] = [...EXERCISES.filter((e) => e.category === 'words' || e.category === 'pitch').map((e) => e.id), ...NEW_28, ...NEW_3NOV, ...NEW_4NOV, ...NEW_16NOV];
+    const ours: string[] = [...EXERCISES.filter((e) => e.category === 'words' || e.category === 'pitch').map((e) => e.id), ...NEW_28, ...NEW_3NOV, ...NEW_4NOV, ...NEW_16NOV, ...NEW_24NOV];
     expect(EXERCISES.map((e) => e.id).filter((id) => id !== 'rangecheck' && !ours.includes(id)).sort()).toEqual([...OLD_IDS].sort());
     expect(exercise('bay')).toBeUndefined();
     expect(exercise('rangecheck')?.engine.kind).toBe('range');
@@ -622,7 +624,8 @@ describe('the 3 Nov Train update', () => {
       'chewhum', 'hum', 'tonguefwd', 'siren']);
     expect(list('tone').indexOf('brighta')).toBe(list('tone').indexOf('tonguecresc') + 1);
     /* Robert's 4 Nov review: three more, 58 in all; Pitch in his order; four more on 16 Nov, 62 */
-    expect(EXERCISES.length).toBe(62);
+    /* 63 with Vibrato (24 Nov) */
+    expect(EXERCISES.length).toBe(63);
     expect(list('pitch')).toEqual(['match', 'interval', 'holdnote', 'threestep', 'matchtone']);
     expect(exercise('neckrelease')).toMatchObject({ category: 'warmup', level: 1, quiet: true, engine: { kind: 'guided', mins: 1 } });
     expect(listed('threestep')).toMatchObject({ category: 'pitch', level: 1, quiet: true, everyStep: true, engine: { kind: 'ladder', pattern: 'three', bpm: 110 } });

@@ -368,6 +368,26 @@ export const copy = {
     lastTime: '{line} (last time {was})',
     sungAt: 'Sung at {level}',
     near: { veryClose: 'very close', close: 'close', bitOff: 'a bit off', farOff: 'far off' },
+    /* Vibrato's measures (24 Nov): numbers beside the typical ranges, never a verdict */
+    tagWobble: 'Wobble measured',
+    vowel: 'Sing on',
+    vowelIs: '"{v}"',
+    wobbleHead: 'Your wobble on the held notes',
+    wobbleSpeed: 'Speed: {r} a second',
+    wobbleWidth: 'Width: {c} cents, top to bottom',
+    typicalSpeed: 'Typical: about 4.5 to 6.5 a second.',
+    typicalWidth: 'Typical: about 50 to 120 cents.',
+    centsAre: '100 cents is a half step.',
+    notTarget: 'Typical, not a target.',
+    overHold: 'start {a}; middle {b}; end {c}',
+    wobblePart: '{r} a second, {c} cents',
+    noPart: 'no wobble',
+    perRound: '{note}: {what}',
+    noWobble: 'No regular wobble on the held notes.',
+    stillTurns: 'Still two notes taking turns',
+    noneHeard: 'Not heard',
+    wobbleKept: 'Last time kept on this phone.',
+
     /* Robert's words, a sentence a line */
     toneHeard: ['I can hear the tone.', 'Put your headphones in.'],
     /* Find your resting note (Robert, 16 Nov; the result in his words) */
@@ -893,6 +913,21 @@ export const copy = {
       why: "Runs need every note placed quickly and cleanly. Learning them slowly first, then speeding up, is how singers build them; rushing just practises the smear.",
       watch: "Notes smearing together, slowing down at the top, your jaw chopping on each note, and getting louder as you climb.",
     },
+    /* Robert, 16 Nov: Vibrato, in our own words. Never how to make the
+       wobble inside the body, never whether it sounds good: the research
+       report's rules (10 Sep) */
+    vibrato: {
+      steps: [
+        "Sing \"ah\" on the lower of the two notes the piano gives you. You can pick \"oh\" or \"ee\" in the gear instead.",
+        "Go back and forth between the two notes, slowly at first, along with the piano.",
+        "Speed up, keeping both notes light, until going back and forth turns into one quick, even wobble.",
+        "When the piano holds the lower note, stay on it and let the wobble carry on by itself. Watch your line.",
+        "Keep it easy, no louder than talking. If no wobble comes, hold the note steady; that's fine.",
+      ],
+      right: "Your line turns from two clear steps into one quick, even wave, and keeps waving on the held note while your volume stays the same.",
+      why: "A wobble tends to come by itself once your voice is free and easy; it isn't something you make. This lets you see yours, how fast and how wide it is, and grow it a little at a time.",
+      watch: "Shaking your jaw or your head to make it wobble, pushing louder to make it wobble, and forcing it in a part of your range where it doesn't come. Leave that round and try the next.",
+    },
     bends: {
       steps: [
         "Sing \"ah\" on the note the piano gives you.",
@@ -1208,6 +1243,8 @@ export const copy = {
       how: 'Hum, let it slide down, and see where it comes to rest.' },
     threerun: { name: 'Three-note run', syl: 'my', goal: 'Three notes down, three notes up. The smallest run there is.',
       how: 'Keep the air moving so every step is light and clean.' },
+    vibrato: { name: 'Vibrato', plain: 'A gentle wobble', syl: 'ah', goal: 'Two notes taking turns, faster and faster, until they become a wobble.',
+      how: 'Go back and forth between the notes, faster, then stay on the lower one.' },
     bends: { name: 'Note bends', syl: 'ah', goal: 'One note with a quick flick to the note next door.',
       how: 'Flick to the next note and straight back, quick and light.' },
     bwoop: { name: 'Bwoop', syl: 'bwoop', goal: 'Short, light "bwoop"s that bounce up toward your top.',

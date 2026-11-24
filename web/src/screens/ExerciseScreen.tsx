@@ -5,8 +5,10 @@ import { Settings } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import {
   CATEGORIES, ROUTINES, atLevel, bandAt, bandOf, bubbleScore, exercise, firstRung, levelsOf, measures, nextInGroup, notesFor, rungAt, rungStarts,
-  rightFor, stepsFor, type Exercise, type Level, type Note, type RoutineId,
+  rightFor, stepsFor, wobbleHolds, type Exercise, type Level, type Note, type RoutineId,
 } from '../core/exercises';
+import { hold as wobbleHold, measures as wobbleMeasures, type Part as WobblePart } from '../core/vibrato';
+import { keepWobble, lastWobbleFor, overall, type LastWobble } from '../data/wobble';
 import { keyName, type Range } from '../core/notemap';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
 import { micLine, monitorOf } from '../core/song';
@@ -34,7 +36,7 @@ import { toneStep } from '../shell/tone';
 import { back, exRoute, exTakesRoute, navigate, routineRoute } from '../shell/router';
 import {
   anyOctaveFor, cueSeen, hearOnFor, hearVolume, jumpLevel, levelFor, nextReminderTurn, reminderTurn, seeCue, setAnyOctaveFor, setHearOnFor, setHearVolume,
-  setJumpLevel, setLevelFor, CUE_TIMES,
+  setJumpLevel, setLevelFor, setVowelFor, vowelFor, CUE_TIMES,
 } from '../shell/settings';
 import { routineNow } from '../shell/routine-session';
 import { review, toStored, type Review } from '../shell/take-review';
@@ -125,7 +127,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   const kind = e.engine.kind;
   const matchMode = e.engine.kind === 'match' ? e.engine.mode : null;
   /* sung over the piano, bubble by bubble: the ladders, held notes, and a round of jumps or notes to match */
-  const sung = kind === 'ladder' || kind === 'hold' || kind === 'interval' || (kind === 'match' && matchMode !== 'wait');
+  const sung = kind === 'ladder' || kind === 'hold' || kind === 'wobble' || kind === 'interval' || (kind === 'match' && matchMode !== 'wait');
   /* a part at a time, each started by a tap (Hold the note, Long soft notes,
      Match the note at Beginner, Match the tone) */
   const inParts = kind === 'steady' || kind === 'vfe' || kind === 'tone' || matchMode === 'wait';
@@ -152,13 +154,19 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
   /* the level it is sung at, shown on the result and kept with it */
   const sungLevel: Level = kind === 'interval' ? level : e.level;
   const [seed] = useState(() => Math.random());
+  /* the vowel, where there's a choice (Vibrato: "ah", "oh" or "ee"), remembered for this exercise */
+  const [vowel, setVowelNow] = useState<string | undefined>(() => (e.vowels ? vowelFor(e.id, e.vowels) : undefined));
+  const setVowel = (v: string) => {
+    setVowelNow(v);
+    setVowelFor(e.id, v);
+  };
   const plan = useMemo<{ notes: Note[]; played: Note[]; beat: number; labels?: readonly string[]; shapes?: ReadonlyArray<{ id: string; down: boolean }>;
     reveal?: readonly number[]; pattern?: Note[] }>(() => {
     const rand = seeded(seed);
     if (kind === 'interval') return intervalRound(level, range, rand);
     if (matchMode === 'window' || matchMode === 'blind') return matchRound(range, rand, matchMode);
-    return notesFor(e, range, { down });
-  }, [e, kind, matchMode, range, level, seed, down]);
+    return notesFor(e, range, { down, vowel });
+  }, [e, kind, matchMode, range, level, seed, down, vowel]);
   const parts = useMemo<Part[]>(() => {
     const rand = seeded(seed);
     return kind === 'steady' ? steadyParts(range, rand) : kind === 'vfe' ? vfeParts(range) : e.engine.kind === 'tone' ? toneParts(range, rand, e.engine.mode)
@@ -237,6 +245,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
      one (Steady hiss, and Vocal Function Exercises' goal), Long soft notes'
      longest "ee" by day, and how Match the note landed the last times */
   const [bestBefore, setBestBefore] = useState<number | null | undefined>(undefined);
+  /* Vibrato's last time, from this phone, read before this time's is kept */
+  const [lastWobble, setLastWobble] = useState<LastWobble | null>(null);
   const [eeDays, setEeDays] = useState<Array<{ date: string; s: number }>>([]);
   const [lastLands, setLastLands] = useState<Array<{ cents?: number; seconds?: number; settle_cents?: number }>>([]);
   useEffect(() => {
@@ -301,6 +311,11 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     const out: Outcome = noMic ? { kind: 'none' } : o;
     setShown({ o: out, noMic, where: null, ...extra });
     setView('result');
+    /* Vibrato's numbers, kept on this phone for next time (not online: 24 Nov) */
+    if (out.kind === 'wobble') {
+      setLastWobble(lastWobbleFor(e.id));
+      keepWobble(e.id, out.holds);
+    }
     const where = await saveResult(resultRow(e, out, sungLevel));
     setShown((s) => (s ? { ...s, where } : s));
     if (kind === 'vfe') readDays();
@@ -333,11 +348,19 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
      rounds you didn't sing don't count), and how each try landed on Match
      the note. The line shown but not scored measures nothing (3 Nov). */
   function sungOutcome(): Outcome {
+    if (kind === 'wobble') return wobbleOutcome();
     const s = bubbleScore(plan.notes, line.t, line.m, HOP, anyOctave, within);
     if (!s.sung || e.lineOnly || !s.n) return { kind: 'none' };
     const rounds = s.rounds.sung < s.rounds.of ? s.rounds : undefined;
     if (kind !== 'match') return { kind: 'pitch', hits: s.hits, n: s.n, rounds };
     return { kind: 'pitch', hits: s.hits, n: s.n, rounds, landing: landed(plan.notes.filter((_, i) => s.counted[i]).map((n) => ({ m: n.m, from: n.t, to: n.t + n.d }))) };
+  }
+  /* Vibrato: each held note's wobble, from your line's own readings
+     (before the median of five, which flattens it; core/vibrato) */
+  function wobbleOutcome(): Outcome {
+    const holds = wobbleHolds(plan.notes).map((n) => ({ m: n.m, ...wobbleHold(wobbleMeasures(line.t, line.r, n.t, n.t + n.d), n.t, n.t + n.d) }))
+      .filter((h) => h.kind !== 'unheard');
+    return holds.length ? { kind: 'wobble', holds } : { kind: 'none' };
   }
   /* Match the note's landing, over each try it heard */
   function landed(tries: ReadonlyArray<{ m: number; from: number; to: number }>) {
@@ -875,7 +898,8 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
 
   /* the sound sheet's rows: the same behind the gear on the page and while singing */
   const sheetRows = {
-    anyOctave: sung || inParts ? { value: anyOctave, set: setAnyOctave } : undefined,
+    /* not on Vibrato: nothing there is scored on the note */
+    anyOctave: (sung || inParts) && kind !== 'wobble' ? { value: anyOctave, set: setAnyOctave } : undefined,
     countSound: countsIn ? { value: countSound, set: setCountSound } : undefined,
     hear: sung || kind === 'tone' ? { value: hear, set: setHear } : undefined,
     hearVolume: sung || kind === 'tone' ? { value: hearVol, set: setHearVol } : undefined,
@@ -902,10 +926,10 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           </>
         ) : lineNow ? <p className="ex-line ex-cue" id="ex-cue">{lineNow}</p> : undefined}
         map={(sung || kind === 'glide') ? (
-          <Bubbles notes={sung ? plan.notes : []} you={line}
+          <Bubbles notes={sung ? plan.notes : []} you={kind === 'wobble' ? { t: line.t, m: line.r } : line}
             now={() => c.position() ?? (!sung ? 0 : paused ? rungTime(resumeRung.current) : keepFrom.current ?? 0)}
             live={playing} anyOctave={anyOctave} colour={cat.colour} label={name} count={counting}
-            heard={kind === 'interval' ? plan.played : undefined} scored={!e.lineOnly} reveal={plan.reveal} within={within} />
+            heard={kind === 'interval' ? plan.played : undefined} scored={!e.lineOnly && kind !== 'wobble'} reveal={plan.reveal} within={within} />
         ) : partShown ? (
           /* a held note: its bubble and your line (Robert, 13 Nov); Match the
              note at Beginner fills by its own rule, 1.2 s on the note */
@@ -1043,6 +1067,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
 
       {sheet && view === 'preview' && (
         <SoundSheet {...sheetRows}
+          vowel={e.vowels && vowel ? { value: vowel, set: setVowel, options: e.vowels } : undefined}
           level={kind === 'interval' ? { value: level, set: setLevel, label: copy.train.jumpLevel, options: [1, 2, 3] }
             : levels.length > 1 && !routine ? { value: e.level, set: setExLevel, label: copy.train.level, options: levels.map((x) => x.level) } : undefined} />
       )}
@@ -1060,6 +1085,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
               {shown.o.landing && shown.o.landing.tries > 0 && <Landed l={shown.o.landing} last={lastLands[0]} />}
             </>
           )}
+          {shown.o.kind === 'wobble' && <Wobbles o={shown.o} last={lastWobble} />}
           {shown.o.kind === 'time' && e.engine.kind === 'timed' && (
             <>
               <p className="ex-score" id="ex-score">{fill(copy.train.held, { s: shown.o.seconds.toFixed(1) })}</p>
@@ -1160,9 +1186,9 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
           </ol>
           <button type="button" className="btn btn-start" id="ex-start" onClick={start}
             data-round={sung ? JSON.stringify(plan.notes.map((n) => [n.m, n.t, n.d])) : undefined}
-            data-rounds={kind === 'ladder' ? JSON.stringify(rungStarts(plan.notes).map((i) => plan.notes[i].m)) : undefined}
+            data-rounds={kind === 'ladder' || kind === 'wobble' ? JSON.stringify(rungStarts(plan.notes).map((i) => plan.notes[i].m)) : undefined}
             data-played={kind === 'interval' || kind === 'match' ? JSON.stringify(plan.played.map((n) => [n.m, n.t])) : undefined}
-            data-piano={kind === 'ladder' || kind === 'hold' ? JSON.stringify(plan.played.map((n) => [n.m, n.t, n.d, n.lead ? 1 : 0])) : undefined}
+            data-piano={kind === 'ladder' || kind === 'hold' || kind === 'wobble' ? JSON.stringify(plan.played.map((n) => [n.m, n.t, n.d, n.lead ? 1 : 0])) : undefined}
             data-shapes={plan.shapes ? JSON.stringify(plan.shapes) : undefined}
             data-parts={inParts ? JSON.stringify(parts.map((p) => (p.kind === 'slide' ? null : p.m))) : undefined}>
             {copy.train.start}
@@ -1203,6 +1229,38 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
         <button type="button" className="btn btn-quiet" id="end-session" onClick={() => navigate('/train', 'screen')}>{copy.train.endSession}</button>
       )}
     </>
+  );
+}
+
+/* Vibrato's wobble (24 Nov): its speed and width over the held notes, each
+   beside its typical range and last time's, then each held note's at its
+   start, middle and end. Numbers only, never whether it's good. */
+function Wobbles({ o, last }: { o: Extract<Outcome, { kind: 'wobble' }>; last: LastWobble | null }) {
+  const t = copy.train;
+  const all = overall(o.holds);
+  const was = (line: string, prev: string | null) => (prev ? fill(t.lastTime, { line, was: prev }) : line);
+  const part = (p: WobblePart) => (p.rate != null && p.width != null ? fill(t.wobblePart, { r: p.rate.toFixed(1), c: Math.round(p.width) }) : t.noPart);
+  return (
+    <div className="ex-landed" id="ex-wobble" data-holds={JSON.stringify(o.holds.map((h) => [h.m, h.kind, h.rate, h.width]))}>
+      <p className="ex-label">{t.wobbleHead}</p>
+      {all ? (
+        <>
+          <p className="ex-score" id="ex-wobble-speed">{was(fill(t.wobbleSpeed, { r: all.rate.toFixed(1) }), last ? fill(t.wobbleSpeed, { r: last.rate.toFixed(1) }).replace(/^[^:]*: /, '') : null)}</p>
+          <p className="hint" id="ex-typical-speed">{t.typicalSpeed}</p>
+          <p className="ex-score" id="ex-wobble-width">{was(fill(t.wobbleWidth, { c: Math.round(all.width) }), last ? fill(t.wobbleWidth, { c: Math.round(last.width) }).replace(/^[^:]*: /, '') : null)}</p>
+          <p className="hint" id="ex-typical-width">{t.typicalWidth}</p>
+          <p className="hint">{t.centsAre}</p>
+          <p className="hint">{t.notTarget}</p>
+        </>
+      ) : <p className="hint" id="ex-no-wobble">{t.noWobble}</p>}
+      <ul className="wobble-rounds" id="ex-wobble-rounds">
+        {o.holds.map((h, i) => (
+          <li key={i} className="hint">{fill(t.perRound, { note: keyName(h.m),
+            what: h.kind === 'wobble' ? fill(t.overHold, { a: part(h.start), b: part(h.middle), c: part(h.end) }) : h.kind === 'turns' ? t.stillTurns : t.noPart })}</li>
+        ))}
+      </ul>
+      {last && <p className="hint" id="ex-wobble-kept">{t.wobbleKept}</p>}
+    </div>
   );
 }
 

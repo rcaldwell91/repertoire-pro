@@ -1,5 +1,6 @@
 import { copy } from './copy';
 import { exercise, levelsOf, measures, type Exercise, type Level } from './exercises';
+import type { Hold } from './vibrato';
 
 /* What an exercise left behind, as the old app kept it (rp-cloud.js
    870-905, the results table): only numbers that were measured
@@ -13,6 +14,10 @@ export type Outcome =
   | { kind: 'time'; seconds: number }
   /** Long soft notes: how long each timed hold lasted, steps 1 and 4 */
   | { kind: 'holds'; step1: readonly number[]; step4: ReadonlyArray<{ m: number; s: number }> }
+  /** Vibrato (24 Nov): each held note's wobble, measured, never scored;
+      kept on this phone, not online (speed has no place in the results
+      table, and its tables aren't changed without Robert) */
+  | { kind: 'wobble'; holds: ReadonlyArray<Hold & { readonly m: number }> }
   | { kind: 'none' };
 
 export interface ResultRow {

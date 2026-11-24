@@ -16,7 +16,8 @@ import { BackButton } from '../ui/BackButton';
 /** what the app measures about it, as a tag */
 export function measureTag(e: Exercise): string {
   const m = measures(e);
-  return m === 'pitch' ? copy.train.tagPitch : m === 'time' ? copy.train.tagTime : m === 'range' ? copy.train.tagRange : copy.train.tagNone;
+  return m === 'pitch' ? copy.train.tagPitch : m === 'time' ? copy.train.tagTime : m === 'range' ? copy.train.tagRange
+    : m === 'wobble' ? copy.train.tagWobble : copy.train.tagNone;
 }
 
 export function TrainCategory(props: { id: string }) {

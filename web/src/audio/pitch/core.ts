@@ -189,6 +189,10 @@ export interface LivePoint {
   readonly at: number;
   /** the note, NaN where none */
   readonly m: number;
+  /** that point's own reading, before the median of five (24 Nov, the
+      vibrato: a wobble of five a second is four readings a cycle, which the
+      median of five flattens); NaN where none */
+  readonly r: number;
 }
 
 /** The microphone, a point every HOP seconds, from the same reading and the
@@ -243,7 +247,7 @@ export class LiveTrace {
         this.raw[n % 8] = m == null ? NaN : m;
         this.ats[n % 8] = at;
         for (let j = Math.max(0, n - 2); j <= n; j++) {
-          out.push({ i: j, at: this.ats[j % 8], m: centred5(this.raw, j, n, 8) });
+          out.push({ i: j, at: this.ats[j % 8], m: centred5(this.raw, j, n, 8), r: this.raw[j % 8] });
         }
       }
     }

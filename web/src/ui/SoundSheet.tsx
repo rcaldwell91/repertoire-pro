@@ -1,4 +1,4 @@
-import { copy } from '../core/copy';
+import { copy, fill } from '../core/copy';
 type Level = 1 | 2 | 3;
 import { Slider } from './Slider';
 
@@ -15,12 +15,14 @@ export interface SheetRow<T> {
 
 export function SoundSheet(props: {
   level?: SheetRow<Level> & { readonly label: string; readonly options: readonly Level[] };
+  /** the vowel to sing on (Vibrato, 24 Nov), on the page only, like the level */
+  vowel?: SheetRow<string> & { readonly options: readonly string[] };
   anyOctave?: SheetRow<boolean>;
   countSound?: SheetRow<boolean>;
   hear?: SheetRow<boolean>;
   hearVolume?: SheetRow<number>;
 }) {
-  const { level, anyOctave, countSound, hear, hearVolume } = props;
+  const { level, vowel, anyOctave, countSound, hear, hearVolume } = props;
   return (
     <section className="card sheet" id="sound-sheet" aria-label={copy.train.soundSheet}>
       {level && (
@@ -29,6 +31,16 @@ export function SoundSheet(props: {
           {level.options.map((v) => (
             <button key={v} type="button" className="choice" role="radio" id={'level-' + v} aria-checked={level.value === v} onClick={() => level.set(v)}>
               {copy.levels[v]}
+            </button>
+          ))}
+        </div>
+      )}
+      {vowel && (
+        <div className="choices" role="radiogroup" aria-label={copy.train.vowel} id="vowel">
+          <p className="ex-label">{copy.train.vowel}</p>
+          {vowel.options.map((v) => (
+            <button key={v} type="button" className="choice" role="radio" id={'vowel-' + v} aria-checked={vowel.value === v} onClick={() => vowel.set(v)}>
+              {fill(copy.train.vowelIs, { v })}
             </button>
           ))}
         </div>

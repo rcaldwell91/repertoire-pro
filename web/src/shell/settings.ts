@@ -60,6 +60,16 @@ export function setAnyOctaveFor(id: string, on: boolean): void {
   localStore().set('rp.anyOctave.' + id, on ? '1' : '0');
 }
 
+/** the vowel an exercise is sung on, for one that offers a choice
+    (Vibrato, 24 Nov), remembered for that exercise; its first if none */
+export function vowelFor(id: string, vowels: readonly string[]): string {
+  const v = localStore().get('rp.vowel.' + id);
+  return v && vowels.includes(v) ? v : vowels[0];
+}
+export function setVowelFor(id: string, v: string): void {
+  localStore().set('rp.vowel.' + id, v);
+}
+
 /** Sing the interval's level (which jumps), remembered (Robert, 28 Oct) */
 export function jumpLevel(): 1 | 2 | 3 {
   const v = Number(localStore().get('rp.interval.level'));

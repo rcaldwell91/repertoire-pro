@@ -20,7 +20,8 @@ const range = { lo: 45, hi: 69 };
 
 describe('four new exercises (Robert, 16 Nov), none in a routine', () => {
   it('in their groups, levels and places', () => {
-    expect(EXERCISES.length).toBe(62);
+    /* 63 with Vibrato (24 Nov) */
+    expect(EXERCISES.length).toBe(63);
     expect(list('warmup').indexOf('restnote')).toBe(list('warmup').indexOf('tensioncheck') + 1);
     expect(list('agility').indexOf('threerun')).toBe(list('agility').indexOf('run5') - 1);
     expect(list('agility').indexOf('bends')).toBe(list('agility').indexOf('turns') + 1);

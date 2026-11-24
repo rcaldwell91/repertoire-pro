@@ -111,7 +111,11 @@ export type Engine =
   | { kind: 'steady' }
   /* Match the tone's levels (Robert, 20 Nov; core/pitch toneParts) */
   | { kind: 'tone'; mode: 'order' | 'random' | 'hidden' }
-  | { kind: 'vfe' };
+  | { kind: 'vfe' }
+  /* Vibrato (Robert, 16 Nov): two notes a half step apart, taking turns
+     faster and faster, then the lower one held while the wobble carries
+     on; its speed and width measured, not scored (core/vibrato) */
+  | { kind: 'wobble' };
 
 /** how an exercise's syllables (copy.ex[id].syls) fall on its notes
     (Robert, 27 and 28 Oct): one a note, starting again each repeat
@@ -156,6 +160,9 @@ export interface Exercise {
   /** the band that counts at the level picked: half its height either side
       of the note (Robert, 21 Nov; BANDS); set by atLevel */
   readonly within?: number;
+  /** the vowels it can be sung on, the first the usual one, picked in the
+      sound sheet (Vibrato: "ah", or "oh" or "ee", as the course offered several) */
+  readonly vowels?: readonly string[];
   /** how hard it is on its own, whatever level it's sung at: the level it
       was listed at (the old app's, where it had one). The list shows it
       beside the level span (Robert, 22 Nov) */
@@ -225,6 +232,8 @@ const LISTED: readonly Exercise[] = [
   ex('yawnsigh', 'tone', 1, true, guided(1)),
   ex('goo', 'tone', 1, true, ladder('arp', 120)),
   ex('guh', 'tone', 2, false, ladder('oct', 120)),
+  /* Robert, 16 Nov: Vibrato, its own round; Advanced, last in Tone */
+  { ...ex('vibrato', 'tone', 3, false, { kind: 'wobble' }), vowels: ['ah', 'oh', 'ee'] },
   /* Agility */
   ex('loo', 'agility', 1, true, ladder('five', 130)),
   { ...ex('staccato', 'agility', 2, false, ladder('arp', 120)), shortNotes: true },
@@ -362,9 +371,10 @@ export function bandOf(e: Exercise): number {
 }
 
 /** what the app can measure about it, and so all it will say (7672-7684) */
-export function measures(e: Exercise): 'pitch' | 'time' | 'range' | 'none' {
+export function measures(e: Exercise): 'pitch' | 'time' | 'range' | 'wobble' | 'none' {
   if (e.lineOnly) return 'none';
   const k = e.engine.kind;
+  if (k === 'wobble') return 'wobble';
   return k === 'ladder' || k === 'hold' || k === 'interval' || k === 'match' || k === 'steady' || k === 'tone' ? 'pitch'
     : k === 'timed' || k === 'vfe' ? 'time' : k === 'range' ? 'range' : 'none';
 }
@@ -544,8 +554,49 @@ export function holdNotes(e: Exercise, range: Range): Sung {
   return { notes, played, pattern, length: t, beat: 1 };
 }
 
+/** Vibrato's round (Robert, 16 Nov): after a note's quiet, the lower note
+    alone (the lead), then the two notes a half step apart taking turns,
+    slowly and then faster, a speed at a time, ending on the upper; then the
+    lower note held while the wobble carries on. A half step higher each
+    round, both notes two half steps inside the range.
+    Every note of a speed is the same length; the round as a whole can't
+    be, because speeding up is the exercise. The lead is one note of the
+    first speed. The hold is a hold. No levels: nothing is scored, and how
+    fast the wobble goes is the singer's own, so a level that set it would
+    be telling them how to wobble. */
+export const WOBBLE_SPEEDS: ReadonlyArray<{ readonly n: number; readonly d: number }> = [{ n: 4, d: 0.6 }, { n: 4, d: 0.4 }, { n: 8, d: 0.2 }];
+export const WOBBLE_HOLD = 4;
+export function wobbleNotes(e: Exercise, range: Range, vowel: string = sylFor(e, 0, 0)): Sung {
+  const lo = Math.round(range.lo) + 2, hi = Math.max(lo, Math.round(range.hi) - 3);
+  const beat = WOBBLE_SPEEDS[0].d;
+  const notes: Note[] = [], played: Note[] = [], pattern: Note[] = [];
+  let t = 0;
+  for (let root = lo, r = 0; root <= hi; root++, r++) {
+    if (r > 0) t += beat;
+    played.push({ m: root, t, d: beat, syl: '', lead: true });
+    t += beat;
+    const from = t;
+    const add = (m: number, d: number, first: boolean) => {
+      const n: Note = { m, t, d, syl: first ? keyName(root) + ' · ' + vowel : vowel };
+      played.push(n);
+      notes.push({ ...n, t: t + SING_LAG });
+      if (r === 0) pattern.push({ ...n, t: t - from });
+      t += d;
+    };
+    let k = 0;
+    for (const sp of WOBBLE_SPEEDS) for (let i = 0; i < sp.n; i++, k++) add(root + (k % 2), sp.d, k === 0);
+    add(root, WOBBLE_HOLD, false);
+  }
+  return { notes, played, pattern, length: t, beat };
+}
+/** Vibrato's held notes: the ones its wobble is measured on */
+export function wobbleHolds(notes: readonly Note[]): Note[] {
+  return notes.filter((n) => n.d >= WOBBLE_HOLD - 1e-9);
+}
+
 /** the notes an exercise sings, in your range (stepping down in the Cool-down) */
-export function notesFor(e: Exercise, range: Range, opts: { down?: boolean } = {}): Sung {
+export function notesFor(e: Exercise, range: Range, opts: { down?: boolean; vowel?: string } = {}): Sung {
+  if (e.engine.kind === 'wobble') return wobbleNotes(e, range, opts.vowel);
   return e.engine.kind === 'hold' ? holdNotes(e, range) : ladderNotes(e, range, opts);
 }
 
@@ -665,7 +716,7 @@ export function stepsFor(id: Exercise['id'], opts: { cooldown?: boolean; level?:
   const own = opts.level ? a?.byLevel?.[opts.level]?.steps : undefined;
   const steps = (a?.steps ?? [copy.ex[id].how]).map((t, i) => own?.[i + 1] ?? t);
   const e = exercise(id);
-  if (!e || !levelsOf(e).every((l) => l.engine.kind === 'ladder')) return steps;
+  if (!e || !levelsOf(e).every((l) => l.engine.kind === 'ladder' || l.engine.kind === 'wobble')) return steps;
   if (opts.cooldown) return [...steps, copy.stepLines.stopAny];
   return steps.some((x) => /^stop (climbing|before|when)/i.test(x)) ? steps : [...steps, copy.stepLines.stopEasy];
 }
@@ -681,7 +732,7 @@ const ALLOW: Partial<Record<Engine['kind'], number>> = { timed: 25, cycle: 90, g
 const TONE_PART_SECS = 3 + TONE_LEAD + TONE_SECS + 3;
 export function exerciseSecs(e: Exercise, range: Range, opts: { down?: boolean } = {}): number {
   const k = e.engine.kind;
-  if (k === 'ladder' || k === 'hold') {
+  if (k === 'ladder' || k === 'hold' || k === 'wobble') {
     const n = notesFor(e, range, opts);
     return n.length + 3 * n.beat;
   }
