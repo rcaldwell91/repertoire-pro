@@ -2182,9 +2182,14 @@ try {
     await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
     const straw = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.round).slice(0, 5).map((x) => x[0])`);
     await page.eval(`localStorage.removeItem('rp.tension'); sessionStorage.clear()`);
+    /* every length the card ever shows, from the first frame: never a stand-in first (24 Nov: 8 exercises, then 9) */
+    await page.addInitScript(`window.__lens = []; new MutationObserver(() => { const v = document.getElementById('today-length')?.textContent;
+      if (v && window.__lens[window.__lens.length - 1] !== v) window.__lens.push(v); }).observe(document, { subtree: true, childList: true, characterData: true });`);
     await page.goto(URL_APP + '?load=' + ++loads + '#/train');
     await page.waitFor(`!!document.querySelector('#today-start')`, 5000);
-    const card = await text('#today-length');
+    await new Promise((r) => setTimeout(r, 1500));
+    const lens = await page.eval(`window.__lens`);
+    const card = lens.join(' then ');
     await page.tap('#today-start');
     await page.waitFor(`!!document.querySelector('#ex-start')`, 5000);
     const s0 = await text('#ex-name');
@@ -2195,7 +2200,7 @@ try {
     const s1 = await text('#ex-name');
     const of = await text('#routine-step');
     check('routine-review', cool[0] === 55 && cool.slice(1).every((r, k) => r === cool[k] - 1) && cool[cool.length - 1] === 46 && coolLast === copy.stepLines.stopAny &&
-      JSON.stringify(straw) === JSON.stringify([46, 48, 50, 48, 46]) && s0 === copy.ex.tensioncheck.name && s1 === copy.ex.hiss.name && /9 exercises/.test(card || '') &&
+      JSON.stringify(straw) === JSON.stringify([46, 48, 50, 48, 46]) && s0 === copy.ex.tensioncheck.name && s1 === copy.ex.hiss.name && lens.length === 1 && /9 exercises/.test(card) &&
       /of 9$/.test(of || ''),
       `Cool-down straw from ${cool[0]} down to ${cool[cool.length - 1]} a half step a round, its last step "${coolLast}"; the Advanced warm-up's straw sings ` +
       `${straw.join('-')}; never done the tension check: "${card}", step 1 "${s0}", and after it step 2 "${s1}" ("${of}")`);

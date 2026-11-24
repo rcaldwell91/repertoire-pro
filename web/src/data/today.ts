@@ -15,8 +15,10 @@ const programDay: TodaySource = async () => null;
     phone. Nothing in the app sets it yet. */
 export const OWN_PLAN = 'rp.plan';
 
-/** 3. their own plan; with none, the daily warm-up */
-const ownPlan: TodaySource = async () => {
+/** 3. their own plan; with none, the daily warm-up. Known on the phone at
+    once, so the Today card shows it from the first moment, never a stand-in
+    first (24 Nov: the card said 8 exercises, then 9). */
+export function ownToday(): TodayItem {
   let key: string | null = null;
   try {
     key = localStorage.getItem(OWN_PLAN);
@@ -24,7 +26,9 @@ const ownPlan: TodaySource = async () => {
     /* a private window, or storage turned off: no plan kept */
   }
   return routineToday(key && key in ROUTINES ? (key as RoutineId) : DAILY, 'own', rangeNow(), tensionEverDone());
-};
+}
+
+const ownPlan: TodaySource = async () => ownToday();
 
 /** what to do today, asked of every source in order */
 export function today(): Promise<TodayItem> {

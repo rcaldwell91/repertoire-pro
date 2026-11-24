@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { Ear, Flame, MoveVertical, Music2, Speech, Wind } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { copy, fill } from '../core/copy';
-import { CATEGORIES, DAILY, type CategoryId } from '../core/exercises';
-import { routineToday, type TodayItem } from '../core/today';
+import { CATEGORIES, type CategoryId } from '../core/exercises';
+import type { TodayItem } from '../core/today';
 import { pullSpots } from '../data/tension';
-import { today } from '../data/today';
+import { ownToday, today } from '../data/today';
 import { beginRoutine } from '../shell/routine-session';
 import { catRoute, exRoute, navigate, routineRoute } from '../shell/router';
 import { QuickRun } from '../ui/icons';
@@ -26,8 +26,8 @@ const PICTURE: Record<CategoryId, ComponentType<{ size?: number; strokeWidth?: n
   warmup: Flame, breath: Wind, tone: Music2, agility: QuickRun, range: MoveVertical, words: Speech, pitch: Ear };
 
 export function TrainPage() {
-  /* the daily warm-up until the source answers */
-  const [t, setT] = useState<TodayItem>(() => routineToday(DAILY));
+  /* the singer's own plan, known on the phone, until the sources answer */
+  const [t, setT] = useState<TodayItem>(ownToday);
   useEffect(() => {
     let live = true;
     void today().then((got) => live && setT(got));

@@ -394,8 +394,8 @@ const MUTATIONS = [
   { test: 'train', what: 'the main page lists every exercise again', file: 'src/screens/TrainPage.tsx',
     from: '      <div className="cat-cards" id="cat-cards">',
     to: '      {EXERCISES.map((e) => <button key={e.id} type="button" className="ex-row" id={\'ex-\' + e.id}>{copy.ex[e.id].name}</button>)}\n      <div className="cat-cards" id="cat-cards">',
-    and: { file: 'src/screens/TrainPage.tsx', from: "import { CATEGORIES, DAILY, type CategoryId } from '../core/exercises';",
-      to: "import { CATEGORIES, DAILY, EXERCISES, type CategoryId } from '../core/exercises';" },
+    and: { file: 'src/screens/TrainPage.tsx', from: "import { CATEGORIES, type CategoryId } from '../core/exercises';",
+      to: "import { CATEGORIES, EXERCISES, type CategoryId } from '../core/exercises';" },
     checks: ['train-tab'] },
   { test: 'train', what: 'More routines leads nowhere', file: 'src/screens/TrainPage.tsx',
     from: "onClick={() => navigate('/train/routines', 'screen')}", to: "onClick={() => navigate('/train', 'screen')}", checks: ['routines-page'] },
@@ -749,6 +749,9 @@ const MUTATIONS = [
   /* 23 Nov: a take stored online whose answer was lost was stuck for good, and the takes after it */
   { test: 'takes', online: true, what: 'a take whose answer was lost never counts as online', file: 'src/data/takes.ts',
     from: '          if (!(await stored(p, t.audio.size, session.access_token))) throw e;', to: '          throw e;', checks: ['take-reply-lost'] },
+  /* 24 Nov: the Today card showed a stand-in length first (8 exercises, then 9) */
+  { test: 'train', what: 'the Today card shows a stand-in length before the right one', file: 'src/screens/TrainPage.tsx',
+    from: 'useState<TodayItem>(ownToday);', to: 'useState<TodayItem>(() => ({ ...ownToday(), count: ownToday().count - 1 }));', checks: ['routine-review'] },
 ];
 
 function edit(dir, { file, from, to }) {
