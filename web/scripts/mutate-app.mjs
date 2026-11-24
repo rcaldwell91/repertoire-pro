@@ -469,7 +469,11 @@ const MUTATIONS = [
   { test: 'train', what: 'two of the run\'s dots sit on the same line', file: 'src/ui/icons.tsx',
     from: '[[4, 18], [8.5, 14], [12.5, 12], [16.5, 8], [20.5, 6]]', to: '[[4, 18], [8.5, 14], [12.5, 14], [16.5, 8], [20.5, 6]]', checks: ['train-tab'] },
   { test: 'train', what: 'Today ignores its source and always shows the daily warm-up', file: 'src/screens/TrainPage.tsx',
-    from: '    void today().then((got) => live && setT(got));', to: '    void today;', checks: ['today'] },
+    from: '    void today().then((got) => live && setT(got));', to: '    void today;',
+    /* since 24 Nov the card starts from the own plan, so that is ignored too */
+    and: { file: 'src/screens/TrainPage.tsx', from: 'useState<TodayItem>(ownToday);',
+      to: "useState<TodayItem>(() => ({ ...ownToday(), name: copy.routineNames.daily, start: { kind: 'routine', key: 'daily' } }));" },
+    checks: ['today'] },
   { test: "train", what: "Today's own plan is never read", file: "src/data/today.ts", from: "  return routineToday(key && key in ROUTINES ? (key as RoutineId) : DAILY, 'own', rangeNow(), tensionEverDone());", to: "  return routineToday(DAILY && key ? DAILY : DAILY, 'own', rangeNow(), tensionEverDone());", and: {"file":"src/data/today.ts","from":"import { ROUTINES, DAILY, type RoutineId } from '../core/exercises';","to":"import { DAILY } from '../core/exercises';"}, checks: ["today"] },
   { test: 'train', what: 'Today\'s Start opens the daily warm-up whatever it shows', file: 'src/screens/TrainPage.tsx',
     from: "t.start.kind === 'routine' ? routineRoute(t.start.key, 0)", to: "t.start.kind === 'routine' ? routineRoute(DAILY, 0)", checks: ['today'] },
