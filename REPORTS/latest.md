@@ -1,181 +1,135 @@
-# Report, 23 Nov 2026, commit b01b8ef
+# Report, 24 Nov 2026, commit 9dc5287
 
-Everything in your notes is built and live. Main hadn't moved since a4ce773 apart from my own 22 Nov report. Every sound change was measured by recording what the app itself plays and reading the waveform; the pictures are below.
+Vibrato is built and live: an Advanced exercise in Tone, as you approved on 16 Nov. I built the measuring first and proved it before building the exercise around it. Main hadn't moved since b01b8ef, apart from my own 23 Nov report. Both fixes from the 23 Nov report are kept: the stuck take and the Today card count. Nothing that waits on your phone check was changed: the bubbles, the zoom and Mum's gap between rounds are as they were.
 
 ## What works
 
-1. **Learn a song's line.** Once the song is ready, nothing shows under its name ("Ready. Tap Start." is gone). While the singer's line is being read, that line shows how far it has got (it used to sit under the map). While the song plays the line is hidden, and its space is kept, so Start doesn't move. A problem still always shows, since it says what to do. The map takes the room the line used to have: 12.9 half steps at 360 x 740 (it was 9.8) and 16.3 at 390 x 844 (it was 13.3), with Start still above the menu.
-2. **Every note the same length.** In every round, the top note and the last note are now as long as all the others, on every exercise that isn't built to hold notes. Sustained note, Messa di voce, Tongue-out with a crescendo, Hold the note, Match the tone and Vocal Function Exercises keep their long notes. The rest between rounds is unchanged: a note's length of quiet, then the lead note. Octave leaps' three notes were 1.5, 2 and 2.5 beats; they're now 2 beats each, so a round lasts as long as before.
-3. **The lead note.** It now lasts exactly one note of that round at the level you pick, on every level of every exercise: for Mum, 0.625 s at Beginner, 0.5 s at Intermediate and 0.42 s at Advanced (it used to be at least 0.5 s, longer than the notes at Advanced). For a round on C: C on its own, then the round from C, with no gap between.
-4. **Short notes aren't chopped.** On Bwoop, Staccato and Consonant pops the piano now plays every note whole: the key is down for the note's full beat and let go just as the next is pressed, with the same fade as every other note (a key let go, its sound falling away over about a quarter of a second). Before, each was cut off after 0.25 s while still loud, gone in 55 ms, then silence. What you sing, and the bubbles, stay short.
-5. **Mum.** It now climbs a half step every round, up to the top of your range and back down to where it began, as the course's Mum does. Before, with a wide range it climbed a whole step a round and never came back down. Every difference from the course is listed below.
+1. **Vibrato, in Tone, last in the list.** Its row reads "Advanced · Wobble measured".
+2. **A round.** First a moment's quiet, then the lower note alone (the lead). Then the two notes, a half step apart, take turns: four notes at 0.6 s each, four at 0.4 s, eight at 0.2 s. Then the piano holds the lower note for 4 seconds, while your wobble carries on. Each round starts a half step higher, from two half steps above the bottom of your range to two below the top.
+3. **"ah", "oh" or "ee".** "ah" is the usual one. "oh" and "ee" are in the gear, and the app remembers your choice.
+4. **The wobble shows on the map.** On this exercise only, your line is drawn from every reading, so the wobble you sing is the wobble you see. Everywhere else the line is smoothed, as before. The smoothing flattens a wobble to about half its width.
+5. **What it measures, on each held note:** how fast the wobble goes (cycles a second) and how wide it is (cents, top to bottom; 100 cents is a half step). Each sits beside its typical range from the project's research report: about 4.5 to 6.5 a second, and about 50 to 120 cents. The result card says "Typical, not a target." Nothing anywhere says whether it is good.
+6. **Over time, as Match the note does it.** Each held note's wobble at its start, middle and end, and last time's numbers beside this time's. A held note that didn't wobble says "no wobble". One where you were still going back and forth says "still two notes taking turns".
 
-## Found along the way: keep or drop
+![Vibrato's page](2026-11-24-vibrato/vibrato-1-page.png)
+![The gear](2026-11-24-vibrato/vibrato-2-gear.png)
+![A held note with an 80-cent wobble, sung by a real voice: the wobble shows on the line](2026-11-24-vibrato/vibrato-3-hold.png)
+![The result after three rounds: a wobble, a steady hold, and two notes taking turns](2026-11-24-vibrato/vibrato-4-result.png)
 
-- **A take could get stuck on the phone for good.** If the signal went just as a take finished going online, the take was stored, but the app never heard back. It tried again, and the store refused the second copy, since a take can't be overwritten. So it stayed "On this phone" for good, and so did every take saved after it. A test run caught it today. Now, when sending a take fails, the app checks whether the whole recording is already stored, and if it is, counts it as online and carries on. I didn't change the database or its security rules. There's a new check that cuts the answer off just as the upload ends; it fails on the app as it was and passes now. **Keep or drop?**
-- **The Today card flashed the wrong count.** On Train, for someone who has never done the "Ah" tension check, the card said 8 exercises for a moment and the default length, then changed to 9 and your length. A test run caught it today. It now shows the right count from the first moment. The new check watches everything the card shows; it saw "8 then 9" on the app as it was, and only "9" now. **Keep or drop?**
+## How the measuring was proved
 
-## What was measured
+The pitch line takes 20 readings a second, so a wobble of 5 a second gets only 4 readings a cycle. Taking the highest and lowest single readings misses the true top and bottom. So the app measures from whole cycles instead: over about a second of readings it fits one smooth wave, on top of the note's own slow drift. The speed is the wave that fits best, and the width is read from the wave, not from any one reading. It measures from the line's own readings, before the smoothing.
 
-### The waveforms
+**1. Sounds of known speed and width.** 125 voice-like sounds, played through the app's own pitch reader: five notes from A2 to A4, speeds from 4 to 7.5 a second, widths from 30 to 150 cents.
+- **The app's measure:** speed exact every time. Width typically within 2 cents, 7 at worst.
+- **Highest less lowest single reading:** read 14 cents low on average, up to 51 cents low.
+- **The smoothed line:** read 72 cents low on average. It all but hides the wobble.
 
-Each exercise was recorded from the app's own output, with the range set to C3 to C5 so the first round starts on C3, as the course's men's tracks do. The app's own note plan gave each note's pitch, when it starts and when its key is let go; the recording checked those starts (within 3 to 28 ms) and gave how loud each note was and how it fell away. In each picture: red lines are where a piano note starts, the green bars are how long its key is held down, the orange dashes are where it's let go, and the lower panel is the loudness.
+**2. Real voices, with a known wobble put on them.** I took 8 real sung notes from the two test songs, 4 from each. I made each one steady, then gave it a wobble of known speed and width, by playing it slightly faster and slower in turn (a sound played 1% faster is 1% higher). That was 72 cases: speeds 4.5, 5.5 and 6.5 a second, widths 40, 70 and 110 cents.
+- Speed within 0.01 a second.
+- Width typically within 2 cents, 5 at worst.
 
-| Exercise | Lead note | Each note's key held | Fade when let go (40 dB down) | Silence between notes in a round |
-|---|---|---|---|---|
-| Mum, Intermediate | 0.5 s, unchanged | 0.5 s, top and last 1.0 s → all 0.5 s | 0.18 s, unchanged | none, unchanged |
-| Mum, Advanced | 0.5 s → 0.42 s | 0.42 s, top and last 0.83 s → all 0.42 s | 0.18 s, unchanged | none, unchanged |
-| Bwoop | 0.5 s, unchanged | 0.25 s → 0.5 s | 0.055 s → 0.18 s | 0.2 s → none |
-| Staccato | 0.5 s, unchanged | 0.25 s → 0.5 s | 0.055 s → 0.18 s | 0.2 s → none |
-| Consonant pops | 0.6 s → 0.3 s | 0.25 s → 0.3 s | 0.055 s → 0.18 s | none, unchanged |
-| Note bends | 0.6 s → 0.18 s | 0.18 s, first and last 0.6 s → all 0.18 s | 0.055 s → 0.18 s | none, unchanged |
-| Five-note run, Advanced | 0.5 s → 0.375 s | 0.375 s, last 0.75 s → all 0.375 s | 0.18 s, unchanged | none, unchanged |
-| Octave leaps | 0.6 s → 1.2 s | 0.9, 1.2 and 1.5 s → all 1.2 s | 0.18 s, unchanged | none, unchanged |
+**3. Telling slow turns apart from a wobble.**
+- **The same 8 real notes taking turns with the half step above**, at 1, 1.5, 2 and 3 times a second: none of the 32 read as a wobble. 26 read as two notes taking turns, and 6 (at once a second) as no wobble.
+- **The 8 notes made steady:** all 8 read as no wobble.
 
-- **No note is cut off any more.** Every key is let go with the same 0.18 s fade; on Bwoop, Staccato, Consonant pops and Note bends it used to be 0.055 s, which cut the sound off while it was still loud. Each note's key is now held until the next one is pressed, so its fade runs under the start of the next: one note after another, with no silence between them.
-- **Every note the same length**, and the lead note the same length as them, at every level.
-- The only silence left is the rest between rounds: one note's length of quiet before the lead note.
+**4. The singers' own vibrato, in the test songs.** Every note the singers hold for 1.2 seconds or more, a second at a time. I compared each second with a separate, much finer measure: 500 readings a second, with the tops and bottoms of each cycle found directly.
+- **Where the fine measure finds a wobble** (24 seconds), the app finds it in 15. There, speed is typically within 0.4 a second (1.5 at worst) and width within 4 cents (38 at worst).
+- **The 9 it misses** are narrow, uneven wobbles of 22 to 38 cents, under the typical range. The app reports those as "no wobble".
+- **Where the fine measure finds no wobble** (3 seconds), the app never claims one.
 
-Before is the app as it was live on 22 Nov; after is today's. Each recording is about the first 11 seconds, after the count-in's three clicks.
+**5. Would reading more often help?** On those same seconds, reading 40 or 100 times a second found 12 and 14 of the 24, against 14 at today's 20. The misses come from how uneven those wobbles are, not from too few readings. So the reading rate is unchanged, and the change costs the phone nothing extra.
 
-![Mum, Intermediate, before](2026-11-23-waveforms/01-mum-L2-before.png)
-![Mum, Intermediate, after](2026-11-23-waveforms/02-mum-L2-after.png)
+**6. In the app, a real voice through the microphone.** Three rounds:
+- **A wobble of 5.5 a second and 80 cents** measured 5.5 and 77.
+- **A steady hold** measured "no wobble".
+- **Turns carried on through the hold** read "still two notes taking turns".
+- **A second session, 6 a second and 60 cents,** measured 6.0 and 58, with last time's numbers beside it.
+- **The line on the map** swung about 77 cents of the 80 sung. A build drawing the smoothed line showed about 43, and the check fails on it.
 
-**Mum, Intermediate.** Before, the top note (G3) and the last (C3) held twice as long, and the second round started a whole step up, on D3. After, every note is the same length, and the second round starts a half step up, on C♯3.
+The first version wasn't good enough on real singers. It took a held note's slow drift for the wobble, and found only 2 of the 10 notes with vibrato. The second version made fast turns read as a wobble. The proofs caught both, and both are fixed above.
 
-![Mum, Advanced, before](2026-11-23-waveforms/03-mum-L3-before.png)
-![Mum, Advanced, after](2026-11-23-waveforms/04-mum-L3-after.png)
+## The page, word for word
 
-**Mum, Advanced.** Before, the lead note (0.5 s) was longer than the notes of its round (0.42 s). After, it's the same.
+**Vibrato**
+*A gentle wobble*
+Two notes taking turns, faster and faster, until they become a wobble.
 
-![Bwoop, before](2026-11-23-waveforms/05-bwoop-L2-before.png)
-![Bwoop, after](2026-11-23-waveforms/06-bwoop-L2-after.png)
+**How to do it**
+1. Sing "ah" on the lower of the two notes the piano gives you. You can pick "oh" or "ee" in the gear instead.
+2. Go back and forth between the two notes, slowly at first, along with the piano.
+3. Speed up, keeping both notes light, until going back and forth turns into one quick, even wobble.
+4. When the piano holds the lower note, stay on it and let the wobble carry on by itself. Watch your line.
+5. Keep it easy, no louder than talking. If no wobble comes, hold the note steady; that's fine.
+6. Stop when it stops feeling easy; you don't have to finish the climb.
 
-**Bwoop.** Before, every note was cut off after a quarter of a second while still loud (the cliff in the loudness), then silence until the next. After, each note sounds for its whole beat and fades under the next.
+**You're doing it right when** your line turns from two clear steps into one quick, even wave, and keeps waving on the held note while your volume stays the same.
 
-![Staccato, before](2026-11-23-waveforms/07-staccato-L2-before.png)
-![Staccato, after](2026-11-23-waveforms/08-staccato-L2-after.png)
+**Watch out for** shaking your jaw or your head to make it wobble, pushing louder to make it wobble, and forcing it in a part of your range where it doesn't come. Leave that round and try the next.
 
-**Staccato.** The same as Bwoop.
+**Why it helps:** A wobble tends to come by itself once your voice is free and easy; it isn't something you make. This lets you see yours, how fast and how wide it is, and grow it a little at a time.
 
-![Consonant pops, before](2026-11-23-waveforms/09-pops-L2-before.png)
-![Consonant pops, after](2026-11-23-waveforms/10-pops-L2-after.png)
+**The gear:** "Sing on": "ah", "oh", "ee".
 
-**Consonant pops.** Its notes are half a beat, 0.3 s. Before, each was cut at 0.25 s; after, each sounds its whole 0.3 s and fades under the next.
+**The result card**
+- Your wobble on the held notes
+- Speed: 5.5 a second. Typical: about 4.5 to 6.5 a second.
+- Width: 77 cents, top to bottom. Typical: about 50 to 120 cents. 100 cents is a half step.
+- Typical, not a target.
+- Then a line for each held note, for example: "A♯3: start 6.0 a second, 85 cents; middle 5.5 a second, 78 cents; end 5.5 a second, 76 cents", "B3: no wobble", or "C4: still two notes taking turns".
+- With a last time: "Speed: 6.0 a second (last time 5.5 a second)", and "Last time kept on this phone."
 
-![Note bends, before](2026-11-23-waveforms/11-bends-L3-before.png)
-![Note bends, after](2026-11-23-waveforms/12-bends-L3-after.png)
-
-**Note bends.** Before, a longer first and last note with quick cut-off flicks between. After, seven even quick notes a round.
-
-![Five-note run, Advanced, before](2026-11-23-waveforms/13-run5-L3-before.png)
-![Five-note run, Advanced, after](2026-11-23-waveforms/14-run5-L3-after.png)
-
-**Five-note run, Advanced.** Before, the last note held twice as long and the lead was longer than a note. After, all the same.
-
-![Octave leaps, before](2026-11-23-waveforms/15-octleap-L2-before.png)
-![Octave leaps, after](2026-11-23-waveforms/16-octleap-L2-after.png)
-
-**Octave leaps.** Before, its three notes were 0.9, 1.2 and 1.5 s and the lead 0.6 s. After, all four 1.2 s.
-
-![Mum, Beginner, before](2026-11-23-waveforms/17-mum-L1-before.png)
-![Mum, Beginner, after](2026-11-23-waveforms/18-mum-L1-after.png)
-
-**Mum, Beginner.** Every note and the lead 0.625 s.
-
-### Every changed exercise with a real voice
-
-Every exercise whose pattern changed was sung by a real voice in the built app, at every level, arriving 0.09 s after each piano note, as in your takes. At Beginner, each was also sung a half step off. The pass mark is the usual one: 85% or more counted when sung right, and 15% or less when a half step off.
-
-All 40 scored exercises that move round by round were sung at every level they have: 118 levels in all. **Every level passes.** Sung right, every note counted at every level but two: Bwoop at Advanced (35 of 36, 97%) and Consonant pops at Advanced (101 of 104, 97%; it was 104 of 104 on 22 Nov). Sung a half step off at Beginner, none counted, except Consonant pops (1 of 104, 1%, as on 22 Nov).
-
-Tension check, Chewing hum, Blah and Note bends only show your line and aren't scored, so there's nothing to count. The chromatic run and Turns have no Beginner level, as before.
-
-### Listed lengths
-
-Shorter rounds and Mum's climb back down change how long the routines take. At the default range: Daily warm-up 12 minutes (was 10), with the "Ah" tension check first 13 (was 11), Intermediate warm-up 16 (was 15), Advanced warm-up 14 (was 15), Quiet warm-up 12 (was 11), Cool-down 3 (was 4).
-
-## Mum: the app and the course
-
-Compared with the course's Mum figures in both breakdown docs (Blueprint for Men, "Track 2"; and the Intermediate course's "Mum with neck movement", block 3, which has the same timing):
-
-| | The course | The app now | Before today |
-|---|---|---|---|
-| Pattern | 1-2-3-4-5-4-3-2-1 | the same | the same |
-| Climb | a half step a round, up to the top and back down | the same | a whole step a round on a wide range, up only |
-| Starting note | C3 for every man | one half step above the bottom of your measured range | the same |
-| Top | G4 for men | the top of your measured range | the same |
-| Note spacing | about 0.41 s | 0.625 s Beginner, 0.5 s Intermediate, 0.42 s Advanced | the same |
-| Note length | the same for every note (the Intermediate course's top note "slightly longer") | every note the same | the top and last notes twice as long |
-| A round every | 5.4 s going up, 5.3 s coming down | 6.9 s Beginner, 5.5 s Intermediate, 4.6 s Advanced | 8.1, 6.5 and 5.5 s |
-| Between rounds | about 1.7 s, with the cue note about 0.8 s before the round | one note's quiet, then the lead note, then the round straight after | the same |
-| How the notes ring into each other | not described in either doc | each key held until the next is pressed, then fading over about a quarter of a second under it | the same |
-
-**Fixed today:** the climb (a half step a round, up and back), and every note the same length.
-
-**Not changed, because they clash with decisions you've already made:**
-- **Speed.** The course's 0.41 s matches Mum at Advanced (0.42 s). Intermediate is 0.5 s, because on 21 Nov you set Intermediate to today's speed with a notch either side. **Suggestion:** keep the levels; Advanced is the course's speed.
-- **The gap between rounds.** The course leaves about 1.7 s between rounds, with a short pause after its cue note. The app leaves one note's quiet and then the lead, about 1 s at Intermediate. You said today that the rest between rounds stays. **Suggestion:** if you want Mum to match the course here too, I'd lengthen its rest to about 1.7 s, with the lead note ending 0.4 s before the round.
-- **Starting note and top.** The course starts every man on C3 and stops at G4. The app fits Mum to your own measured range, which you chose for every exercise.
-
-I couldn't compare how the course's notes ring into each other: neither doc describes it, and I have no recording of the course here.
+A check holds the page to your rules. Outside "Watch out for", no line mentions the jaw, head, throat, voice box, belly or any muscle. No line anywhere says whether the sound is good or correct.
 
 ## What I decided
 
-- **Note bends:** its first and last notes were a beat long, with quick flicks in between. Since every note of a round now has to be the same length, they're as quick as the flicks: seven quick notes, note, neighbour, note and so on, 0.18 s each.
-- **Short notes:** the piano plays them whole, but the sung note and its bubble stay short, as you asked on 20 Nov.
-- **The fade when a key is let go:** 40 dB in 0.18 s, 60 dB in 0.28 s, like a key whose damper falls on the string. It's the fade the app already used for every note but the short ones. I haven't measured a real piano's damper; I have no recording of one here.
-- **A problem on Learn a song** still shows while the song plays, because it needs to say what to do.
-- **Hold notes' lead note** stays a second: one held note is 4 to 10 s, too long to be its lead.
+- **Lead note:** one note of the first speed (0.6 s), as everywhere.
+- **Even notes:** every note within a speed is the same length. The round as a whole can't be, because speeding up is the exercise. The held note is a hold.
+- **Levels:** none. Nothing is scored, and how fast the wobble goes is your own. A level that set a speed would be telling you how fast to wobble.
+- **How fast the piano goes:** it stops at 2.5 back-and-forths a second, slower than a wobble. Going from there into a wobble is up to you, as you described it.
+- **The bubbles** show the notes but don't fill, as on Note bends. Any octave isn't in the gear, since nothing is scored on the note.
+- **The first 0.4 s of each held note isn't measured**, while the note is found.
+- **Not in any routine.** It's not quiet (it's sung on a vowel), so it has no "Quiet" tag.
+- **Kept on the phone:** last time's speed and width. The results list online gets the session as done, with no numbers, as for other exercises that aren't scored.
 
-## Held, and clashes
+## Held
 
-- The speed and the gap between rounds on Mum (above).
+- **Saving the speed and width online**, so they follow you to a new phone. The results table has no place for a speed. Adding one changes the database, which I don't do without you. **Your decision: add it, or keep it on the phone.**
+- **Whether the piano's three speeds suit you:** for your phone check.
 
 ## Not tried on a real phone
 
 Everything was measured in Chrome made to behave like an Android phone, not on your Samsung. On the phone I haven't heard or seen:
-- the even notes;
-- the shorter lead at Advanced;
-- the whole short notes;
-- Mum's climb back down;
-- Learn a song's line.
+- the round;
+- the wobble on the map;
+- the result card.
 
-## Checks
+No one has sung this exercise for real yet. The real voices here are recordings made to follow the round. I also don't yet know whether your phone's microphone changes a wobble's width. A tap below will show it.
 
-- 355 unit checks pass. The type check and the code-style check are clean (one old warning, from before this round, about a comment).
-- In Chrome made to behave like a phone, signed in as the test singer: Train 86 of 86, Takes 21 of 21, Android 28 of 28, the browser checks 15 of 15, Learn a song 19 of 19, the note map 14 of 14, the library 7 of 7, and loudness 13 of 13, sung with a real voice.
-- The old app's own checks all pass, so it is unchanged.
-- Real voice: 118 levels of 40 exercises, and every level passes (above).
-- Broken builds: all 262 broken rules were caught, and all 336 broken copies of the app.
-- A restart of the machine stopped the broken-rule run partway, and left one rule it had broken on purpose. I put that file back as it was and ran the whole set again.
-- The test takes were deleted after the runs, and the two test accounts hold none. Your and Briar's accounts weren't touched.
+## What was measured
+
+- **Unit checks:** 369 pass, 14 of them new for Vibrato. The type check is clean, and the code tidiness check finds no errors.
+- **The app in a phone-like browser, real voices throughout:** first screens 15 of 15, Android 28 of 28, library 7 of 7, note map 14 of 14, Learn a song 19 of 19, takes 21 of 21, loudness 13 of 13, Train 88 of 88, and the old app all good. Train includes two new Vibrato checks: three rounds sung, and a second session with last time beside it. One Train timing check failed once while the lab was running; run alone, it passed twice.
+- **Broken builds, the core:** 281, each a rule deliberately broken. The first run missed 2, both Vibrato: the hold measured from its very first moment, and the piano never speeding up. My checks for those were too loose. I tightened both, and both are now caught.
+- **Broken builds, the app:** 348. The first run missed 1, which couldn't break anything as written (below). Re-aimed, it is caught, so all 348 are.
+- **Test takes:** none left online on either test account.
 
 ## Mistakes of mine
 
-- When I made every note the same length, I didn't update two of my own checks that still expected the old lengths and Mum's old climb. The full run caught them, and I updated them.
-- My first guess at why a take got stuck (the upload hanging when the signal goes) was wrong. A test disproved it, and the store's own records showed the real cause.
-- My first version of the stuck-take check couldn't tell the old app from the new. I fixed it, and saw it fail on the old app before trusting it.
-- I left Consonant pops out of the first real-voice list. I caught it by comparing with the full list, and sang it.
-- I first wrote the real-voice totals as 46 exercises and 124 levels. The true count is 40 and 118, corrected before this report.
-- When I fixed the Today card, I didn't look for other broken builds aimed at the same lines. One of them no longer broke anything you'd see, and the broken-build run flagged it. I re-aimed it, and it's caught.
+- **The first measure took a note's slow drift for the wobble.** It found only 2 of the 10 held notes with vibrato in the test songs. The proof on real singers caught it, before anything was built on it.
+- **My fix for that made two notes taking turns three times a second read as a wobble.** The turns proof caught it, and the turns rule fixed it.
+- **A note in the code said a wobble must explain "at least half" of the movement.** The measure in fact asks for a third. I corrected the note.
+- **I ticked a line on the checklist ("the map draws every reading") before a check for it existed.** The checklist test caught it. I then built the check: it measures how far the line swings, and it fails on a build that draws the smoothed line.
+- **I first wrote the misses as "16 to 38 cents" wide.** On a re-run they were 22 to 38, and that is what's above.
+- **I ran the lab while the browser checks were running,** against my own rule, since both lean on timing. One timing check failed. Run alone, it passed twice.
+- **I misread a count of the code tidiness check as errors.** There were none.
+- **Two of my Vibrato checks were too loose.** One allowed the measuring to start before the note settles. The other allowed the piano to never speed up. The broken builds caught both, and I tightened them.
+- **My report first lacked the heading every report needs ("What was measured").** The report check caught it before it went anywhere.
+- **I wrote a broken build that couldn't break anything.** The line stores each reading twice, once when it arrives and again when a better version comes, so dropping only the first changed nothing. It now drops both, and the check catches it.
 
 ## Your taps
 
-First, close Chrome fully: swipe it away from your recent apps, then open the app again, so you get today's version. Wear your wired headphones throughout.
+Wired headphones on, as always. First, close Chrome fully: swipe it away from your recent apps, then open the app again, so you get today's version.
 
-From 22 Nov (again, after closing Chrome):
-
-1. Train, Agility, Five-note run, gear, Advanced, Start. Before each round you'll hear its first note on its own, as short as the round's notes, then the round. Sing each round from its first note, on time. Its first bubble should fill green.
-2. While that runs, look at the map: thin bubbles with a line through the middle, and the view sliding up as the rounds climb. Every note, the last included, is the same length.
-3. Agility, Note bends, Start: quick flicks between the note and its neighbour, seven even notes a round, ending on the note. Your line is shown and there's no score.
-4. Pitch, Match the tone, Beginner, Start. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
-5. Match the tone, Advanced: your line stays hidden while the tone plays, and appears once it stops.
-6. Range: the Octave leaps row reads "Advanced · Levels Beginner to Advanced · Scored on pitch". Tap it, Start: low, high, low, all three notes the same length (they used to be three different lengths, the last the longest).
-7. Agility, Three-note run, gear, Advanced, Start: a notch faster than Intermediate. Sing it through.
-8. Sing, Learn a song, open one of your songs. Under its name there's nothing, or "Reading the singer's line…" with how far it has got. Tap Start: that line disappears while the song plays and nothing moves. The map's rows are as far apart as on Train, and before each phrase the view slides to show it. "Any octave" is in the sound card below.
-
-New this round:
-
-9. Tone, Mum, gear, Intermediate, Start. Every note is the same length, the top and the last too. Each round starts a half step higher than the one before; after the top it comes back down a half step a round.
-10. Range, Bwoop, Start. The piano plays whole notes one after another, with no cut and no silence between them; what you sing is still a short "bwoop".
+1. Train, Tone, Vibrato (last in the list). Read the page, tap Start and sing two or three rounds. Take turns between the two notes with the piano, speed up until it wobbles, then stay on the lower note when the piano holds it. Watch your line wobble on the map. Tap the cross. You'll see your wobble's speed and width beside the typical ranges, and each held note's start, middle and end.
+2. Open Vibrato's gear, pick "oh", tap Start and sing one round. Each note should say "oh". Then tap the cross: this time last time's numbers are beside the new ones.
