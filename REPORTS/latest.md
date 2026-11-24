@@ -1,130 +1,181 @@
-# Report, 22 Nov 2026, commit a4ce773
+# Report, 23 Nov 2026, commit b01b8ef
 
-Everything you answered on 21 Nov is built and live, and Learn a song's map now follows Train's rule. Main hadn't moved since 63dd31f apart from my own 21 Nov report. One clash on small phones is under "Held, and clashes".
+Everything in your notes is built and live. Main hadn't moved since a4ce773 apart from my own 22 Nov report. Every sound change was measured by recording what the app itself plays and reading the waveform; the pictures are below.
 
 ## What works
 
-1. **The spacing.** It stays 30 px a half step, as you said.
-2. **A level column for results.** The results table has a level column, and it can be left empty. Who can read or write results is exactly as before. Its definition is in the repo's database scripts, with the others. Results saved before it existed have no level. A result's name is plain again ("Mum", not "Mum · Advanced"), because the level now has its own place. Checked online: a real voice sang Mum at Intermediate on the test account, and the result reached the table as "Mum", level 2.
-3. **The missing levels.** Every two-level exercise now has three, a notch slower or faster as everywhere else:
-   - Advanced, a notch faster than Intermediate: Red leather 144, Unique New York 132, Peter Piper 144, Lips and tongue 134, Three-note run 156. Bratty Nay's Advanced is its Intermediate octave pattern at 144 (Intermediate is 120).
-   - Beginner, a notch slower than Intermediate: Nine-tone scale 104, Tongue trill 96.
-   - Chromatic run and Three-note turns still have no Beginner. Every new level passed the real-voice check, so all of them ship.
-4. **The difficulty tag.** Each exercise's own difficulty is back beside its level span. Octave leaps reads "Advanced · Levels Beginner to Advanced · Scored on pitch"; Mum reads "Beginner · Levels Beginner to Advanced · Quiet · Scored on pitch". Exercises without levels show their difficulty alone, as before.
-5. **Hold the note and Match the tone** keep the levels they had.
-6. **Learn a song's map follows the same rule as Train's.**
-   - It's 30 px a half step and never zooms.
-   - It slides up and down with the song's notes, moving a moment before them: every note of the next 2 seconds is in view, wherever the map can hold it.
-   - It stays put while the notes fit and moves only when they won't, gliding over up to 0.6 s.
-   - The song's line, your line and the scoring are unchanged; only the view changes.
+1. **Learn a song's line.** Once the song is ready, nothing shows under its name ("Ready. Tap Start." is gone). While the singer's line is being read, that line shows how far it has got (it used to sit under the map). While the song plays the line is hidden, and its space is kept, so Start doesn't move. A problem still always shows, since it says what to do. The map takes the room the line used to have: 12.9 half steps at 360 x 740 (it was 9.8) and 16.3 at 390 x 844 (it was 13.3), with Start still above the menu.
+2. **Every note the same length.** In every round, the top note and the last note are now as long as all the others, on every exercise that isn't built to hold notes. Sustained note, Messa di voce, Tongue-out with a crescendo, Hold the note, Match the tone and Vocal Function Exercises keep their long notes. The rest between rounds is unchanged: a note's length of quiet, then the lead note. Octave leaps' three notes were 1.5, 2 and 2.5 beats; they're now 2 beats each, so a round lasts as long as before.
+3. **The lead note.** It now lasts exactly one note of that round at the level you pick, on every level of every exercise: for Mum, 0.625 s at Beginner, 0.5 s at Intermediate and 0.42 s at Advanced (it used to be at least 0.5 s, longer than the notes at Advanced). For a round on C: C on its own, then the round from C, with no gap between.
+4. **Short notes aren't chopped.** On Bwoop, Staccato and Consonant pops the piano now plays every note whole: the key is down for the note's full beat and let go just as the next is pressed, with the same fade as every other note (a key let go, its sound falling away over about a quarter of a second). Before, each was cut off after 0.25 s while still loud, gone in 55 ms, then silence. What you sing, and the bubbles, stay short.
+5. **Mum.** It now climbs a half step every round, up to the top of your range and back down to where it began, as the course's Mum does. Before, with a wide range it climbed a whole step a round and never came back down. Every difference from the course is listed below.
+
+## Found along the way: keep or drop
+
+- **A take could get stuck on the phone for good.** If the signal went just as a take finished going online, the take was stored, but the app never heard back. It tried again, and the store refused the second copy, since a take can't be overwritten. So it stayed "On this phone" for good, and so did every take saved after it. A test run caught it today. Now, when sending a take fails, the app checks whether the whole recording is already stored, and if it is, counts it as online and carries on. I didn't change the database or its security rules. There's a new check that cuts the answer off just as the upload ends; it fails on the app as it was and passes now. **Keep or drop?**
+- **The Today card flashed the wrong count.** On Train, for someone who has never done the "Ah" tension check, the card said 8 exercises for a moment and the default length, then changed to 9 and your length. A test run caught it today. It now shows the right count from the first moment. The new check watches everything the card shows; it saw "8 then 9" on the app as it was, and only "9" now. **Keep or drop?**
 
 ## What was measured
 
-### Every new level with a real voice
+### The waveforms
 
-Each new level, and the levels next to it, was sung by a real voice in the built app, arriving 0.09 s after each piano note, as in your takes. At Beginner it was also sung a half step off. The pass mark is the usual one: 85% or more counted when sung right, and 15% or less when sung a half step off.
+Each exercise was recorded from the app's own output, with the range set to C3 to C5 so the first round starts on C3, as the course's men's tracks do. The app's own note plan gave each note's pitch, when it starts and when its key is let go; the recording checked those starts (within 3 to 28 ms) and gave how loud each note was and how it fell away. In each picture: red lines are where a piano note starts, the green bars are how long its key is held down, the orange dashes are where it's let go, and the lower panel is the loudness.
 
-| Exercise | Beginner | Intermediate | Advanced |
+| Exercise | Lead note | Each note's key held | Fade when let go (40 dB down) | Silence between notes in a round |
+|---|---|---|---|---|
+| Mum, Intermediate | 0.5 s, unchanged | 0.5 s, top and last 1.0 s → all 0.5 s | 0.18 s, unchanged | none, unchanged |
+| Mum, Advanced | 0.5 s → 0.42 s | 0.42 s, top and last 0.83 s → all 0.42 s | 0.18 s, unchanged | none, unchanged |
+| Bwoop | 0.5 s, unchanged | 0.25 s → 0.5 s | 0.055 s → 0.18 s | 0.2 s → none |
+| Staccato | 0.5 s, unchanged | 0.25 s → 0.5 s | 0.055 s → 0.18 s | 0.2 s → none |
+| Consonant pops | 0.6 s → 0.3 s | 0.25 s → 0.3 s | 0.055 s → 0.18 s | none, unchanged |
+| Note bends | 0.6 s → 0.18 s | 0.18 s, first and last 0.6 s → all 0.18 s | 0.055 s → 0.18 s | none, unchanged |
+| Five-note run, Advanced | 0.5 s → 0.375 s | 0.375 s, last 0.75 s → all 0.375 s | 0.18 s, unchanged | none, unchanged |
+| Octave leaps | 0.6 s → 1.2 s | 0.9, 1.2 and 1.5 s → all 1.2 s | 0.18 s, unchanged | none, unchanged |
+
+- **No note is cut off any more.** Every key is let go with the same 0.18 s fade; on Bwoop, Staccato, Consonant pops and Note bends it used to be 0.055 s, which cut the sound off while it was still loud. Each note's key is now held until the next one is pressed, so its fade runs under the start of the next: one note after another, with no silence between them.
+- **Every note the same length**, and the lead note the same length as them, at every level.
+- The only silence left is the rest between rounds: one note's length of quiet before the lead note.
+
+Before is the app as it was live on 22 Nov; after is today's. Each recording is about the first 11 seconds, after the count-in's three clicks.
+
+![Mum, Intermediate, before](2026-11-23-waveforms/01-mum-L2-before.png)
+![Mum, Intermediate, after](2026-11-23-waveforms/02-mum-L2-after.png)
+
+**Mum, Intermediate.** Before, the top note (G3) and the last (C3) held twice as long, and the second round started a whole step up, on D3. After, every note is the same length, and the second round starts a half step up, on C♯3.
+
+![Mum, Advanced, before](2026-11-23-waveforms/03-mum-L3-before.png)
+![Mum, Advanced, after](2026-11-23-waveforms/04-mum-L3-after.png)
+
+**Mum, Advanced.** Before, the lead note (0.5 s) was longer than the notes of its round (0.42 s). After, it's the same.
+
+![Bwoop, before](2026-11-23-waveforms/05-bwoop-L2-before.png)
+![Bwoop, after](2026-11-23-waveforms/06-bwoop-L2-after.png)
+
+**Bwoop.** Before, every note was cut off after a quarter of a second while still loud (the cliff in the loudness), then silence until the next. After, each note sounds for its whole beat and fades under the next.
+
+![Staccato, before](2026-11-23-waveforms/07-staccato-L2-before.png)
+![Staccato, after](2026-11-23-waveforms/08-staccato-L2-after.png)
+
+**Staccato.** The same as Bwoop.
+
+![Consonant pops, before](2026-11-23-waveforms/09-pops-L2-before.png)
+![Consonant pops, after](2026-11-23-waveforms/10-pops-L2-after.png)
+
+**Consonant pops.** Its notes are half a beat, 0.3 s. Before, each was cut at 0.25 s; after, each sounds its whole 0.3 s and fades under the next.
+
+![Note bends, before](2026-11-23-waveforms/11-bends-L3-before.png)
+![Note bends, after](2026-11-23-waveforms/12-bends-L3-after.png)
+
+**Note bends.** Before, a longer first and last note with quick cut-off flicks between. After, seven even quick notes a round.
+
+![Five-note run, Advanced, before](2026-11-23-waveforms/13-run5-L3-before.png)
+![Five-note run, Advanced, after](2026-11-23-waveforms/14-run5-L3-after.png)
+
+**Five-note run, Advanced.** Before, the last note held twice as long and the lead was longer than a note. After, all the same.
+
+![Octave leaps, before](2026-11-23-waveforms/15-octleap-L2-before.png)
+![Octave leaps, after](2026-11-23-waveforms/16-octleap-L2-after.png)
+
+**Octave leaps.** Before, its three notes were 0.9, 1.2 and 1.5 s and the lead 0.6 s. After, all four 1.2 s.
+
+![Mum, Beginner, before](2026-11-23-waveforms/17-mum-L1-before.png)
+![Mum, Beginner, after](2026-11-23-waveforms/18-mum-L1-after.png)
+
+**Mum, Beginner.** Every note and the lead 0.625 s.
+
+### Every changed exercise with a real voice
+
+Every exercise whose pattern changed was sung by a real voice in the built app, at every level, arriving 0.09 s after each piano note, as in your takes. At Beginner, each was also sung a half step off. The pass mark is the usual one: 85% or more counted when sung right, and 15% or less when a half step off.
+
+All 40 scored exercises that move round by round were sung at every level they have: 118 levels in all. **Every level passes.** Sung right, every note counted at every level but two: Bwoop at Advanced (35 of 36, 97%) and Consonant pops at Advanced (101 of 104, 97%; it was 104 of 104 on 22 Nov). Sung a half step off at Beginner, none counted, except Consonant pops (1 of 104, 1%, as on 22 Nov).
+
+Tension check, Chewing hum, Blah and Note bends only show your line and aren't scored, so there's nothing to count. The chromatic run and Turns have no Beginner level, as before.
+
+### Listed lengths
+
+Shorter rounds and Mum's climb back down change how long the routines take. At the default range: Daily warm-up 12 minutes (was 10), with the "Ah" tension check first 13 (was 11), Intermediate warm-up 16 (was 15), Advanced warm-up 14 (was 15), Quiet warm-up 12 (was 11), Cool-down 3 (was 4).
+
+## Mum: the app and the course
+
+Compared with the course's Mum figures in both breakdown docs (Blueprint for Men, "Track 2"; and the Intermediate course's "Mum with neck movement", block 3, which has the same timing):
+
+| | The course | The app now | Before today |
 |---|---|---|---|
-| Red leather | 100 a minute: 100% right (42 of 42), 0% a half step off | 120 a minute: 100% right (42 of 42) | **144 a minute: 100% right (42 of 42)** (new) |
-| Unique New York | 100 a minute: 100% right (48 of 48), 0% a half step off | 110 a minute: 100% right (48 of 48) | **132 a minute: 100% right (48 of 48)** (new) |
-| Peter Piper | 100 a minute: 100% right (42 of 42), 0% a half step off | 120 a minute: 100% right (42 of 42) | **144 a minute: 100% right (42 of 42)** (new) |
-| Lips and tongue | 100 a minute: 100% right (54 of 54), 0% a half step off | 112 a minute: 100% right (54 of 54) | **134 a minute: 100% right (54 of 54)** (new) |
-| Three-note run | 100 a minute: 100% right (54 of 54), 0% a half step off | 130 a minute: 100% right (54 of 54) | **156 a minute: 100% right (54 of 54)** (new) |
-| Bratty Nay | 120 a minute: 100% right (54 of 54), 0% a half step off | 120 a minute: 100% right (7 of 7) | **144 a minute: 100% right (7 of 7)** (new) |
-| Nine-tone scale | **104 a minute: 100% right (17 of 17), 0% a half step off** (new) | 130 a minute: 100% right (17 of 17) | 160 a minute: 100% right (17 of 17) |
-| Tongue trill | **96 a minute: 100% right (54 of 54), 0% a half step off** (new) | 120 a minute: 100% right (54 of 54) | 120 a minute: 100% right (54 of 54) |
+| Pattern | 1-2-3-4-5-4-3-2-1 | the same | the same |
+| Climb | a half step a round, up to the top and back down | the same | a whole step a round on a wide range, up only |
+| Starting note | C3 for every man | one half step above the bottom of your measured range | the same |
+| Top | G4 for men | the top of your measured range | the same |
+| Note spacing | about 0.41 s | 0.625 s Beginner, 0.5 s Intermediate, 0.42 s Advanced | the same |
+| Note length | the same for every note (the Intermediate course's top note "slightly longer") | every note the same | the top and last notes twice as long |
+| A round every | 5.4 s going up, 5.3 s coming down | 6.9 s Beginner, 5.5 s Intermediate, 4.6 s Advanced | 8.1, 6.5 and 5.5 s |
+| Between rounds | about 1.7 s, with the cue note about 0.8 s before the round | one note's quiet, then the lead note, then the round straight after | the same |
+| How the notes ring into each other | not described in either doc | each key held until the next is pressed, then fading over about a quarter of a second under it | the same |
 
-Bratty Nay's Intermediate and Advanced were checked on 7 notes each. Its octave pattern fits only one round in the test voice's range, which was the same on 21 Nov.
+**Fixed today:** the climb (a half step a round, up and back), and every note the same length.
 
-### Learn a song's map
+**Not changed, because they clash with decisions you've already made:**
+- **Speed.** The course's 0.41 s matches Mum at Advanced (0.42 s). Intermediate is 0.5 s, because on 21 Nov you set Intermediate to today's speed with a notch either side. **Suggestion:** keep the levels; Advanced is the course's speed.
+- **The gap between rounds.** The course leaves about 1.7 s between rounds, with a short pause after its cue note. The app leaves one note's quiet and then the lead, about 1 s at Intermediate. You said today that the rest between rounds stays. **Suggestion:** if you want Mum to match the course here too, I'd lengthen its rest to about 1.7 s, with the lead note ending 0.4 s before the round.
+- **Starting note and top.** The course starts every man on C3 and stops at G4. The app fits Mum to your own measured range, which you chose for every exercise.
 
-Three songs, each read by the app itself:
-- All of Me and Ride, the two test songs;
-- a wide-range song made from All of Me's real voice and music, cut into ten passages each moved up or down by up to an octave without changing its speed. It spans 44 half steps, over three and a half octaves, with shifts of up to 8 half steps between passages.
-
-Every 0.05 s of each song, I checked whether each note of the next 2 seconds was in view. While each played, I also checked that the view on screen was where it should be (it never differed by more than a hundredth of a half step).
-
-| Song | Screen | Half steps shown | Moves | Instant moves | Notes it could have shown but didn't | Jumps from one note straight to the next, wider than the map |
-|---|---|---|---|---|---|---|
-| All of Me | 390 x 844 | 13.3 | 36 (8.0 a minute) | 13 | 0 | 1 (0.08% of upcoming notes), in view 0.05 to 0.05 s before sung |
-| All of Me | 360 x 740 | 9.8 | 157 (34.9 a minute) | 123 | 0 | 7 (2.30% of upcoming notes), in view 0.00 to 0.40 s before sung |
-| Ride | 390 x 844 | 13.3 | 45 (12.2 a minute) | 24 | 0 | 3 (0.66% of upcoming notes), in view 0.05 to 0.30 s before sung |
-| Ride | 360 x 740 | 9.8 | 143 (38.8 a minute) | 119 | 0 | 11 (3.44% of upcoming notes), in view 0.00 to 0.55 s before sung |
-| Wide range | 390 x 844 | 13.3 | 58 (13.4 a minute) | 25 | 0 | 2 (0.80% of upcoming notes), in view 0.05 to 0.70 s before sung |
-| Wide range | 360 x 740 | 9.8 | 170 (39.2 a minute) | 133 | 0 | 14 (3.31% of upcoming notes), in view 0.00 to 0.90 s before sung |
-
-- **Upcoming notes the map could have shown, but didn't: none, on every song, at both widths.**
-- **Instant moves.** Sometimes the note just sung and a note in the next 2 seconds are further apart than the map is tall, so they can't share the screen. Then the view moves the instant that note ends, so the next ones show up as early as they possibly can. That's the only time it moves without gliding. The last column counts the sharpest of these: a jump from one note straight to the next that's wider than the map, and how early the far note was in view.
-- **The moves.** Most are small, and a move comes about 2 s before the notes it's for (the median).
-
-### How tall the map is
-
-At 30 px a half step, the map's height decides how much it shows. Until now it was a fixed 260 px on every phone: 8 half steps. That's too few: with the new movement, 6 to 8% of the next 2 seconds' notes still couldn't be shown, because so many leaps were wider than the map. So it now takes the height the screen allows while Start stays above the menu:
-- 13.3 half steps at 390 x 844;
-- 9.8 at 360 x 740.
-
-To make room, "Any octave" moved from under the map into the sound card, next to Hear yourself, as in Train's gear.
+I couldn't compare how the course's notes ring into each other: neither doc describes it, and I have no recording of the course here.
 
 ## What I decided
 
-- **The tag's wording:** "Advanced · Levels Beginner to Advanced". "Levels" keeps the two from reading as one. Say if you want other words.
-- **Nine-tone scale and Tongue trill** now start at their new Beginner, but their own difficulty stays Intermediate, as it was.
-- **Bratty Nay's Advanced** is its octave pattern, a notch faster, since its Intermediate already moved up to the octave.
-- **How the song map moves:** it keeps the next 2 seconds in view and stays at least half a half step clear of its top and bottom where there's room. Of the settings I measured on the real songs, these moved the least without leaving an upcoming note out (a margin of a whole half step moved 1.6 to 2.7 times as often).
-- **Any octave** moved into the sound card to give the map room (above).
+- **Note bends:** its first and last notes were a beat long, with quick flicks in between. Since every note of a round now has to be the same length, they're as quick as the flicks: seven quick notes, note, neighbour, note and so on, 0.18 s each.
+- **Short notes:** the piano plays them whole, but the sung note and its bubble stay short, as you asked on 20 Nov.
+- **The fade when a key is let go:** 40 dB in 0.18 s, 60 dB in 0.28 s, like a key whose damper falls on the string. It's the fade the app already used for every note but the short ones. I haven't measured a real piano's damper; I have no recording of one here.
+- **A problem on Learn a song** still shows while the song plays, because it needs to say what to do.
+- **Hold notes' lead note** stays a second: one held note is 4 to 10 s, too long to be its lead.
 
 ## Held, and clashes
 
-- **The song map on a 360 x 740 phone.** There, the song screen has room for 9.8 half steps. Every upcoming note the map can hold stays in view, but the view moves often: 35 to 39 times a minute, mostly small instant steps. At 390 x 844 (13.3 half steps) it's 8 to 13 times a minute. On the real songs, moves drop sharply from about 13 half steps up (5 to 10 a minute at 15). **Suggestion:** on Learn a song, drop "Ready. Tap Start." once the song is ready (Start says it) and show the reading progress in that same line. That gives a 360 x 740 phone about 12 half steps. I haven't done it, because you said only the view changes.
-- **Found while doing this:** "Ready. Tap Start." stays on screen while the song plays. It was like this before this round. **Suggestion:** hide it while the song plays.
+- The speed and the gap between rounds on Mum (above).
 
 ## Not tried on a real phone
 
-Everything was measured in Chrome made to behave like an Android phone, not on your Samsung. On the phone I haven't seen or heard:
-- the new levels' speeds;
-- the difficulty tags;
-- Learn a song's map moving with a song;
-- Any octave in its new place.
-
-Screenshots at 390 and 360 wide are in the repo: the three songs on Learn a song, and the list's tags.
+Everything was measured in Chrome made to behave like an Android phone, not on your Samsung. On the phone I haven't heard or seen:
+- the even notes;
+- the shorter lead at Advanced;
+- the whole short notes;
+- Mum's climb back down;
+- Learn a song's line.
 
 ## Checks
 
-- The unit tests: 348 of 348 pass.
-- Every browser suite passes: browser 15, Android 28, library 7, note map 13, song 19, takes 20, loudness 13, Train 85 (with the online checks).
-- One Train online check failed once and then passed: a take saved with no signal hadn't reached your account within 60 seconds of the signal coming back. On the rerun it went up and was private to the singer. Nothing that uploads takes changed this round.
-- The old app: 186 of 187 (its checks stop at the first failure, so I ran the part after it on its own: 52 of 52). One check fails in both runs today: when a song he opens interrupts the Library's background reading, the background reading should wait where it stopped, but it carried on about 5 seconds further. It passed on 21 Nov, and the old app and its checks are exactly as they were then; nothing this round touches them. I haven't found why it behaves differently today, and the old app is frozen, so I've left it.
-- The real-voice level check: all 24 levels of the 8 changed exercises pass (above).
-- The real-song map check: all 3 songs at both widths pass (above).
-- Broken builds:
-  - I broke the app's core rules 253 ways, and the checks caught all 253.
-  - I broke the app itself 328 ways, and the checks caught all 328.
-  - New this round: the level not reaching the results table, the level back in the name, an unscored exercise keeping a level; each missing level left out, or no faster or slower than the level next to it; Chromatic run given a Beginner; Bratty Nay's Advanced on the wrong pattern; the starting level shown as the difficulty, or the difficulty left out; and the song map pinned, squeezing the song in again, not looking ahead, jumping instead of gliding, gliding while a note it would push off is sung, chasing brief slips, moving for every phrase, and letting a note it could show fall out.
+- 355 unit checks pass. The type check and the code-style check are clean (one old warning, from before this round, about a comment).
+- In Chrome made to behave like a phone, signed in as the test singer: Train 86 of 86, Takes 21 of 21, Android 28 of 28, the browser checks 15 of 15, Learn a song 19 of 19, the note map 14 of 14, the library 7 of 7, and loudness 13 of 13, sung with a real voice.
+- The old app's own checks all pass, so it is unchanged.
+- Real voice: 118 levels of 40 exercises, and every level passes (above).
+- Broken builds: all 262 broken rules were caught, and all 336 broken copies of the app.
+- A restart of the machine stopped the broken-rule run partway, and left one rule it had broken on purpose. I put that file back as it was and ran the whole set again.
+- The test takes were deleted after the runs, and the two test accounts hold none. Your and Briar's accounts weren't touched.
 
 ## Mistakes of mine
 
-- My first version of the song map's movement left some upcoming notes out of view that it could have shown, and moved in many tiny steps. Two causes: it kept a whole half step clear of the edges even when the notes only fitted without that, and when the notes ahead exactly filled the map, a rounding hair made it think nowhere fitted, so it didn't move at all. The real-song check caught both; I rewrote the movement and measured it again.
-- The map worked out its movement from the song's line while the line was still being read, and never again, because the line fills in place. The note map suite caught it (the view was up to 7 half steps from where it should be); it now works it out again as the line grows.
-- I first wrote the song map's height without measuring the song screen: at 260 px the map held only 8 half steps on every phone. I caught it from the first numbers, before going further.
-- I started the app's broken builds without first checking that each still fitted the code. Two older ones were aimed at lines I'd changed, and the run stopped part-way. I re-aimed them, checked all 328 fit, and ran the rest.
-- One of the new broken builds (the map chasing brief octave slips) wasn't caught at first, because my check counted moves but not where the view sat. I tightened the check.
+- When I made every note the same length, I didn't update two of my own checks that still expected the old lengths and Mum's old climb. The full run caught them, and I updated them.
+- My first guess at why a take got stuck (the upload hanging when the signal goes) was wrong. A test disproved it, and the store's own records showed the real cause.
+- My first version of the stuck-take check couldn't tell the old app from the new. I fixed it, and saw it fail on the old app before trusting it.
+- I left Consonant pops out of the first real-voice list. I caught it by comparing with the full list, and sang it.
+- I first wrote the real-voice totals as 46 exercises and 124 levels. The true count is 40 and 118, corrected before this report.
+- When I fixed the Today card, I didn't look for other broken builds aimed at the same lines. One of them no longer broke anything you'd see, and the broken-build run flagged it. I re-aimed it, and it's caught.
 
 ## Your taps
 
-From 21 Nov:
+First, close Chrome fully: swipe it away from your recent apps, then open the app again, so you get today's version. Wear your wired headphones throughout.
 
-1. Look at the bottom menu: every tab should show its name under its icon, with Train highlighted. Tap each tab once.
-2. Train, Agility, Five-note run, gear, Advanced, Start. Before each round you'll hear its first note on its own, then the round. Sing each round from its first note, on time. Its first bubble should fill green.
-3. While that runs, look at the map: thin bubbles with a line through the middle, and the view sliding up as the rounds climb.
-4. Tone, Mum, gear, Beginner, Start. Sing a round or two and note the taller bubbles and slower speed. Close. Then gear, Advanced, Start: thinner bubbles and faster. At the end the result should say "Sung at Advanced".
-5. Range, Bwoop, Start: the piano notes should sound short and clipped, and the bubbles short. Sing it through and look at the score.
-6. Agility, Note bends, Start: a quick flick between note and neighbour, three times, ending on the note, with short piano notes. Your line is shown and there's no score.
-7. Pitch, Match the tone, Beginner, Start. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
-8. Match the tone, Advanced: your line stays hidden while the tone plays, and appears once it stops.
+From 22 Nov (again, after closing Chrome):
+
+1. Train, Agility, Five-note run, gear, Advanced, Start. Before each round you'll hear its first note on its own, as short as the round's notes, then the round. Sing each round from its first note, on time. Its first bubble should fill green.
+2. While that runs, look at the map: thin bubbles with a line through the middle, and the view sliding up as the rounds climb. Every note, the last included, is the same length.
+3. Agility, Note bends, Start: quick flicks between the note and its neighbour, seven even notes a round, ending on the note. Your line is shown and there's no score.
+4. Pitch, Match the tone, Beginner, Start. Each tone lasts 6 s and the notes go up in order. At the end you get a score and how it landed.
+5. Match the tone, Advanced: your line stays hidden while the tone plays, and appears once it stops.
+6. Range: the Octave leaps row reads "Advanced · Levels Beginner to Advanced · Scored on pitch". Tap it, Start: low, high, low, all three notes the same length (they used to be three different lengths, the last the longest).
+7. Agility, Three-note run, gear, Advanced, Start: a notch faster than Intermediate. Sing it through.
+8. Sing, Learn a song, open one of your songs. Under its name there's nothing, or "Reading the singer's line…" with how far it has got. Tap Start: that line disappears while the song plays and nothing moves. The map's rows are as far apart as on Train, and before each phrase the view slides to show it. "Any octave" is in the sound card below.
 
 New this round:
 
-9. Range: the Octave leaps row should read "Advanced · Levels Beginner to Advanced · Scored on pitch".
-10. Agility, Three-note run, gear, Advanced, Start: a notch faster than Intermediate. Sing it through.
-11. Sing, Learn a song, open one of your songs, Start. The map's rows are as far apart as on Train. Before each phrase the view slides to show it, and it never shrinks. "Any octave" is now in the sound card below.
+9. Tone, Mum, gear, Intermediate, Start. Every note is the same length, the top and the last too. Each round starts a half step higher than the one before; after the top it comes back down a half step a round.
+10. Range, Bwoop, Start. The piano plays whole notes one after another, with no cut and no silence between them; what you sing is still a short "bwoop".
