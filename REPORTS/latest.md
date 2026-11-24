@@ -63,20 +63,28 @@ Two notes taking turns, faster and faster, until they become a wobble.
 5. Keep it easy, no louder than talking. If no wobble comes, hold the note steady; that's fine.
 6. Stop when it stops feeling easy; you don't have to finish the climb.
 
-**You're doing it right when** your line turns from two clear steps into one quick, even wave, and keeps waving on the held note while your volume stays the same.
+Under "More about this":
 
-**Watch out for** shaking your jaw or your head to make it wobble, pushing louder to make it wobble, and forcing it in a part of your range where it doesn't come. Leave that round and try the next.
+**You're doing it right when**
+Your line turns from two clear steps into one quick, even wave, and keeps waving on the held note while your volume stays the same.
 
-**Why it helps:** A wobble tends to come by itself once your voice is free and easy; it isn't something you make. This lets you see yours, how fast and how wide it is, and grow it a little at a time.
+**Watch out for**
+Shaking your jaw or your head to make it wobble, pushing louder to make it wobble, and forcing it in a part of your range where it doesn't come. Leave that round and try the next.
+
+**Why it helps**
+A wobble tends to come by itself once your voice is free and easy; it isn't something you make. This lets you see yours, how fast and how wide it is, and grow it a little at a time.
 
 **The gear:** "Sing on": "ah", "oh", "ee".
 
-**The result card**
+**The result card** (the numbers are the ones in the last picture above)
 - Your wobble on the held notes
-- Speed: 5.5 a second. Typical: about 4.5 to 6.5 a second.
-- Width: 77 cents, top to bottom. Typical: about 50 to 120 cents. 100 cents is a half step.
+- Speed: 5.5 a second
+- Typical: about 4.5 to 6.5 a second.
+- Width: 77 cents, top to bottom
+- Typical: about 50 to 120 cents.
+- 100 cents is a half step.
 - Typical, not a target.
-- Then a line for each held note, for example: "A♯3: start 6.0 a second, 85 cents; middle 5.5 a second, 78 cents; end 5.5 a second, 76 cents", "B3: no wobble", or "C4: still two notes taking turns".
+- Then a line for each held note: "A♯3: start 6.0 a second, 85 cents; middle 5.5 a second, 78 cents; end 5.5 a second, 76 cents", "B3: no wobble", "C4: still two notes taking turns".
 - With a last time: "Speed: 6.0 a second (last time 5.5 a second)", and "Last time kept on this phone."
 
 A check holds the page to your rules. Outside "Watch out for", no line mentions the jaw, head, throat, voice box, belly or any muscle. No line anywhere says whether the sound is good or correct.
@@ -131,5 +139,5 @@ No one has sung this exercise for real yet. The real voices here are recordings 
 
 Wired headphones on, as always. First, close Chrome fully: swipe it away from your recent apps, then open the app again, so you get today's version.
 
-1. Train, Tone, Vibrato (last in the list). Read the page, tap Start and sing two or three rounds. Take turns between the two notes with the piano, speed up until it wobbles, then stay on the lower note when the piano holds it. Watch your line wobble on the map. Tap the cross. You'll see your wobble's speed and width beside the typical ranges, and each held note's start, middle and end.
+1. Train, Tone, Vibrato (last in the list). Read the page (tap "More about this" for the rest of it), tap Start and sing two or three rounds. Take turns between the two notes with the piano, speed up until it wobbles, then stay on the lower note when the piano holds it. Watch your line wobble on the map. Tap the cross. You'll see your wobble's speed and width beside the typical ranges, and each held note's start, middle and end.
 2. Open Vibrato's gear, pick "oh", tap Start and sing one round. Each note should say "oh". Then tap the cross: this time last time's numbers are beside the new ones.
