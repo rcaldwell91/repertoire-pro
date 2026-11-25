@@ -389,6 +389,7 @@ export const copy = {
     stillTurns: 'still two notes taking turns',
     noneHeard: 'Not heard',
     wobbleKept: 'Last time kept on this phone.',
+    wobbleFromAccount: 'Last time from your account.',
 
     /* Robert's words, a sentence a line */
     toneHeard: ['I can hear the tone.', 'Put your headphones in.'],

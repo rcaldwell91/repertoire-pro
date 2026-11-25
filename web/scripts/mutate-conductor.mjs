@@ -618,6 +618,19 @@ export const MUTATIONS = [
     from: '      notes.push({ ...n, t: n.t + SING_LAG });', to: '      notes.push({ ...n });' },
   { rule: 'Vibrato scored like a pitch exercise', file: X,
     from: "  if (k === 'wobble') return 'wobble';", to: '' },
+  /* 25 Nov: Vibrato's speed and width on the account (Robert's answer to the 24 Nov report) */
+  { rule: 'Vibrato\'s speed and width not kept with the result', file: 'src/core/results.ts',
+    from: '    return w ? { ...base, wobble_rate: Math.round(w.rate * 100) / 100, wobble_width: Math.round(w.width) } : base;', to: '    return base;' },
+  { rule: 'Vibrato\'s speed kept to the nearest whole number', file: 'src/core/results.ts',
+    from: 'wobble_rate: Math.round(w.rate * 100) / 100', to: 'wobble_rate: Math.round(w.rate)' },
+  { rule: 'signed in, last time from this phone', file: 'src/core/results.ts',
+    from: "  if (account === 'out' || account === 'unreached') return phone", to: "  if (account === 'out' || account === 'unreached' || !!phone) return phone" },
+  { rule: 'last time from a session with no numbers', file: 'src/core/results.ts',
+    from: '  const r = account.find((x) => x.wobble_rate != null && x.wobble_width != null);', to: '  const r = account[0];' },
+  { rule: 'the account\'s speed taken as written, not as a number', file: 'src/core/results.ts',
+    from: 'rate: Number(r.wobble_rate)', to: 'rate: r.wobble_rate as number' },
+  { rule: 'the wobble columns can\'t be left empty', file: 'scripts/db/2026-11-25-results-wobble.sql',
+    from: 'wobble_rate numeric(4,2)\n', to: 'wobble_rate numeric(4,2) not null\n' },
 ];
 
 function run() {

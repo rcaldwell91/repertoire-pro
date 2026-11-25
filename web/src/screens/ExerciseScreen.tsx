@@ -8,7 +8,7 @@ import {
   rightFor, stepsFor, sylOf, wobbleHolds, type Exercise, type Level, type Note, type RoutineId,
 } from '../core/exercises';
 import { hold as wobbleHold, measures as wobbleMeasures, type Part as WobblePart } from '../core/vibrato';
-import { keepWobble, lastWobbleFor, overall, type LastWobble } from '../data/wobble';
+import { keepWobble, lastWobbleNow, overall } from '../data/wobble';
 import { keyName, type Range } from '../core/notemap';
 import { RANGE_POINTS, rangeFrom } from '../core/range';
 import { micLine, monitorOf } from '../core/song';
@@ -19,7 +19,7 @@ import {
 import { isRight } from '../core/takes';
 import { cueFor, pickReminder, SPOTS, type Spot } from '../core/tension';
 import { clock as clockText } from '../core/time';
-import { atSameLevel, hasLevels, resultRow, type Outcome } from '../core/results';
+import { atSameLevel, hasLevels, resultRow, type Outcome, type WobbleLast } from '../core/results';
 import { cycleAt, SoundClock } from '../core/timed';
 import { restSlides, type Slide } from '../core/rest';
 import type { Plan, Take } from '../audio/conductor/conductor';
@@ -245,8 +245,11 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
      one (Steady hiss, and Vocal Function Exercises' goal), Long soft notes'
      longest "ee" by day, and how Match the note landed the last times */
   const [bestBefore, setBestBefore] = useState<number | null | undefined>(undefined);
-  /* Vibrato's last time, from this phone, read before this time's is kept */
-  const [lastWobble, setLastWobble] = useState<LastWobble | null>(null);
+  /* Vibrato's last time (Robert, 25 Nov): from the account when signed in,
+     from this phone when not; read when the page opens, and again after
+     each session is saved, ready for the next */
+  const [lastWobble, setLastWobble] = useState<WobbleLast | null>(null);
+  const wobbleBefore = useRef<WobbleLast | null>(null);
   const [eeDays, setEeDays] = useState<Array<{ date: string; s: number }>>([]);
   const [lastLands, setLastLands] = useState<Array<{ cents?: number; seconds?: number; settle_cents?: number }>>([]);
   useEffect(() => {
@@ -254,10 +257,13 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     if (kind === 'timed' || kind === 'vfe') void bestHiss().then((b) => live && setBestBefore(b));
     /* last time at this same level only (Robert, 21 Nov) */
     if (kind === 'match') void myResults('match').then((rs) => live && setLastLands(atSameLevel(rs, e.level).filter((r) => r.cents != null).slice(0, 3)));
+    if (kind === 'wobble') void lastWobbleNow(e.id).then((w) => {
+      if (live) wobbleBefore.current = w;
+    });
     return () => {
       live = false;
     };
-  }, [kind, e.level]);
+  }, [kind, e.level, e.id]);
   const readDays = () => void myResults('vfe').then((rs) => {
     const by = new Map<string, number>();
     for (const r of rs) {
@@ -311,13 +317,15 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
     const out: Outcome = noMic ? { kind: 'none' } : o;
     setShown({ o: out, noMic, where: null, ...extra });
     setView('result');
-    /* Vibrato's numbers, kept on this phone for next time (not online: 24 Nov) */
+    /* Vibrato: last time beside this time's; this time's kept on this phone,
+       and with the result on the account when signed in (Robert, 25 Nov) */
     if (out.kind === 'wobble') {
-      setLastWobble(lastWobbleFor(e.id));
+      setLastWobble(wobbleBefore.current);
       keepWobble(e.id, out.holds);
     }
     const where = await saveResult(resultRow(e, out, sungLevel));
     setShown((s) => (s ? { ...s, where } : s));
+    if (out.kind === 'wobble') wobbleBefore.current = await lastWobbleNow(e.id);
     if (kind === 'vfe') readDays();
   };
 
@@ -1236,7 +1244,7 @@ function ExerciseFor({ e: base, routine, step, steps, stepLevel }: { e: Exercise
 /* Vibrato's wobble (24 Nov): its speed and width over the held notes, each
    beside its typical range and last time's, then each held note's at its
    start, middle and end. Numbers only, never whether it's good. */
-function Wobbles({ o, last }: { o: Extract<Outcome, { kind: 'wobble' }>; last: LastWobble | null }) {
+function Wobbles({ o, last }: { o: Extract<Outcome, { kind: 'wobble' }>; last: WobbleLast | null }) {
   const t = copy.train;
   const all = overall(o.holds);
   const was = (line: string, prev: string | null) => (prev ? fill(t.lastTime, { line, was: prev }) : line);
@@ -1260,7 +1268,7 @@ function Wobbles({ o, last }: { o: Extract<Outcome, { kind: 'wobble' }>; last: L
             what: h.kind === 'wobble' ? fill(t.overHold, { a: part(h.start), b: part(h.middle), c: part(h.end) }) : h.kind === 'turns' ? t.stillTurns : t.noPart })}</li>
         ))}
       </ul>
-      {last && <p className="hint" id="ex-wobble-kept">{t.wobbleKept}</p>}
+      {last && <p className="hint" id="ex-wobble-kept" data-from={last.from}>{last.from === 'account' ? t.wobbleFromAccount : t.wobbleKept}</p>}
     </div>
   );
 }

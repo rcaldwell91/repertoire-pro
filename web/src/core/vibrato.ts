@@ -230,6 +230,14 @@ export function hold(ms: readonly Measure[], from: number, to: number): Hold {
   };
 }
 
+/** the speed and width over these holds, the median of the holds that
+    wobbled; null if none did (what the result card shows first, and what
+    the account keeps: Robert, 25 Nov) */
+export function overall(holds: readonly Hold[]): { rate: number; width: number } | null {
+  const w = holds.filter((h) => h.rate != null && h.width != null);
+  return w.length ? { rate: median(w.map((h) => h.rate as number)), width: median(w.map((h) => h.width as number)) } : null;
+}
+
 /** where a number sits against a typical range: under it, in it, over it */
 export function against(v: number, range: readonly [number, number]): 'under' | 'in' | 'over' {
   return v < range[0] ? 'under' : v > range[1] ? 'over' : 'in';

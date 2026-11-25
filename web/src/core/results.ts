@@ -1,6 +1,6 @@
 import { copy } from './copy';
 import { exercise, levelsOf, measures, type Exercise, type Level } from './exercises';
-import type { Hold } from './vibrato';
+import { overall, type Hold } from './vibrato';
 
 /* What an exercise left behind, as the old app kept it (rp-cloud.js
    870-905, the results table): only numbers that were measured
@@ -15,8 +15,8 @@ export type Outcome =
   /** Long soft notes: how long each timed hold lasted, steps 1 and 4 */
   | { kind: 'holds'; step1: readonly number[]; step4: ReadonlyArray<{ m: number; s: number }> }
   /** Vibrato (24 Nov): each held note's wobble, measured, never scored;
-      kept on this phone, not online (speed has no place in the results
-      table, and its tables aren't changed without Robert) */
+      its speed and width kept on this phone, and since Robert's 25 Nov
+      answer with the result on the account too (wobble_rate, wobble_width) */
   | { kind: 'wobble'; holds: ReadonlyArray<Hold & { readonly m: number }> }
   | { kind: 'none' };
 
@@ -35,6 +35,28 @@ export interface ResultRow {
   /** the level it was sung at (Robert, 21 Nov), on an exercise with levels;
       online in the results table's own level column (Robert, 22 Nov) */
   readonly level?: Level;
+  /** Vibrato: over the held notes that wobbled, how fast (cycles a second,
+      to two places) and how wide (cents, top to bottom); online in the
+      results table's own columns (Robert, 25 Nov) */
+  readonly wobble_rate?: number;
+  readonly wobble_width?: number;
+}
+
+/** Vibrato's last time (Robert, 25 Nov): from the account when signed in,
+    from this phone when not. `account` is 'out' when no one is signed in,
+    'unreached' when signed in but the account can't be reached (no
+    signal: this phone's, and it says so), or the account's own Vibrato
+    results, newest first. A session saved only on this phone stays there. */
+export interface WobbleLast {
+  readonly rate: number;
+  readonly width: number;
+  readonly from: 'account' | 'phone';
+}
+export function wobbleLast(account: 'out' | 'unreached' | ReadonlyArray<{ wobble_rate?: number | string | null; wobble_width?: number | string | null }>,
+  phone: { rate: number; width: number } | null): WobbleLast | null {
+  if (account === 'out' || account === 'unreached') return phone ? { rate: phone.rate, width: phone.width, from: 'phone' } : null;
+  const r = account.find((x) => x.wobble_rate != null && x.wobble_width != null);
+  return r ? { rate: Number(r.wobble_rate), width: Number(r.wobble_width), from: 'account' } : null;
 }
 
 /** the level of a saved result; null for one saved before it had its own
@@ -65,6 +87,11 @@ export function resultRow(e: Exercise, o: Outcome, level: Level = e.level): Resu
   /* the hiss: its seconds, and no target nobody measured (Robert, 4 Nov) */
   if (o.kind === 'time' && e.engine.kind === 'timed') {
     return { ...base, score: Math.round(o.seconds), seconds: Math.round(o.seconds * 10) / 10 };
+  }
+  /* Vibrato: the speed and width over the held notes that wobbled (Robert, 25 Nov) */
+  if (o.kind === 'wobble') {
+    const w = overall(o.holds);
+    return w ? { ...base, wobble_rate: Math.round(w.rate * 100) / 100, wobble_width: Math.round(w.width) } : base;
   }
   /* Long soft notes: the longest hold on "ee" (step 1), the measure Stemple tracks */
   if (o.kind === 'holds' && o.step1.length) return { ...base, seconds: Math.round(Math.max(...o.step1) * 10) / 10 };

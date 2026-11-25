@@ -42,7 +42,7 @@ const ALL = ['train-tab', 'today', 'tab-bar', 'category', 'routines-page', 'prev
   'content', 'interval', 'interval-view', 'interval-level', 'match', 'hold-note', 'long-soft', 'bay-results',
   'page-layout', 'levels', 'climb', 'line-only', 'cue-line', 'tension-ticks', 'tension-early', 'reminders',
   'next-moves-on', 'no-silent-taps', 'menu-everywhere', 'menu-leave', 'rounds-sung', 'stop-early', 'match-wait', 'match-window', 'match-blind', 'hold-map', 'match-tone',
-  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'own-tag', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'vibrato', 'vibrato-again', 'no-page-errors'];
+  'hiss-best', 'vfe-goal', 'cycle-grow', 'range-was', 'routine-review', 'interval-cue', 'on-notes', 'note-timing', 'rest-note', 'trill-advanced', 'new-four', 'own-tag', 'progress-phone', 'progress-online', 'level-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'vibrato', 'vibrato-again', 'vibrato-online', 'no-page-errors'];
 /* the old app's groups, and how many exercises each has (CHECKLIST 5) */
 const GROUPS = { warmup: 14, breath: 6, tone: 13, agility: 12, range: 6, words: 7, pitch: 5 };
 const COLOURS = { warmup: 'warmup', breath: 'breath', tone: 'tone', agility: 'pitch', range: 'pitch', words: 'words', pitch: 'pitch' };
@@ -177,6 +177,17 @@ async function signIn() {
     await page.tap('#sign-in');
     await page.waitFor(`document.querySelector('#signed-in-as')?.textContent.includes(${JSON.stringify(EMAIL)})`, 15000);
   }
+}
+/** signed out on this browser; says whether it was signed in */
+async function signOut() {
+  await page.goto(URL_APP + '?load=' + ++loads + '#/profile/account');
+  await page.waitFor(`!!document.querySelector('#email') || !!document.querySelector('#sign-out')`, 8000);
+  const wasIn = await page.eval(`!!document.querySelector('#sign-out')`);
+  if (wasIn) {
+    await page.tap('#sign-out');
+    await page.waitFor(`!!document.querySelector('#email')`, 8000);
+  }
+  return wasIn;
 }
 const quietNow = () => page.eval(`(() => { const P = window.__probe; return P.live.size === 0 && P.micLive() === 0; })()`);
 const text = (sel) => page.eval(`document.querySelector(${JSON.stringify(sel)})?.textContent ?? null`);
@@ -2410,9 +2421,12 @@ try {
      to bottom), then a steady hold, then turns carried on through the hold.
      Each hold measured from the line's own readings, numbers beside the
      typical ranges, never a verdict; last time's kept on this phone */
-  const vibratoRun = async (holds) => {
-    await openEx('vibrato');
-    const piano = await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano)`);
+  let vibPiano = null;
+  /* again: from the result, by Try again, without leaving the page */
+  const vibratoRun = async (holds, again = false) => {
+    if (!again) await openEx('vibrato');
+    const piano = again ? vibPiano : await page.eval(`JSON.parse(document.querySelector('#ex-start').dataset.piano)`);
+    vibPiano = piano;
     /* each round: its lead, its turns, and its held note (the longest) */
     const rounds = [];
     for (const [m, t, d, lead] of piano) {
@@ -2436,7 +2450,7 @@ try {
       return NaN;
     };
     await singer(b64(followVoice(FFMPEG, SOURCE, STEADY, want, end.t + end.d + LAG + 0.5, tmp)));
-    await page.tap('#ex-start');
+    await page.tap(again ? '#ex-again' : '#ex-start');
     /* the run's clock: wait out the rounds sung, then Close (with RP_SHOTS, a
        picture of the map during the first round's hold, after the count-in) */
     await page.waitFor(`!!document.querySelector('#ex-close')`, 8000);
@@ -2460,6 +2474,7 @@ try {
       speed: document.querySelector('#ex-wobble-speed')?.textContent ?? null, width: document.querySelector('#ex-wobble-width')?.textContent ?? null,
       typical: [document.querySelector('#ex-typical-speed')?.textContent, document.querySelector('#ex-typical-width')?.textContent],
       rounds: [...document.querySelectorAll('#ex-wobble-rounds li')].map((x) => x.textContent), kept: !!document.querySelector('#ex-wobble-kept'),
+      keptText: document.querySelector('#ex-wobble-kept')?.textContent ?? null, keptFrom: document.querySelector('#ex-wobble-kept')?.dataset.from ?? null,
       text: document.querySelector('#ex-result')?.textContent ?? '' })`);
     return { shown, got, rounds, swing };
   };
@@ -2474,6 +2489,8 @@ try {
       P.stroke = function () { if (this.strokeStyle instanceof CanvasGradient && this.canvas && this.canvas.id === 'bubbles') window.__youPath = cur.slice(); return st.apply(this, arguments); };
     })()`);
   }
+  /* the phone's own last time is checked signed out (Robert, 25 Nov: from the account only when signed in) */
+  const vibWasIn = want('vibrato') || want('vibrato-again') ? await signOut() : false;
   if (want('vibrato')) {
     await go('/train/cat/tone');
     await page.waitFor(`!!document.querySelector('#ex-vibrato')`, 5000);
@@ -2519,10 +2536,68 @@ try {
     const { got } = await vibratoRun([{ kind: 'wobble', rate: 6, width: 60 }]);
     const w = got.holds[0];
     const keptNow = JSON.parse((await page.eval(`localStorage.getItem('rp.wobble.vibrato')`)) || 'null');
-    check('vibrato-again', got.kept && got.speed === fill(copy.train.lastTime, { line: fill(copy.train.wobbleSpeed, { r: '6.0' }), was: fill(copy.train.lastSpeed, { r: '5.2' }) }) &&
+    check('vibrato-again', got.kept && got.keptFrom === 'phone' && got.keptText === copy.train.wobbleKept && got.speed === fill(copy.train.lastTime, { line: fill(copy.train.wobbleSpeed, { r: '6.0' }), was: fill(copy.train.lastSpeed, { r: '5.2' }) }) &&
       /last time 70 cents\)$/.test(got.width || '') && !!w && w[1] === 'wobble' && Math.abs(w[2] - 6) < 0.3 && Math.abs(w[3] - 60) < 15 &&
       !!keptNow && Math.abs(keptNow.rate - w[2]) < 1e-9,
-      `last time 5.2 a second and 70 cents; now "${got.speed}", "${got.width}", ${JSON.stringify(got.holds)}; then kept ${JSON.stringify(keptNow)}`);
+      `signed out, last time on this phone 5.2 a second and 70 cents; now "${got.speed}", "${got.width}", "${got.keptText}", ${JSON.stringify(got.holds)}; then kept ${JSON.stringify(keptNow)}`);
+  }
+  if (vibWasIn) await signIn();
+
+  /* Robert, 25 Nov: Vibrato's speed and width saved to the account (the
+     results table's own two columns), so they follow the singer to a new
+     phone; last time from the account when signed in. Who may read and
+     write results is unchanged: the singer's linked coach (the second test
+     account) reads them, and not once unlinked; no one else, and the coach
+     can't write any (RP_ONLINE=1) */
+  if (want('vibrato-online') && ONLINE) {
+    await signIn();
+    const me = signedIn(EMAIL), coach = signedIn(COACH_EMAIL);
+    const t0 = new Date(Date.now() - 5000).toISOString();
+    /* last time on the account: a session of 4.8 a second and 95 cents, saved as the app saves one */
+    const planted = rest('POST', 'results', me.access_token, { student_id: me.user.id, kind: 'practice', label: copy.ex.vibrato.name, app_ex_id: 'vibrato', wobble_rate: 4.8, wobble_width: 95 });
+    /* this phone remembers a different last time, and none of the account's results: as a new phone, or one used signed out */
+    await go('/train');
+    await page.eval(`localStorage.setItem('rp.wobble.vibrato', JSON.stringify({ at: '2026-11-23T10:00:00Z', rate: 5.2, width: 70 })); localStorage.removeItem('rp.results')`);
+    const { got } = await vibratoRun([{ kind: 'wobble', rate: 6, width: 60 }]);
+    await page.waitFor(`!!document.querySelector('#ex-saved')`, 10000);
+    const saidWhere = await text('#ex-saved');
+    const w = got.holds[0];
+    const q = `results?select=label,app_ex_id,level,score,wobble_rate,wobble_width,created_at&student_id=eq.${me.user.id}&app_ex_id=eq.vibrato&created_at=gte.${encodeURIComponent(t0)}&order=created_at.desc`;
+    const own = rest('GET', q, me.access_token);
+    const row = Array.isArray(own.data) ? own.data[0] : null;
+    const coachRead = rest('GET', q, coach.access_token);
+    const nobody = rest('GET', q, null);
+    const coachAdd = rest('POST', 'results', coach.access_token, { student_id: me.user.id, kind: 'practice', label: copy.ex.vibrato.name, app_ex_id: 'vibrato', wobble_rate: 9, wobble_width: 9 });
+    const coachEdit = rest('PATCH', `results?student_id=eq.${me.user.id}&app_ex_id=eq.vibrato`, coach.access_token, { wobble_rate: 9 });
+    /* the link taken away, as the coach removes a singer, and put back (the old app's own ways) */
+    const link = () => rest('GET', `coach_students?select=id&coach_id=eq.${coach.user.id}&student_id=eq.${me.user.id}`, coach.access_token);
+    const wasLinked = Array.isArray(link().data) && link().data.length === 1;
+    let unlinkedRead = null, relinked = false;
+    try {
+      rest('DELETE', `coach_students?coach_id=eq.${coach.user.id}&student_id=eq.${me.user.id}`, coach.access_token);
+      unlinkedRead = rest('GET', q, coach.access_token);
+    } finally {
+      if (wasLinked) rest('POST', 'rpc/add_student_by_email', coach.access_token, { p_email: EMAIL });
+      relinked = Array.isArray(link().data) && link().data.length === 1;
+    }
+    const after = rest('GET', q, me.access_token);
+    /* a second session on the same visit, by Try again: last time is the session just sung */
+    const { got: got2 } = await vibratoRun([{ kind: 'wobble', rate: 5, width: 100 }], true);
+    const rows = (x) => (Array.isArray(x?.data) ? x.data : []);
+    const againOk = got2.keptFrom === 'account' && !!w && got2.speed?.endsWith(`(last time ${w[2].toFixed(1)} a second)`) && got2.width?.endsWith(`(last time ${Math.round(w[3])} cents)`);
+    const ok = planted.status < 300 && saidWhere === copy.train.saved &&
+      got.speed === fill(copy.train.lastTime, { line: fill(copy.train.wobbleSpeed, { r: (w?.[2] ?? 0).toFixed(1) }), was: fill(copy.train.lastSpeed, { r: '4.8' }) }) &&
+      /last time 95 cents\)$/.test(got.width || '') && got.keptFrom === 'account' && got.keptText === copy.train.wobbleFromAccount &&
+      !!w && w[1] === 'wobble' && Math.abs(w[2] - 6) < 0.3 && Math.abs(w[3] - 60) < 15 &&
+      rows(own).length === 2 && !!row && row.label === copy.ex.vibrato.name && row.level == null && row.score == null &&
+      Math.abs(Number(row.wobble_rate) - Math.round(w[2] * 100) / 100) < 1e-9 && row.wobble_width === Math.round(w[3]) &&
+      JSON.stringify(rows(coachRead)) === JSON.stringify(rows(own)) && rows(nobody).length === 0 &&
+      coachAdd.status >= 400 && rows(coachEdit).length === 0 && wasLinked && rows(unlinkedRead).length === 0 && relinked &&
+      JSON.stringify(rows(after)) === JSON.stringify(rows(own)) && againOk;
+    check('vibrato-online', ok, `signed in, this phone remembering 5.2 a second and 70 cents, the account 4.8 and 95: "${got.speed}", "${got.width}", "${got.keptText}"; ` +
+      `sung ${JSON.stringify(w)}, "${saidWhere}"; on the account since the check began: ${JSON.stringify(rows(own).map((r) => [r.label, r.wobble_rate, r.wobble_width, r.level, r.score]))}; ` +
+      `the linked coach reads ${rows(coachRead).length} the same ${JSON.stringify(rows(coachRead)) === JSON.stringify(rows(own))}, adds one for them ${coachAdd.status}, changes ${rows(coachEdit).length}; ` +
+      `no one signed in reads ${rows(nobody).length}; unlinked the coach reads ${rows(unlinkedRead).length}; linked again ${relinked}; the singer's rows unchanged ${JSON.stringify(rows(after)) === JSON.stringify(rows(own))}; Try again, a second session: "${got2.speed}", "${got2.width}", from ${got2.keptFrom}`);
   }
 
   if (want('new-four')) {
@@ -2567,7 +2642,7 @@ try {
 } catch (e) {
   const why = 'the test stopped: ' + String(e.message || e).split('\n')[0];
   const said = new Set(results.map((r) => r.name));
-  for (const name of ALL) if (want(name) && !said.has(name) && (!['progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online'].includes(name) || ONLINE)) check(name, false, why);
+  for (const name of ALL) if (want(name) && !said.has(name) && (!['progress-online', 'ex-take-offline', 'ex-take-online', 'tension-online', 'vibrato-online'].includes(name) || ONLINE)) check(name, false, why);
 } finally {
   /* the exercise takes this run put on the test account, and only those, deleted (RULEBOOK: delete test takes after live tests) */
   if (ONLINE) {

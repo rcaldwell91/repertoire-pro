@@ -63,7 +63,7 @@ export async function myResults(id: string): Promise<Array<ResultRow & { created
     const { data: s } = await supabase.auth.getSession();
     const me = s.session?.user?.id;
     if (me) {
-      const { data, error } = await supabase.from('results').select('kind,label,app_ex_id,score,out_of,pct,seconds,cents,settle_cents,level,created_at')
+      const { data, error } = await supabase.from('results').select('kind,label,app_ex_id,score,out_of,pct,seconds,cents,settle_cents,level,wobble_rate,wobble_width,created_at')
         .eq('student_id', me).eq('app_ex_id', id).order('created_at', { ascending: false }).limit(200);
       if (!error && data) {
         const clean = (r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).filter(([, v]) => v != null));
@@ -75,6 +75,23 @@ export async function myResults(id: string): Promise<Array<ResultRow & { created
     /* offline: this phone's */
   }
   return phone;
+}
+
+/** Your own results for one exercise on the account, newest first: 'out'
+    when no one is signed in, 'unreached' when the account can't be reached.
+    Only the account's, nothing from this phone (Vibrato's last time:
+    Robert, 25 Nov). */
+export async function accountResults(id: string): Promise<'out' | 'unreached' | Array<ResultRow & { created_at: string }>> {
+  try {
+    const { data: s } = await supabase.auth.getSession();
+    const me = s.session?.user?.id;
+    if (!me) return 'out';
+    const { data, error } = await supabase.from('results').select('kind,label,app_ex_id,score,out_of,pct,seconds,cents,settle_cents,level,wobble_rate,wobble_width,created_at')
+      .eq('student_id', me).eq('app_ex_id', id).order('created_at', { ascending: false }).limit(50);
+    return error || !data ? 'unreached' : (data as Array<ResultRow & { created_at: string }>);
+  } catch {
+    return 'unreached';
+  }
 }
 
 /** your best Steady hiss so far, in seconds; null if never timed */
