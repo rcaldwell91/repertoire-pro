@@ -698,5 +698,5 @@ main > .sub, .card > .sub { color: var(--muted); font-size: 0.9rem; font-weight:
 .compare p { margin: 0 0 10px; }
 .compare-sides { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
 .compare-sides > span { font-weight: 600; }
-.compare-sides .btn { min-width: 0; flex: 1 1 6rem; }
+.compare-sides .btn { min-width: 0; flex: 1 1 6rem; white-space: nowrap; }
 .compare-sides .btn[aria-pressed='true'] { background-color: var(--accent); color: var(--on-accent); }

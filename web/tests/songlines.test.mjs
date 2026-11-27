@@ -165,7 +165,14 @@ async function shot(name, sel = null) {
     const h = Math.max(document.documentElement.scrollHeight, innerHeight);
     if (!e) return { x: 0, y: 0, width: innerWidth, height: h };
     const b = e.getBoundingClientRect(); return { x: 0, y: 0, width: innerWidth, height: Math.min(h, b.bottom + scrollY + 12) }; })()`);
+  /* the bottom menu is fixed to the screen; in a picture of the whole page it would sit
+     in the middle, so for the picture it goes just under what is shown */
+  await page.eval(`(() => { const t = document.querySelector('.tabs'); if (!t) return;
+    t.dataset.shot = t.style.cssText; t.style.position = 'absolute'; t.style.bottom = 'auto';
+    t.style.top = ${box.height} + 'px'; })()`);
+  box.height += await page.eval(`document.querySelector('.tabs')?.offsetHeight || 0`);
   const r = await page.c.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { ...box, scale: 1 } });
+  await page.eval(`(() => { const t = document.querySelector('.tabs'); if (t) { t.style.cssText = t.dataset.shot || ''; delete t.dataset.shot; } })()`);
   writeFileSync(join(SHOTS, name + '.png'), Buffer.from(r.data, 'base64'));
 }
 const made = new Set();
