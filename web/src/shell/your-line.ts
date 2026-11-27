@@ -14,11 +14,16 @@ export class YourLine {
       vibrato's wobble, which the median flattens); NaN where none */
   readonly r: number[] = [];
   private readonly at = new Map<number, number>();
+  /** each time round a repeated stretch, as it was sung, before it went
+      (Practise a line, 27 Nov: each of its two passes scored on its own);
+      the last few only */
+  readonly rounds: Array<{ t: number[]; m: number[] }> = [];
 
   clear(): void {
     this.t.length = 0;
     this.m.length = 0;
     this.r.length = 0;
+    this.rounds.length = 0;
     this.at.clear();
   }
 
@@ -53,7 +58,11 @@ export class YourLine {
     if (songT == null) return;
     /* a repeated part came round again: the last time round goes */
     const last = this.t.length ? this.t[this.t.length - 1] : -Infinity;
-    if (songT < last - 0.5) this.cut(songT);
+    if (songT < last - 0.5) {
+      this.rounds.push({ t: this.t.slice(), m: this.m.slice() });
+      if (this.rounds.length > ROUNDS_KEPT) this.rounds.shift();
+      this.cut(songT);
+    }
     this.at.set(p.i, this.t.length);
     this.at.delete(p.i - 4);
     this.t.push(songT);
@@ -61,6 +70,9 @@ export class YourLine {
     this.r.push(p.r);
   }
 }
+
+/** how many times round a repeated stretch are kept */
+export const ROUNDS_KEPT = 4;
 
 /* one line per song, kept while the app is open, so a take's line is
    still there after leaving its screen and coming back */

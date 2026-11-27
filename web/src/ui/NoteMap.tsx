@@ -18,6 +18,10 @@ export interface Lines {
   /** your line, in song time */
   youT: number[];
   youM: number[];
+  /** your Before take's line, in song time, next to this one (Robert's song
+      feature, approved 16 Nov): drawn dashed, under yours */
+  beforeT?: ArrayLike<number>;
+  beforeM?: ArrayLike<number>;
   /** seconds of the singer's line read so far: the line is filled in place
       while it is read, so the view's path is worked out again as it grows */
   readTo?: number;
@@ -129,6 +133,34 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       g.clip();
       const singerDrawn = drawLine(g, sp, x, y, 10, css.getPropertyValue('--singer'));
 
+      /* your Before, dashed and fainter, under your line: the same
+         colours, as it is your voice too */
+      const fold = (t: number, m: number) => {
+        if (!anyOctave || !Number.isFinite(m)) return m;
+        const s = singerAt(lines.singer, lines.hop, t);
+        return Number.isFinite(s) ? foldTo(m, s) : m;
+      };
+      const bp: Pt[] = [];
+      if (lines.beforeT && lines.beforeM) {
+        for (let i = 0; i < lines.beforeT.length; i++) {
+          const t = lines.beforeT[i];
+          if (t < t0 - 1 || t > t1) continue;
+          bp.push({ t, m: fold(t, lines.beforeM[i]) });
+        }
+      }
+      let beforeDrawn = 0;
+      if (bp.length) {
+        const bg = g.createLinearGradient(0, pad, 0, H - pad);
+        bg.addColorStop(0, css.getPropertyValue('--you-c'));
+        bg.addColorStop(0.5, css.getPropertyValue('--you-b'));
+        bg.addColorStop(1, css.getPropertyValue('--you-a'));
+        g.save();
+        g.globalAlpha = 0.6;
+        g.setLineDash([6, 6]);
+        beforeDrawn = drawLine(g, bp, x, y, 3, bg);
+        g.restore();
+      }
+
       /* your line, on top */
       const yp: Pt[] = [];
       for (let i = 0; i < lines.youT.length; i++) {
@@ -165,7 +197,8 @@ export function NoteMap(props: { lines: Lines; range: Range | null; now: () => n
       cv.dataset.singer = String(singerDrawn);
       cv.dataset.you = String(youDrawn);
       cv.dataset.hit = String(hitDrawn);
-      (cv as HTMLCanvasElement & { drawn?: unknown }).drawn = { lines, you: yp, hits, anyOctave };
+      cv.dataset.before = String(beforeDrawn);
+      (cv as HTMLCanvasElement & { drawn?: unknown }).drawn = { lines, you: yp, hits, before: bp, anyOctave };
       if (propsRef.current.live) raf = requestAnimationFrame(draw);
     };
     draw();

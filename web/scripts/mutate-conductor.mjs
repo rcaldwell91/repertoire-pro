@@ -19,6 +19,8 @@ const X = 'src/core/exercises.ts';
 const REST = 'src/core/rest.ts';
 const TEN = 'src/core/tension.ts';
 const CP = 'src/core/copy.ts';
+/* Robert's song features (27 Nov) */
+const PR = 'src/core/practise.ts';
 
 export const MUTATIONS = [
   { rule: 'an exercise of the old app is dropped', file: X,
@@ -631,6 +633,57 @@ export const MUTATIONS = [
     from: 'rate: Number(r.wobble_rate)', to: 'rate: r.wobble_rate as number' },
   { rule: 'the wobble columns can\'t be left empty', file: 'scripts/db/2026-11-25-results-wobble.sql',
     from: 'wobble_rate numeric(4,2)\n', to: 'wobble_rate numeric(4,2) not null\n' },
+  /* 27 Nov: Robert's song features (approved 16 Nov) */
+  { rule: 'a song\'s lines split at every breath', file: PR,
+    from: 'export const GAP = 0.45;', to: 'export const GAP = 0.1;' },
+  { rule: 'a line too short to practise left on its own', file: PR,
+    from: "    const i = out.findIndex((x) => (x.b - x.a) * hop < MIN_LINE);", to: "    const i = out.findIndex((x) => (x.b - x.a) * hop < 0);" },
+  { rule: 'a short line joined to the farther neighbour', file: PR,
+    from: '    const j = before <= after ? i - 1 : i + 1;', to: '    const j = before <= after ? i + 1 : i - 1;' },
+  { rule: 'a line too long never cut', file: PR,
+    from: '    if ((x.b - x.a) * hop <= MAX_LINE) return [x];', to: '    return [x];' },
+  { rule: 'a long line cut at its first breath, not its longest', file: PR,
+    from: '      if (g > len && (last - x.a) * hop >= MIN_LINE', to: '      if (g > 1 && best < 0 && (last - x.a) * hop >= MIN_LINE' },
+  { rule: 'a line played into the line before it', file: PR,
+    from: '    const prev = i > 0 ? sung[i - 1].end + CLEAR : 0;', to: '    const prev = 0;' },
+  { rule: 'a line played into the line after it', file: PR,
+    from: '    const next = i < sung.length - 1 ? sung[i + 1].start - CLEAR : total;', to: '    const next = total;' },
+  { rule: 'a line played from its first note, with no moment before', file: PR,
+    from: 'x.start - LEAD', to: 'x.start' },
+  { rule: 'the line at a point is the one before it', file: PR,
+    from: '  const i = lines.findIndex((l) => t < l.end);', to: '  const i = lines.findIndex((l) => t < l.end) - 1;' },
+  { rule: 'a longer stretch drops the line it started from', file: PR,
+    from: '  return { from: c.from, to: Math.min(lines.length - 1, c.to + 1) };', to: '  return { from: Math.min(lines.length - 1, c.to + 1), to: Math.min(lines.length - 1, c.to + 1) };' },
+  { rule: 'a kept line beyond the song still used', file: PR,
+    from: ' || c.to >= lines.length) return { from: 0, to: 0 };', to: ') return { from: 0, to: 0 };' },
+  { rule: 'the second pass scored as the first', file: PR,
+    from: '  if (rounds.length > roundsAtMark) return [rounds[rounds.length - 1], slice(now, 0, now.t.length)];', to: '  if (rounds.length > roundsAtMark) return [rounds[rounds.length - 1], rounds[rounds.length - 1]];' },
+  { rule: 'a pass with nothing sung given the other\'s notes', file: PR,
+    from: '  return [slice(now, 0, mark), slice(now, mark, now.t.length)];', to: '  return [slice(now, 0, now.t.length), slice(now, 0, now.t.length)];' },
+  { rule: 'a pass scored on notes outside the line', file: PR,
+    from: '    for (let i = 0; i < p.t.length; i++) if (p.t[i] >= s.start && p.t[i] <= s.end) keep.push(i);', to: '    for (let i = 0; i < p.t.length; i++) keep.push(i);' },
+  { rule: 'each step sung once', file: PR,
+    from: 'export const PASSES = 2;', to: 'export const PASSES = 1;' },
+  { rule: 'an exercise sound not Train\'s', file: PR,
+    from: "export const SOUNDS = ['liptrill', 'mum', 'straw'] as const;", to: "export const SOUNDS = ['liptrill', 'mum', 'hum'] as const;" },
+  { rule: 'the Before is the newest take', file: PR,
+    from: '  return takes.reduce((a, b) => (b.created < a.created ? b : a));', to: '  return takes[0];' },
+  { rule: 'the chosen Before ignored', file: PR,
+    from: '  if (picked) return picked;\n', to: '' },
+  { rule: 'your line forgets each time round', file: 'src/shell/your-line.ts',
+    from: '      this.rounds.push({ t: this.t.slice(), m: this.m.slice() });\n', to: '' },
+  { rule: 'your line keeps every time round', file: 'src/shell/your-line.ts',
+    from: '      if (this.rounds.length > ROUNDS_KEPT) this.rounds.shift();\n', to: '' },
+  { rule: 'your line keeps rounds from the last run', file: 'src/shell/your-line.ts',
+    from: '    this.rounds.length = 0;\n', to: '' },
+  { rule: 'the Before readable by a coach', file: 'scripts/db/2026-11-27-song-befores.sql',
+    from: 'for select to authenticated using (student_id = auth.uid());', to: 'for select to authenticated using (student_id = auth.uid() or teaches(student_id));' },
+  { rule: 'the Before readable signed out', file: 'scripts/db/2026-11-27-song-befores.sql',
+    from: 'revoke all on public.song_befores from anon;\n', to: '' },
+  { rule: 'Practise a line has no address', file: 'src/shell/router.ts',
+    from: ' || LINE_ROUTE.test(r) || SPEAK_ROUTE.test(r);', to: ' || SPEAK_ROUTE.test(r);' },
+  { rule: 'Speak it, then sing it says which is better', file: CP,
+    from: "    listen: 'Not scored. Just listen for the difference.',", to: "    listen: 'Not scored. The sung one is better.'," },
 ];
 
 function run() {

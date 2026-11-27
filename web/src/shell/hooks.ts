@@ -6,6 +6,7 @@ import type { SplitPhase } from '../core/song';
 import { onTheme, themeChoice, type ThemeChoice } from './theme';
 import { onSingerLine, singerLine, type SingerLine } from './singer-line';
 import { onTakes, takesFor, type StoredTake } from '../data/takes';
+import { chosenBefore, onBefore } from '../data/before';
 
 /* What screens watch: the signed-in person, the songs on the phone, and
    splits under way. */
@@ -79,4 +80,23 @@ export function useTakes(songId: string | null, title?: string): StoredTake[] | 
     };
   }, [songId, title]);
   return takes;
+}
+
+/** The take chosen as a song's Before (data/before); null if none was, so
+    the first take saved is; undefined while loading. */
+export function useChosenBefore(title: string | undefined): string | null | undefined {
+  const [id, setId] = useState<string | null | undefined>(undefined);
+  const who = useUser();
+  useEffect(() => {
+    if (!title) return;
+    let live = true;
+    const load = () => void chosenBefore(title).then((v) => live && setId(v), () => live && setId(null));
+    load();
+    const off = onBefore(load);
+    return () => {
+      live = false;
+      off();
+    };
+  }, [title, who?.email]);
+  return id;
 }

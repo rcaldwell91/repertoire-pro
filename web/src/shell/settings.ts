@@ -97,3 +97,27 @@ export function reminderTurn(): number {
 export function nextReminderTurn(): void {
   localStore().set('rp.tension.turn', String(reminderTurn() + 1));
 }
+
+/** Practise a line (27 Nov): the line being worked on in each song, kept
+    on this phone so Practise a line and Speak it, then sing it share it,
+    and it is still picked next time */
+export function lineFor(songId: string): { from: number; to: number } | null {
+  try {
+    const v = JSON.parse(localStore().get('rp.line.' + songId) ?? 'null') as { from?: unknown; to?: unknown } | null;
+    return v && typeof v.from === 'number' && typeof v.to === 'number' ? { from: v.from, to: v.to } : null;
+  } catch {
+    return null;
+  }
+}
+export function setLineFor(songId: string, c: { from: number; to: number }): void {
+  localStore().set('rp.line.' + songId, JSON.stringify({ from: c.from, to: c.to }));
+}
+
+/** the exercise sound picked for Practise a line's second step; Lip trills until one is */
+export function lineSound<T extends string>(sounds: readonly T[]): T {
+  const v = localStore().get('rp.line.sound');
+  return (sounds as readonly string[]).includes(v ?? '') ? (v as T) : sounds[0];
+}
+export function setLineSound(v: string): void {
+  localStore().set('rp.line.sound', v);
+}

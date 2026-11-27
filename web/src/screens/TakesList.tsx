@@ -5,12 +5,17 @@ import { MoreHorizontal, Play } from 'lucide-react';
 import { copy, fill } from '../core/copy';
 import { clock } from '../core/time';
 import { deleteTake, lastSent, takeUrl, undoDelete, UNDO_MS, type StoredTake } from '../data/takes';
-import { useTakes, useUser } from '../shell/hooks';
+import { chooseBefore } from '../data/before';
+import { beforeOf } from '../core/practise';
+import { useChosenBefore, useTakes, useUser } from '../shell/hooks';
 import { navigate, sendRoute } from '../shell/router';
 
 /* "Your takes" for one song, under the sound card: newest first, with the
    date, the length and the right-note % the app measured; where each one
-   has got to online; tap to hear one; a small menu to delete, with undo. */
+   has got to online; tap to hear one; a small menu to delete, with undo.
+   A song's Before (Robert's song feature, approved 16 Nov) is marked: the
+   first take saved, or the one the singer chose; any other can be heard
+   next to it, or made the Before instead. */
 
 function when(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -28,8 +33,14 @@ function where(t: StoredTake, signedIn: boolean): string {
 export function TakesList(props: { songId: string | null; title?: string; playing: string | null; showSong?: boolean;
   /** the menu to send or delete; an exercise's takes are only heard for now (Robert, 28 Oct) */
   menu?: boolean;
-  onPlay: (ev: SyntheticEvent, t: StoredTake, url: string) => void }) {
+  onPlay: (ev: SyntheticEvent, t: StoredTake, url: string) => void;
+  /** a song's takes: this one next to the Before, both lines on the map */
+  onCompare?: (t: StoredTake, url: string, before: StoredTake, beforeUrl: string) => void }) {
   const takes = useTakes(props.songId, props.title);
+  /* the Before: only for a song's own takes */
+  const befores = !!props.onCompare && !!props.title && !props.showSong;
+  const chosen = useChosenBefore(befores ? props.title : undefined);
+  const before = befores && takes && chosen !== undefined ? beforeOf(takes, chosen) : null;
   /* where each take can be heard from, ready before it is tapped (a take
      kept online only needs a signed link first) */
   const [urls, setUrls] = useState<ReadonlyMap<string, string>>(new Map());
@@ -79,7 +90,7 @@ export function TakesList(props: { songId: string | null; title?: string; playin
       </div>
       <ul>
         {takes.map((t) => (
-          <li key={t.id} className="take-row" data-take={t.id} data-playing={props.playing === t.id}>
+          <li key={t.id} className="take-row" data-take={t.id} data-playing={props.playing === t.id} data-before={before?.id === t.id}>
             <button type="button" className="take-hear" aria-label={copy.takes.hear} disabled={!urls.has(t.id)}
               onClick={(e) => { const u = urls.get(t.id); if (u) props.onPlay(e, t, u); }}>
               <Play size={20} aria-hidden="true" />
@@ -92,10 +103,22 @@ export function TakesList(props: { songId: string | null; title?: string; playin
                     ? fill(copy.takes.rowUnscored, { date: when(t.created), length: clock(t.seconds) })
                     : fill(copy.takes.row, { date: when(t.created), length: clock(t.seconds), pct: t.rightPct })}
                 <span className="sub take-where">{where(t, !!me)}</span>
+                {before?.id === t.id && <span className="take-before" id="take-before">{copy.takes.before}</span>}
               </span>
             </button>
             {props.menu === false ? null : menu === t.id ? (
               <span className="take-menu">
+                {before && before.id !== t.id && props.onCompare && (
+                  <button type="button" className="btn btn-quiet take-compare" disabled={!urls.has(t.id) || !urls.has(before.id)}
+                    onClick={() => { const u = urls.get(t.id), b = urls.get(before.id); setMenu(null); if (u && b) props.onCompare?.(t, u, before, b); }}>
+                    {copy.takes.compare}
+                  </button>
+                )}
+                {before && before.id !== t.id && props.title && (
+                  <button type="button" className="btn btn-quiet take-make-before" onClick={() => { setMenu(null); void chooseBefore(props.title as string, t.id); }}>
+                    {copy.takes.makeBefore}
+                  </button>
+                )}
                 <button type="button" className="btn btn-quiet take-send" onClick={() => { setMenu(null); navigate(sendRoute(t.songId, t.id), 'screen'); }}>
                   {copy.takes.send}
                 </button>

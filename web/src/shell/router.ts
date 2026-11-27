@@ -26,12 +26,15 @@ export const EX_TAKES_ROUTE = /^\/train\/ex\/([a-z0-9]+)\/takes$/;
 export const CAT_ROUTE = /^\/train\/cat\/([a-z]+)$/;
 /** a step of a routine, on the same screen */
 export const ROUTINE_ROUTE = /^\/train\/routine\/([a-z]+)\/(\d+)$/;
+/** Practise a line, and Speak it, then sing it, on a song (Robert's song features, 27 Nov) */
+export const LINE_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)\/line$/;
+export const SPEAK_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)\/speak$/;
 /** sending a song's take to a coach */
 export const SEND_ROUTE = /^\/sing\/learn\/song\/([A-Za-z0-9-]+)\/send(?:\/([A-Za-z0-9-]+))?$/;
 
 export function isRoute(r: string): boolean {
   return (ROUTES as readonly string[]).includes(r) || SONG_ROUTE.test(r) || SEND_ROUTE.test(r) || EX_ROUTE.test(r) || EX_TAKES_ROUTE.test(r) || ROUTINE_ROUTE.test(r) ||
-    CAT_ROUTE.test(r);
+    CAT_ROUTE.test(r) || LINE_ROUTE.test(r) || SPEAK_ROUTE.test(r);
 }
 
 export function exRoute(id: string): Route {
@@ -57,6 +60,14 @@ export function isExercise(route: Route): boolean {
 
 export function songRoute(id: string): Route {
   return '/sing/learn/song/' + id;
+}
+
+export function lineRoute(id: string): Route {
+  return songRoute(id) + '/line';
+}
+
+export function speakRoute(id: string): Route {
+  return songRoute(id) + '/speak';
 }
 
 /** send the take just made, or a kept one */

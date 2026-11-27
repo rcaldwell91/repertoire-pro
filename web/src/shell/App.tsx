@@ -8,6 +8,8 @@ import { ProfilePage } from '../screens/ProfilePage';
 import { SingPage } from '../screens/SingPage';
 import { SongList } from '../screens/SongList';
 import { SongScreen } from '../screens/SongScreen';
+import { PractiseLine } from '../screens/PractiseLine';
+import { SpeakSing } from '../screens/SpeakSing';
 import { SendTake } from '../screens/SendTake';
 import { SoundCheck } from '../screens/SoundCheck';
 import { TabPage } from '../screens/TabPage';
@@ -18,7 +20,7 @@ import { ExerciseScreen } from '../screens/ExerciseScreen';
 import { ExerciseTakes } from '../screens/ExerciseTakes';
 import { TabBar } from '../ui/TabBar';
 import { ConductorContext } from './conductor-context';
-import { CAT_ROUTE, current, EX_ROUTE, EX_TAKES_ROUTE, navigate, onRoute, ROUTINE_ROUTE, SEND_ROUTE, SONG_ROUTE, tabOf, type Route } from './router';
+import { CAT_ROUTE, current, EX_ROUTE, EX_TAKES_ROUTE, LINE_ROUTE, navigate, onRoute, ROUTINE_ROUTE, SEND_ROUTE, SONG_ROUTE, SPEAK_ROUTE, tabOf, type Route } from './router';
 
 /* The one screen registry (RULEBOOK 4, Screens). */
 const SCREENS: Record<string, () => ReactNode> = {
@@ -40,6 +42,10 @@ const SCREENS: Record<string, () => ReactNode> = {
 function screenFor(route: Route): ReactNode {
   const song = SONG_ROUTE.exec(route);
   if (song) return <SongScreen id={song[1]} />;
+  const line = LINE_ROUTE.exec(route);
+  if (line) return <PractiseLine id={line[1]} />;
+  const speak = SPEAK_ROUTE.exec(route);
+  if (speak) return <SpeakSing id={speak[1]} />;
   const send = SEND_ROUTE.exec(route);
   if (send) return <SendTake id={send[1]} takeId={send[2]} />;
   const ex = EX_ROUTE.exec(route);

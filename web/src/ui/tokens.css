@@ -669,3 +669,34 @@ h1 + .ex-plain { margin: -6px 0 6px; }
 .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--track); }
 .dot[data-done='true'] { background: var(--hit); }
 .dot[data-now='true'] { background: var(--now); transform: scale(1.4); }
+
+/* Practise a line; Speak it, then sing it; the Before (Robert's song features, 27 Nov) */
+main > .sub, .card > .sub { color: var(--muted); font-size: 0.9rem; font-weight: 600; margin: 0 0 8px; }
+.line-picker { margin: 8px 0; }
+.line-which { margin: 0 0 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.line-moves { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.line-moves .btn { flex: 1 1 9rem; min-width: 0; }
+.line-step h2 { font-size: 1.15rem; margin: 0 0 6px; }
+.line-step p { margin: 0 0 8px; }
+.line-sounds { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.line-sounds .choice { flex: 1 1 6rem; text-align: center; padding: 0 10px; }
+.line-sounds .choice:disabled { opacity: 0.45; cursor: default; }
+.line-scores { list-style: none; margin: 0 0 8px; padding: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.line-scores li { margin: 2px 0; }
+.line-doors { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 0; }
+.line-doors .btn { flex: 1 1 9rem; min-width: 0; }
+.speak-step { margin: 10px 0; }
+.speak-step p { margin: 0 0 6px; }
+.speak-step .btn-start { margin: 8px 0; }
+.take-before {
+  display: inline-block; margin-top: 4px; padding: 1px 10px; border-radius: 999px;
+  border: 1px solid var(--songs); color: var(--songs); font-size: 0.8rem; font-weight: 700;
+}
+.take-menu { flex-wrap: wrap; }
+.take-menu .btn { min-width: 0; }
+.compare h2 { font-size: 1.15rem; margin: 0 0 6px; }
+.compare p { margin: 0 0 10px; }
+.compare-sides { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
+.compare-sides > span { font-weight: 600; }
+.compare-sides .btn { min-width: 0; flex: 1 1 6rem; }
+.compare-sides .btn[aria-pressed='true'] { background-color: var(--accent); color: var(--on-accent); }

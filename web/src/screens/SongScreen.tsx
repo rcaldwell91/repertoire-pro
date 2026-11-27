@@ -20,7 +20,7 @@ import { draftFor, dropDraft, keepDraft, takeOf } from '../data/take-draft';
 import { TakesList } from './TakesList';
 import { localStore, micBlockedBrowser } from '../shell/env';
 import { hearOn, hearVolume, setHearOn, setHearVolume } from '../shell/settings';
-import { back, navigate, sendRoute } from '../shell/router';
+import { back, lineRoute, navigate, sendRoute, speakRoute } from '../shell/router';
 import { BackButton } from '../ui/BackButton';
 import { Slider } from '../ui/Slider';
 import { LevelBar } from '../ui/LevelBar';
@@ -115,6 +115,14 @@ export function SongScreen(props: { id: string }) {
   const [heard, setHeard] = useState<{ key: string; url: string; songAt: number; t: ArrayLike<number>; m: ArrayLike<number> } | null>(null);
   const [, setDecided] = useState(0);
   const shown = total;
+  /* a take next to the Before (Robert's song feature, approved 16 Nov): both
+     lines on the map; played together over the music where both were sung,
+     either one heard, switched on the spot */
+  const [compare, setCompare] = useState<{ take: StoredTake; url: string; before: StoredTake; beforeUrl: string } | null>(null);
+  const [hearSide, setHearSideNow] = useState<'take' | 'before'>('take');
+  const overlap = compare ? { start: Math.max(compare.take.songAt, compare.before.songAt),
+    end: Math.min(compare.take.songAt + compare.take.seconds, compare.before.songAt + compare.before.seconds) } : null;
+  const together = !!overlap && overlap.end - overlap.start >= 1;
 
   /* a take just made, waiting for the singer to say what to do with it */
   const rv = review(c.take(owner), singer?.m ?? null, singer?.hop ?? 0.05, anyOctave);
@@ -214,6 +222,7 @@ export function SongScreen(props: { id: string }) {
     /* singing again is trying again: the take not kept goes (with Undo) */
     if (rv) discard();
     setHeard(null);
+    setCompare(null);
     c.start(c.tap(ev.nativeEvent), p);
   }
 
@@ -231,7 +240,40 @@ export function SongScreen(props: { id: string }) {
       gains: [gainOf(voice), gainOf(music), gainOf(takeVol)], starts: [0, 0, t.songAt], level: songLevel, onLevel, songParts: 2 }] });
   }
   function playKept(ev: SyntheticEvent, t: StoredTake, url: string) {
+    setCompare(null);
     playTake(ev, { key: t.id, url, songAt: t.songAt, t: t.line.t, m: t.line.m });
+  }
+
+  function startCompare(t: StoredTake, url: string, before: StoredTake, beforeUrl: string) {
+    if (playing) c.stop();
+    setHeard(null);
+    setHearSideNow('take');
+    setCompare({ take: t, url, before, beforeUrl });
+    setPos(Math.max(t.songAt, before.songAt));
+    window.scrollTo(0, 0);
+  }
+  const sideGain = (side: 'take' | 'before', on: 'take' | 'before') => (side === on ? gainOf(takeVol) : 0);
+  function playCompare(ev: SyntheticEvent) {
+    if (!parts || !compare || !overlap || !together) return;
+    if (playing) {
+      c.stop();
+      if (heard?.key === 'compare') {
+        setHeard(null);
+        return;
+      }
+    }
+    setHeard({ key: 'compare', url: compare.url, songAt: compare.take.songAt, t: compare.take.line.t, m: compare.take.line.m });
+    setPos(overlap.start);
+    c.start(c.tap(ev.nativeEvent), { owner, steps: [{ kind: 'song', urls: [...parts.urls, compare.beforeUrl, compare.url], from: overlap.start,
+      gains: [gainOf(voice), gainOf(music), sideGain('before', hearSide), sideGain('take', hearSide)],
+      starts: [0, 0, compare.before.songAt, compare.take.songAt], level: songLevel, onLevel, songParts: 2 }] });
+  }
+  function setHearSide(on: 'take' | 'before') {
+    setHearSideNow(on);
+    if (playing && heard?.key === 'compare') {
+      c.setGain(2, sideGain('before', on));
+      c.setGain(3, sideGain('take', on));
+    }
   }
 
   function toggle(ev: SyntheticEvent) {
@@ -310,7 +352,9 @@ export function SongScreen(props: { id: string }) {
   const lines = useMemo(() => ({ singer: singer?.m ?? new Float32Array(0), hop: singer?.hop ?? 0.05,
     /* how far it's read; Infinity once finished, so the map plans its view once more on the whole line */
     readTo: singer ? (singer.reading ? singer.readTo : Infinity) : 0,
-    youT: shownLine ? Array.from(shownLine.t) : you.t, youM: shownLine ? Array.from(shownLine.m) : you.m }), [singer, you, shownLine]);
+    youT: shownLine ? Array.from(shownLine.t) : compare ? Array.from(compare.take.line.t) : you.t,
+    youM: shownLine ? Array.from(shownLine.m) : compare ? Array.from(compare.take.line.m) : you.m,
+    ...(compare ? { beforeT: compare.before.line.t, beforeM: compare.before.line.m } : {}) }), [singer, you, shownLine, compare]);
   const hearingTake = playing && !!heard;
   const now = () => (playing ? c.position() ?? pos : seeking ?? pos);
 
@@ -409,6 +453,36 @@ export function SongScreen(props: { id: string }) {
         </section>
       )}
 
+      {compare && (
+        <section className="card compare" id="compare" aria-label={copy.takes.compareTitle}>
+          <h2>{copy.takes.compareTitle}</h2>
+          <p className="hint" id="compare-key">{copy.takes.beforeKey}</p>
+          {together ? (
+            <>
+              <div className="compare-sides" role="group" aria-label={copy.takes.hearing}>
+                <span>{copy.takes.hearing}</span>
+                <button type="button" className="btn btn-quiet" id="compare-before" aria-pressed={hearSide === 'before'}
+                  onClick={() => setHearSide('before')}>{copy.takes.hearBefore}</button>
+                <button type="button" className="btn btn-quiet" id="compare-this" aria-pressed={hearSide === 'take'}
+                  onClick={() => setHearSide('take')}>{copy.takes.hearThis}</button>
+              </div>
+              <div className="take-actions">
+                <button type="button" className="btn" id="compare-play" disabled={!parts} onClick={playCompare}>
+                  {hearingTake && heard?.key === 'compare' ? copy.takes.stop : copy.takes.play}
+                </button>
+                <button type="button" className="btn btn-quiet" id="compare-done"
+                  onClick={() => { if (playing && heard?.key === 'compare') c.stop(); setHeard(null); setCompare(null); }}>{copy.takes.done}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p id="compare-apart">{copy.takes.apart}</p>
+              <button type="button" className="btn btn-quiet" id="compare-done" onClick={() => setCompare(null)}>{copy.takes.done}</button>
+            </>
+          )}
+        </section>
+      )}
+
       <div className="undo-line" role="status" id="take-removed-line">
         {removed && !rv && (
           <>
@@ -434,9 +508,9 @@ export function SongScreen(props: { id: string }) {
           onChange={(v) => { setVoice(v); if (playing) c.setGain(0, gainOf(v)); }} />
         <Slider id="music-volume" label={copy.song.music} value={music} max={SONG_TOP}
           onChange={(v) => { setMusic(v); if (playing) c.setGain(1, gainOf(v)); }} />
-        {(rv || heard) && (
+        {(rv || heard || compare) && (
           <Slider id="take-volume" label={copy.take.volume} value={takeVol}
-            onChange={(v) => { setTakeVol(v); if (hearingTake) c.setGain(2, gainOf(v)); }} />
+            onChange={(v) => { setTakeVol(v); if (hearingTake) c.setGain(heard?.key === 'compare' && hearSide === 'take' ? 3 : 2, gainOf(v)); }} />
         )}
         <label className="switch-row">
           <span>{copy.song.hearYourself}</span>
@@ -462,7 +536,15 @@ export function SongScreen(props: { id: string }) {
           onClick={() => navigate('/profile/sound-check', 'screen')}>{copy.song.soundCheck}</button>
       </section>
 
-      <TakesList songId={props.id} title={song.title} playing={hearingTake ? heard?.key ?? null : null} onPlay={playKept} />
+      {/* one line of the song at a time (Robert's song features, approved 16 Nov) */}
+      {voiceParts > 0 && (
+        <section className="card line-doors" aria-label={copy.line.title}>
+          <button type="button" className="btn btn-quiet" id="open-line" onClick={() => navigate(lineRoute(props.id), 'screen')}>{copy.line.open}</button>
+          <button type="button" className="btn btn-quiet" id="open-speak" onClick={() => navigate(speakRoute(props.id), 'screen')}>{copy.speak.open}</button>
+        </section>
+      )}
+
+      <TakesList songId={props.id} title={song.title} playing={hearingTake ? heard?.key ?? null : null} onPlay={playKept} onCompare={startCompare} />
     </>
   );
 }

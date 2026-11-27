@@ -155,7 +155,11 @@ export const PROBE = `(() => {
    Install BEFORE the PROBE, so the probe still sees every mic track. Off
    until window.__mirror.on = true. */
 export const MIRROR = `(() => {
-  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, stage: 0.0147, buffer: null, ctx: null, src: null, starts: [], at: null, pre: null, waiting: null };
+  /* follow: sing along again each time the song's voice starts again (a
+     line played twice, 27 Nov); shift: sing this many seconds further on
+     in the recording than what plays (a singer singing the wrong notes) */
+  const M = window.__mirror = { on: false, out: 0.15, inLat: 0.05, stage: 0.0147, buffer: null, ctx: null, src: null, starts: [], at: null, pre: null, waiting: null,
+    follow: false, shift: 0, dest: null, voiceBuf: null, sings: 0 };
   const AC = window.AudioContext;
   /* The app opens the mic before it makes its sound (RULEBOOK 4, Sound,
      Android 4). The mirror's mic has to come from the app's own sound, so
@@ -179,6 +183,8 @@ export const MIRROR = `(() => {
     const r = start.apply(this, a);
     /* the first part of the song (the voice) starts: the singer joins in */
     if (real && M.waiting && this.context === M.ctx) { const w = M.waiting; M.waiting = null; void w(M.starts[M.starts.length - 1]); }
+    /* the song's voice again (the line's second time round): sing it again */
+    else if (real && M.follow && M.dest && this.context === M.ctx && this.buffer === M.voiceBuf) M.sing(M.starts[M.starts.length - 1]);
     return r;
   };
   /* another recording to sing, from the next Start on */
@@ -222,14 +228,28 @@ export const MIRROR = `(() => {
     /* M.atOnce: sing the recording from the moment the mic opens (an
        exercise that only listens: no song part for the singer to join) */
     if (M.atOnce && M.buffer) { src.buffer = M.buffer; start.call(src, ctx.currentTime + 0.05, 0); M.at = { atOnce: ctx.currentTime + 0.05 }; }
-    M.waiting = M.atOnce ? null : async ({ when, offset, node }) => {
-      if (M.src !== src) return;
-      src.buffer = M.buffer || node.buffer;
+    M.dest = dest;
+    M.sings = 0;
+    const place = (s, { when, offset, node }) => {
+      s.buffer = M.buffer || node.buffer;
       const heard = when + M.stage + M.out + (ctx.baseLatency || 0);   /* the speaker plays it */
       const sing = heard + M.inLat - (M.loop || 0);          /* the mic has it */
       const at = Math.max(sing, ctx.currentTime + 0.02);
-      start.call(src, at, offset + (at - sing));
+      start.call(s, at, Math.max(0, offset + M.shift + (at - sing)));
+      M.sings++;
       M.at = { when, heard, sing, at, offset, loop: M.loop };
+    };
+    M.sing = (x) => {
+      const s2 = ctx.createBufferSource();
+      s2.connect(dest);
+      try { M.src.stop(); } catch {}
+      M.src = s2;
+      place(s2, x);
+    };
+    M.waiting = M.atOnce ? null : async (x) => {
+      if (M.src !== src) return;
+      M.voiceBuf = x.node.buffer;
+      place(src, x);
     };
     const track = dest.stream.getAudioTracks()[0];
     const gs = track.getSettings.bind(track);
