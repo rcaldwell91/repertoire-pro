@@ -809,7 +809,7 @@ const MUTATIONS = [
     from: '          m.at = you.t.length;\n', to: '', checks: ['line-scored'] },
   { test: 'songlines', online: true, what: 'both passes scored on the last one sung', file: 'src/screens/PractiseLine.tsx',
     from: 'const passes = splitPasses(you.rounds, { t: you.t, m: you.m }, m.at, m.rounds, m.reached);',
-    to: 'const passes = [{ t: you.t, m: you.m }, { t: you.t, m: you.m }];', checks: ['line-stop-early'] },
+    to: 'const passes = [{ t: you.t, m: you.m }, { t: you.t, m: you.m }];', checks: ['line-each-pass'] },
   { test: 'songlines', online: true, what: 'a run stopped early counts as done', file: 'src/screens/PractiseLine.tsx',
     from: "finished: sn.state === 'finished' });", to: 'finished: true });', checks: ['line-stop-early'] },
   { test: 'songlines', online: true, what: 'Next step offered before the step is sung', file: 'src/screens/PractiseLine.tsx',

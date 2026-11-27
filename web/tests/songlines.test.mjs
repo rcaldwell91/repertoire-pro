@@ -34,6 +34,8 @@ const APP = resolve(process.env.APP_DIR || join(REPO, 'app'));
 const ONLY = (process.env.ONLY || '').split(',').filter(Boolean);
 const want = (...names) => !ONLY.length || names.some((n) => ONLY.includes(n));
 const QUIET_MS = 300;
+/* SHOTS=dir: pictures of the pages for the report, the whole page at a phone's size */
+const SHOTS = process.env.SHOTS || '';
 const PREFIX = process.env.RP_SPLIT || '';
 const PARTS = ['voice', 'music', 'voice30', 'music30'];
 if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
@@ -41,7 +43,7 @@ if (!PARTS.every((p) => existsSync(`${PREFIX}-${p}.mp3`))) {
   process.exit(1);
 }
 
-const ALL = ['line-door', 'line-pick', 'line-twice', 'line-scored', 'line-off', 'line-steps', 'line-stop-early', 'line-leave', 'line-next',
+const ALL = ['line-door', 'line-pick', 'line-twice', 'line-scored', 'line-off', 'line-each-pass', 'line-steps', 'line-stop-early', 'line-leave', 'line-next',
   'speak-door', 'speak-pair', 'speak-back-to-back', 'speak-kept', 'speak-no-score', 'speak-no-mic',
   'before-first', 'before-compare', 'before-hear-either', 'before-apart', 'before-choose', 'before-private', 'before-new-phone', 'before-falls-back',
   'pages-360', 'pages-words', 'no-page-errors'];
@@ -133,11 +135,16 @@ async function saveTake(from, seconds) {
   return t;
 }
 /** Practise a line: sing the step (both passes), as the mirror */
-async function singStep({ shift = 0, stopAfter = null } = {}) {
+async function singStep({ shift = 0, stopAfter = null, secondShift = null } = {}) {
   await page.eval(`window.__mirror.on = true; window.__mirror.follow = true; window.__mirror.shift = ${shift}`);
   const n = await page.eval(S(SONG + '.length'));
   const b = await page.eval(S(BEEPS + '.length'));
   await page.tap('#line-sing');
+  /* the second time through sung differently from the first */
+  if (secondShift != null) {
+    await page.waitFor(S(`${SONG}.length >= ${n + 2}`), 15000);
+    await page.eval(`window.__mirror.shift = ${secondShift}`);
+  }
   if (stopAfter != null) {
     await page.waitFor(S(`${SONG}.length >= ${n + 2}`), 15000);
     await sleep(stopAfter * 1000);
@@ -150,6 +157,17 @@ async function singStep({ shift = 0, stopAfter = null } = {}) {
   return { done, starts, beeps, scores };
 }
 const lineLabel = () => text('#line-which');
+async function shot(name, sel = null) {
+  if (!SHOTS) return;
+  const { writeFileSync } = await import('node:fs');
+  await page.eval(`window.scrollTo(0, 0)`);
+  const box = await page.eval(`(() => { const e = ${sel ? `document.querySelector(${JSON.stringify(sel)})` : 'null'};
+    const h = Math.max(document.documentElement.scrollHeight, innerHeight);
+    if (!e) return { x: 0, y: 0, width: innerWidth, height: h };
+    const b = e.getBoundingClientRect(); return { x: 0, y: 0, width: innerWidth, height: Math.min(h, b.bottom + scrollY + 12) }; })()`);
+  const r = await page.c.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { ...box, scale: 1 } });
+  writeFileSync(join(SHOTS, name + '.png'), Buffer.from(r.data, 'base64'));
+}
 const made = new Set();
 
 /** sign in through the Account screen */
@@ -244,6 +262,7 @@ try {
         `each let go after ${lens[0]} s; count-in beeps ${r.beeps} (once, before the first pass)`);
     }
     if (want('line-scored')) {
+      await shot('practise-line', '#line-step');
       const ok = r.scores.length === 2 && r.scores.every((s) => s.pct != null && s.pct >= 70);
       check('line-scored', ok && map.singer > 0 && map.you > 0 && map.hit > 0 && r.scores[0].text === fill(copy.line.passScore, { n: 1, pct: r.scores[0].pct }),
         `sung right (the singer's own voice): ${r.scores.map((s) => s.text).join('; ')}; on the map: the song's line ${map.singer} points, yours ${map.you}, green ${map.hit}`);
@@ -254,6 +273,13 @@ try {
     const r = await singStep({ shift: 7 });
     const ok = r.scores.length === 2 && r.scores.every((s) => s.pct == null || s.pct <= 40);
     check('line-off', r.done && ok, `the same singer, seven seconds further on in the song than what plays: ${r.scores.map((s) => s.text).join('; ')}`);
+  }
+
+  if (want('line-each-pass')) {
+    const r = await singStep({ secondShift: 7 });
+    const [p1, p2] = r.scores.map((x) => x.pct);
+    check('line-each-pass', r.done && p1 != null && p1 >= 70 && (p2 == null || p2 <= 40),
+      `the first time through sung right, the second seven seconds out: ${r.scores.map((x) => x.text).join('; ')} - each scored on its own`);
   }
 
   if (want('line-steps')) {
@@ -347,6 +373,7 @@ try {
         loud: [p.spoken, p.sung].map((s) => s ? Math.max(...Array.from(s.samples.subarray(0, 200000)).map(Math.abs)) : 0) } : null;
     })()`);
     if (want('speak-pair')) {
+      await shot('speak-sing', '#speak-both');
       const ok = spoken && sung && pair && Math.abs(pair.spoken - len) < 1.5 && Math.abs(pair.sung - len) < 1.5 && pair.loud.every((v) => v > 1000);
       check('speak-pair', ok, `Speak it, then Sing it, each over the line once (${len} s): kept on the phone ${!!pair}, ` +
         `${pair?.spoken?.toFixed(2)} s and ${pair?.sung?.toFixed(2)} s, a voice in each (loudest ${pair?.loud.join(' and ')} of 32767)`);
@@ -420,6 +447,7 @@ try {
     const inA = drawn.bT.length > 0 && drawn.bT.every((t) => t >= A.songAt - 0.2 && t <= A.songAt + A.seconds + 0.2);
     const inB = drawn.yT.length > 0 && drawn.yT.every((t) => t >= B.songAt - 0.2 && t <= B.songAt + B.seconds + 0.2);
     if (want('before-compare')) {
+      await shot('before-compare', '#compare');
       check('before-compare', items.includes(copy.takes.compare) && items.includes(copy.takes.makeBefore) && card && drawn.before > 0 && drawn.you > 0 && inA && inB,
         `the later take's menu: ${items.join(', ')}; "${copy.takes.compare}": both lines on the map, the Before dashed (${drawn.before} points, all from the first take ${inA}) ` +
         `and this take (${drawn.you} points, all from it ${inB})`);
