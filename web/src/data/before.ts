@@ -12,6 +12,8 @@ import { supabase } from './auth';
    phone's. */
 
 const KEY = 'rp.before.';
+/* choices made on this phone and not yet on the account, by song */
+const sending = new Map<string, string>();
 const listeners = new Set<() => void>();
 export function onBefore(fn: () => void): () => void {
   listeners.add(fn);
@@ -61,6 +63,8 @@ async function send(id: string, title: string, takeId: string): Promise<boolean>
     else this phone's. Null: the first take saved is the Before. */
 export async function chosenBefore(title: string): Promise<string | null> {
   const here = local(title);
+  /* a choice still on its way to the account wins over what the account holds */
+  if (sending.has(title)) return sending.get(title) ?? here;
   const id = await me();
   if (!id) return here;
   try {
@@ -82,8 +86,14 @@ export async function chosenBefore(title: string): Promise<string | null> {
     if signed in. Says where it got to. */
 export async function chooseBefore(title: string, takeId: string): Promise<'online' | 'phone'> {
   keepLocal(title, takeId);
+  sending.set(title, takeId);
   changed();
-  const id = await me();
-  if (!id) return 'phone';
-  return (await send(id, title, takeId)) ? 'online' : 'phone';
+  try {
+    const id = await me();
+    if (!id) return 'phone';
+    return (await send(id, title, takeId)) ? 'online' : 'phone';
+  } finally {
+    if (sending.get(title) === takeId) sending.delete(title);
+    changed();
+  }
 }

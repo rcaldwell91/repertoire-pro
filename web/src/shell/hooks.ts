@@ -90,7 +90,11 @@ export function useChosenBefore(title: string | undefined): string | null | unde
   useEffect(() => {
     if (!title) return;
     let live = true;
-    const load = () => void chosenBefore(title).then((v) => live && setId(v), () => live && setId(null));
+    let asked = 0; /* only the latest answer counts, as answers can come back out of order */
+    const load = () => {
+      const n = ++asked;
+      void chosenBefore(title).then((v) => live && n === asked && setId(v), () => live && n === asked && setId(null));
+    };
     load();
     const off = onBefore(load);
     return () => {

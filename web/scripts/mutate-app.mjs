@@ -846,6 +846,8 @@ const MUTATIONS = [
     to: 'gains: [gainOf(voice), gainOf(music), gainOf(takeVol), gainOf(takeVol)],', checks: ['before-hear-either'] },
   { test: 'songlines', online: true, what: 'the chosen Before kept on the phone only', file: 'src/data/before.ts',
     from: "  return (await send(id, title, takeId)) ? 'online' : 'phone';", to: "  return 'phone';", checks: ['before-choose', 'before-new-phone'] },
+  { test: 'songlines', online: true, what: 'a new Before loses to the one already on the account', file: 'src/data/before.ts',
+    from: '  if (sending.has(title)) return sending.get(title) ?? here;', to: '', checks: ['before-choose'] },
   { test: 'songlines', online: true, what: 'signed in, the Before from this phone', file: 'src/data/before.ts',
     from: '  if (!id) return here;\n  try {', to: '  if (id || !id) return here;\n  try {', checks: ['before-new-phone'] },
 ];

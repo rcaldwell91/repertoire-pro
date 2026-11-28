@@ -494,15 +494,24 @@ try {
     check('before-apart', apart && noPlay, `a take from another part of the song: "${copy.takes.apart}" ${apart}, nothing to play together ${noPlay}`);
   }
   if (want('before-choose', 'before-private', 'before-new-phone', 'before-falls-back') && A && B) {
-    await page.tap(`.take-row[data-take="${B.id}"] .take-more`);
-    await page.tap(`.take-row[data-take="${B.id}"] .take-make-before`);
-    const moved = await page.waitFor(`document.querySelector('.take-row[data-take="${B.id}"]')?.dataset.before === 'true'`, 5000);
+    /* the singer changes their mind: the third take first, then the second, so the
+       second is chosen while the account already holds a choice */
+    const choose = async (t) => {
+      await page.tap(`.take-row[data-take="${t.id}"] .take-more`);
+      await page.tap(`.take-row[data-take="${t.id}"] .take-make-before`);
+      const ok = await page.waitFor(`document.querySelector('.take-row[data-take="${t.id}"]')?.dataset.before === 'true'`, 5000);
+      await sleep(1500);
+      return ok;
+    };
+    const firstPick = C ? await choose(C) : true;
+    const afterFirst = C ? befores(singerToken).json?.[0]?.take_id === C.id : true;
+    const moved = (await choose(B)) && (await page.eval(`document.querySelector('.take-row[data-take="${B.id}"]')?.dataset.before === 'true'`));
     const one = (await marked()).length === 1;
-    await sleep(1500);
     const online = befores(singerToken);
     if (want('before-choose')) {
-      check('before-choose', moved && one && online.status === 200 && online.json?.length === 1 && online.json[0].take_id === B.id,
-        `"${copy.takes.makeBefore}" on the second take: it is marked Before ${moved}, the only one ${one}; on the account: ${online.json?.length} choice, that take ${online.json?.[0]?.take_id === B.id}`);
+      check('before-choose', firstPick && afterFirst && moved && one && online.status === 200 && online.json?.length === 1 && online.json[0].take_id === B.id,
+        `"${copy.takes.makeBefore}" on the third take, then on the second: the third was kept on the account ${afterFirst}; ` +
+        `the second is marked Before ${moved} and stays so, the only one ${one}; on the account: ${online.json?.length} choice, the second take ${online.json?.[0]?.take_id === B.id}`);
     }
     if (want('before-private')) {
       const coach = befores(coachToken);
