@@ -496,22 +496,38 @@ try {
   if (want('before-choose', 'before-private', 'before-new-phone', 'before-falls-back') && A && B) {
     /* the singer changes their mind: the third take first, then the second, so the
        second is chosen while the account already holds a choice */
+    /* watched every 10 ms: the mark moves to the chosen take at once (under half a second, while the
+       save is still on its way) and never leaves it, even for a moment */
+    const marks = [];
     const choose = async (t) => {
       await page.tap(`.take-row[data-take="${t.id}"] .take-more`);
+      await page.eval(`(() => { const w = window.__mark = { at: null, lost: false, from: 0 };
+        const id = setInterval(() => { if (!w.from) return; const on = document.querySelector('.take-row[data-take="${t.id}"]')?.dataset.before === 'true';
+          if (on && w.at === null) w.at = performance.now() - w.from; else if (!on && w.at !== null) w.lost = true; }, 10);
+        setTimeout(() => clearInterval(id), 2500);
+        document.querySelector('.take-row[data-take="${t.id}"] .take-make-before').addEventListener('click', () => { w.from = performance.now(); }, { capture: true, once: true }); })()`);
       await page.tap(`.take-row[data-take="${t.id}"] .take-make-before`);
-      const ok = await page.waitFor(`document.querySelector('.take-row[data-take="${t.id}"]')?.dataset.before === 'true'`, 5000);
-      await sleep(1500);
-      return ok;
+      await sleep(2600);
+      const w = await page.eval(`window.__mark`);
+      marks.push(w.at === null ? 'never' : Math.round(w.at) + ' ms');
+      return w.at !== null && w.at < 500 && !w.lost;
     };
+    /* a slow signal: each save of a choice takes 0.8 s longer to reach the account (held in the browser) */
+    page.c.on('Fetch.requestPaused', (p) => {
+      const go = () => void page.c.send('Fetch.continueRequest', { requestId: p.requestId });
+      if (p.request.method !== 'GET') setTimeout(go, 800); else go();
+    });
+    await page.c.send('Fetch.enable', { patterns: [{ urlPattern: '*song_befores*' }] });
     const firstPick = C ? await choose(C) : true;
     const afterFirst = C ? befores(singerToken).json?.[0]?.take_id === C.id : true;
     const moved = (await choose(B)) && (await page.eval(`document.querySelector('.take-row[data-take="${B.id}"]')?.dataset.before === 'true'`));
+    await page.c.send('Fetch.disable');
     const one = (await marked()).length === 1;
     const online = befores(singerToken);
     if (want('before-choose')) {
       check('before-choose', firstPick && afterFirst && moved && one && online.status === 200 && online.json?.length === 1 && online.json[0].take_id === B.id,
-        `"${copy.takes.makeBefore}" on the third take, then on the second: the third was kept on the account ${afterFirst}; ` +
-        `the second is marked Before ${moved} and stays so, the only one ${one}; on the account: ${online.json?.length} choice, the second take ${online.json?.[0]?.take_id === B.id}`);
+        `"${copy.takes.makeBefore}" on the third take, then on the second, with each save slowed by 0.8 s: the third was kept on the account ${afterFirst}; ` +
+        `the mark moved in ${marks.join(' and ')}; the second is marked Before and keeps it ${moved}, the only one ${one}; on the account: ${online.json?.length} choice, the second take ${online.json?.[0]?.take_id === B.id}`);
     }
     if (want('before-private')) {
       const coach = befores(coachToken);
